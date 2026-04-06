@@ -12,6 +12,7 @@ import confetti from "canvas-confetti";
 import { addDays } from "date-fns";
 import { BrainCircuit, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { NCardStudy } from "@/components/n-card-study";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -32,7 +33,6 @@ export default function StudyPage() {
   const queryClient = useQueryClient();
 
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
 
   const { data: deckName = "Loading...", isLoading: isDeckLoading } = useQuery({
     queryKey: ["deck", id],
@@ -122,7 +122,6 @@ export default function StudyPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
       queryClient.invalidateQueries({ queryKey: ["cards", user?.id] });
-      setShowAnswer(false);
       setCurrentIndex((prev) => prev + 1);
     },
     onError: (error) => {
@@ -249,90 +248,19 @@ export default function StudyPage() {
             </div>
           </div>
         ) : (
-          <div className="w-full space-y-8">
-            <Card className="min-h-[300px] flex flex-col">
-              <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center min-w-0">
-                <div className="text-2xl font-medium text-slate-900 mb-8 break-words w-full">
-                  {currentCard.front}
-                </div>
-
-                {showAnswer && (
-                  <div className="w-full pt-8 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500 min-w-0">
-                    <div className="text-xl text-slate-700 break-words w-full">
-                      {currentCard.back}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-center">
-              {!showAnswer ? (
-                <Button
-                  size="lg"
-                  className="w-full max-w-sm"
-                  onClick={() => setShowAnswer(true)}
-                >
-                  Show Answer
-                </Button>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex flex-col gap-1 border-red-200 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => handleRate(1)}
-                    isLoading={
-                      rateCardMutation.isPending &&
-                      rateCardMutation.variables?.quality === 1
-                    }
-                    disabled={rateCardMutation.isPending}
-                  >
-                    <span className="font-bold">Again</span>
-                    <span className="text-xs opacity-70">{previewIntervals!.again}d</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex flex-col gap-1 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
-                    onClick={() => handleRate(3)}
-                    isLoading={
-                      rateCardMutation.isPending &&
-                      rateCardMutation.variables?.quality === 3
-                    }
-                    disabled={rateCardMutation.isPending}
-                  >
-                    <span className="font-bold">Hard</span>
-                    <span className="text-xs opacity-70">{previewIntervals!.hard}d</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex flex-col gap-1 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                    onClick={() => handleRate(4)}
-                    isLoading={
-                      rateCardMutation.isPending &&
-                      rateCardMutation.variables?.quality === 4
-                    }
-                    disabled={rateCardMutation.isPending}
-                  >
-                    <span className="font-bold">Good</span>
-                    <span className="text-xs opacity-70">{previewIntervals!.good}d</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex flex-col gap-1 border-green-200 hover:bg-green-50 hover:text-green-700"
-                    onClick={() => handleRate(5)}
-                    isLoading={
-                      rateCardMutation.isPending &&
-                      rateCardMutation.variables?.quality === 5
-                    }
-                    disabled={rateCardMutation.isPending}
-                  >
-                    <span className="font-bold">Easy</span>
-                    <span className="text-xs opacity-70">{previewIntervals!.easy}d</span>
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
+          <NCardStudy
+            key={currentCard.id}
+            front={currentCard.front}
+            back={currentCard.back}
+            onRate={handleRate}
+            ratingPending={rateCardMutation.isPending}
+            pendingQuality={
+              (rateCardMutation.variables?.quality as 1 | 3 | 4 | 5 | undefined) ?? null
+            }
+            hardLabel={`${previewIntervals!.hard}d`}
+            goodLabel={`${previewIntervals!.good}d`}
+            easyLabel={`${previewIntervals!.easy}d`}
+          />
         )}
       </main>
     </div>

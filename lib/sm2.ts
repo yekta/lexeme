@@ -14,17 +14,16 @@ export function calculateSM2(
     } else if (repetition === 1) {
       newInterval = 6;
     } else {
-      newInterval = Math.round(interval * easeFactor);
+      newInterval = Math.ceil(interval * easeFactor);
     }
     newRepetition += 1;
+    newEaseFactor = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    if (newEaseFactor < 1.3) {
+      newEaseFactor = 1.3;
+    }
   } else {
     newRepetition = 0;
     newInterval = 1;
-  }
-
-  newEaseFactor = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-  if (newEaseFactor < 1.3) {
-    newEaseFactor = 1.3;
   }
 
   return {

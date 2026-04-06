@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { NDeck } from "@/components/n-deck";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,28 +22,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase";
 import { handleDbError, OperationType } from "@/lib/db-error";
 import { useState } from "react";
-import Link from "next/link";
 import {
   BrainCircuit,
   Plus,
   LogOut,
-  Trash2,
   MoreVertical,
-  Pencil,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNow } from "@/components/now-provider";
-import { cn } from "@/lib/utils";
 
 import { Navbar } from "@/components/navbar";
 
@@ -646,102 +637,33 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {decks.map((deck) => (
-              <Card key={deck.id} className="flex flex-col">
-                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
-                  <div className="space-y-1 min-w-0">
-                    <CardTitle className="truncate">{deck.name}</CardTitle>
-                    {deck.description && (
-                      <CardDescription className="truncate">
-                        {deck.description}
-                      </CardDescription>
-                    )}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-slate-100 h-8 w-8 shrink-0 focus-visible:outline-none">
-                      <MoreVertical className="h-4 w-4 text-slate-500" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="cursor-pointer"
-                        onClick={() => {
-                          setDeckToRename(deck);
-                          setRenameDeckName(deck.name);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Rename Deck
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        className="cursor-pointer"
-                        onClick={() => setDeckToDelete(deck)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Deck
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  {(() => {
-                    const stats = getDeckStats(deck.id);
-                    const isRecentlyUpdated =
-                      stats.latestCardCreatedAt > 0 &&
-                      nowTime - stats.latestCardCreatedAt <= 5000;
-                    return (
-                      <div className="flex flex-col gap-3 mt-2">
-                        <div
-                          className={cn(
-                            "text-sm font-medium w-fit transition-colors duration-300 rounded px-2 py-0.5 -ml-2",
-                            isRecentlyUpdated
-                              ? "bg-green-100 text-green-800"
-                              : "text-slate-500 bg-transparent",
-                          )}
-                        >
-                          {stats.total} {stats.total === 1 ? "card" : "cards"}
-                        </div>
-                        <div className="flex items-center gap-4 text-sm font-medium">
-                          <div className="flex items-center gap-1.5 text-blue-600">
-                            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                            {stats.new} New
-                          </div>
-                          <div className="flex items-center gap-1.5 text-red-600">
-                            <span className="w-2 h-2 rounded-full bg-red-600"></span>
-                            {stats.learn} Learn
-                          </div>
-                          <div className="flex items-center gap-1.5 text-green-600">
-                            <span className="w-2 h-2 rounded-full bg-green-600"></span>
-                            {stats.due} Due
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-                <CardFooter className="flex flex-col gap-2">
-                  <Link href={`/study/${deck.id}`} className="w-full">
-                    <Button variant="default" className="w-full">
-                      Study
-                    </Button>
-                  </Link>
-                  <div className="flex w-full gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => setDeckToAddCard(deck)}
-                    >
-                      Add Card
-                    </Button>
-                    <Link href={`/deck/${deck.id}`} className="flex-1">
-                      <Button variant="outline" className="w-full">
-                        Manage
-                      </Button>
-                    </Link>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
+            {decks.map((deck) => {
+              const stats = getDeckStats(deck.id);
+              const isRecentlyUpdated =
+                stats.latestCardCreatedAt > 0 &&
+                nowTime - stats.latestCardCreatedAt <= 5000;
+              return (
+                <NDeck
+                  key={deck.id}
+                  id={deck.id}
+                  name={deck.name}
+                  description={deck.description}
+                  totalCards={stats.total}
+                  newCount={stats.new}
+                  learningCount={stats.learn}
+                  dueCount={stats.due}
+                  isRecentlyUpdated={isRecentlyUpdated}
+                  studyHref={`/study/${deck.id}`}
+                  manageHref={`/deck/${deck.id}`}
+                  onAddCard={() => setDeckToAddCard(deck)}
+                  onRename={() => {
+                    setDeckToRename(deck);
+                    setRenameDeckName(deck.name);
+                  }}
+                  onDelete={() => setDeckToDelete(deck)}
+                />
+              );
+            })}
           </div>
         )}
       </main>

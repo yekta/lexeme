@@ -21,21 +21,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { db } from "@/firebase";
-import { handleFirestoreError, OperationType } from "@/lib/firebase-error";
+import { supabase } from "@/lib/supabase";
+import { handleDbError, OperationType } from "@/lib/db-error";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
-} from "firebase/firestore";
 import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -47,7 +35,7 @@ interface Flashcard {
   id: string;
   front: string;
   back: string;
-  nextReviewDate: any;
+  next_review_date: string;
   repetition: number;
 }
 
@@ -69,42 +57,27 @@ export default function DeckPage() {
     queryKey: ["deck", id],
     queryFn: async () => {
       if (!user || !id) return "Loading...";
-      try {
-        const docRef = doc(db, "decks", id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          return docSnap.data().name;
-        } else {
-          router.push("/");
-          return "Deck not found";
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `decks/${id}`);
-        return "Error loading deck";
-      }
+      const { data, error } = await supabase
+        .from("decks")
+        .select("name")
+        .eq("id", id)
+        .single();
+      if (error || !data) { router.push("/"); return "Deck not found"; }
+      return data.name as string;
     },
     enabled: !!user && !!id,
   });
 
   const { data: cards = [], isLoading: isCardsLoading } = useQuery({
-    queryKey: ["cards", id, user?.uid],
+    queryKey: ["cards", id, user?.id],
     queryFn: async () => {
       if (!user || !id) return [];
-      try {
-        const q = query(
-          collection(db, "cards"),
-          where("deckId", "==", id),
-          where("userId", "==", user.uid),
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Flashcard[];
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, "cards");
-        return [];
-      }
+      const { data, error } = await supabase
+        .from("cards")
+        .select("*")
+        .eq("deck_id", id);
+      if (error) await handleDbError(error, OperationType.GET, "cards");
+      return (data ?? []) as Flashcard[];
     },
     enabled: !!user && !!id,
   });
@@ -115,55 +88,44 @@ export default function DeckPage() {
     mutationFn: async () => {
       if (!user || !newFront.trim() || !newBack.trim())
         throw new Error("Missing data");
-      await addDoc(collection(db, "cards"), {
-        deckId: id,
-        userId: user.uid,
+      const { error } = await supabase.from("cards").insert({
+        deck_id: id,
+        user_id: user.id,
         front: newFront.trim(),
         back: newBack.trim(),
         interval: 0,
         repetition: 0,
-        easeFactor: 2.5,
-        nextReviewDate: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        ease_factor: 2.5,
       });
+      if (error) await handleDbError(error, OperationType.CREATE, "cards");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.uid] });
-      queryClient.invalidateQueries({ queryKey: ["cards", user?.uid] });
-      queryClient.invalidateQueries({
-        queryKey: ["studyCards", id, user?.uid],
-      });
+      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["cards", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["studyCards", id, user?.id] });
       setNewFront("");
       setNewBack("");
       setIsDialogOpen(false);
     },
     onError: (error) => {
-      handleFirestoreError(error, OperationType.CREATE, "cards");
+      console.error(error);
     },
   });
 
   const deleteCardMutation = useMutation({
     mutationFn: async () => {
       if (!cardToDelete) throw new Error("No card to delete");
-      await deleteDoc(doc(db, "cards", cardToDelete));
+      const { error } = await supabase.from("cards").delete().eq("id", cardToDelete);
+      if (error) await handleDbError(error, OperationType.DELETE, `cards/${cardToDelete}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.uid] });
-      queryClient.invalidateQueries({ queryKey: ["cards", user?.uid] });
-      queryClient.invalidateQueries({
-        queryKey: ["studyCards", id, user?.uid],
-      });
+      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["cards", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["studyCards", id, user?.id] });
       setCardToDelete(null);
     },
     onError: (error) => {
-      if (cardToDelete) {
-        handleFirestoreError(
-          error,
-          OperationType.DELETE,
-          `cards/${cardToDelete}`,
-        );
-      }
+      console.error(error);
     },
   });
 
@@ -171,30 +133,22 @@ export default function DeckPage() {
     mutationFn: async () => {
       if (!user || !cardToEdit || !editFront.trim() || !editBack.trim())
         throw new Error("Missing data");
-      await updateDoc(doc(db, "cards", cardToEdit.id), {
-        front: editFront.trim(),
-        back: editBack.trim(),
-        updatedAt: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from("cards")
+        .update({ front: editFront.trim(), back: editBack.trim(), updated_at: new Date().toISOString() })
+        .eq("id", cardToEdit.id);
+      if (error) await handleDbError(error, OperationType.UPDATE, `cards/${cardToEdit.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.uid] });
-      queryClient.invalidateQueries({ queryKey: ["cards", user?.uid] });
-      queryClient.invalidateQueries({
-        queryKey: ["studyCards", id, user?.uid],
-      });
+      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["cards", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["studyCards", id, user?.id] });
       setCardToEdit(null);
       setEditFront("");
       setEditBack("");
     },
     onError: (error) => {
-      if (cardToEdit) {
-        handleFirestoreError(
-          error,
-          OperationType.UPDATE,
-          `cards/${cardToEdit.id}`,
-        );
-      }
+      console.error(error);
     },
   });
 

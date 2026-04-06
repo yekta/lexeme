@@ -4,24 +4,12 @@ import { useAuth } from "@/components/auth-provider";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { db } from "@/firebase";
-import { handleFirestoreError, OperationType } from "@/lib/firebase-error";
+import { supabase } from "@/lib/supabase";
+import { handleDbError, OperationType } from "@/lib/db-error";
 import { calculateSM2 } from "@/lib/sm2";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import confetti from "canvas-confetti";
 import { addDays } from "date-fns";
-import {
-  collection,
-  doc,
-  getCountFromServer,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-  where,
-} from "firebase/firestore";
 import { BrainCircuit, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -34,7 +22,7 @@ interface Flashcard {
   interval: number;
   repetition: number;
   easeFactor: number;
-  nextReviewDate: any;
+  next_review_date: string;
 }
 
 export default function StudyPage() {
@@ -50,58 +38,41 @@ export default function StudyPage() {
     queryKey: ["deck", id],
     queryFn: async () => {
       if (!user || !id) return "Loading...";
-      try {
-        const docRef = doc(db, "decks", id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          return docSnap.data().name;
-        } else {
-          router.push("/");
-          return "Deck not found";
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `decks/${id}`);
-        return "Error loading deck";
-      }
+      const { data, error } = await supabase
+        .from("decks")
+        .select("name")
+        .eq("id", id)
+        .single();
+      if (error || !data) { router.push("/"); return "Deck not found"; }
+      return data.name as string;
     },
     enabled: !!user && !!id,
   });
 
   const { data: studyData, isLoading: isCardsLoading } = useQuery({
-    queryKey: ["studyCards", id, user?.uid],
+    queryKey: ["studyCards", id, user?.id],
     staleTime: 0,
     gcTime: 0,
     queryFn: async () => {
       if (!user || !id) return { totalCards: 0, dueCards: [] };
-      try {
-        const totalQ = query(
-          collection(db, "cards"),
-          where("deckId", "==", id),
-          where("userId", "==", user.uid),
-        );
-        const totalSnap = await getCountFromServer(totalQ);
-        const totalCards = totalSnap.data().count;
 
-        const now = Timestamp.now();
-        const q = query(
-          collection(db, "cards"),
-          where("deckId", "==", id),
-          where("userId", "==", user.uid),
-          where("nextReviewDate", "<=", now),
-        );
+      const { count, error: countError } = await supabase
+        .from("cards")
+        .select("*", { count: "exact", head: true })
+        .eq("deck_id", id);
 
-        const snapshot = await getDocs(q);
-        const cardsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Flashcard[];
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("cards")
+        .select("*")
+        .eq("deck_id", id)
+        .lte("next_review_date", now);
 
-        const shuffled = [...cardsData].sort(() => Math.random() - 0.5);
-        return { totalCards, dueCards: shuffled };
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `cards`);
-        return { totalCards: 0, dueCards: [] };
-      }
+      if (countError) await handleDbError(countError, OperationType.GET, "cards");
+      if (error) await handleDbError(error, OperationType.GET, "cards");
+
+      const shuffled = [...(data ?? [])].sort(() => Math.random() - 0.5);
+      return { totalCards: count ?? 0, dueCards: shuffled as Flashcard[] };
     },
     enabled: !!user && !!id,
   });
@@ -127,26 +98,26 @@ export default function StudyPage() {
 
       const nextDate = addDays(new Date(), interval);
 
-      await updateDoc(doc(db, "cards", currentCard.id), {
-        interval,
-        repetition,
-        easeFactor,
-        nextReviewDate: Timestamp.fromDate(nextDate),
-        updatedAt: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from("cards")
+        .update({
+          interval,
+          repetition,
+          ease_factor: easeFactor,
+          next_review_date: nextDate.toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", currentCard.id);
+      if (error) await handleDbError(error, OperationType.UPDATE, `cards/${currentCard.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.uid] });
-      queryClient.invalidateQueries({ queryKey: ["cards", user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["cards", user?.id] });
       setShowAnswer(false);
       setCurrentIndex((prev) => prev + 1);
     },
-    onError: (error, variables) => {
-      handleFirestoreError(
-        error,
-        OperationType.UPDATE,
-        `cards/${variables.currentCard.id}`,
-      );
+    onError: (error) => {
+      console.error(error);
     },
   });
 

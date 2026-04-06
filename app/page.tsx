@@ -7,9 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { db } from '@/firebase';
-import { collection, query, where, addDoc, serverTimestamp, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '@/lib/firebase-error';
+import { supabase } from '@/lib/supabase';
+import { handleDbError, OperationType } from '@/lib/db-error';
 import { useState } from 'react';
 import Link from 'next/link';
 import { BrainCircuit, Plus, LogOut, Trash2, MoreVertical, Pencil } from 'lucide-react';
@@ -24,16 +23,16 @@ interface Deck {
   id: string;
   name: string;
   description: string;
-  createdAt: any;
+  created_at: string;
 }
 
 interface Flashcard {
   id: string;
-  deckId: string;
+  deck_id: string;
   interval: number;
   repetition: number;
-  nextReviewDate: any;
-  createdAt: any;
+  next_review_date: string;
+  created_at: string;
 }
 
 export default function Home() {
@@ -55,40 +54,26 @@ export default function Home() {
   const [isSigningIn, setIsSigningIn] = useState(false);
 
   const { data: decks = [], isLoading: isDecksLoading } = useQuery({
-    queryKey: ['decks', user?.uid],
+    queryKey: ['decks', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      try {
-        const q = query(collection(db, 'decks'), where('userId', '==', user.uid));
-        const snapshot = await getDocs(q);
-        const decksData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Deck[];
-        return decksData.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'decks');
-        return [];
-      }
+      const { data, error } = await supabase
+        .from('decks')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) await handleDbError(error, OperationType.GET, 'decks');
+      return (data ?? []) as Deck[];
     },
     enabled: !!user,
   });
 
   const { data: cards = [], isLoading: isCardsLoading } = useQuery({
-    queryKey: ['cards', user?.uid],
+    queryKey: ['cards', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      try {
-        const cardsQuery = query(collection(db, 'cards'), where('userId', '==', user.uid));
-        const snapshot = await getDocs(cardsQuery);
-        return snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Flashcard[];
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, 'cards');
-        return [];
-      }
+      const { data, error } = await supabase.from('cards').select('*');
+      if (error) await handleDbError(error, OperationType.GET, 'cards');
+      return (data ?? []) as Flashcard[];
     },
     enabled: !!user,
   });
@@ -98,122 +83,111 @@ export default function Home() {
   const createDeckMutation = useMutation({
     mutationFn: async () => {
       if (!user || !newDeckName.trim()) throw new Error("Missing data");
-      const docRef = await addDoc(collection(db, 'decks'), {
-        userId: user.uid,
-        name: newDeckName.trim(),
-        description: newDeckDesc.trim(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      return docRef.id;
+      const { data, error } = await supabase
+        .from('decks')
+        .insert({
+          user_id: user.id,
+          name: newDeckName.trim(),
+          description: newDeckDesc.trim(),
+        })
+        .select('id')
+        .single();
+      if (error) await handleDbError(error, OperationType.CREATE, 'decks');
+      return data!.id as string;
     },
     onSuccess: (id) => {
-      queryClient.invalidateQueries({ queryKey: ['decks', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['decks', user?.id] });
       setNewDeckName('');
       setNewDeckDesc('');
       setIsDialogOpen(false);
       router.push(`/deck/${id}`);
     },
     onError: (error) => {
-      handleFirestoreError(error, OperationType.CREATE, 'decks');
+      console.error(error);
     }
   });
 
   const deleteDeckMutation = useMutation({
     mutationFn: async () => {
       if (!user || !deckToDelete || deleteConfirmation !== "I want to delete this deck") throw new Error("Invalid delete request");
-      
-      const cardsQuery = query(
-        collection(db, 'cards'), 
-        where('deckId', '==', deckToDelete.id),
-        where('userId', '==', user.uid)
-      );
-      const cardsSnapshot = await getDocs(cardsQuery);
-      const deletePromises = cardsSnapshot.docs.map(cardDoc => deleteDoc(doc(db, 'cards', cardDoc.id)));
-      await Promise.all(deletePromises);
-
-      await deleteDoc(doc(db, 'decks', deckToDelete.id));
+      // Cards are deleted automatically via ON DELETE CASCADE
+      const { error } = await supabase.from('decks').delete().eq('id', deckToDelete.id);
+      if (error) await handleDbError(error, OperationType.DELETE, `decks/${deckToDelete.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['decks', user?.uid] });
-      queryClient.invalidateQueries({ queryKey: ['cards', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['decks', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['cards', user?.id] });
       if (deckToDelete) {
-        queryClient.invalidateQueries({ queryKey: ['cards', deckToDelete.id, user?.uid] });
-        queryClient.invalidateQueries({ queryKey: ['studyCards', deckToDelete.id, user?.uid] });
+        queryClient.invalidateQueries({ queryKey: ['cards', deckToDelete.id, user?.id] });
+        queryClient.invalidateQueries({ queryKey: ['studyCards', deckToDelete.id, user?.id] });
       }
       setDeckToDelete(null);
       setDeleteConfirmation('');
     },
     onError: (error) => {
-      if (deckToDelete) {
-        handleFirestoreError(error, OperationType.DELETE, `decks/${deckToDelete.id}`);
-      }
+      console.error(error);
     }
   });
 
   const renameDeckMutation = useMutation({
     mutationFn: async () => {
       if (!user || !deckToRename || !renameDeckName.trim()) throw new Error("Invalid rename request");
-      await updateDoc(doc(db, 'decks', deckToRename.id), {
-        name: renameDeckName.trim(),
-        updatedAt: serverTimestamp(),
-      });
+      const { error } = await supabase
+        .from('decks')
+        .update({ name: renameDeckName.trim(), updated_at: new Date().toISOString() })
+        .eq('id', deckToRename.id);
+      if (error) await handleDbError(error, OperationType.UPDATE, `decks/${deckToRename.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['decks', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['decks', user?.id] });
       setDeckToRename(null);
       setRenameDeckName('');
     },
     onError: (error) => {
-      if (deckToRename) {
-        handleFirestoreError(error, OperationType.UPDATE, `decks/${deckToRename.id}`);
-      }
+      console.error(error);
     }
   });
 
   const addCardMutation = useMutation({
     mutationFn: async () => {
       if (!user || !deckToAddCard || !newCardFront.trim() || !newCardBack.trim()) throw new Error("Missing data");
-      await addDoc(collection(db, 'cards'), {
-        deckId: deckToAddCard.id,
-        userId: user.uid,
+      const { error } = await supabase.from('cards').insert({
+        deck_id: deckToAddCard.id,
+        user_id: user.id,
         front: newCardFront.trim(),
         back: newCardBack.trim(),
         interval: 0,
         repetition: 0,
-        easeFactor: 2.5,
-        nextReviewDate: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        ease_factor: 2.5,
       });
+      if (error) await handleDbError(error, OperationType.CREATE, 'cards');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cards', user?.uid] });
+      queryClient.invalidateQueries({ queryKey: ['cards', user?.id] });
       if (deckToAddCard) {
-        queryClient.invalidateQueries({ queryKey: ['cards', deckToAddCard.id, user?.uid] });
-        queryClient.invalidateQueries({ queryKey: ['studyCards', deckToAddCard.id, user?.uid] });
+        queryClient.invalidateQueries({ queryKey: ['cards', deckToAddCard.id, user?.id] });
+        queryClient.invalidateQueries({ queryKey: ['studyCards', deckToAddCard.id, user?.id] });
       }
       setDeckToAddCard(null);
       setNewCardFront('');
       setNewCardBack('');
     },
     onError: (error) => {
-      handleFirestoreError(error, OperationType.CREATE, 'cards');
+      console.error(error);
     }
   });
 
   const getDeckStats = (deckId: string) => {
-    const deckCards = cards.filter(c => c.deckId === deckId);
+    const deckCards = cards.filter(c => c.deck_id === deckId);
     const now = new Date();
-    
+
     const newCards = deckCards.filter(c => c.interval === 0).length;
-    const learnCards = deckCards.filter(c => c.interval > 0 && c.repetition === 0 && c.nextReviewDate?.toDate() <= now).length;
-    const dueCards = deckCards.filter(c => c.interval > 0 && c.repetition > 0 && c.nextReviewDate?.toDate() <= now).length;
-    
+    const learnCards = deckCards.filter(c => c.interval > 0 && c.repetition === 0 && new Date(c.next_review_date) <= now).length;
+    const dueCards = deckCards.filter(c => c.interval > 0 && c.repetition > 0 && new Date(c.next_review_date) <= now).length;
+
     const latestCardCreatedAt = deckCards.reduce((latest, card) => {
-      if (!card.createdAt) return latest;
-      const cardTime = card.createdAt.toMillis ? card.createdAt.toMillis() : card.createdAt;
-      return Math.max(latest, cardTime);
+      if (!card.created_at) return latest;
+      return Math.max(latest, new Date(card.created_at).getTime());
     }, 0);
 
     return {

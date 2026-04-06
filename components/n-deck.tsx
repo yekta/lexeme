@@ -57,10 +57,7 @@ export function NDeck({
       {/* Ghost card 1 */}
       <div className="absolute top-1 left-0.5 w-[calc(100%-12px)] h-[calc(100%-12px)] rounded-xl border border-slate-200 bg-white/75 -rotate-[1deg] origin-bottom-left" />
       {/* Main card */}
-      <motion.div
-        className="relative z-10"
-        whileHover={{ y: -5, transition: { duration: 0.18, ease: "easeOut" } }}
-      >
+      <motion.div className="relative z-10">
         <Card className="flex flex-col shadow-md">
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
             <div className="space-y-1 min-w-0">

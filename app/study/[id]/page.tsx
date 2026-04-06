@@ -159,7 +159,7 @@ export default function StudyPage() {
 
   if (loading || (user && isFetching)) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="h-svh overflow-hidden bg-slate-50 flex flex-col">
         <Navbar
           backHref="/"
           title="Loading..."
@@ -170,7 +170,7 @@ export default function StudyPage() {
           }
         />
 
-        <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-3xl mx-auto w-full">
+        <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-3xl mx-auto w-full overflow-hidden">
           <div className="w-full space-y-8">
             <Card className="min-h-[300px] flex flex-col">
               <CardContent className="flex-1 flex flex-col items-center justify-center p-8 text-center">
@@ -194,7 +194,7 @@ export default function StudyPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-svh overflow-hidden bg-slate-50 flex flex-col">
       <Navbar
         backHref="/"
         title={deckName}
@@ -208,7 +208,7 @@ export default function StudyPage() {
         }
       />
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-3xl mx-auto w-full">
+      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-3xl mx-auto w-full overflow-hidden">
         {totalCards === 0 ? (
           <div className="text-center space-y-6">
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-100 text-blue-600 mb-4">

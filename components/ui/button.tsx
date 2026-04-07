@@ -44,14 +44,14 @@ const buttonVariants = cva(
 )
 
 interface ButtonProps extends ButtonPrimitive.Props, VariantProps<typeof buttonVariants> {
-  isLoading?: boolean;
+  isPending?: boolean;
 }
 
 function Button({
   className,
   variant = "default",
   size = "default",
-  isLoading,
+  isPending,
   children,
   disabled,
   ...props
@@ -68,11 +68,11 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }), isLoading && "text-transparent [&_svg:not(.loader)]:opacity-0")}
-      disabled={isLoading || disabled}
+      className={cn(buttonVariants({ variant, size, className }), isPending && "text-transparent [&_svg:not(.loader)]:opacity-0")}
+      disabled={isPending || disabled}
       {...props}
     >
-      {isLoading && (
+      {isPending && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Loader2 className={cn("animate-spin loader", loaderColorClass)} />
         </div>

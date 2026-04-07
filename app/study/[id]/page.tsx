@@ -34,25 +34,27 @@ export default function StudyPage() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const { data: deckName = "Loading...", isLoading: isDeckLoading } = useQuery({
-    queryKey: ["deck", id],
-    queryFn: async () => {
-      if (!user || !id) return "Loading...";
-      const { data, error } = await supabase
-        .from("decks")
-        .select("name")
-        .eq("id", id)
-        .single();
-      if (error || !data) {
-        router.push("/");
-        return "Deck not found";
-      }
-      return data.name as string;
+  const { data: deckName = "Loading...", isPending: isPendingDecks } = useQuery(
+    {
+      queryKey: ["deck", id],
+      queryFn: async () => {
+        if (!user || !id) return "Loading...";
+        const { data, error } = await supabase
+          .from("decks")
+          .select("name")
+          .eq("id", id)
+          .single();
+        if (error || !data) {
+          router.push("/");
+          return "Deck not found";
+        }
+        return data.name as string;
+      },
+      enabled: !!user && !!id,
     },
-    enabled: !!user && !!id,
-  });
+  );
 
-  const { data: studyData, isLoading: isCardsLoading } = useQuery({
+  const { data: studyData, isPending: isPendingCards } = useQuery({
     queryKey: ["studyCards", id, user?.id],
     staleTime: 0,
     gcTime: 0,
@@ -81,7 +83,7 @@ export default function StudyPage() {
     enabled: !!user && !!id,
   });
 
-  const isFetching = isDeckLoading || isCardsLoading;
+  const isPending = isPendingDecks || isPendingCards;
   const totalCards = studyData?.totalCards || 0;
   const dueCards = studyData?.dueCards || [];
 
@@ -177,7 +179,7 @@ export default function StudyPage() {
     }
   }, [isFinished, dueCards.length]);
 
-  if (loading || (user && isFetching)) {
+  if (loading || (user && isPending)) {
     return (
       <div className="h-svh overflow-hidden bg-slate-50 flex flex-col">
         <Navbar

@@ -25,12 +25,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { handleDbError, OperationType } from "@/lib/db-error";
 import { useState } from "react";
-import {
-  BrainCircuit,
-  Plus,
-  LogOut,
-  MoreVertical,
-} from "lucide-react";
+import { BrainCircuit, Plus, LogOut, MoreVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNow } from "@/components/now-provider";
@@ -71,7 +66,7 @@ export default function Home() {
   const [newCardBack, setNewCardBack] = useState("");
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  const { data: decks = [], isLoading: isDecksLoading } = useQuery({
+  const { data: decks = [], isPending: isPendingDecks } = useQuery({
     queryKey: ["decks", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -85,7 +80,7 @@ export default function Home() {
     enabled: !!user,
   });
 
-  const { data: cards = [], isLoading: isCardsLoading } = useQuery({
+  const { data: cards = [], isPending: isPendingCards } = useQuery({
     queryKey: ["cards", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -96,7 +91,7 @@ export default function Home() {
     enabled: !!user,
   });
 
-  const isFetching = isDecksLoading || isCardsLoading;
+  const isPending = isPendingDecks || isPendingCards;
 
   const createDeckMutation = useMutation({
     mutationFn: async () => {
@@ -272,7 +267,7 @@ export default function Home() {
     deleteDeckMutation.mutate();
   };
 
-  if (loading || (user && isFetching)) {
+  if (loading || (user && isPending)) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Navbar />
@@ -381,7 +376,7 @@ export default function Home() {
             size="lg"
             onClick={handleSignIn}
             className="w-full"
-            isLoading={isSigningIn}
+            isPending={isSigningIn}
           >
             Sign in with Google
           </Button>
@@ -453,7 +448,7 @@ export default function Home() {
                     !renameDeckName.trim() ||
                     renameDeckName.trim() === deckToRename?.name
                   }
-                  isLoading={renameDeckMutation.isPending}
+                  isPending={renameDeckMutation.isPending}
                 >
                   Save
                 </Button>
@@ -509,7 +504,7 @@ export default function Home() {
                   <Button
                     type="submit"
                     disabled={!newCardFront.trim() || !newCardBack.trim()}
-                    isLoading={addCardMutation.isPending}
+                    isPending={addCardMutation.isPending}
                   >
                     Add Card
                   </Button>
@@ -566,7 +561,7 @@ export default function Home() {
                   variant="destructive"
                   onClick={handleDeleteDeck}
                   disabled={deleteConfirmation !== "I want to delete this deck"}
-                  isLoading={deleteDeckMutation.isPending}
+                  isPending={deleteDeckMutation.isPending}
                 >
                   Delete
                 </Button>
@@ -612,7 +607,7 @@ export default function Home() {
                   <Button
                     type="submit"
                     disabled={!newDeckName.trim()}
-                    isLoading={createDeckMutation.isPending}
+                    isPending={createDeckMutation.isPending}
                   >
                     Create Deck
                   </Button>

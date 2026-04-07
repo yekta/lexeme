@@ -53,22 +53,27 @@ export default function DeckPage() {
   const [editFront, setEditFront] = useState("");
   const [editBack, setEditBack] = useState("");
 
-  const { data: deckName = "Loading...", isLoading: isDeckLoading } = useQuery({
-    queryKey: ["deck", id],
-    queryFn: async () => {
-      if (!user || !id) return "Loading...";
-      const { data, error } = await supabase
-        .from("decks")
-        .select("name")
-        .eq("id", id)
-        .single();
-      if (error || !data) { router.push("/"); return "Deck not found"; }
-      return data.name as string;
+  const { data: deckName = "Loading...", isPending: isPendingDecks } = useQuery(
+    {
+      queryKey: ["deck", id],
+      queryFn: async () => {
+        if (!user || !id) return "Loading...";
+        const { data, error } = await supabase
+          .from("decks")
+          .select("name")
+          .eq("id", id)
+          .single();
+        if (error || !data) {
+          router.push("/");
+          return "Deck not found";
+        }
+        return data.name as string;
+      },
+      enabled: !!user && !!id,
     },
-    enabled: !!user && !!id,
-  });
+  );
 
-  const { data: cards = [], isLoading: isCardsLoading } = useQuery({
+  const { data: cards = [], isPending: isPendingCards } = useQuery({
     queryKey: ["cards", id, user?.id],
     queryFn: async () => {
       if (!user || !id) return [];
@@ -82,7 +87,7 @@ export default function DeckPage() {
     enabled: !!user && !!id,
   });
 
-  const isFetching = isDeckLoading || isCardsLoading;
+  const isPending = isPendingDecks || isPendingCards;
 
   const addCardMutation = useMutation({
     mutationFn: async () => {
@@ -115,8 +120,16 @@ export default function DeckPage() {
   const deleteCardMutation = useMutation({
     mutationFn: async () => {
       if (!cardToDelete) throw new Error("No card to delete");
-      const { error } = await supabase.from("cards").delete().eq("id", cardToDelete);
-      if (error) await handleDbError(error, OperationType.DELETE, `cards/${cardToDelete}`);
+      const { error } = await supabase
+        .from("cards")
+        .delete()
+        .eq("id", cardToDelete);
+      if (error)
+        await handleDbError(
+          error,
+          OperationType.DELETE,
+          `cards/${cardToDelete}`,
+        );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
@@ -135,9 +148,18 @@ export default function DeckPage() {
         throw new Error("Missing data");
       const { error } = await supabase
         .from("cards")
-        .update({ front: editFront.trim(), back: editBack.trim(), updated_at: new Date().toISOString() })
+        .update({
+          front: editFront.trim(),
+          back: editBack.trim(),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", cardToEdit.id);
-      if (error) await handleDbError(error, OperationType.UPDATE, `cards/${cardToEdit.id}`);
+      if (error)
+        await handleDbError(
+          error,
+          OperationType.UPDATE,
+          `cards/${cardToEdit.id}`,
+        );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cards", id, user?.id] });
@@ -166,7 +188,7 @@ export default function DeckPage() {
     editCardMutation.mutate();
   };
 
-  if (loading || (user && isFetching)) {
+  if (loading || (user && isPending)) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Navbar
@@ -264,7 +286,7 @@ export default function DeckPage() {
                 <Button
                   variant="destructive"
                   onClick={handleDeleteCard}
-                  isLoading={deleteCardMutation.isPending}
+                  isPending={deleteCardMutation.isPending}
                 >
                   Delete
                 </Button>
@@ -312,7 +334,7 @@ export default function DeckPage() {
                   <Button
                     type="submit"
                     disabled={!editFront.trim() || !editBack.trim()}
-                    isLoading={editCardMutation.isPending}
+                    isPending={editCardMutation.isPending}
                   >
                     Save Changes
                   </Button>
@@ -355,7 +377,7 @@ export default function DeckPage() {
                   <Button
                     type="submit"
                     disabled={!newFront.trim() || !newBack.trim()}
-                    isLoading={addCardMutation.isPending}
+                    isPending={addCardMutation.isPending}
                   >
                     Add Card
                   </Button>

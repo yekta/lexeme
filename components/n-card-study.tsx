@@ -246,7 +246,7 @@ function RatingButtons({
           e.stopPropagation();
           onRate(1);
         }}
-        isLoading={ratingPending && pendingQuality === 1}
+        isPending={ratingPending && pendingQuality === 1}
         disabled={ratingPending}
       >
         <span className="font-bold text-sm">Again</span>
@@ -259,7 +259,7 @@ function RatingButtons({
           e.stopPropagation();
           onRate(3);
         }}
-        isLoading={ratingPending && pendingQuality === 3}
+        isPending={ratingPending && pendingQuality === 3}
         disabled={ratingPending}
       >
         <span className="font-bold text-sm">Hard</span>
@@ -272,7 +272,7 @@ function RatingButtons({
           e.stopPropagation();
           onRate(4);
         }}
-        isLoading={ratingPending && pendingQuality === 4}
+        isPending={ratingPending && pendingQuality === 4}
         disabled={ratingPending}
       >
         <span className="font-bold text-sm">Good</span>
@@ -285,7 +285,7 @@ function RatingButtons({
           e.stopPropagation();
           onRate(5);
         }}
-        isLoading={ratingPending && pendingQuality === 5}
+        isPending={ratingPending && pendingQuality === 5}
         disabled={ratingPending}
       >
         <span className="font-bold text-sm">Easy</span>

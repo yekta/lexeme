@@ -1,12 +1,12 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 export enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
+  CREATE = "create",
+  UPDATE = "update",
+  DELETE = "delete",
+  LIST = "list",
+  GET = "get",
+  WRITE = "write",
 }
 
 export interface DbErrorInfo {
@@ -22,7 +22,7 @@ export interface DbErrorInfo {
 export async function handleDbError(
   error: unknown,
   operationType: OperationType,
-  path: string | null
+  path: string | null,
 ): Promise<never> {
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
@@ -36,6 +36,6 @@ export async function handleDbError(
     operationType,
     path,
   };
-  console.error('DB Error: ', JSON.stringify(errInfo));
+  console.error("DB Error: ", errInfo);
   throw new Error(JSON.stringify(errInfo));
 }

@@ -37,12 +37,12 @@ export function NCard(props: NCardProps) {
       <Dots />
       {/* Menu */}
       {!isPlaceholder && (
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-accent h-8 w-8 shrink-0 focus-visible:outline-none">
               <MoreVertical className="h-4 w-4 text-slate-400" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem
                 className="cursor-pointer"
                 onClick={props.onEdit}

@@ -35,7 +35,7 @@ type NDeckProps =
       studyHref: string;
       manageHref: string;
       onAddCard: () => void;
-      onRename: () => void;
+      onEdit: () => void;
       onDelete: () => void;
     };
 
@@ -56,9 +56,13 @@ export function NDeck(props: NDeckProps) {
       data-placeholder={isPlaceholder || undefined}
     >
       {/* Ghost card 2 — bottom of stack */}
-      <div className="absolute -top-2 left-3 w-[calc(100%-12px)] h-[calc(100%-12px)] rounded-xl border border-border bg-card rotate-[2deg] origin-bottom-left shadow-md" />
+      {(isPlaceholder || totalCards > 2) && (
+        <div className="absolute -top-2 left-3 w-[calc(100%-12px)] h-[calc(100%-12px)] rounded-xl border border-border bg-card rotate-[2deg] origin-bottom-left" />
+      )}
       {/* Ghost card 1 */}
-      <div className="absolute top-1 left-1 w-[calc(100%-12px)] h-[calc(100%-12px)] rounded-xl border border-border bg-card -rotate-[0.5deg] origin-bottom-left shadow-md" />
+      {(isPlaceholder || totalCards > 1) && (
+        <div className="absolute top-1 left-1 w-[calc(100%-12px)] h-[calc(100%-12px)] rounded-xl border border-border bg-card -rotate-[0.5deg] origin-bottom-left" />
+      )}
       {/* Main card */}
       <motion.div className="relative z-10">
         <Card className="flex flex-col shadow-md">
@@ -67,23 +71,21 @@ export function NDeck(props: NDeckProps) {
               <CardTitle className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {name}
               </CardTitle>
-              {(isPlaceholder || description) && (
-                <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                  {description ?? "\u00a0"}
-                </CardDescription>
-              )}
+              <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                {description || <>&nbsp;</>}
+              </CardDescription>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-slate-100 h-8 w-8 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
                 <MoreVertical className="h-4 w-4 text-slate-500 group-data-placeholder:opacity-0" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem
                   className="cursor-pointer"
-                  onClick={isPlaceholder ? undefined : props.onRename}
+                  onClick={isPlaceholder ? undefined : props.onEdit}
                 >
                   <Pencil className="h-4 w-4 mr-2" />
-                  Rename Deck
+                  Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"

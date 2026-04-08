@@ -71,12 +71,9 @@ export function Navbar({ backHref, title, rightActions }: NavbarProps) {
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem className="font-normal pointer-events-none">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {user.user_metadata?.full_name || "User"}
-                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>

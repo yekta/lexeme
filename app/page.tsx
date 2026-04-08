@@ -53,6 +53,7 @@ export default function Home() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deckToRename, setDeckToRename] = useState<Deck | null>(null);
   const [renameDeckName, setRenameDeckName] = useState("");
+  const [renameDeckDesc, setRenameDeckDesc] = useState("");
   const [deckToAddCard, setDeckToAddCard] = useState<Deck | null>(null);
   const [newCardFront, setNewCardFront] = useState("");
   const [newCardBack, setNewCardBack] = useState("");
@@ -159,6 +160,7 @@ export default function Home() {
         .from("decks")
         .update({
           name: renameDeckName.trim(),
+          description: renameDeckDesc.trim(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", deckToRename.id);
@@ -173,6 +175,7 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ["decks", user?.id] });
       setDeckToRename(null);
       setRenameDeckName("");
+      setRenameDeckDesc("");
     },
     onError: (error) => {
       console.error(error);
@@ -315,34 +318,34 @@ export default function Home() {
               if (!open) {
                 setDeckToRename(null);
                 setRenameDeckName("");
+                setRenameDeckDesc("");
               }
             }}
           >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Rename Deck</DialogTitle>
+                <DialogTitle>Edit Deck</DialogTitle>
                 <DialogDescription>
-                  Enter a new name for this deck.
+                  Update the name or description for this deck.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="rename-deck">New Name</Label>
+                  <Label htmlFor="rename-deck">Name</Label>
                   <Input
                     id="rename-deck"
                     value={renameDeckName}
                     onChange={(e) => setRenameDeckName(e.target.value)}
                     placeholder="Deck Name"
-                    onKeyDown={(e) => {
-                      if (
-                        e.key === "Enter" &&
-                        renameDeckName.trim() &&
-                        !renameDeckMutation.isPending
-                      ) {
-                        e.preventDefault();
-                        renameDeckMutation.mutate();
-                      }
-                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rename-deck-desc">Description (optional)</Label>
+                  <Input
+                    id="rename-deck-desc"
+                    value={renameDeckDesc}
+                    onChange={(e) => setRenameDeckDesc(e.target.value)}
+                    placeholder="e.g. Words from chapter 1-5"
                   />
                 </div>
               </div>
@@ -352,6 +355,7 @@ export default function Home() {
                   onClick={() => {
                     setDeckToRename(null);
                     setRenameDeckName("");
+                    setRenameDeckDesc("");
                   }}
                 >
                   Cancel
@@ -360,7 +364,8 @@ export default function Home() {
                   onClick={() => renameDeckMutation.mutate()}
                   disabled={
                     !renameDeckName.trim() ||
-                    renameDeckName.trim() === deckToRename?.name
+                    (renameDeckName.trim() === deckToRename?.name &&
+                      renameDeckDesc.trim() === (deckToRename?.description ?? ""))
                   }
                   isPending={renameDeckMutation.isPending}
                 >
@@ -545,7 +550,7 @@ export default function Home() {
 
         {showPlaceholder ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
+            {Array.from({ length: 9 }).map((_, i) => (
               <NDeck key={i} isPlaceholder />
             ))}
           </div>
@@ -583,9 +588,10 @@ export default function Home() {
                   studyHref={`/study/${deck.id}`}
                   manageHref={`/deck/${deck.id}`}
                   onAddCard={() => setDeckToAddCard(deck)}
-                  onRename={() => {
+                  onEdit={() => {
                     setDeckToRename(deck);
                     setRenameDeckName(deck.name);
+                    setRenameDeckDesc(deck.description ?? "");
                   }}
                   onDelete={() => setDeckToDelete(deck)}
                 />

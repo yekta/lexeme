@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Logo from "@/components/icons/logo";
 
 interface NavbarProps {
   backHref?: string;
@@ -23,11 +24,11 @@ export function Navbar({ backHref, title, rightActions }: NavbarProps) {
   const { user, logout } = useAuth();
 
   return (
-    <header className="bg-white border-b h-16 flex items-center sticky top-0 z-50">
+    <header className="bg-background border-b h-14 flex items-center sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-6 w-full flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <Link href="/" className="flex items-center shrink-0">
-            <BrainCircuit className="h-6 w-6 text-blue-600" />
+            <Logo />
           </Link>
 
           {(backHref || title) && (

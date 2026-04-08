@@ -22,7 +22,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html
+      lang="en"
+      className={cn(
+        "font-sans dark bg-background text-foreground",
+        geist.variable,
+      )}
+    >
       <body suppressHydrationWarning>
         <NextTopLoader color="#2563eb" showSpinner={false} />
         <ErrorBoundary>

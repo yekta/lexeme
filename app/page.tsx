@@ -292,7 +292,7 @@ export default function Home() {
   const showPlaceholder = loading || isPending;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       <Navbar />
 
       <main className="max-w-5xl mx-auto p-6 space-y-8">
@@ -340,7 +340,9 @@ export default function Home() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rename-deck-desc">Description (optional)</Label>
+                  <Label htmlFor="rename-deck-desc">
+                    Description (optional)
+                  </Label>
                   <Input
                     id="rename-deck-desc"
                     value={renameDeckDesc}
@@ -365,7 +367,8 @@ export default function Home() {
                   disabled={
                     !renameDeckName.trim() ||
                     (renameDeckName.trim() === deckToRename?.name &&
-                      renameDeckDesc.trim() === (deckToRename?.description ?? ""))
+                      renameDeckDesc.trim() ===
+                        (deckToRename?.description ?? ""))
                   }
                   isPending={renameDeckMutation.isPending}
                 >
@@ -555,7 +558,7 @@ export default function Home() {
             ))}
           </div>
         ) : decks.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-lg border border-dashed">
+          <div className="text-center py-20 bg-background rounded-lg border border-dashed">
             <h3 className="text-lg font-medium text-slate-900 mb-2">
               No decks yet
             </h3>

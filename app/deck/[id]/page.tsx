@@ -181,7 +181,7 @@ export default function DeckPage() {
   const showPlaceholder = loading || isPending;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       <Navbar
         backHref="/"
         title={
@@ -360,7 +360,7 @@ export default function DeckPage() {
             ))}
           </div>
         ) : cards.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-lg border border-dashed">
+          <div className="text-center py-20 bg-background rounded-lg border border-dashed">
             <h3 className="text-lg font-medium text-slate-900 mb-2">
               No cards yet
             </h3>

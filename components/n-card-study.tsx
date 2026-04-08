@@ -160,7 +160,7 @@ export function NCardStudy(props: NCardStudyProps) {
           <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-slate-400 mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-400/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Front
           </p>
-          <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10 py-6 min-h-[calc(30svh-80px)]">
+          <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10 py-6 min-h-[calc((100svh-80px)*0.35)]">
             <p className="max-w-full text-2xl font-medium text-slate-900 break-words text-center group-data-placeholder:text-transparent group-data-placeholder:bg-slate-900/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
               {isPlaceholder ? "Front text" : props.front}
             </p>

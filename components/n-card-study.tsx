@@ -41,7 +41,7 @@ const placeholderProps: Omit<RatingButtonsProps, "visible"> = {
   onRate: () => {},
   ratingPending: false,
   pendingRating: null,
-  againLabel: "< 1m",
+  againLabel: "<1m",
   hardLabel: "1d",
   goodLabel: "3d",
   easyLabel: "5d",

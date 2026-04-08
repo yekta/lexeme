@@ -111,8 +111,8 @@ export function formatInterval(dueDate: Date, now: Date): string {
   const diffMs = dueDate.getTime() - now.getTime();
   const diffMinutes = Math.round(diffMs / 60_000);
 
-  if (diffMinutes < 1) return "< 1m";
-  if (diffMinutes < 60) return `${diffMinutes}m`;
+  if (diffMinutes < 1.1) return "< 1m | This session";
+  if (diffMinutes < 60) return `< ${diffMinutes}m | This session`;
 
   const diffHours = Math.round(diffMs / 3_600_000);
   if (diffHours < 24) return `${diffHours}h`;

@@ -30,7 +30,7 @@ export default function RootLayout({
       )}
     >
       <body suppressHydrationWarning>
-        <NextTopLoader color="#2563eb" showSpinner={false} />
+        <NextTopLoader color="var(--brand)" showSpinner={false} />
         <ErrorBoundary>
           <AuthProvider>
             <Providers>

@@ -106,9 +106,7 @@ export default function StudyPage() {
         .select("*", { count: "exact", head: true })
         .eq("deck_id", id);
 
-      const soonCutoff = new Date(
-        Date.now() + SHORT_INTERVAL_MS,
-      ).toISOString();
+      const soonCutoff = new Date(Date.now() + SHORT_INTERVAL_MS).toISOString();
       const { data, error } = await supabase
         .from("cards")
         .select("*")
@@ -224,7 +222,10 @@ export default function StudyPage() {
   const currentCard = queue[0]?.card ?? null;
   const isFinished = queue.length === 0 && reviewedCount > 0;
   const hasNoDueCards =
-    !isPending && studyData && studyData.dueCards.length === 0 && totalCards > 0;
+    !isPending &&
+    studyData &&
+    studyData.dueCards.length === 0 &&
+    totalCards > 0;
 
   const handleRate = (rating: Grade) => {
     if (!user || !currentCard) return;
@@ -257,28 +258,29 @@ export default function StudyPage() {
 
   if (!loading && !user) return null;
 
-  const showPlaceholder = loading || isPending || (!currentCard && !isFinished && !hasNoDueCards);
+  const showPlaceholder =
+    loading || isPending || (!currentCard && !isFinished && !hasNoDueCards);
 
   return (
-    <div className="h-svh overflow-hidden bg-slate-50 flex flex-col">
+    <div className="h-svh overflow-hidden flex flex-col">
       <Navbar
         backHref="/"
         title={
           showPlaceholder ? (
-            <div className="h-5 w-36 bg-slate-200 animate-pulse rounded" />
+            <div className="h-5 w-36 bg-skeleton animate-pulse rounded" />
           ) : (
             deckName
           )
         }
         rightActions={
           showPlaceholder ? (
-            <div className="text-sm font-medium text-transparent bg-slate-200 animate-pulse rounded w-12">
+            <div className="text-sm font-medium text-transparent bg-skeleton animate-pulse rounded w-12">
               &nbsp;
             </div>
           ) : (
             !isFinished &&
             queue.length > 0 && (
-              <div className="text-sm font-medium text-slate-500">
+              <div className="text-sm font-medium text-muted-foreground">
                 {reviewedCount + 1} / {reviewedCount + queue.length}
               </div>
             )
@@ -291,13 +293,13 @@ export default function StudyPage() {
           <NCardStudy isPlaceholder />
         ) : totalCards === 0 && !hasNoDueCards ? (
           <div className="text-center space-y-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-100 text-blue-600 mb-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-brand-muted text-brand mb-4">
               <BrainCircuit className="w-10 h-10" />
             </div>
-            <h2 className="text-3xl font-bold text-slate-900">
+            <h2 className="text-3xl font-bold text-foreground">
               This deck is empty
             </h2>
-            <p className="text-lg text-slate-600 max-w-md mx-auto">
+            <p className="text-lg text-muted-foreground max-w-md mx-auto">
               You need to add some flashcards to this deck before you can study
               it.
             </p>
@@ -309,13 +311,13 @@ export default function StudyPage() {
           </div>
         ) : isFinished || hasNoDueCards ? (
           <div className="text-center space-y-6">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 text-green-600 mb-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-success-muted text-success mb-4">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h2 className="text-3xl font-bold text-slate-900">
+            <h2 className="text-3xl font-bold text-foreground">
               You&apos;re all caught up!
             </h2>
-            <p className="text-lg text-slate-600 max-w-md mx-auto">
+            <p className="text-lg text-muted-foreground max-w-md mx-auto">
               You have reviewed all the due cards in this deck. Great job!
             </p>
             <div className="pt-6 flex gap-4 justify-center">

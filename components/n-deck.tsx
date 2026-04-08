@@ -68,23 +68,23 @@ export function NDeck(props: NDeckProps) {
         <Card className="flex flex-col shadow-md">
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
             <div className="space-y-1 min-w-0">
-              <CardTitle className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+              <CardTitle className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {name}
               </CardTitle>
-              <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+              <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {description || <>&nbsp;</>}
               </CardDescription>
             </div>
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-slate-100 h-8 w-8 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
-                <MoreVertical className="h-4 w-4 text-slate-500 group-data-placeholder:opacity-0" />
+              <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-accent h-8 w-8 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
+                <MoreVertical className="h-4 w-4 text-muted-foreground group-data-placeholder:opacity-0" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={isPlaceholder ? undefined : props.onEdit}
                 >
-                  <Pencil className="h-4 w-4 mr-2" />
+                  <Pencil className="h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -92,7 +92,7 @@ export function NDeck(props: NDeckProps) {
                   className="cursor-pointer"
                   onClick={isPlaceholder ? undefined : props.onDelete}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <Trash2 className="h-4 w-4" />
                   Delete Deck
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -104,25 +104,25 @@ export function NDeck(props: NDeckProps) {
                 className={cn(
                   "text-sm font-medium w-fit transition-colors duration-300 rounded px-2 py-0.5 -ml-2",
                   isRecentlyUpdated
-                    ? "bg-green-100 text-green-800"
-                    : "text-slate-500 bg-transparent",
+                    ? "bg-success-muted text-success-foreground"
+                    : "text-muted-foreground bg-transparent",
                 )}
               >
-                <p className="group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
+                <p className="group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:select-none">
                   {totalCards} {totalCards === 1 ? "card" : "cards"}
                 </p>
               </div>
               <div className="flex items-center gap-4 text-sm font-medium">
-                <div className="flex items-center gap-1.5 text-blue-600 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                  <span className="w-2 h-2 rounded-full bg-blue-600 group-data-placeholder:opacity-0" />
+                <div className="flex items-center gap-1.5 text-state-new group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                  <span className="w-2 h-2 rounded-full bg-state-new group-data-placeholder:opacity-0" />
                   {newCount} New
                 </div>
-                <div className="flex items-center gap-1.5 text-red-600 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                  <span className="w-2 h-2 rounded-full bg-red-600 group-data-placeholder:opacity-0" />
+                <div className="flex items-center gap-1.5 text-state-learn group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                  <span className="w-2 h-2 rounded-full bg-state-learn group-data-placeholder:opacity-0" />
                   {learningCount} Learn
                 </div>
-                <div className="flex items-center gap-1.5 text-green-600 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                  <span className="w-2 h-2 rounded-full bg-green-600 group-data-placeholder:opacity-0" />
+                <div className="flex items-center gap-1.5 text-state-due group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                  <span className="w-2 h-2 rounded-full bg-state-due group-data-placeholder:opacity-0" />
                   {dueCount} Due
                 </div>
               </div>
@@ -132,7 +132,7 @@ export function NDeck(props: NDeckProps) {
             {isPlaceholder ? (
               <Button
                 variant="default"
-                className="w-full text-transparent bg-slate-200 animate-pulse border-transparent pointer-events-none hover:bg-slate-200"
+                className="w-full text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
               >
                 &nbsp;
               </Button>
@@ -146,7 +146,7 @@ export function NDeck(props: NDeckProps) {
             <div className="flex w-full gap-2">
               <Button
                 variant="outline"
-                className="flex-1 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:border-transparent group-data-placeholder:pointer-events-none group-data-placeholder:hover:bg-slate-200"
+                className="flex-1 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:border-transparent group-data-placeholder:pointer-events-none group-data-placeholder:hover:bg-skeleton"
                 onClick={isPlaceholder ? undefined : props.onAddCard}
               >
                 {isPlaceholder ? "\u00a0" : "Add Card"}
@@ -154,7 +154,7 @@ export function NDeck(props: NDeckProps) {
               {isPlaceholder ? (
                 <Button
                   variant="outline"
-                  className="flex-1 text-transparent bg-slate-200 animate-pulse border-transparent pointer-events-none hover:bg-slate-200"
+                  className="flex-1 text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
                 >
                   &nbsp;
                 </Button>

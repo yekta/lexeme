@@ -28,7 +28,7 @@ export function NCard(props: NCardProps) {
 
   return (
     <div
-      className="group relative rounded-xl border border-border bg-card shadow-md overflow-hidden group-data-placeholder:border-slate-200"
+      className="group relative rounded-xl border border-border bg-card shadow-md overflow-hidden group-data-placeholder:border-skeleton"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
@@ -40,14 +40,14 @@ export function NCard(props: NCardProps) {
         <div className="absolute top-2 right-2 z-10">
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-accent h-8 w-8 shrink-0 focus-visible:outline-none">
-              <MoreVertical className="h-4 w-4 text-slate-400" />
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem
                 className="cursor-pointer"
                 onClick={props.onEdit}
               >
-                <Pencil className="h-4 w-4 mr-2" />
+                <Pencil className="h-4 w-4" />
                 Edit Card
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -55,7 +55,7 @@ export function NCard(props: NCardProps) {
                 className="cursor-pointer"
                 onClick={props.onDelete}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="h-4 w-4" />
                 Delete Card
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -65,23 +65,23 @@ export function NCard(props: NCardProps) {
 
       {/* Front */}
       <div className="px-5 pt-5 pb-4 relative bg-card">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Front
         </p>
-        <p className="text-sm text-slate-900 line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {front}
         </p>
       </div>
 
       {/* Divider — ruled line style */}
-      <div className="w-full h-px bg-border relative" />
+      <div className="w-full h-px bg-border relative z-10" />
 
       {/* Back */}
       <div className="px-5 pt-3 pb-5 relative">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
-        <p className="text-sm text-slate-700 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-slate-200 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {back}
         </p>
       </div>

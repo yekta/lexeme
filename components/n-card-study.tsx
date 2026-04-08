@@ -157,14 +157,14 @@ export function NCardStudy(props: NCardStudyProps) {
             "border border-border bg-card shadow-lg overflow-hidden flex flex-col items-center",
           )}
         >
-          <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-slate-400 mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-slate-400/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+          <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Front
           </p>
           <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10 py-6 min-h-[calc((100svh-80px)*0.35)]">
-            <p className="max-w-full text-2xl font-medium text-slate-900 break-words text-center group-data-placeholder:text-transparent group-data-placeholder:bg-slate-900/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+            <p className="max-w-full text-2xl font-medium text-foreground break-words text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
               {isPlaceholder ? "Front text" : props.front}
             </p>
-            <p className="max-w-full text-xl text-slate-700 break-words text-center opacity-0">
+            <p className="max-w-full text-xl text-foreground/80 break-words text-center opacity-0">
               {isPlaceholder ? "Back text" : props.back}
             </p>
           </div>
@@ -173,7 +173,7 @@ export function NCardStudy(props: NCardStudyProps) {
             visible={false}
             {...(isPlaceholder ? placeholderProps : props)}
           />
-          <p className="text-xs text-slate-400 text-center relative z-10 select-none group-data-placeholder:text-transparent group-data-placeholder:bg-slate-400/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+          <p className="text-xs text-muted-foreground text-center relative z-10 select-none group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Tap or drag to flip
           </p>
         </motion.div>
@@ -194,11 +194,11 @@ export function NCardStudy(props: NCardStudyProps) {
             )}
           >
             <Dots />
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-5 text-center relative">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative">
               Back
             </p>
             <div className="w-full flex-1 flex flex-col items-center justify-center py-6 min-h-[120px] relative">
-              <p className="max-w-full text-xl text-slate-700 break-words text-center">
+              <p className="max-w-full text-xl text-foreground/80 break-words text-center">
                 {isPlaceholder ? "Back text" : props.back}
               </p>
               <p className="opacity-0 max-w-full text-2xl font-medium text-transparent break-words text-center">
@@ -249,7 +249,7 @@ function RatingButtons({
     >
       <Button
         variant="outline"
-        className="h-auto py-3 flex flex-col gap-0.5 bg-red-50 border-red-200 hover:bg-red-100 hover:text-red-700"
+        className="h-auto py-3 flex flex-col gap-0.5 bg-rating-again border-rating-again-border hover:bg-rating-again-border hover:text-rating-again-hover"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Again);
@@ -262,7 +262,7 @@ function RatingButtons({
       </Button>
       <Button
         variant="outline"
-        className="h-auto py-3 flex flex-col gap-0.5 bg-orange-50 border-orange-200 hover:bg-orange-100 hover:text-orange-700"
+        className="h-auto py-3 flex flex-col gap-0.5 bg-rating-hard border-rating-hard-border hover:bg-rating-hard-border hover:text-rating-hard-hover"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Hard);
@@ -275,7 +275,7 @@ function RatingButtons({
       </Button>
       <Button
         variant="outline"
-        className="h-auto py-3 flex flex-col gap-0.5 bg-blue-50 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+        className="h-auto py-3 flex flex-col gap-0.5 bg-rating-good border-rating-good-border hover:bg-rating-good-border hover:text-rating-good-hover"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Good);
@@ -288,7 +288,7 @@ function RatingButtons({
       </Button>
       <Button
         variant="outline"
-        className="h-auto py-3 flex flex-col gap-0.5 bg-green-50 border-green-200 hover:bg-green-100 hover:text-green-700"
+        className="h-auto py-3 flex flex-col gap-0.5 bg-rating-easy border-rating-easy-border hover:bg-rating-easy-border hover:text-rating-easy-hover"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Easy);

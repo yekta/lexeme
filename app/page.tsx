@@ -266,13 +266,13 @@ export default function Home() {
 
   if (!loading && !user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4">
         <div className="max-w-md text-center space-y-6">
-          <BrainCircuit className="mx-auto h-16 w-16 text-blue-600" />
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+          <BrainCircuit className="mx-auto h-16 w-16 text-brand" />
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">
             DeckNinja
           </h1>
-          <p className="text-lg text-slate-600">
+          <p className="text-lg text-muted-foreground">
             Master any subject with spaced repetition. Sign in to start
             learning.
           </p>
@@ -301,7 +301,7 @@ export default function Home() {
             className={cn(
               "text-2xl font-bold tracking-tight truncate min-w-0",
               showPlaceholder &&
-                "text-transparent bg-slate-200 animate-pulse rounded w-48 select-none",
+                "text-transparent bg-skeleton animate-pulse rounded w-48 select-none",
             )}
           >
             {showPlaceholder ? "\u00a0" : `Decks`}{" "}
@@ -454,9 +454,9 @@ export default function Home() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <p className="text-sm text-slate-600 mb-2">
+                  <p className="text-sm text-muted-foreground mb-2">
                     Please type{" "}
-                    <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-mono font-medium">
+                    <span className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-mono font-medium">
                       I want to delete this deck
                     </span>{" "}
                     to confirm.
@@ -498,14 +498,12 @@ export default function Home() {
                   className={cn(
                     "shrink-0",
                     showPlaceholder &&
-                      "text-transparent bg-slate-200 animate-pulse border-transparent pointer-events-none hover:bg-slate-200",
+                      "text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton",
                   )}
                 />
               }
             >
-              <Plus
-                className={cn("h-4 w-4 mr-2", showPlaceholder && "opacity-0")}
-              />
+              <Plus className={cn("h-4 w-4", showPlaceholder && "opacity-0")} />
               {showPlaceholder ? "\u00a0" : "Create Deck"}
             </DialogTrigger>
             <DialogContent>
@@ -559,14 +557,14 @@ export default function Home() {
           </div>
         ) : decks.length === 0 ? (
           <div className="text-center py-20 bg-background rounded-lg border border-dashed">
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               No decks yet
             </h3>
-            <p className="text-slate-500 mb-6">
+            <p className="text-muted-foreground mb-6">
               Create your first deck to start adding flashcards.
             </p>
             <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Create Deck
             </Button>
           </div>

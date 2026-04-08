@@ -186,14 +186,14 @@ export default function DeckPage() {
         backHref="/"
         title={
           showPlaceholder ? (
-            <div className="h-6 w-48 bg-slate-200 animate-pulse rounded" />
+            <div className="h-6 w-48 bg-skeleton animate-pulse rounded" />
           ) : (
             deckName
           )
         }
         rightActions={
           showPlaceholder ? (
-            <Button className="text-transparent bg-slate-200 animate-pulse border-transparent pointer-events-none hover:bg-slate-200">
+            <Button className="text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton">
               &nbsp;
             </Button>
           ) : (
@@ -210,7 +210,7 @@ export default function DeckPage() {
             className={cn(
               "text-2xl font-bold tracking-tight truncate min-w-0",
               showPlaceholder &&
-                "text-transparent bg-slate-200 animate-pulse rounded w-32 select-none",
+                "text-transparent bg-skeleton animate-pulse rounded w-32 select-none",
             )}
           >
             {showPlaceholder ? "\u00a0" : `Cards`}{" "}
@@ -255,7 +255,7 @@ export default function DeckPage() {
             <DialogContent>
               <form onSubmit={handleEditCard}>
                 <DialogHeader>
-                  <DialogTitle>Edit flashcard</DialogTitle>
+                  <DialogTitle>Edit Card</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
@@ -304,14 +304,12 @@ export default function DeckPage() {
                   className={cn(
                     "shrink-0",
                     showPlaceholder &&
-                      "text-transparent bg-slate-200 animate-pulse border-transparent pointer-events-none hover:bg-slate-200",
+                      "text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton",
                   )}
                 />
               }
             >
-              <Plus
-                className={cn("h-4 w-4 mr-2", showPlaceholder && "opacity-0")}
-              />
+              <Plus className={cn("h-4 w-4", showPlaceholder && "opacity-0")} />
               {showPlaceholder ? "\u00a0" : "Add Card"}
             </DialogTrigger>
             <DialogContent>
@@ -361,14 +359,14 @@ export default function DeckPage() {
           </div>
         ) : cards.length === 0 ? (
           <div className="text-center py-20 bg-background rounded-lg border border-dashed">
-            <h3 className="text-lg font-medium text-slate-900 mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               No cards yet
             </h3>
-            <p className="text-slate-500 mb-6">
+            <p className="text-muted-foreground mb-6">
               Add your first flashcard to this deck.
             </p>
             <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Add Card
             </Button>
           </div>

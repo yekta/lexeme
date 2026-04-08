@@ -1,10 +1,9 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { Button } from "@/components/ui/button";
 import { NDeck } from "@/components/n-deck";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useNow } from "@/components/now-provider";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,14 +13,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { supabase } from "@/lib/supabase";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { handleDbError, OperationType } from "@/lib/db-error";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
-import { BrainCircuit, Plus, LogOut } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BrainCircuit, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNow } from "@/components/now-provider";
+import { useState } from "react";
 
 import { Navbar } from "@/components/navbar";
 
@@ -42,7 +42,7 @@ interface Flashcard {
 
 export default function Home() {
   const router = useRouter();
-  const { user, loading, signInWithGoogle, logout } = useAuth();
+  const { user, loading, signInWithGoogle } = useAuth();
   const queryClient = useQueryClient();
   const nowTime = useNow();
 
@@ -548,59 +548,113 @@ export default function Home() {
             </DialogContent>
           </Dialog>
         </div>
-
-        {showPlaceholder ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <NDeck key={i} isPlaceholder />
-            ))}
-          </div>
-        ) : decks.length === 0 ? (
-          <div className="text-center py-20 bg-background rounded-lg border border-dashed">
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              No decks yet
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first deck to start adding flashcards.
-            </p>
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Create Deck
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
-            {decks.map((deck) => {
-              const stats = getDeckStats(deck.id);
-              const isRecentlyUpdated =
-                stats.latestCardCreatedAt > 0 &&
-                nowTime - stats.latestCardCreatedAt <= 5000;
-              return (
-                <NDeck
-                  key={deck.id}
-                  id={deck.id}
-                  name={deck.name}
-                  description={deck.description}
-                  totalCards={stats.total}
-                  newCount={stats.new}
-                  learningCount={stats.learn}
-                  dueCount={stats.due}
-                  isRecentlyUpdated={isRecentlyUpdated}
-                  studyHref={`/study/${deck.id}`}
-                  manageHref={`/deck/${deck.id}`}
-                  onAddCard={() => setDeckToAddCard(deck)}
-                  onEdit={() => {
-                    setDeckToRename(deck);
-                    setRenameDeckName(deck.name);
-                    setRenameDeckDesc(deck.description ?? "");
-                  }}
-                  onDelete={() => setDeckToDelete(deck)}
-                />
-              );
-            })}
-          </div>
-        )}
+        <DecksSection
+          showPlaceholder={showPlaceholder}
+          decks={decks}
+          getDeckStats={getDeckStats}
+          nowTime={nowTime}
+          onCreateDeck={() => setIsDialogOpen(true)}
+          onAddCard={(deck) => setDeckToAddCard(deck)}
+          onEdit={(deck) => {
+            setDeckToRename(deck);
+            setRenameDeckName(deck.name);
+            setRenameDeckDesc(deck.description ?? "");
+          }}
+          onDelete={(deck) => setDeckToDelete(deck)}
+        />
       </main>
+    </div>
+  );
+}
+
+interface DeckStats {
+  total: number;
+  new: number;
+  learn: number;
+  due: number;
+  latestCardCreatedAt: number;
+}
+
+function DecksSection({
+  showPlaceholder,
+  decks,
+  getDeckStats,
+  nowTime,
+  onCreateDeck,
+  onAddCard,
+  onEdit,
+  onDelete,
+}: {
+  showPlaceholder: boolean;
+  decks: Deck[];
+  getDeckStats: (deckId: string) => DeckStats;
+  nowTime: number;
+  onCreateDeck: () => void;
+  onAddCard: (deck: Deck) => void;
+  onEdit: (deck: Deck) => void;
+  onDelete: (deck: Deck) => void;
+}) {
+  if (showPlaceholder) {
+    return (
+      <DeckWrapper>
+        {Array.from({ length: 9 }).map((_, i) => (
+          <NDeck key={i} isPlaceholder />
+        ))}
+      </DeckWrapper>
+    );
+  }
+
+  if (decks.length === 0) {
+    return (
+      <div className="text-center py-20 bg-background rounded-lg border border-dashed">
+        <h3 className="text-lg font-medium text-foreground mb-2">
+          No decks yet
+        </h3>
+        <p className="text-muted-foreground mb-6">
+          Create your first deck to start adding flashcards.
+        </p>
+        <Button onClick={onCreateDeck}>
+          <Plus className="h-4 w-4" />
+          Create Deck
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <DeckWrapper>
+      {decks.map((deck) => {
+        const stats = getDeckStats(deck.id);
+        const isRecentlyUpdated =
+          stats.latestCardCreatedAt > 0 &&
+          nowTime - stats.latestCardCreatedAt <= 5000;
+        return (
+          <NDeck
+            key={deck.id}
+            id={deck.id}
+            name={deck.name}
+            description={deck.description}
+            totalCards={stats.total}
+            newCount={stats.new}
+            learningCount={stats.learn}
+            dueCount={stats.due}
+            isRecentlyUpdated={isRecentlyUpdated}
+            studyHref={`/study/${deck.id}`}
+            manageHref={`/deck/${deck.id}`}
+            onAddCard={() => onAddCard(deck)}
+            onEdit={() => onEdit(deck)}
+            onDelete={() => onDelete(deck)}
+          />
+        );
+      })}
+    </DeckWrapper>
+  );
+}
+
+function DeckWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
+      {children}
     </div>
   );
 }

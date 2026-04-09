@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 
-type TNCardProps =
+type TNDeckCardProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
@@ -20,7 +20,7 @@ type TNCardProps =
       onDelete: () => void;
     };
 
-export function NCard(props: TNCardProps) {
+export function NDeckCard(props: TNDeckCardProps) {
   const { isPlaceholder } = props;
 
   const front = isPlaceholder ? "This is the front of the card" : props.front;
@@ -37,9 +37,9 @@ export function NCard(props: TNCardProps) {
       <Dots />
       {/* Menu */}
       {!isPlaceholder && (
-        <div className="absolute top-2 right-2 z-10">
+        <div className="absolute top-1 right-1 z-10">
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-accent h-8 w-8 shrink-0 focus-visible:outline-none">
+            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-sm font-medium hover:bg-accent h-8 w-8 shrink-0 focus-visible:outline-none">
               <MoreVertical className="h-4 w-4 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
@@ -64,8 +64,8 @@ export function NCard(props: TNCardProps) {
       )}
 
       {/* Front */}
-      <div className="w-full flex flex-col items-start px-5 pt-5 pb-4 relative bg-card">
-        <p className="shrink max-w-full min-w-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+      <div className="px-5 py-4 w-full flex flex-col items-start relative bg-card gap-2">
+        <p className="shrink max-w-full pr-4 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Front
         </p>
         <p className="shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
@@ -77,8 +77,8 @@ export function NCard(props: TNCardProps) {
       <div className="w-full h-px bg-border relative z-10" />
 
       {/* Back */}
-      <div className="px-5 pt-3 pb-5 relative w-full flex flex-col items-start">
-        <p className="shrink max-w-full min-w-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+      <div className="px-5 py-4 relative w-full flex flex-col items-start gap-2">
+        <p className="shrink max-w-full pr-4 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
         <p className="shrink max-w-full min-w-0 text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">

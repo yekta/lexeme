@@ -184,7 +184,7 @@ export default function DeckPage() {
     <div className="min-h-screen">
       <Navbar />
 
-      <main className="max-w-5xl mx-auto p-5 space-y-5">
+      <main className="max-w-5xl mx-auto p-5 pb-16 space-y-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Link href="/" className="shrink-0 -ml-2">

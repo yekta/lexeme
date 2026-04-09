@@ -60,8 +60,12 @@ export default function Home() {
   const [deckToRename, setDeckToRename] = useState<Deck | null>(null);
   const [renameDeckName, setRenameDeckName] = useState("");
   const [renameDeckDesc, setRenameDeckDesc] = useState("");
-  const [renameNewCardsPerDay, setRenameNewCardsPerDay] = useState(DEFAULT_NEW_CARDS_PER_DAY);
-  const [renameMaxReviewsPerDay, setRenameMaxReviewsPerDay] = useState(DEFAULT_MAX_REVIEWS_PER_DAY);
+  const [renameNewCardsPerDay, setRenameNewCardsPerDay] = useState(
+    DEFAULT_NEW_CARDS_PER_DAY,
+  );
+  const [renameMaxReviewsPerDay, setRenameMaxReviewsPerDay] = useState(
+    DEFAULT_MAX_REVIEWS_PER_DAY,
+  );
   const [deckToAddCard, setDeckToAddCard] = useState<Deck | null>(null);
   const [newCardFront, setNewCardFront] = useState("");
   const [newCardBack, setNewCardBack] = useState("");
@@ -102,8 +106,7 @@ export default function Home() {
         .from("review_logs")
         .select("card_id, state")
         .gte("review", startOfDay.toISOString());
-      if (error)
-        await handleDbError(error, OperationType.GET, "review_logs");
+      if (error) await handleDbError(error, OperationType.GET, "review_logs");
       return (data ?? []) as { card_id: string; state: string }[];
     },
     enabled: !!user,
@@ -265,7 +268,8 @@ export default function Home() {
     ).size;
 
     const newCardsPerDay = deck?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
-    const maxReviewsPerDay = deck?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
+    const maxReviewsPerDay =
+      deck?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
 
     const totalNewCards = deckCards.filter((c) => c.state === "new").length;
     const learnCards = deckCards.filter(
@@ -461,9 +465,11 @@ export default function Home() {
                       renameDeckDesc.trim() ===
                         (deckToRename?.description ?? "") &&
                       renameNewCardsPerDay ===
-                        (deckToRename?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY) &&
+                        (deckToRename?.new_cards_per_day ??
+                          DEFAULT_NEW_CARDS_PER_DAY) &&
                       renameMaxReviewsPerDay ===
-                        (deckToRename?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY))
+                        (deckToRename?.max_reviews_per_day ??
+                          DEFAULT_MAX_REVIEWS_PER_DAY))
                   }
                   isPending={renameDeckMutation.isPending}
                 >
@@ -654,8 +660,12 @@ export default function Home() {
             setDeckToRename(deck);
             setRenameDeckName(deck.name);
             setRenameDeckDesc(deck.description ?? "");
-            setRenameNewCardsPerDay(deck.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY);
-            setRenameMaxReviewsPerDay(deck.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY);
+            setRenameNewCardsPerDay(
+              deck.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY,
+            );
+            setRenameMaxReviewsPerDay(
+              deck.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY,
+            );
           }}
           onDelete={(deck) => setDeckToDelete(deck)}
         />
@@ -750,7 +760,7 @@ function DecksSection({
 
 function DeckWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2 pb-16">
       {children}
     </div>
   );

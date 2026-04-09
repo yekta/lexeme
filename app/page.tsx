@@ -318,7 +318,7 @@ export default function Home() {
 
   if (!loading && !user) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <div className="max-w-md text-center space-y-6">
           <BrainCircuit className="mx-auto h-16 w-16 text-brand" />
           <h1 className="text-4xl font-bold tracking-tight text-foreground">

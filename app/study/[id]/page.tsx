@@ -103,7 +103,7 @@ export default function StudyPage() {
   const deckName = deckData?.name ?? "Loading...";
 
   const { data: studyData, isPending: isPendingCards } = useQuery({
-    queryKey: ["studyCards", id, user?.id],
+    queryKey: ["studyCards", id, user?.id, deckData?.new_cards_per_day, deckData?.max_reviews_per_day],
     staleTime: 0,
     gcTime: 0,
     queryFn: async () => {
@@ -189,7 +189,7 @@ export default function StudyPage() {
 
       return { totalCards: count ?? 0, dueCards: shuffled };
     },
-    enabled: !!user && !!id,
+    enabled: !!user && !!id && !!deckData,
   });
 
   const isPending = isPendingDecks || isPendingCards;

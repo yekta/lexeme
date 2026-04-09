@@ -58,11 +58,11 @@ export function Navbar({ backHref, title, rightActions }: NavbarProps) {
                 render={
                   <Button
                     variant="ghost"
-                    className="relative h-8 w-8 rounded-full"
+                    className="relative h-8 w-8 rounded-full border-[2px] border-border hover:border-foreground/50 active:border-foreground/50"
                   />
                 }
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className="size-7">
                   <AvatarImage
                     src={user.user_metadata?.avatar_url || ""}
                     alt={user.email || ""}

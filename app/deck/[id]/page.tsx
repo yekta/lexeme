@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { NDeckCard } from "@/components/n-deck-card";
+import { NCardManage } from "@/components/n-card-manage";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
@@ -288,7 +288,7 @@ export default function DeckPage() {
         {showPlaceholder ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <NDeckCard key={i} isPlaceholder />
+              <NCardManage key={i} isPlaceholder />
             ))}
           </div>
         ) : cards.length === 0 ? (
@@ -307,7 +307,7 @@ export default function DeckPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {cards.map((card) => (
-              <NDeckCard
+              <NCardManage
                 key={card.id}
                 id={card.id}
                 front={card.front}

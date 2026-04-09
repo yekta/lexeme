@@ -4,14 +4,14 @@ import { useAuth } from "@/components/auth-provider";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 
-export interface UserSettingsRow {
+export type TUserSettingsRow = {
   user_id: string;
   request_retention: number;
   maximum_interval: number;
   w: number[] | null;
   enable_fuzz: boolean;
   enable_short_term: boolean;
-}
+};
 
 export const userSettingsKey = (userId: string | undefined) =>
   ["userSettings", userId] as const;
@@ -27,7 +27,7 @@ export function useUserSettings() {
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
-      return (data ?? null) as UserSettingsRow | null;
+      return (data ?? null) as TUserSettingsRow | null;
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,

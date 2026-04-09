@@ -66,13 +66,13 @@ function ThemeMenuItem() {
   );
 }
 
-interface NavbarProps {
+type TNavbarProps = {
   backHref?: string;
   title?: React.ReactNode;
   rightActions?: React.ReactNode;
-}
+};
 
-export function Navbar({ backHref, title, rightActions }: NavbarProps) {
+export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
   const { user, logout } = useAuth();
 
   return (

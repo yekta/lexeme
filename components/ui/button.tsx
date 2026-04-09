@@ -43,10 +43,10 @@ const buttonVariants = cva(
   },
 );
 
-interface ButtonProps
-  extends ButtonPrimitive.Props, VariantProps<typeof buttonVariants> {
-  isPending?: boolean;
-}
+type TButtonProps = ButtonPrimitive.Props &
+  VariantProps<typeof buttonVariants> & {
+    isPending?: boolean;
+  };
 
 function Button({
   className,
@@ -56,7 +56,7 @@ function Button({
   children,
   disabled,
   ...props
-}: ButtonProps) {
+}: TButtonProps) {
   const loaderColorClass = {
     default: "text-primary-foreground",
     outline: "text-foreground",

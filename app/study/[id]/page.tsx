@@ -8,7 +8,7 @@ import { useDeck } from "@/hooks/data/use-decks";
 import { useRateCard } from "@/hooks/data/use-rate-card";
 import {
   useStudyCards,
-  type StudyFlashcard,
+  type TStudyCard,
 } from "@/hooks/data/use-study-cards";
 import { useUserSettings } from "@/hooks/data/use-user-settings";
 import { useReviewTimer } from "@/hooks/use-review-timer";
@@ -26,18 +26,18 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-interface QueueItem {
-  card: StudyFlashcard;
+type TQueueItem = {
+  card: TStudyCard;
   isRequeued: boolean;
   dueTime: number;
-}
+};
 
 export default function StudyPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const { user, loading } = useAuth();
 
-  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [queue, setQueue] = useState<TQueueItem[]>([]);
   const [reviewedCount, setReviewedCount] = useState(0);
 
   const { data: userSettings } = useUserSettings();
@@ -106,11 +106,11 @@ export default function StudyPage() {
             if (!current) return prev;
 
             if (intervalMs < SHORT_INTERVAL_MS) {
-              const updatedCard: StudyFlashcard = {
+              const updatedCard: TStudyCard = {
                 ...current.card,
                 ...dbFields,
               };
-              const requeued: QueueItem = {
+              const requeued: TQueueItem = {
                 card: updatedCard,
                 isRequeued: true,
                 dueTime: newDueMs,

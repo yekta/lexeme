@@ -147,7 +147,7 @@ export const reviewLogs = pgTable(
   (t) => [index("review_logs_card_id_review_idx").on(t.cardId, t.review)],
 );
 
-export type Deck = typeof decks.$inferSelect;
-export type Card = typeof cards.$inferSelect;
-export type UserSettings = typeof userSettings.$inferSelect;
-export type ReviewLog = typeof reviewLogs.$inferSelect;
+export type TDeck = typeof decks.$inferSelect;
+export type TCard = typeof cards.$inferSelect;
+export type TUserSettings = typeof userSettings.$inferSelect;
+export type TReviewLog = typeof reviewLogs.$inferSelect;

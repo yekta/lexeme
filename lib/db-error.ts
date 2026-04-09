@@ -9,7 +9,7 @@ export enum OperationType {
   WRITE = "write",
 }
 
-export interface DbErrorInfo {
+export type TDbErrorInfo = {
   error: string;
   operationType: OperationType;
   path: string | null;
@@ -17,7 +17,7 @@ export interface DbErrorInfo {
     userId?: string;
     email?: string | null;
   };
-}
+};
 
 export async function handleDbError(
   error: unknown,
@@ -27,7 +27,7 @@ export async function handleDbError(
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
 
-  const errInfo: DbErrorInfo = {
+  const errInfo: TDbErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: user?.id,

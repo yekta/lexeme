@@ -6,20 +6,20 @@ import { supabase } from "@/lib/supabase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invalidateCards } from "./use-cards";
 
-export interface Deck {
+export type TDeck = {
   id: string;
   name: string;
   description: string;
   new_cards_per_day: number;
   max_reviews_per_day: number;
   created_at: string;
-}
+};
 
-export interface DeckSummary {
+export type TDeckSummary = {
   name: string;
   new_cards_per_day: number;
   max_reviews_per_day: number;
-}
+};
 
 export const decksKey = (userId: string | undefined) =>
   ["decks", userId] as const;
@@ -37,7 +37,7 @@ export function useDecks() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) await handleDbError(error, OperationType.GET, "decks");
-      return (data ?? []) as Deck[];
+      return (data ?? []) as TDeck[];
     },
     enabled: !!user,
   });
@@ -55,7 +55,7 @@ export function useDeck(id: string | undefined) {
         .eq("id", id)
         .single();
       if (error || !data) return null;
-      return data as DeckSummary;
+      return data as TDeckSummary;
     },
     enabled: !!user && !!id,
   });
@@ -109,11 +109,7 @@ export function useUpdateDeck() {
         })
         .eq("id", input.id);
       if (error)
-        await handleDbError(
-          error,
-          OperationType.UPDATE,
-          `decks/${input.id}`,
-        );
+        await handleDbError(error, OperationType.UPDATE, `decks/${input.id}`);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: decksKey(user?.id) });
@@ -133,11 +129,7 @@ export function useDeleteDeck() {
         .delete()
         .eq("id", input.id);
       if (error)
-        await handleDbError(
-          error,
-          OperationType.DELETE,
-          `decks/${input.id}`,
-        );
+        await handleDbError(error, OperationType.DELETE, `decks/${input.id}`);
     },
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: decksKey(user?.id) });

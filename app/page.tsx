@@ -21,7 +21,7 @@ import {
   useDecks,
   useDeleteDeck,
   useUpdateDeck,
-  type Deck,
+  type TDeck,
 } from "@/hooks/data/use-decks";
 import { useTodayReviewLogs } from "@/hooks/data/use-review-logs";
 import {
@@ -44,9 +44,9 @@ export default function Home() {
   const [newDeckName, setNewDeckName] = useState("");
   const [newDeckDesc, setNewDeckDesc] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [deckToDelete, setDeckToDelete] = useState<Deck | null>(null);
+  const [deckToDelete, setDeckToDelete] = useState<TDeck | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [deckToRename, setDeckToRename] = useState<Deck | null>(null);
+  const [deckToRename, setDeckToRename] = useState<TDeck | null>(null);
   const [renameDeckName, setRenameDeckName] = useState("");
   const [renameDeckDesc, setRenameDeckDesc] = useState("");
   const [renameNewCardsPerDay, setRenameNewCardsPerDay] = useState(
@@ -55,7 +55,7 @@ export default function Home() {
   const [renameMaxReviewsPerDay, setRenameMaxReviewsPerDay] = useState(
     DEFAULT_MAX_REVIEWS_PER_DAY,
   );
-  const [deckToAddCard, setDeckToAddCard] = useState<Deck | null>(null);
+  const [deckToAddCard, setDeckToAddCard] = useState<TDeck | null>(null);
   const [newCardFront, setNewCardFront] = useState("");
   const [newCardBack, setNewCardBack] = useState("");
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -551,13 +551,13 @@ export default function Home() {
   );
 }
 
-interface DeckStats {
+type TDeckStats = {
   total: number;
   new: number;
   learn: number;
   due: number;
   latestCardCreatedAt: number;
-}
+};
 
 function DecksSection({
   showPlaceholder,
@@ -570,13 +570,13 @@ function DecksSection({
   onDelete,
 }: {
   showPlaceholder: boolean;
-  decks: Deck[];
-  getDeckStats: (deckId: string) => DeckStats;
+  decks: TDeck[];
+  getDeckStats: (deckId: string) => TDeckStats;
   nowTime: number;
   onCreateDeck: () => void;
-  onAddCard: (deck: Deck) => void;
-  onEdit: (deck: Deck) => void;
-  onDelete: (deck: Deck) => void;
+  onAddCard: (deck: TDeck) => void;
+  onEdit: (deck: TDeck) => void;
+  onDelete: (deck: TDeck) => void;
 }) {
   if (showPlaceholder) {
     return (

@@ -2,22 +2,22 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 
-interface Props {
+type TProps = {
   children?: ReactNode;
-}
+};
 
-interface State {
+type TState = {
   hasError: boolean;
   error: Error | null;
-}
+};
 
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+export class ErrorBoundary extends Component<TProps, TState> {
+  public state: TState = {
     hasError: false,
     error: null
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): TState {
     return { hasError: true, error };
   }
 

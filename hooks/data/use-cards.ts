@@ -10,19 +10,19 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-export interface Flashcard {
+export type TCard = {
   id: string;
   front: string;
   back: string;
-}
+};
 
-export interface FlashcardListItem {
+export type TCardListItem = {
   id: string;
   deck_id: string;
   due: string;
   state: string;
   created_at: string;
-}
+};
 
 export const cardsKey = (userId: string | undefined) =>
   ["cards", userId] as const;
@@ -61,7 +61,7 @@ export function useCards() {
       if (!user) return [];
       const { data, error } = await supabase.from("cards").select("*");
       if (error) await handleDbError(error, OperationType.GET, "cards");
-      return (data ?? []) as FlashcardListItem[];
+      return (data ?? []) as TCardListItem[];
     },
     enabled: !!user,
   });
@@ -78,7 +78,7 @@ export function useCardsByDeck(deckId: string | undefined) {
         .select("*")
         .eq("deck_id", deckId);
       if (error) await handleDbError(error, OperationType.GET, "cards");
-      return (data ?? []) as Flashcard[];
+      return (data ?? []) as TCard[];
     },
     enabled: !!user && !!deckId,
   });

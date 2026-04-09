@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 
-type NCardProps =
+type TNCardProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
@@ -20,7 +20,7 @@ type NCardProps =
       onDelete: () => void;
     };
 
-export function NCard(props: NCardProps) {
+export function NCard(props: TNCardProps) {
   const { isPlaceholder } = props;
 
   const front = isPlaceholder ? "This is the front of the card" : props.front;

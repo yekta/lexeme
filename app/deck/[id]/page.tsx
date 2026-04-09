@@ -20,7 +20,7 @@ import {
   useCreateCard,
   useDeleteCard,
   useUpdateCard,
-  type Flashcard,
+  type TCard,
 } from "@/hooks/data/use-cards";
 import { useDeck } from "@/hooks/data/use-decks";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,7 @@ export default function DeckPage() {
   const [newBack, setNewBack] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<string | null>(null);
-  const [cardToEdit, setCardToEdit] = useState<Flashcard | null>(null);
+  const [cardToEdit, setCardToEdit] = useState<TCard | null>(null);
   const [editFront, setEditFront] = useState("");
   const [editBack, setEditBack] = useState("");
 

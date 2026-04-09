@@ -5,10 +5,10 @@ import { handleDbError, OperationType } from "@/lib/db-error";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 
-export interface TodayReviewLog {
+export type TTodayReviewLog = {
   card_id: string;
   state: string;
-}
+};
 
 export const todayReviewLogsKey = (userId: string | undefined) =>
   ["todayReviewLogs", userId] as const;
@@ -26,7 +26,7 @@ export function useTodayReviewLogs() {
         .select("card_id, state")
         .gte("review", startOfDay.toISOString());
       if (error) await handleDbError(error, OperationType.GET, "review_logs");
-      return (data ?? []) as TodayReviewLog[];
+      return (data ?? []) as TTodayReviewLog[];
     },
     enabled: !!user,
   });

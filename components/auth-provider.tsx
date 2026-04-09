@@ -4,14 +4,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-interface AuthContextType {
+type TAuthContext = {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-}
+};
 
-const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext<TAuthContext>({
   user: null,
   loading: true,
   signInWithGoogle: async () => {},

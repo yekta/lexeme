@@ -7,7 +7,7 @@ import { useState, useRef } from "react";
 import { motion, useMotionValue, useTransform, animate } from "motion/react";
 import Dots from "@/components/dots";
 
-type NCardStudyProps =
+type TNCardStudyProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
@@ -36,7 +36,7 @@ function rubberBand(raw: number): number {
   return sign * (limit + excess / (1 + excess * k));
 }
 
-const placeholderProps: Omit<RatingButtonsProps, "visible"> = {
+const placeholderProps: Omit<TRatingButtonsProps, "visible"> = {
   isPlaceholder: true,
   onRate: () => {},
   ratingPending: false,
@@ -47,7 +47,7 @@ const placeholderProps: Omit<RatingButtonsProps, "visible"> = {
   easyLabel: "5d",
 };
 
-export function NCardStudy(props: NCardStudyProps) {
+export function NCardStudy(props: TNCardStudyProps) {
   const { isPlaceholder } = props;
 
   const [isGrabbing, setIsGrabbing] = useState(false);
@@ -215,7 +215,7 @@ export function NCardStudy(props: NCardStudyProps) {
   );
 }
 
-type RatingButtonsProps = {
+type TRatingButtonsProps = {
   isPlaceholder?: boolean;
   visible: boolean;
   ratingPending: boolean;
@@ -236,7 +236,7 @@ function RatingButtons({
   hardLabel,
   goodLabel,
   easyLabel,
-}: RatingButtonsProps) {
+}: TRatingButtonsProps) {
   return (
     <div
       className={cn(

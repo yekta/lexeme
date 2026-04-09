@@ -20,7 +20,7 @@ import { MoreVertical, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "motion/react";
 
-type NDeckProps =
+type TNDeckProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
@@ -39,7 +39,7 @@ type NDeckProps =
       onDelete: () => void;
     };
 
-export function NDeck(props: NDeckProps) {
+export function NDeck(props: TNDeckProps) {
   const { isPlaceholder } = props;
 
   const name = isPlaceholder ? "Deck Name" : props.name;

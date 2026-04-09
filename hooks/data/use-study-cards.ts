@@ -9,9 +9,9 @@ import { handleDbError, OperationType } from "@/lib/db-error";
 import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-import type { DeckSummary } from "./use-decks";
+import type { TDeckSummary } from "./use-decks";
 
-export interface StudyFlashcard {
+export type TStudyCard = {
   id: string;
   front: string;
   back: string;
@@ -25,7 +25,7 @@ export interface StudyFlashcard {
   state: string;
   learning_steps: number;
   last_review: string | null;
-}
+};
 
 export const studyCardsKey = (
   deckId: string,
@@ -43,7 +43,7 @@ export const studyCardsKey = (
 
 export function useStudyCards(
   deckId: string | undefined,
-  deck: DeckSummary | null | undefined,
+  deck: TDeckSummary | null | undefined,
 ) {
   const { user } = useAuth();
   return useQuery({
@@ -74,7 +74,7 @@ export function useStudyCards(
         await handleDbError(countError, OperationType.GET, "cards");
       if (error) await handleDbError(error, OperationType.GET, "cards");
 
-      const allDueCards = (data ?? []) as StudyFlashcard[];
+      const allDueCards = (data ?? []) as TStudyCard[];
 
       // Count today's reviews to enforce daily limits
       const startOfDay = new Date();

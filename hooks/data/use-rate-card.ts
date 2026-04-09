@@ -12,13 +12,13 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cardsByDeckKey, cardsKey } from "./use-cards";
-import type { StudyFlashcard } from "./use-study-cards";
+import type { TStudyCard } from "./use-study-cards";
 
-export interface RateCardVariables {
+export type TRateCardVariables = {
   rating: Grade;
-  currentCard: StudyFlashcard;
+  currentCard: TStudyCard;
   durationMs: number;
-}
+};
 
 /**
  * Mutation hook for rating a card during study. Owns the DB writes (card
@@ -33,7 +33,7 @@ export function useRateCard(scheduler: FSRS, deckId: string | undefined) {
       rating,
       currentCard,
       durationMs,
-    }: RateCardVariables) => {
+    }: TRateCardVariables) => {
       const fsrsCard = dbRowToFSRSCard(currentCard);
       const now = new Date();
       const result = scheduler.next(fsrsCard, now, rating);

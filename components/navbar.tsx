@@ -11,8 +11,61 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, LogOut } from "lucide-react";
+import {
+  AvailableThemesEnum,
+  DEFAULT_NON_SYSTEM_THEME,
+  TTheme,
+} from "@/lib/constants";
+import {
+  ArrowLeftIcon,
+  LogOutIcon,
+  MoonIcon,
+  SunIcon,
+  MonitorSmartphoneIcon,
+} from "lucide-react";
+import { useTheme } from "next-themes";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
+  light: { label: "Light", icon: SunIcon },
+  dark: { label: "Dark", icon: MoonIcon },
+  system: { label: "System", icon: MonitorSmartphoneIcon },
+};
+
+function ThemeMenuItem() {
+  const { theme, setTheme, themes, systemTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const current = mounted ? theme : undefined;
+  const resolved = current === "system" ? systemTheme : current;
+  const labelParsed = AvailableThemesEnum.safeParse(current);
+  const iconParsed = AvailableThemesEnum.safeParse(resolved);
+  const label = labelParsed.success
+    ? THEME_META[labelParsed.data].label
+    : THEME_META[DEFAULT_NON_SYSTEM_THEME].label;
+  const Icon = iconParsed.success
+    ? THEME_META[iconParsed.data].icon
+    : THEME_META[DEFAULT_NON_SYSTEM_THEME].icon;
+
+  const cycleTheme = () => {
+    if (!current) return;
+    const idx = themes.indexOf(current);
+    const next = themes[(idx + 1) % themes.length];
+    setTheme(next);
+  };
+
+  return (
+    <DropdownMenuItem closeOnClick={false} onClick={cycleTheme}>
+      <Icon className="mr-2 h-4 w-4" />
+      <span>Theme: {label}</span>
+    </DropdownMenuItem>
+  );
+}
 
 interface NavbarProps {
   backHref?: string;
@@ -36,7 +89,7 @@ export function Navbar({ backHref, title, rightActions }: NavbarProps) {
               {backHref && (
                 <Link href={backHref} className="shrink-0">
                   <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeftIcon className="h-4 w-4" />
                   </Button>
                 </Link>
               )}
@@ -81,8 +134,9 @@ export function Navbar({ backHref, title, rightActions }: NavbarProps) {
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <ThemeMenuItem />
                 <DropdownMenuItem onClick={logout} className="cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOutIcon className="mr-2 h-4 w-4" />
                   <span>Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>

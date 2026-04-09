@@ -5,7 +5,9 @@ import { Providers } from "@/components/query-provider";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import NextTopLoader from "nextjs-toploader";
+import { DEFAULT_THEME } from "@/lib/constants";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -24,19 +26,23 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(
-        "font-sans dark bg-background text-foreground",
-        geist.variable,
-      )}
+      className={cn("font-sans bg-background text-foreground", geist.variable)}
+      suppressHydrationWarning
     >
       <body suppressHydrationWarning>
         <NextTopLoader color="var(--primary)" showSpinner={false} />
         <ErrorBoundary>
-          <AuthProvider>
-            <Providers>
-              <NowProvider>{children}</NowProvider>
-            </Providers>
-          </AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme={DEFAULT_THEME}
+            enableSystem
+          >
+            <AuthProvider>
+              <Providers>
+                <NowProvider>{children}</NowProvider>
+              </Providers>
+            </AuthProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

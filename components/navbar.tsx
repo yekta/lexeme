@@ -34,7 +34,7 @@ const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
 };
 
 function ThemeMenuItem() {
-  const { theme, setTheme, themes, systemTheme } = useTheme();
+  const { theme, setTheme, themes } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -42,14 +42,13 @@ function ThemeMenuItem() {
   }, []);
 
   const current = mounted ? theme : undefined;
-  const resolved = current === "system" ? systemTheme : current;
-  const labelParsed = AvailableThemesEnum.safeParse(current);
-  const iconParsed = AvailableThemesEnum.safeParse(resolved);
-  const label = labelParsed.success
-    ? THEME_META[labelParsed.data].label
+
+  const themeForLabel = AvailableThemesEnum.safeParse(current);
+  const label = themeForLabel.success
+    ? THEME_META[themeForLabel.data].label
     : THEME_META[DEFAULT_NON_SYSTEM_THEME].label;
-  const Icon = iconParsed.success
-    ? THEME_META[iconParsed.data].icon
+  const Icon = themeForLabel.success
+    ? THEME_META[themeForLabel.data].icon
     : THEME_META[DEFAULT_NON_SYSTEM_THEME].icon;
 
   const cycleTheme = () => {

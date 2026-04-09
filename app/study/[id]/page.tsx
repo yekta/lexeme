@@ -6,6 +6,10 @@ import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { handleDbError, OperationType } from "@/lib/db-error";
 import {
+  DEFAULT_MAX_REVIEWS_PER_DAY,
+  DEFAULT_NEW_CARDS_PER_DAY,
+} from "@/lib/constants";
+import {
   createUserScheduler,
   dbRowToFSRSCard,
   formatInterval,
@@ -74,25 +78,29 @@ export default function StudyPage() {
     [userSettings],
   );
 
-  const { data: deckName = "Loading...", isPending: isPendingDecks } = useQuery(
-    {
-      queryKey: ["deck", id],
-      queryFn: async () => {
-        if (!user || !id) return "Loading...";
-        const { data, error } = await supabase
-          .from("decks")
-          .select("name")
-          .eq("id", id)
-          .single();
-        if (error || !data) {
-          router.push("/");
-          return "Deck not found";
-        }
-        return data.name as string;
-      },
-      enabled: !!user && !!id,
+  const { data: deckData, isPending: isPendingDecks } = useQuery({
+    queryKey: ["deck", id],
+    queryFn: async () => {
+      if (!user || !id) return null;
+      const { data, error } = await supabase
+        .from("decks")
+        .select("name, new_cards_per_day, max_reviews_per_day")
+        .eq("id", id)
+        .single();
+      if (error || !data) {
+        router.push("/");
+        return null;
+      }
+      return data as {
+        name: string;
+        new_cards_per_day: number;
+        max_reviews_per_day: number;
+      };
     },
-  );
+    enabled: !!user && !!id,
+  });
+
+  const deckName = deckData?.name ?? "Loading...";
 
   const { data: studyData, isPending: isPendingCards } = useQuery({
     queryKey: ["studyCards", id, user?.id],
@@ -117,8 +125,69 @@ export default function StudyPage() {
         await handleDbError(countError, OperationType.GET, "cards");
       if (error) await handleDbError(error, OperationType.GET, "cards");
 
-      const shuffled = [...(data ?? [])].sort(() => Math.random() - 0.5);
-      return { totalCards: count ?? 0, dueCards: shuffled as Flashcard[] };
+      const allDueCards = (data ?? []) as Flashcard[];
+
+      // Count today's reviews to enforce daily limits
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const cardIds = allDueCards.map((c) => c.id);
+      let newReviewedToday = 0;
+      let reviewReviewedToday = 0;
+
+      if (cardIds.length > 0) {
+        // Get all card IDs in this deck (not just due ones) for review log counting
+        const { data: allDeckCards } = await supabase
+          .from("cards")
+          .select("id")
+          .eq("deck_id", id);
+
+        const allDeckCardIds = (allDeckCards ?? []).map(
+          (c: { id: string }) => c.id,
+        );
+
+        if (allDeckCardIds.length > 0) {
+          const { data: todayLogs } = await supabase
+            .from("review_logs")
+            .select("card_id, state")
+            .in("card_id", allDeckCardIds)
+            .gte("review", startOfDay.toISOString());
+
+          if (todayLogs) {
+            const newCardIds = new Set<string>();
+            const reviewCardIds = new Set<string>();
+            for (const log of todayLogs) {
+              if (log.state === "new") newCardIds.add(log.card_id);
+              else if (log.state === "review") reviewCardIds.add(log.card_id);
+            }
+            newReviewedToday = newCardIds.size;
+            reviewReviewedToday = reviewCardIds.size;
+          }
+        }
+      }
+
+      // Partition cards by type
+      const newCards = allDueCards.filter((c) => c.state === "new");
+      const reviewCards = allDueCards.filter((c) => c.state === "review");
+      const learningCards = allDueCards.filter(
+        (c) => c.state === "learning" || c.state === "relearning",
+      );
+
+      // Apply daily limits
+      const newCardsPerDay = deckData?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
+      const maxReviewsPerDay = deckData?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
+
+      const newLimit = Math.max(0, newCardsPerDay - newReviewedToday);
+      const reviewLimit = Math.max(0, maxReviewsPerDay - reviewReviewedToday);
+
+      const limitedNew = newCards.slice(0, newLimit);
+      const limitedReview = reviewCards.slice(0, reviewLimit);
+
+      // Learning cards are always shown (not limited)
+      const limitedCards = [...limitedNew, ...learningCards, ...limitedReview];
+      const shuffled = limitedCards.sort(() => Math.random() - 0.5);
+
+      return { totalCards: count ?? 0, dueCards: shuffled };
     },
     enabled: !!user && !!id,
   });

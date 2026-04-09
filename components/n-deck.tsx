@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "motion/react";
 
@@ -84,8 +84,8 @@ export function NDeck(props: NDeckProps) {
                   className="cursor-pointer"
                   onClick={isPlaceholder ? undefined : props.onEdit}
                 >
-                  <Pencil className="h-4 w-4" />
-                  Edit
+                  <Settings className="h-4 w-4" />
+                  Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"

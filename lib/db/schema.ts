@@ -10,6 +10,10 @@ import {
   index,
   pgSchema,
 } from "drizzle-orm/pg-core";
+import {
+  DEFAULT_MAX_REVIEWS_PER_DAY,
+  DEFAULT_NEW_CARDS_PER_DAY,
+} from "@/lib/constants";
 
 export const cardStateEnum = pgEnum("card_state", [
   "new",
@@ -47,6 +51,12 @@ export const decks = pgTable(
       .notNull(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
+    newCardsPerDay: integer("new_cards_per_day")
+      .notNull()
+      .default(DEFAULT_NEW_CARDS_PER_DAY),
+    maxReviewsPerDay: integer("max_reviews_per_day")
+      .notNull()
+      .default(DEFAULT_MAX_REVIEWS_PER_DAY),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

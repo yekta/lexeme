@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DEFAULT_MAX_REVIEWS_PER_DAY,
+  DEFAULT_NEW_CARDS_PER_DAY,
+} from "@/lib/constants";
 import { handleDbError, OperationType } from "@/lib/db-error";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -29,6 +33,8 @@ interface Deck {
   id: string;
   name: string;
   description: string;
+  new_cards_per_day: number;
+  max_reviews_per_day: number;
   created_at: string;
 }
 
@@ -54,6 +60,8 @@ export default function Home() {
   const [deckToRename, setDeckToRename] = useState<Deck | null>(null);
   const [renameDeckName, setRenameDeckName] = useState("");
   const [renameDeckDesc, setRenameDeckDesc] = useState("");
+  const [renameNewCardsPerDay, setRenameNewCardsPerDay] = useState(DEFAULT_NEW_CARDS_PER_DAY);
+  const [renameMaxReviewsPerDay, setRenameMaxReviewsPerDay] = useState(DEFAULT_MAX_REVIEWS_PER_DAY);
   const [deckToAddCard, setDeckToAddCard] = useState<Deck | null>(null);
   const [newCardFront, setNewCardFront] = useState("");
   const [newCardBack, setNewCardBack] = useState("");
@@ -80,6 +88,23 @@ export default function Home() {
       const { data, error } = await supabase.from("cards").select("*");
       if (error) await handleDbError(error, OperationType.GET, "cards");
       return (data ?? []) as Flashcard[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: todayReviewLogs = [] } = useQuery({
+    queryKey: ["todayReviewLogs", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const { data, error } = await supabase
+        .from("review_logs")
+        .select("card_id, state")
+        .gte("review", startOfDay.toISOString());
+      if (error)
+        await handleDbError(error, OperationType.GET, "review_logs");
+      return (data ?? []) as { card_id: string; state: string }[];
     },
     enabled: !!user,
   });
@@ -161,6 +186,8 @@ export default function Home() {
         .update({
           name: renameDeckName.trim(),
           description: renameDeckDesc.trim(),
+          new_cards_per_day: renameNewCardsPerDay,
+          max_reviews_per_day: renameMaxReviewsPerDay,
           updated_at: new Date().toISOString(),
         })
         .eq("id", deckToRename.id);
@@ -176,6 +203,8 @@ export default function Home() {
       setDeckToRename(null);
       setRenameDeckName("");
       setRenameDeckDesc("");
+      setRenameNewCardsPerDay(DEFAULT_NEW_CARDS_PER_DAY);
+      setRenameMaxReviewsPerDay(DEFAULT_MAX_REVIEWS_PER_DAY);
     },
     onError: (error) => {
       console.error(error);
@@ -220,17 +249,36 @@ export default function Home() {
 
   const getDeckStats = (deckId: string) => {
     const deckCards = cards.filter((c) => c.deck_id === deckId);
+    const deck = decks.find((d) => d.id === deckId);
     const now = new Date();
 
-    const newCards = deckCards.filter((c) => c.state === "new").length;
+    const deckCardIds = new Set(deckCards.map((c) => c.id));
+    const deckTodayLogs = todayReviewLogs.filter((l) =>
+      deckCardIds.has(l.card_id),
+    );
+
+    const newReviewedToday = new Set(
+      deckTodayLogs.filter((l) => l.state === "new").map((l) => l.card_id),
+    ).size;
+    const reviewReviewedToday = new Set(
+      deckTodayLogs.filter((l) => l.state === "review").map((l) => l.card_id),
+    ).size;
+
+    const newCardsPerDay = deck?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
+    const maxReviewsPerDay = deck?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
+
+    const totalNewCards = deckCards.filter((c) => c.state === "new").length;
     const learnCards = deckCards.filter(
       (c) =>
         (c.state === "learning" || c.state === "relearning") &&
         new Date(c.due) <= now,
     ).length;
-    const dueCards = deckCards.filter(
+    const totalDueCards = deckCards.filter(
       (c) => c.state === "review" && new Date(c.due) <= now,
     ).length;
+
+    const newLimit = Math.max(0, newCardsPerDay - newReviewedToday);
+    const reviewLimit = Math.max(0, maxReviewsPerDay - reviewReviewedToday);
 
     const latestCardCreatedAt = deckCards.reduce((latest, card) => {
       if (!card.created_at) return latest;
@@ -239,9 +287,9 @@ export default function Home() {
 
     return {
       total: deckCards.length,
-      new: newCards,
+      new: Math.min(totalNewCards, newLimit),
       learn: learnCards,
-      due: dueCards,
+      due: Math.min(totalDueCards, reviewLimit),
       latestCardCreatedAt,
     };
   };
@@ -319,14 +367,16 @@ export default function Home() {
                 setDeckToRename(null);
                 setRenameDeckName("");
                 setRenameDeckDesc("");
+                setRenameNewCardsPerDay(DEFAULT_NEW_CARDS_PER_DAY);
+                setRenameMaxReviewsPerDay(DEFAULT_MAX_REVIEWS_PER_DAY);
               }
             }}
           >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Deck</DialogTitle>
+                <DialogTitle>Settings</DialogTitle>
                 <DialogDescription>
-                  Update the name or description for this deck.
+                  Update the name, description, or daily limits for this deck.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -350,6 +400,45 @@ export default function Home() {
                     placeholder="e.g. Words from chapter 1-5"
                   />
                 </div>
+                <div className="border-t pt-4 space-y-4">
+                  <p className="text-sm font-medium">Daily Limits</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-cards-per-day">New cards/day</Label>
+                    <Input
+                      id="new-cards-per-day"
+                      type="number"
+                      min={0}
+                      value={renameNewCardsPerDay}
+                      onChange={(e) =>
+                        setRenameNewCardsPerDay(
+                          Math.max(0, parseInt(e.target.value) || 0),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The maximum number of new cards to introduce in a day.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="max-reviews-per-day">
+                      Maximum reviews/day
+                    </Label>
+                    <Input
+                      id="max-reviews-per-day"
+                      type="number"
+                      min={0}
+                      value={renameMaxReviewsPerDay}
+                      onChange={(e) =>
+                        setRenameMaxReviewsPerDay(
+                          Math.max(0, parseInt(e.target.value) || 0),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The maximum number of review cards to show in a day.
+                    </p>
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button
@@ -358,6 +447,8 @@ export default function Home() {
                     setDeckToRename(null);
                     setRenameDeckName("");
                     setRenameDeckDesc("");
+                    setRenameNewCardsPerDay(DEFAULT_NEW_CARDS_PER_DAY);
+                    setRenameMaxReviewsPerDay(DEFAULT_MAX_REVIEWS_PER_DAY);
                   }}
                 >
                   Cancel
@@ -368,7 +459,11 @@ export default function Home() {
                     !renameDeckName.trim() ||
                     (renameDeckName.trim() === deckToRename?.name &&
                       renameDeckDesc.trim() ===
-                        (deckToRename?.description ?? ""))
+                        (deckToRename?.description ?? "") &&
+                      renameNewCardsPerDay ===
+                        (deckToRename?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY) &&
+                      renameMaxReviewsPerDay ===
+                        (deckToRename?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY))
                   }
                   isPending={renameDeckMutation.isPending}
                 >
@@ -559,6 +654,8 @@ export default function Home() {
             setDeckToRename(deck);
             setRenameDeckName(deck.name);
             setRenameDeckDesc(deck.description ?? "");
+            setRenameNewCardsPerDay(deck.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY);
+            setRenameMaxReviewsPerDay(deck.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY);
           }}
           onDelete={(deck) => setDeckToDelete(deck)}
         />

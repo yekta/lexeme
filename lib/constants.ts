@@ -1,0 +1,2 @@
+export const DEFAULT_NEW_CARDS_PER_DAY = 20;
+export const DEFAULT_MAX_REVIEWS_PER_DAY = 200;

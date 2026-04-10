@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 export enum OperationType {
   CREATE = "create",
@@ -24,8 +24,9 @@ export async function handleDbError(
   operationType: OperationType,
   path: string | null,
 ): Promise<never> {
-  const { data } = await supabase.auth.getSession();
-  const user = data.session?.user;
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
 
   const errInfo: TDbErrorInfo = {
     error: error instanceof Error ? error.message : String(error),

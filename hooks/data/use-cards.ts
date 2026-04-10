@@ -2,7 +2,9 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { handleDbError, OperationType } from "@/lib/db-error";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 import {
   useMutation,
   useQuery,

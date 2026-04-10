@@ -1,7 +1,9 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 import { useQuery } from "@tanstack/react-query";
 
 export type TUserSettingsRow = {

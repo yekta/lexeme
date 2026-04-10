@@ -7,7 +7,9 @@ import {
 } from "@/lib/constants";
 import { handleDbError, OperationType } from "@/lib/db-error";
 import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 import { useQuery } from "@tanstack/react-query";
 import type { TDeckSummary } from "./use-decks";
 

@@ -9,7 +9,9 @@ import {
   type FSRS,
   type Grade,
 } from "@/lib/fsrs";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cardsByDeckKey, cardsKey } from "./use-cards";
 import { todayReviewLogsKey } from "./use-review-logs";

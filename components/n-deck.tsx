@@ -104,7 +104,7 @@ export function NDeck(props: TNDeckProps) {
             <div className="flex flex-col gap-3 mt-2">
               <div
                 className={cn(
-                  "text-sm font-medium w-fit transition-colors duration-300 rounded px-2 py-0.5 -ml-2",
+                  "text-sm w-full transition-colors duration-300 rounded px-2 py-0.5 -ml-2",
                   isRecentlyUpdated
                     ? "bg-success-muted text-success-foreground"
                     : "text-muted-foreground bg-transparent",
@@ -114,7 +114,7 @@ export function NDeck(props: TNDeckProps) {
                   {totalCards} {totalCards === 1 ? "card" : "cards"}
                 </p>
               </div>
-              <div className="flex items-center gap-4 text-sm font-medium">
+              <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1.5 text-state-new group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-new group-data-placeholder:opacity-0" />
                   {newCount} New

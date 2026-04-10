@@ -182,7 +182,7 @@ export default function Home() {
                 "text-transparent bg-skeleton animate-pulse rounded w-48 select-none",
             )}
           >
-            {showPlaceholder ? "\u00a0" : `Decks`}{" "}
+            Decks{" "}
             {!showPlaceholder && (
               <span className="font-normal text-muted-foreground">
                 ({decks.length})
@@ -250,8 +250,8 @@ export default function Home() {
                 />
               }
             >
-              <Plus className={cn("h-4 w-4", showPlaceholder && "opacity-0")} />
-              {showPlaceholder ? "\u00a0" : "Create Deck"}
+              <Plus className={cn("size-5", showPlaceholder && "opacity-0")} />
+              Create Deck
             </DialogTrigger>
             <DialogContent>
               {isCreateDeckOpen && (
@@ -609,13 +609,7 @@ function HomeAddCardForm({
   );
 }
 
-function DeleteDeckForm({
-  deck,
-  onDone,
-}: {
-  deck: TDeck;
-  onDone: () => void;
-}) {
+function DeleteDeckForm({ deck, onDone }: { deck: TDeck; onDone: () => void }) {
   const mutation = useDeleteDeck();
   const form = useForm({
     defaultValues: { confirmation: "" },
@@ -789,7 +783,7 @@ function DecksSection({
           Create your first deck to start adding cards.
         </p>
         <Button onClick={onCreateDeck}>
-          <Plus className="h-4 w-4" />
+          <Plus className="size-5" />
           Create Deck
         </Button>
       </div>

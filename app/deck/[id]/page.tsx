@@ -81,8 +81,8 @@ export default function DeckPage() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Link href="/" className="shrink-0 -ml-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <ArrowLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="size-9">
+                <ArrowLeft className="size-5" />
               </Button>
             </Link>
             {showPlaceholder ? (
@@ -95,7 +95,7 @@ export default function DeckPage() {
           </div>
           {showPlaceholder ? (
             <Button className="text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton">
-              &nbsp;
+              Study Deck
             </Button>
           ) : (
             <Link href={`/study/${id}`}>
@@ -114,7 +114,7 @@ export default function DeckPage() {
                 "text-transparent bg-skeleton animate-pulse rounded w-32 select-none",
             )}
           >
-            {showPlaceholder ? "\u00a0" : `Cards`}{" "}
+            Cards{" "}
             {!showPlaceholder && (
               <span className="font-normal text-muted-foreground">
                 ({cards.length})
@@ -177,7 +177,7 @@ export default function DeckPage() {
               }
             >
               <Plus className={cn("h-4 w-4", showPlaceholder && "opacity-0")} />
-              {showPlaceholder ? "\u00a0" : "Add Card"}
+              Add Card
             </DialogTrigger>
             <DialogContent>
               {isAddCardOpen && (

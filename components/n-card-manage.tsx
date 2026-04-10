@@ -39,8 +39,8 @@ export function NCardManage(props: TNCardManageProps) {
       {!isPlaceholder && (
         <div className="absolute top-1 right-1 z-10">
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-sm font-medium hover:bg-accent h-8 w-8 shrink-0 focus-visible:outline-none">
-              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none">
+              <MoreVertical className="size-5 text-muted-foreground" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem
@@ -65,7 +65,7 @@ export function NCardManage(props: TNCardManageProps) {
 
       {/* Front */}
       <div className="px-5 py-4 w-full flex flex-col items-start relative bg-card gap-2">
-        <p className="shrink max-w-full pr-4 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Front
         </p>
         <p className="shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
@@ -78,7 +78,7 @@ export function NCardManage(props: TNCardManageProps) {
 
       {/* Back */}
       <div className="px-5 py-4 relative w-full flex flex-col items-start gap-2">
-        <p className="shrink max-w-full pr-4 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
         <p className="shrink max-w-full min-w-0 text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">

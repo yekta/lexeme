@@ -60,7 +60,7 @@ function ThemeMenuItem() {
 
   return (
     <DropdownMenuItem closeOnClick={false} onClick={cycleTheme}>
-      <Icon className="mr-2 h-4 w-4" />
+      <Icon className="size-5" />
       <span>Theme: {label}</span>
     </DropdownMenuItem>
   );
@@ -87,8 +87,8 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
             <div className="flex items-center gap-2 border-l pl-4 min-w-0 flex-1">
               {backHref && (
                 <Link href={backHref} className="shrink-0">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ArrowLeftIcon className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="size-9">
+                    <ArrowLeftIcon className="size-5" />
                   </Button>
                 </Link>
               )}
@@ -135,7 +135,7 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                 <DropdownMenuSeparator />
                 <ThemeMenuItem />
                 <DropdownMenuItem onClick={logout} className="cursor-pointer">
-                  <LogOutIcon className="mr-2 h-4 w-4" />
+                  <LogOutIcon className="size-5" />
                   <span>Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>

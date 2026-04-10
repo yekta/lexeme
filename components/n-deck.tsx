@@ -68,15 +68,15 @@ export function NDeck(props: TNDeckProps) {
         <Card className="flex flex-col shadow-md relative">
           {!isPlaceholder && (
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-8 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
-                <MoreVertical className="h-4 w-4 text-muted-foreground group-data-placeholder:opacity-0" />
+              <DropdownMenuTrigger className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
+                <MoreVertical className="size-5 text-muted-foreground group-data-placeholder:opacity-0" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem
                   className="cursor-pointer"
                   onClick={isPlaceholder ? undefined : props.onEdit}
                 >
-                  <Settings className="h-4 w-4" />
+                  <Settings className="size-5" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -84,7 +84,7 @@ export function NDeck(props: TNDeckProps) {
                   className="cursor-pointer"
                   onClick={isPlaceholder ? undefined : props.onDelete}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="size-5" />
                   Delete Deck
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -92,7 +92,7 @@ export function NDeck(props: TNDeckProps) {
           )}
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
             <div className="space-y-1 min-w-0">
-              <CardTitle className="truncate pr-4 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+              <CardTitle className="truncate pr-5 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {name}
               </CardTitle>
               <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
@@ -136,7 +136,7 @@ export function NDeck(props: TNDeckProps) {
                 variant="default"
                 className="w-full text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
               >
-                &nbsp;
+                Study
               </Button>
             ) : (
               <Link href={props.studyHref} className="w-full">
@@ -151,14 +151,14 @@ export function NDeck(props: TNDeckProps) {
                 className="flex-1 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:border-transparent group-data-placeholder:pointer-events-none group-data-placeholder:hover:bg-skeleton"
                 onClick={isPlaceholder ? undefined : props.onAddCard}
               >
-                {isPlaceholder ? "\u00a0" : "Add Card"}
+                Add Card
               </Button>
               {isPlaceholder ? (
                 <Button
                   variant="outline"
                   className="flex-1 text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
                 >
-                  &nbsp;
+                  Manage
                 </Button>
               ) : (
                 <Link href={props.manageHref} className="flex-1">

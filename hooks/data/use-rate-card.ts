@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cardsByDeckKey, cardsKey } from "./use-cards";
+import { todayReviewLogsKey } from "./use-review-logs";
 import type { TStudyCard } from "./use-study-cards";
 
 export type TRateCardVariables = {
@@ -70,6 +71,7 @@ export function useRateCard(scheduler: FSRS, deckId: string | undefined) {
       // Don't invalidate studyCards here — the page manages its in-memory
       // queue for the active session and re-fetching would disrupt it.
       qc.invalidateQueries({ queryKey: cardsKey(user?.id) });
+      qc.invalidateQueries({ queryKey: todayReviewLogsKey(user?.id) });
       if (deckId) {
         qc.invalidateQueries({ queryKey: cardsByDeckKey(deckId, user?.id) });
       }

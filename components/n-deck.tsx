@@ -66,28 +66,30 @@ export function NDeck(props: TNDeckProps) {
       {/* Main card */}
       <motion.div className="relative z-10">
         <Card className="flex flex-col shadow-md relative">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-8 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
-              <MoreVertical className="h-4 w-4 text-muted-foreground group-data-placeholder:opacity-0" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-40">
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={isPlaceholder ? undefined : props.onEdit}
-              >
-                <Settings className="h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                className="cursor-pointer"
-                onClick={isPlaceholder ? undefined : props.onDelete}
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Deck
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!isPlaceholder && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-8 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
+                <MoreVertical className="h-4 w-4 text-muted-foreground group-data-placeholder:opacity-0" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={isPlaceholder ? undefined : props.onEdit}
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={isPlaceholder ? undefined : props.onDelete}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Deck
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
             <div className="space-y-1 min-w-0">
               <CardTitle className="truncate pr-4 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">

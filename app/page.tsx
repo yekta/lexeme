@@ -24,6 +24,7 @@ import {
   type TDeck,
 } from "@/hooks/data/use-decks";
 import { useTodayReviewLogs } from "@/hooks/data/use-review-logs";
+import { useTodayStats } from "@/hooks/data/use-stats";
 import {
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
@@ -35,6 +36,7 @@ import { useState } from "react";
 
 import Logo from "@/components/icons/logo";
 import { Navbar } from "@/components/navbar";
+import { formatDuration, intervalToDuration } from "date-fns";
 
 export default function Home() {
   const router = useRouter();
@@ -188,7 +190,7 @@ export default function Home() {
     <div className="min-h-screen">
       <Navbar />
 
-      <main className="max-w-5xl mx-auto p-5 space-y-8">
+      <main className="max-w-5xl mx-auto px-5 pt-5 pb-16 space-y-8">
         <div className="flex items-center justify-between gap-4">
           <h2
             className={cn(
@@ -374,9 +376,7 @@ export default function Home() {
                 }}
               >
                 <DialogHeader>
-                  <DialogTitle>
-                    Add flashcard to {deckToAddCard?.name}
-                  </DialogTitle>
+                  <DialogTitle>Add card to {deckToAddCard?.name}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
@@ -427,7 +427,7 @@ export default function Home() {
                 <DialogTitle>Delete Deck</DialogTitle>
                 <DialogDescription>
                   This action cannot be undone. This will permanently delete the
-                  deck "{deckToDelete?.name}" and all its flashcards.
+                  deck "{deckToDelete?.name}" and all its cards.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -489,7 +489,7 @@ export default function Home() {
                 <DialogHeader>
                   <DialogTitle>Create a new deck</DialogTitle>
                   <DialogDescription>
-                    Organize your flashcards into decks by topic or subject.
+                    Organize your cards into decks by topic or subject.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -546,9 +546,60 @@ export default function Home() {
           }}
           onDelete={(deck) => setDeckToDelete(deck)}
         />
+        <div className="w-full h-px rounded-full bg-border" />
+        <TodayStatsFooter showPlaceholder={showPlaceholder} />
       </main>
     </div>
   );
+}
+
+function TodayStatsFooter({ showPlaceholder }: { showPlaceholder: boolean }) {
+  const { data, isPending } = useTodayStats();
+  const humanDuration = formatHumanDuration(data.totalMs);
+  const secondsPerCard = formatSecondsPerCard(data.msPerCard);
+  const cardWord = data.count === 1 ? "card" : "cards";
+
+  const statsText =
+    showPlaceholder || isPending ? (
+      "Loading today's stats..."
+    ) : data.count === 0 ? (
+      "You haven't studied today."
+    ) : (
+      <>
+        You've studied{" "}
+        <span className="text-foreground">
+          {data.count} {cardWord}
+        </span>{" "}
+        in <span className="text-foreground">{humanDuration}</span> today (
+        <span className="text-foreground">{secondsPerCard}s/card</span>)
+      </>
+    );
+
+  return (
+    <div
+      data-placeholder={showPlaceholder ? "true" : undefined}
+      className="w-full flex justify-center group"
+    >
+      <p className="text-center max-w-2xl text-muted-foreground group-data-placeholder:bg-skeleton group-data-placeholder:text-transparent group-data-placeholder:animate-skeleton group-data-placeholder:rounded">
+        {statsText}
+      </p>
+    </div>
+  );
+}
+
+function formatHumanDuration(totalMs: number): string {
+  const duration = intervalToDuration({ start: 0, end: Math.round(totalMs) });
+  const formatted = formatDuration(duration, {
+    format: ["hours", "minutes", "seconds"],
+    delimiter: ", ",
+  });
+  return formatted || "less than a second";
+}
+
+function formatSecondsPerCard(msPerCard: number): string {
+  const seconds = msPerCard / 1000;
+  const rounded = Math.round(seconds * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
 }
 
 type TDeckStats = {
@@ -595,7 +646,7 @@ function DecksSection({
           No decks yet
         </h3>
         <p className="text-muted-foreground mb-6">
-          Create your first deck to start adding flashcards.
+          Create your first deck to start adding cards.
         </p>
         <Button onClick={onCreateDeck}>
           <Plus className="h-4 w-4" />
@@ -637,7 +688,7 @@ function DecksSection({
 
 function DeckWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2 pb-16">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
       {children}
     </div>
   );

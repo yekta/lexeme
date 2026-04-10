@@ -163,8 +163,8 @@ export default function DeckPage() {
               <DialogHeader>
                 <DialogTitle>Delete Card</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to delete this flashcard? This action
-                  cannot be undone.
+                  Are you sure you want to delete this card? This action cannot
+                  be undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -249,7 +249,7 @@ export default function DeckPage() {
             <DialogContent>
               <form onSubmit={handleAddCard}>
                 <DialogHeader>
-                  <DialogTitle>Add a new flashcard</DialogTitle>
+                  <DialogTitle>Add a new card</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
@@ -297,7 +297,7 @@ export default function DeckPage() {
               No cards yet
             </h3>
             <p className="text-muted-foreground mb-6">
-              Add your first flashcard to this deck.
+              Add your first card to this deck.
             </p>
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-4 w-4" />

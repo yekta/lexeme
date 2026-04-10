@@ -6,10 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { useDeck } from "@/hooks/data/use-decks";
 import { useRateCard } from "@/hooks/data/use-rate-card";
-import {
-  useStudyCards,
-  type TStudyCard,
-} from "@/hooks/data/use-study-cards";
+import { useStudyCards, type TStudyCard } from "@/hooks/data/use-study-cards";
 import { useUserSettings } from "@/hooks/data/use-user-settings";
 import { useReviewTimer } from "@/hooks/use-review-timer";
 import {
@@ -205,7 +202,7 @@ export default function StudyPage() {
                 This deck is empty
               </h2>
               <p className="text-lg text-muted-foreground max-w-lg mx-auto">
-                Add some flashcards to this deck to study it.
+                Add some cards to this deck to study it.
               </p>
             </div>
             <div className="flex gap-4 justify-center">

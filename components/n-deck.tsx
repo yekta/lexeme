@@ -101,16 +101,12 @@ export function NDeck(props: TNDeckProps) {
             </div>
           </CardHeader>
           <CardContent className="flex-1">
-            <div className="flex flex-col gap-3 mt-2">
+            <div className="flex flex-col items-start gap-3 mt-2">
               <div
-                className={cn(
-                  "text-sm w-full transition-colors duration-300 rounded px-2 py-0.5 -ml-2",
-                  isRecentlyUpdated
-                    ? "bg-success-muted text-success-foreground"
-                    : "text-muted-foreground bg-transparent",
-                )}
+                data-updated={isRecentlyUpdated ? "true" : undefined}
+                className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-updated:bg-success-muted data-updated:text-success-foreground"
               >
-                <p className="group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:select-none">
+                <p className="max-w-full min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:select-none">
                   {totalCards} {totalCards === 1 ? "card" : "cards"}
                 </p>
               </div>

@@ -125,7 +125,7 @@ export function NDeck(props: TNDeckProps) {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-2">
+          <CardFooter className="flex flex-col w-full gap-2">
             {isPlaceholder ? (
               <Button
                 variant="default"
@@ -140,22 +140,20 @@ export function NDeck(props: TNDeckProps) {
                 </Button>
               </Link>
             )}
-            <div className="flex w-full gap-2">
-              {isPlaceholder ? (
-                <Button
-                  variant="outline"
-                  className="flex-1 text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
-                >
+            {isPlaceholder ? (
+              <Button
+                variant="outline"
+                className="w-full text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
+              >
+                Manage
+              </Button>
+            ) : (
+              <Link href={props.manageHref} className="w-full">
+                <Button variant="outline" className="w-full">
                   Manage
                 </Button>
-              ) : (
-                <Link href={props.manageHref} className="flex-1">
-                  <Button variant="outline" className="w-full">
-                    Manage
-                  </Button>
-                </Link>
-              )}
-            </div>
+              </Link>
+            )}
           </CardFooter>
         </Card>
       </motion.div>

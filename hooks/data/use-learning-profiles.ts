@@ -33,7 +33,7 @@ export function useLearningProfiles() {
 
 export function useDefaultLearningProfile() {
   const { data: profiles = [], ...rest } = useLearningProfiles();
-  const defaultProfile = profiles.find((p) => p.isDefault) ?? null;
+  const defaultProfile = profiles.find((p) => p.is_default) ?? null;
   return { data: defaultProfile, ...rest };
 }
 
@@ -53,11 +53,7 @@ export function useCreateLearningProfile() {
         .select("id")
         .single();
       if (error)
-        await handleDbError(
-          error,
-          OperationType.CREATE,
-          "learning_profiles",
-        );
+        await handleDbError(error, OperationType.CREATE, "learning_profiles");
       return data!.id as string;
     },
     onSuccess: () => {

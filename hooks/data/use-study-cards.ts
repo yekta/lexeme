@@ -33,13 +33,7 @@ export const studyCardsKey = (
   deckId: string,
   userId: string | undefined,
   learningProfileId: string | undefined,
-) =>
-  [
-    "studyCards",
-    deckId,
-    userId,
-    learningProfileId,
-  ] as const;
+) => ["studyCards", deckId, userId, learningProfileId] as const;
 
 export function useStudyCards(
   deckId: string | undefined,
@@ -47,11 +41,7 @@ export function useStudyCards(
 ) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: studyCardsKey(
-      deckId ?? "",
-      user?.id,
-      learningProfile?.id,
-    ),
+    queryKey: studyCardsKey(deckId ?? "", user?.id, learningProfile?.id),
     staleTime: 0,
     gcTime: 0,
     queryFn: async () => {
@@ -123,9 +113,9 @@ export function useStudyCards(
 
       // Apply daily limits
       const newCardsPerDay =
-        learningProfile?.newCardsPerDay ?? DEFAULT_NEW_CARDS_PER_DAY;
+        learningProfile?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
       const maxReviewsPerDay =
-        learningProfile?.maxReviewsPerDay ?? DEFAULT_MAX_REVIEWS_PER_DAY;
+        learningProfile?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
 
       const newLimit = Math.max(0, newCardsPerDay - newReviewedToday);
       const reviewLimit = Math.max(0, maxReviewsPerDay - reviewReviewedToday);

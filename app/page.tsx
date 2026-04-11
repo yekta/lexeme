@@ -5,6 +5,14 @@ import { NDeck } from "@/components/n-deck";
 import { useNow } from "@/components/now-provider";
 import { Button } from "@/components/ui/button";
 import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,6 +31,7 @@ import {
   useUpdateDeck,
   type TDeck,
 } from "@/hooks/data/use-decks";
+import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useTodayReviewLogs } from "@/hooks/data/use-review-logs";
 import { useTodayStats } from "@/hooks/data/use-stats";
 import {
@@ -33,25 +42,26 @@ import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 import { Navbar } from "@/components/navbar";
 import SignInForm from "@/components/sign-in-form";
 import { formatDuration, intervalToDuration } from "date-fns";
+import { learningProfiles } from "@/lib/db/schema";
 
 const DELETE_DECK_CONFIRMATION = "I want to delete this deck";
 
 const createDeckSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   description: z.string().trim(),
+  learning_profile_id: z.uuid(),
 });
 
 const deckSettingsSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   description: z.string().trim(),
-  new_cards_per_day: z.number().int().min(0),
-  max_reviews_per_day: z.number().int().min(0),
+  learning_profile_id: z.uuid(),
 });
 
 const addCardSchema = z.object({
@@ -82,12 +92,17 @@ export default function Home() {
   const { data: decks = [], isPending: isPendingDecks } = useDecks();
   const { data: cards = [], isPending: isPendingCards } = useCards();
   const { data: todayReviewLogs = [] } = useTodayReviewLogs();
+  const { data: profiles = [] } = useLearningProfiles();
+  const defaultProfile = profiles.find((p) => p.is_default) ?? null;
 
   const isPending = isPendingDecks || isPendingCards;
 
   const getDeckStats = (deckId: string) => {
     const deckCards = cards.filter((c) => c.deck_id === deckId);
     const deck = decks.find((d) => d.id === deckId);
+    const profile =
+      profiles.find((p) => p.id === deck?.learning_profile_id) ??
+      defaultProfile;
     const now = new Date();
 
     const deckCardIds = new Set(deckCards.map((c) => c.id));
@@ -102,9 +117,10 @@ export default function Home() {
       deckTodayLogs.filter((l) => l.state === "review").map((l) => l.card_id),
     ).size;
 
-    const newCardsPerDay = deck?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
+    const newCardsPerDay =
+      profile?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
     const maxReviewsPerDay =
-      deck?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
+      profile?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
 
     const totalNewCards = deckCards.filter((c) => c.state === "new").length;
     const learnCards = deckCards.filter(
@@ -264,9 +280,16 @@ export default function Home() {
 }
 
 function CreateDeckForm({ onSuccess }: { onSuccess: (id: string) => void }) {
+  const { data: profiles, isPending: isPendingProfiles } =
+    useLearningProfiles();
+  const defaultProfile = profiles?.find((p) => p.is_default);
   const mutation = useCreateDeck();
   const form = useForm({
-    defaultValues: { name: "", description: "" },
+    defaultValues: {
+      name: "",
+      description: "",
+      learning_profile_id: defaultProfile?.id ?? "",
+    },
     validators: {
       onMount: createDeckSchema,
       onChange: createDeckSchema,
@@ -276,10 +299,19 @@ function CreateDeckForm({ onSuccess }: { onSuccess: (id: string) => void }) {
       const id = await mutation.mutateAsync({
         name: value.name,
         description: value.description,
+        learning_profile_id: value.learning_profile_id,
       });
       onSuccess(id);
     },
   });
+
+  useEffect(() => {
+    if (defaultProfile && !form.state.values.learning_profile_id) {
+      form.setFieldValue("learning_profile_id", defaultProfile.id);
+    }
+  }, [defaultProfile]);
+
+  const isLoading = isPendingProfiles;
 
   return (
     <form
@@ -289,7 +321,7 @@ function CreateDeckForm({ onSuccess }: { onSuccess: (id: string) => void }) {
       }}
     >
       <DialogHeader>
-        <DialogTitle>Create a new deck</DialogTitle>
+        <DialogTitle>Create Deck</DialogTitle>
         <DialogDescription>
           Organize your cards into decks by topic or subject.
         </DialogDescription>
@@ -325,6 +357,65 @@ function CreateDeckForm({ onSuccess }: { onSuccess: (id: string) => void }) {
             </div>
           )}
         </form.Field>
+        <form.Field name="learning_profile_id">
+          {(field) => {
+            const profileOptions = (profiles ?? []).map((p) => ({
+              value: p.id,
+              label: p.name,
+            }));
+            const selected =
+              profileOptions.find((o) => o.value === field.state.value) ?? null;
+            return (
+              <div className="space-y-2">
+                <Label>Learning Profile</Label>
+                {isLoading ? (
+                  <div className="h-10 w-full rounded-lg bg-skeleton animate-pulse" />
+                ) : (
+                  <Combobox
+                    items={profileOptions}
+                    itemToStringValue={(i) => i.label}
+                    value={selected}
+                    onValueChange={(val) => {
+                      const selectedValue = val;
+                      field.handleChange(selectedValue?.value || "");
+                    }}
+                    onOpenChangeComplete={(open) => {
+                      if (open) return;
+                      if (
+                        field.state.value &&
+                        profileOptions.some(
+                          (o) => o.value === field.state.value,
+                        )
+                      ) {
+                        return;
+                      }
+                      if (!defaultProfile) return;
+                      field.handleChange(defaultProfile.id);
+                    }}
+                  >
+                    <ComboboxInput
+                      placeholder="Search profiles..."
+                      className="w-full"
+                    />
+                    <ComboboxContent>
+                      <ComboboxEmpty>No profiles found.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(item: (typeof profileOptions)[number]) => (
+                          <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Controls daily limits and learning parameters.
+                </p>
+              </div>
+            );
+          }}
+        </form.Field>
       </div>
       <DialogFooter>
         <form.Subscribe
@@ -336,7 +427,7 @@ function CreateDeckForm({ onSuccess }: { onSuccess: (id: string) => void }) {
           {({ canSubmit, isSubmitting }) => (
             <Button
               type="submit"
-              disabled={!canSubmit}
+              disabled={!canSubmit || isLoading}
               isPending={isSubmitting}
             >
               Create Deck
@@ -355,14 +446,14 @@ function DeckSettingsForm({
   deck: TDeck;
   onDone: () => void;
 }) {
+  const { data: profiles, isPending: isPendingProfiles } =
+    useLearningProfiles();
   const mutation = useUpdateDeck();
   const form = useForm({
     defaultValues: {
       name: deck.name,
       description: deck.description ?? "",
-      new_cards_per_day: deck.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY,
-      max_reviews_per_day:
-        deck.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY,
+      learning_profile_id: deck.learning_profile_id,
     },
     validators: {
       onMount: deckSettingsSchema,
@@ -374,12 +465,13 @@ function DeckSettingsForm({
         id: deck.id,
         name: value.name,
         description: value.description,
-        new_cards_per_day: value.new_cards_per_day,
-        max_reviews_per_day: value.max_reviews_per_day,
+        learning_profile_id: value.learning_profile_id,
       });
       onDone();
     },
   });
+
+  const isLoading = isPendingProfiles || !profiles;
 
   return (
     <form
@@ -391,7 +483,7 @@ function DeckSettingsForm({
       <DialogHeader>
         <DialogTitle>Settings</DialogTitle>
         <DialogDescription>
-          Update the name, description, or daily limits for this deck.
+          Update the name, description, or learning profile for this deck.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
@@ -426,52 +518,59 @@ function DeckSettingsForm({
           )}
         </form.Field>
         <div className="border-t pt-4 space-y-4">
-          <p className="text-sm font-medium">Daily Limits</p>
-          <form.Field name="new_cards_per_day">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>New cards/day</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="number"
-                  min={0}
-                  value={field.state.value}
-                  onChange={(e) =>
-                    field.handleChange(
-                      Math.max(0, parseInt(e.target.value) || 0),
-                    )
-                  }
-                  onBlur={field.handleBlur}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The maximum number of new cards to introduce in a day.
-                </p>
-              </div>
-            )}
-          </form.Field>
-          <form.Field name="max_reviews_per_day">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Maximum reviews/day</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="number"
-                  min={0}
-                  value={field.state.value}
-                  onChange={(e) =>
-                    field.handleChange(
-                      Math.max(0, parseInt(e.target.value) || 0),
-                    )
-                  }
-                  onBlur={field.handleBlur}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The maximum number of review cards to show in a day.
-                </p>
-              </div>
-            )}
+          <form.Field name="learning_profile_id">
+            {(field) => {
+              const profileOptions = (profiles ?? []).map((p) => ({
+                value: p.id,
+                label: p.name,
+              }));
+              const selected =
+                profileOptions.find((o) => o.value === field.state.value) ??
+                null;
+              const fallbackId =
+                profiles?.find((p) => p.is_default)?.id ??
+                deck.learning_profile_id;
+              return (
+                <div className="space-y-2">
+                  <Label>Learning Profile</Label>
+                  {isLoading ? (
+                    <div className="h-8 w-full rounded-lg bg-skeleton animate-pulse" />
+                  ) : (
+                    <Combobox
+                      items={profileOptions}
+                      itemToStringValue={(i) => i.label}
+                      value={selected}
+                      onValueChange={(val) => {
+                        field.handleChange(val?.value ?? fallbackId);
+                      }}
+                      onOpenChange={(open) => {
+                        if (!open && !field.state.value) {
+                          field.handleChange(fallbackId);
+                        }
+                      }}
+                    >
+                      <ComboboxInput
+                        placeholder="Search profiles..."
+                        className="w-full"
+                      />
+                      <ComboboxContent>
+                        <ComboboxEmpty>No profiles found.</ComboboxEmpty>
+                        <ComboboxList>
+                          {(item: (typeof profileOptions)[number]) => (
+                            <ComboboxItem key={item.value} value={item}>
+                              {item.label}
+                            </ComboboxItem>
+                          )}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Controls daily limits and scheduling parameters.
+                  </p>
+                </div>
+              );
+            }}
           </form.Field>
         </div>
       </div>
@@ -489,7 +588,7 @@ function DeckSettingsForm({
           {({ canSubmit, isSubmitting, isDirty }) => (
             <Button
               type="submit"
-              disabled={!canSubmit || !isDirty}
+              disabled={!canSubmit || !isDirty || isLoading}
               isPending={isSubmitting}
             >
               Save

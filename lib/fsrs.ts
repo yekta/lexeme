@@ -1,4 +1,4 @@
-import { TUserSettings } from "@/lib/db/schema";
+import { TLearningProfile } from "@/lib/db/schema";
 import {
   fsrs,
   createEmptyCard,
@@ -54,14 +54,14 @@ export const FSRS_DEFAULT_W = Object.freeze([
   FSRS_DEFAULT_DECAY,
 ]);
 
-export function createUserScheduler(params: TUserSettings): FSRS {
+export function createUserScheduler(params: TLearningProfile): FSRS {
   const fsrsParams: FSRSParameters = {
-    request_retention: params.requestRetention,
-    maximum_interval: params.maximumInterval,
-    enable_fuzz: params.enableFuzz,
-    enable_short_term: params.enableShortTerm,
-    learning_steps: params.learningSteps as StepUnit[],
-    relearning_steps: params.relearningSteps as StepUnit[],
+    request_retention: params.request_retention,
+    maximum_interval: params.maximum_interval,
+    enable_fuzz: params.enable_fuzz,
+    enable_short_term: params.enable_short_term,
+    learning_steps: params.learning_steps as StepUnit[],
+    relearning_steps: params.relearning_steps as StepUnit[],
     w: params.w,
   };
   return fsrs(fsrsParams);

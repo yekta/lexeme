@@ -10,9 +10,9 @@ BEGIN
   )
   ON CONFLICT ("id") DO NOTHING;
 
-  INSERT INTO public."user_settings" ("user_id")
-  VALUES (NEW.id)
-  ON CONFLICT ("user_id") DO NOTHING;
+  INSERT INTO public."learning_profiles" ("user_id", "name", "is_default")
+  VALUES (NEW.id, 'Default', true)
+  ON CONFLICT DO NOTHING;
 
   RETURN NEW;
 END;
@@ -67,6 +67,6 @@ CREATE TRIGGER set_updated_at
   EXECUTE FUNCTION public.set_updated_at ();
 
 CREATE TRIGGER set_updated_at
-  BEFORE UPDATE ON public."user_settings"
+  BEFORE UPDATE ON public."learning_profiles"
   FOR EACH ROW
   EXECUTE FUNCTION public.set_updated_at ();

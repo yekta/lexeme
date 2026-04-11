@@ -12,15 +12,13 @@ export type TDeck = {
   id: string;
   name: string;
   description: string;
-  new_cards_per_day: number;
-  max_reviews_per_day: number;
+  learning_profile_id: string;
   created_at: string;
 };
 
 export type TDeckSummary = {
   name: string;
-  new_cards_per_day: number;
-  max_reviews_per_day: number;
+  learning_profile_id: string;
 };
 
 export const decksKey = (userId: string | undefined) =>
@@ -53,7 +51,7 @@ export function useDeck(id: string | undefined) {
       if (!user || !id) return null;
       const { data, error } = await supabase
         .from("decks")
-        .select("name, new_cards_per_day, max_reviews_per_day")
+        .select("name, learning_profile_id")
         .eq("id", id)
         .single();
       if (error || !data) return null;
@@ -67,7 +65,11 @@ export function useCreateDeck() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { name: string; description: string }) => {
+    mutationFn: async (input: {
+      name: string;
+      description: string;
+      learning_profile_id: string;
+    }) => {
       if (!user || !input.name.trim()) throw new Error("Missing data");
       const { data, error } = await supabase
         .from("decks")
@@ -75,6 +77,7 @@ export function useCreateDeck() {
           user_id: user.id,
           name: input.name.trim(),
           description: input.description.trim(),
+          learning_profile_id: input.learning_profile_id,
         })
         .select("id")
         .single();
@@ -95,8 +98,7 @@ export function useUpdateDeck() {
       id: string;
       name: string;
       description: string;
-      new_cards_per_day: number;
-      max_reviews_per_day: number;
+      learning_profile_id: string;
     }) => {
       if (!user || !input.name.trim())
         throw new Error("Invalid update request");
@@ -105,8 +107,7 @@ export function useUpdateDeck() {
         .update({
           name: input.name.trim(),
           description: input.description.trim(),
-          new_cards_per_day: input.new_cards_per_day,
-          max_reviews_per_day: input.max_reviews_per_day,
+          learning_profile_id: input.learning_profile_id,
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.id);

@@ -6,12 +6,12 @@ import {
   DEFAULT_NEW_CARDS_PER_DAY,
 } from "@/lib/constants";
 import { handleDbError, OperationType } from "@/lib/db-error";
+import { TLearningProfile } from "@/lib/db/schema";
 import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
 import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
 import { useQuery } from "@tanstack/react-query";
-import type { TDeckSummary } from "./use-decks";
 
 export type TStudyCard = {
   id: string;
@@ -32,28 +32,25 @@ export type TStudyCard = {
 export const studyCardsKey = (
   deckId: string,
   userId: string | undefined,
-  newCardsPerDay: number | undefined,
-  maxReviewsPerDay: number | undefined,
+  learningProfileId: string | undefined,
 ) =>
   [
     "studyCards",
     deckId,
     userId,
-    newCardsPerDay,
-    maxReviewsPerDay,
+    learningProfileId,
   ] as const;
 
 export function useStudyCards(
   deckId: string | undefined,
-  deck: TDeckSummary | null | undefined,
+  learningProfile: TLearningProfile | null | undefined,
 ) {
   const { user } = useAuth();
   return useQuery({
     queryKey: studyCardsKey(
       deckId ?? "",
       user?.id,
-      deck?.new_cards_per_day,
-      deck?.max_reviews_per_day,
+      learningProfile?.id,
     ),
     staleTime: 0,
     gcTime: 0,
@@ -125,9 +122,10 @@ export function useStudyCards(
       );
 
       // Apply daily limits
-      const newCardsPerDay = deck?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
+      const newCardsPerDay =
+        learningProfile?.newCardsPerDay ?? DEFAULT_NEW_CARDS_PER_DAY;
       const maxReviewsPerDay =
-        deck?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
+        learningProfile?.maxReviewsPerDay ?? DEFAULT_MAX_REVIEWS_PER_DAY;
 
       const newLimit = Math.max(0, newCardsPerDay - newReviewedToday);
       const reviewLimit = Math.max(0, maxReviewsPerDay - reviewReviewedToday);
@@ -141,6 +139,6 @@ export function useStudyCards(
 
       return { totalCards: count ?? 0, dueCards: shuffled };
     },
-    enabled: !!user && !!deckId && !!deck,
+    enabled: !!user && !!deckId && !!learningProfile,
   });
 }

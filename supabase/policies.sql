@@ -5,10 +5,14 @@ ALTER TABLE decks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
 
 
-ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE learning_profiles ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE review_logs ENABLE ROW LEVEL SECURITY;
+
+
+-- Only one default learning profile per user
+CREATE UNIQUE INDEX one_default_per_user ON learning_profiles (user_id) WHERE is_default = true;
 
 
 -- Decks
@@ -23,17 +27,27 @@ WITH
   CHECK (auth.uid () = user_id);
 
 
--- User Settings
-CREATE POLICY "Users can read own settings" ON user_settings FOR
+-- Learning Profiles
+CREATE POLICY "Users can read own learning profiles" ON learning_profiles FOR
 SELECT
   USING (auth.uid () = user_id);
 
 
-CREATE POLICY "Users can update own settings" ON user_settings
+CREATE POLICY "Users can insert own learning profiles" ON learning_profiles FOR INSERT
+WITH
+  CHECK (auth.uid () = user_id);
+
+
+CREATE POLICY "Users can update own learning profiles" ON learning_profiles
 FOR UPDATE
   USING (auth.uid () = user_id)
 WITH
   CHECK (auth.uid () = user_id);
+
+
+CREATE POLICY "Users can delete own non-default learning profiles" ON learning_profiles
+FOR DELETE
+  USING (auth.uid () = user_id AND is_default = false);
 
 
 -- Review Logs

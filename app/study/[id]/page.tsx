@@ -5,9 +5,9 @@ import { NCardStudy } from "@/components/n-card-study";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { useDeck } from "@/hooks/data/use-decks";
+import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useRateCard } from "@/hooks/data/use-rate-card";
 import { useStudyCards, type TStudyCard } from "@/hooks/data/use-study-cards";
-import { useUserSettings } from "@/hooks/data/use-user-settings";
 import { useReviewTimer } from "@/hooks/use-review-timer";
 import {
   createUserScheduler,
@@ -37,15 +37,20 @@ export default function StudyPage() {
   const [queue, setQueue] = useState<TQueueItem[]>([]);
   const [reviewedCount, setReviewedCount] = useState(0);
 
-  const { data: userSettings, isPending: isPendingSettings } =
-    useUserSettings();
-
-  const userScheduler = useMemo(() => {
-    if (!userSettings) return null;
-    return createUserScheduler(userSettings);
-  }, [userSettings]);
+  const { data: profiles = [], isPending: isPendingProfiles } =
+    useLearningProfiles();
 
   const { data: deckData, isPending: isPendingDecks } = useDeck(id);
+
+  const learningProfile =
+    profiles.find((p) => p.id === deckData?.learning_profile_id) ??
+    profiles.find((p) => p.is_default) ??
+    null;
+
+  const userScheduler = useMemo(() => {
+    if (!learningProfile) return null;
+    return createUserScheduler(learningProfile);
+  }, [learningProfile]);
 
   // Redirect home if the deck doesn't exist.
   useEffect(() => {
@@ -58,10 +63,10 @@ export default function StudyPage() {
 
   const { data: studyData, isPending: isPendingCards } = useStudyCards(
     id,
-    deckData,
+    learningProfile,
   );
 
-  const isPending = isPendingDecks || isPendingCards || isPendingSettings;
+  const isPending = isPendingDecks || isPendingCards || isPendingProfiles;
   const totalCards = studyData?.totalCards || 0;
 
   // Initialize queue from fetched data

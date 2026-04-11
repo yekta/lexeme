@@ -6,16 +6,12 @@ import {
   DEFAULT_NEW_CARDS_PER_DAY,
 } from "@/lib/constants";
 import { handleDbError, OperationType } from "@/lib/db-error";
-import {
-  TCardStateEnum,
-  TLearningProfile,
-  TLearningProfileLoose,
-} from "@/lib/db/schema";
+import { TCardStateEnum, TLearningProfileLoose } from "@/lib/db/schema";
 import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
 import { createClient } from "@/lib/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const supabase = createClient();
-import { useQuery } from "@tanstack/react-query";
 
 export type TStudyCard = {
   id: string;
@@ -67,7 +63,7 @@ export function useStudyCards(
         await handleDbError(countError, OperationType.GET, "cards");
       if (error) await handleDbError(error, OperationType.GET, "cards");
 
-      const allDueCards = (data ?? []) as TStudyCard[];
+      const allDueCards: TStudyCard[] = data ?? [];
 
       // Count today's reviews to enforce daily limits
       const startOfDay = new Date();

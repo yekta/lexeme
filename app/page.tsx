@@ -566,7 +566,7 @@ function DeckSettingsForm({
                     </Combobox>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Controls daily limits and scheduling parameters.
+                    Controls daily limits and learning parameters.
                   </p>
                 </div>
               );

@@ -418,7 +418,7 @@ function EditCardForm({
               disabled={!canSubmit || !isDirty}
               isPending={isSubmitting}
             >
-              Save Changes
+              Save
             </Button>
           )}
         </form.Subscribe>

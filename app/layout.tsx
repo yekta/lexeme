@@ -6,11 +6,14 @@ import { DEFAULT_THEME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
-import { Geist } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const fontMain = DM_Sans({
+  variable: "--font-sans",
+  weight: "variable",
+});
 
 export const metadata: Metadata = {
   title: "DeckNinja",
@@ -26,7 +29,10 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("font-sans bg-background text-foreground", geist.variable)}
+      className={cn(
+        "font-sans bg-background text-foreground",
+        fontMain.variable,
+      )}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

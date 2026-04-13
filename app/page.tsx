@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
 import { useRouter } from "nextjs-toploader/app";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { Navbar } from "@/components/navbar";
@@ -326,63 +326,15 @@ function CreateDeckForm({
           )}
         </form.Field>
         <form.Field name="learning_profile_id">
-          {(field) => {
-            const profileOptions = (profiles ?? []).map((p) => ({
-              value: p.id,
-              label: p.name,
-            }));
-            const selected =
-              profileOptions.find((o) => o.value === field.state.value) ?? null;
-            return (
-              <div className="space-y-2">
-                <Label>Learning Profile</Label>
-                {isLoading ? (
-                  <div className="h-10 w-full rounded-lg bg-skeleton animate-pulse" />
-                ) : (
-                  <Combobox
-                    items={profileOptions}
-                    itemToStringValue={(i) => i.label}
-                    value={selected}
-                    onValueChange={(val) => {
-                      const selectedValue = val;
-                      field.handleChange(selectedValue?.value || "");
-                    }}
-                    onOpenChangeComplete={(open) => {
-                      if (open) return;
-                      if (
-                        field.state.value &&
-                        profileOptions.some(
-                          (o) => o.value === field.state.value,
-                        )
-                      ) {
-                        return;
-                      }
-                      if (!defaultProfile) return;
-                      field.handleChange(defaultProfile.id);
-                    }}
-                  >
-                    <ComboboxInput
-                      placeholder="Search profiles..."
-                      className="w-full"
-                    />
-                    <ComboboxContent>
-                      <ComboboxEmpty>No profiles found.</ComboboxEmpty>
-                      <ComboboxList>
-                        {(item: (typeof profileOptions)[number]) => (
-                          <ComboboxItem key={item.value} value={item}>
-                            {item.label}
-                          </ComboboxItem>
-                        )}
-                      </ComboboxList>
-                    </ComboboxContent>
-                  </Combobox>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Controls daily limits and learning parameters.
-                </p>
-              </div>
-            );
-          }}
+          {(field) => (
+            <LearningProfileField
+              profiles={profiles}
+              isLoading={isLoading}
+              value={field.state.value}
+              onChange={field.handleChange}
+              fallbackId={defaultProfile?.id}
+            />
+          )}
         </form.Field>
       </div>
       <DialogFooter>
@@ -487,58 +439,18 @@ function DeckSettingsForm({
         </form.Field>
         <div className="border-t pt-4 space-y-4">
           <form.Field name="learning_profile_id">
-            {(field) => {
-              const profileOptions = (profiles ?? []).map((p) => ({
-                value: p.id,
-                label: p.name,
-              }));
-              const selected =
-                profileOptions.find((o) => o.value === field.state.value) ??
-                null;
-              const fallbackId =
-                profiles?.find((p) => p.is_default)?.id ??
-                deck.learning_profile_id;
-              return (
-                <div className="space-y-2">
-                  <Label>Learning Profile</Label>
-                  {isLoading ? (
-                    <div className="h-8 w-full rounded-lg bg-skeleton animate-pulse" />
-                  ) : (
-                    <Combobox
-                      items={profileOptions}
-                      itemToStringValue={(i) => i.label}
-                      value={selected}
-                      onValueChange={(val) => {
-                        field.handleChange(val?.value ?? fallbackId);
-                      }}
-                      onOpenChange={(open) => {
-                        if (!open && !field.state.value) {
-                          field.handleChange(fallbackId);
-                        }
-                      }}
-                    >
-                      <ComboboxInput
-                        placeholder="Search profiles..."
-                        className="w-full"
-                      />
-                      <ComboboxContent>
-                        <ComboboxEmpty>No profiles found.</ComboboxEmpty>
-                        <ComboboxList>
-                          {(item: (typeof profileOptions)[number]) => (
-                            <ComboboxItem key={item.value} value={item}>
-                              {item.label}
-                            </ComboboxItem>
-                          )}
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Controls daily limits and learning parameters.
-                  </p>
-                </div>
-              );
-            }}
+            {(field) => (
+              <LearningProfileField
+                profiles={profiles}
+                isLoading={isLoading}
+                value={field.state.value}
+                onChange={field.handleChange}
+                fallbackId={
+                  profiles?.find((p) => p.is_default)?.id ??
+                  deck.learning_profile_id
+                }
+              />
+            )}
           </form.Field>
         </div>
       </div>
@@ -780,6 +692,72 @@ function DeckWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
       {children}
+    </div>
+  );
+}
+
+type TLearningProfile = NonNullable<
+  ReturnType<typeof useLearningProfiles>["data"]
+>[number];
+
+function LearningProfileField({
+  profiles,
+  isLoading,
+  value,
+  onChange,
+  fallbackId,
+}: {
+  profiles: TLearningProfile[] | undefined;
+  isLoading: boolean;
+  value: string;
+  onChange: (id: string) => void;
+  fallbackId: string | undefined;
+}) {
+  const profileOptions = useMemo(
+    () => (profiles ?? []).map((p) => ({ value: p.id, label: p.name })),
+    [profiles],
+  );
+  const selected = useMemo(
+    () => profileOptions.find((o) => o.value === value) ?? null,
+    [profileOptions, value],
+  );
+
+  return (
+    <div className="w-full flex flex-col gap-2">
+      <Label>Learning Profile</Label>
+      {isLoading ? (
+        <div className="h-10 w-full rounded-lg bg-skeleton animate-pulse" />
+      ) : (
+        <Combobox
+          items={profileOptions}
+          itemToStringValue={(i) => i.label}
+          value={selected}
+          onValueChange={(val) => {
+            onChange(val?.value ?? fallbackId ?? "");
+          }}
+          onOpenChangeComplete={(open) => {
+            if (open) return;
+            if (value && profileOptions.some((o) => o.value === value)) return;
+            if (!fallbackId) return;
+            onChange(fallbackId);
+          }}
+        >
+          <ComboboxInput placeholder="Search profiles..." className="w-full" />
+          <ComboboxContent>
+            <ComboboxEmpty>No profiles found.</ComboboxEmpty>
+            <ComboboxList>
+              {(item: (typeof profileOptions)[number]) => (
+                <ComboboxItem key={item.value} value={item}>
+                  {item.label}
+                </ComboboxItem>
+              )}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Controls daily limits and learning parameters.
+      </p>
     </div>
   );
 }

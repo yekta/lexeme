@@ -1,23 +1,42 @@
 "use client";
 
 import BgPattern from "@/components/bg-pattern";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
+import { useForm } from "@tanstack/react-form";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { z } from "zod";
+
+const cardSchema = z.object({
+  front: z.string().trim().min(1, "Front is required"),
+  back: z.string().trim().min(1, "Back is required"),
+});
 
 type TNCardManageProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
       id: string;
+      deckId: string;
       front: string;
       back: string;
-      onEdit: () => void;
-      onDelete: () => void;
     };
 
 export function NCardManage(props: TNCardManageProps) {
@@ -25,6 +44,9 @@ export function NCardManage(props: TNCardManageProps) {
 
   const front = isPlaceholder ? "This is the front of the card" : props.front;
   const back = isPlaceholder ? "This is the back of the card" : props.back;
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <div
@@ -44,7 +66,7 @@ export function NCardManage(props: TNCardManageProps) {
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem
                 className="cursor-pointer"
-                onClick={props.onEdit}
+                onClick={() => setEditOpen(true)}
               >
                 <Pencil className="h-4 w-4" />
                 Edit Card
@@ -52,13 +74,35 @@ export function NCardManage(props: TNCardManageProps) {
               <DropdownMenuItem
                 variant="destructive"
                 className="cursor-pointer"
-                onClick={props.onDelete}
+                onClick={() => setDeleteOpen(true)}
               >
                 <Trash2 className="h-4 w-4" />
                 Delete Card
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent>
+              <EditCardForm
+                id={props.id}
+                deckId={props.deckId}
+                front={props.front}
+                back={props.back}
+                onDone={() => setEditOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogContent>
+              <DeleteCardForm
+                id={props.id}
+                deckId={props.deckId}
+                onDone={() => setDeleteOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
@@ -86,5 +130,140 @@ export function NCardManage(props: TNCardManageProps) {
         </p>
       </div>
     </div>
+  );
+}
+
+function EditCardForm({
+  id,
+  deckId,
+  front,
+  back,
+  onDone,
+}: {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  onDone: () => void;
+}) {
+  const mutation = useUpdateCard();
+  const form = useForm({
+    defaultValues: { front, back },
+    validators: {
+      onMount: cardSchema,
+      onChange: cardSchema,
+      onSubmit: cardSchema,
+    },
+    onSubmit: async ({ value }) => {
+      await mutation.mutateAsync({
+        id,
+        deckId,
+        front: value.front,
+        back: value.back,
+      });
+      onDone();
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>Edit Card</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <form.Field name="front">
+          {(field) => (
+            <div className="space-y-2">
+              <Label htmlFor={field.name}>Front (Question)</Label>
+              <Input
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+              />
+            </div>
+          )}
+        </form.Field>
+        <form.Field name="back">
+          {(field) => (
+            <div className="space-y-2">
+              <Label htmlFor={field.name}>Back (Answer)</Label>
+              <Input
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+              />
+            </div>
+          )}
+        </form.Field>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <form.Subscribe
+          selector={(s) => ({
+            canSubmit: s.canSubmit,
+            isSubmitting: s.isSubmitting,
+            isDirty: s.isDirty,
+          })}
+        >
+          {({ canSubmit, isSubmitting, isDirty }) => (
+            <Button
+              type="submit"
+              disabled={!canSubmit || !isDirty}
+              isPending={isSubmitting}
+            >
+              Save
+            </Button>
+          )}
+        </form.Subscribe>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function DeleteCardForm({
+  id,
+  deckId,
+  onDone,
+}: {
+  id: string;
+  deckId: string;
+  onDone: () => void;
+}) {
+  const mutation = useDeleteCard();
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Delete Card</DialogTitle>
+        <DialogDescription>
+          Are you sure you want to delete this card? This action cannot be
+          undone.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="outline" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          isPending={mutation.isPending}
+          onClick={() => {
+            mutation.mutate({ id, deckId }, { onSuccess: onDone });
+          }}
+        >
+          Delete
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

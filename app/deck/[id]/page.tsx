@@ -17,7 +17,6 @@ import { Button, LinkButton } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -25,13 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  useCardsByDeck,
-  useCreateCard,
-  useDeleteCard,
-  useUpdateCard,
-  type TCard,
-} from "@/hooks/data/use-cards";
+import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
 import { useDeck } from "@/hooks/data/use-decks";
 import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
@@ -52,8 +45,6 @@ export default function DeckPage() {
   const { user, loading } = useAuth();
 
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
-  const [cardToDelete, setCardToDelete] = useState<string | null>(null);
-  const [cardToEdit, setCardToEdit] = useState<TCard | null>(null);
 
   const { data: deckData, isPending: isPendingDecks } = useDeck(id);
   const { data: cards = [], isPending: isPendingCards } = useCardsByDeck(id);
@@ -68,16 +59,6 @@ export default function DeckPage() {
   const deckName = deckData?.name ?? "Loading...";
 
   const isPending = isPendingDecks || isPendingCards;
-
-  const deleteCardMutation = useDeleteCard();
-
-  const handleDeleteCard = () => {
-    if (!cardToDelete) return;
-    deleteCardMutation.mutate(
-      { id: cardToDelete, deckId: id },
-      { onSuccess: () => setCardToDelete(null) },
-    );
-  };
 
   if (!loading && !user) return null;
 
@@ -130,48 +111,6 @@ export default function DeckPage() {
             )}
           </h2>
 
-          <Dialog
-            open={cardToDelete !== null}
-            onOpenChange={(open) => !open && setCardToDelete(null)}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete Card</DialogTitle>
-                <DialogDescription>
-                  Are you sure you want to delete this card? This action cannot
-                  be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCardToDelete(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDeleteCard}
-                  isPending={deleteCardMutation.isPending}
-                >
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog
-            open={cardToEdit !== null}
-            onOpenChange={(open) => !open && setCardToEdit(null)}
-          >
-            <DialogContent>
-              {cardToEdit && (
-                <EditCardForm
-                  card={cardToEdit}
-                  deckId={id}
-                  onDone={() => setCardToEdit(null)}
-                />
-              )}
-            </DialogContent>
-          </Dialog>
-
           <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
             <DialogTrigger
               render={
@@ -192,12 +131,11 @@ export default function DeckPage() {
               </span>
             </DialogTrigger>
             <DialogContent>
-              {isAddCardOpen && (
-                <AddCardForm
-                  deckId={id}
-                  onDone={() => setIsAddCardOpen(false)}
-                />
-              )}
+              <AddCardForm
+                key={String(isAddCardOpen)}
+                deckId={id}
+                onDone={() => setIsAddCardOpen(false)}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -231,10 +169,9 @@ export default function DeckPage() {
               <NCardManage
                 key={card.id}
                 id={card.id}
+                deckId={id}
                 front={card.front}
                 back={card.back}
-                onEdit={() => setCardToEdit(card)}
-                onDelete={() => setCardToDelete(card.id)}
               />
             ))}
           </div>
@@ -323,100 +260,6 @@ function AddCardForm({
               isPending={isSubmitting}
             >
               Add Card
-            </Button>
-          )}
-        </form.Subscribe>
-      </DialogFooter>
-    </form>
-  );
-}
-
-function EditCardForm({
-  card,
-  deckId,
-  onDone,
-}: {
-  card: TCard;
-  deckId: string;
-  onDone: () => void;
-}) {
-  const mutation = useUpdateCard();
-  const form = useForm({
-    defaultValues: { front: card.front, back: card.back },
-    validators: {
-      onMount: cardSchema,
-      onChange: cardSchema,
-      onSubmit: cardSchema,
-    },
-    onSubmit: async ({ value }) => {
-      await mutation.mutateAsync({
-        id: card.id,
-        deckId,
-        front: value.front,
-        back: value.back,
-      });
-      onDone();
-    },
-  });
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        form.handleSubmit();
-      }}
-    >
-      <DialogHeader>
-        <DialogTitle>Edit Card</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-4 py-4">
-        <form.Field name="front">
-          {(field) => (
-            <div className="space-y-2">
-              <Label htmlFor={field.name}>Front (Question)</Label>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-              />
-            </div>
-          )}
-        </form.Field>
-        <form.Field name="back">
-          {(field) => (
-            <div className="space-y-2">
-              <Label htmlFor={field.name}>Back (Answer)</Label>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-              />
-            </div>
-          )}
-        </form.Field>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-        <form.Subscribe
-          selector={(s) => ({
-            canSubmit: s.canSubmit,
-            isSubmitting: s.isSubmitting,
-            isDirty: s.isDirty,
-          })}
-        >
-          {({ canSubmit, isSubmitting, isDirty }) => (
-            <Button
-              type="submit"
-              disabled={!canSubmit || !isDirty}
-              isPending={isSubmitting}
-            >
-              Save
             </Button>
           )}
         </form.Subscribe>

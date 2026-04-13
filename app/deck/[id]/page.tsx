@@ -13,7 +13,7 @@ import {
 import CardsIcon from "@/components/icons/cards";
 import { NCardManage } from "@/components/n-card-manage";
 import { Navbar } from "@/components/navbar";
-import { Button } from "@/components/ui/button";
+import { Button, LinkButton } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,6 @@ import { useDeck } from "@/hooks/data/use-decks";
 import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
 import { ArrowLeft, Plus } from "lucide-react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useState } from "react";
@@ -90,27 +89,26 @@ export default function DeckPage() {
       <main className="max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Link href="/" className="shrink-0 -ml-2">
-              <Button variant="ghost" size="icon" className="size-9">
-                <ArrowLeft className="size-5" />
-              </Button>
-            </Link>
-            {showPlaceholder ? (
-              <div className="h-7 w-48 bg-skeleton animate-pulse rounded" />
-            ) : (
-              <h1 className="text-xl font-semibold truncate min-w-0">
-                {deckName}
-              </h1>
-            )}
+            <LinkButton
+              variant="ghost"
+              href="/"
+              className="shrink-0 -ml-2 size-9"
+            >
+              <ArrowLeft className="size-5" />
+            </LinkButton>
+            <h1
+              data-placeholder={showPlaceholder ? "true" : undefined}
+              className="text-xl font-semibold truncate min-w-0 data-placeholder:animate-pulse data-placeholder:bg-skeleton data-placeholder:rounded data-placeholder:text-transparent"
+            >
+              {deckName}
+            </h1>
           </div>
           {showPlaceholder ? (
             <Button className="text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton">
               Study Deck
             </Button>
           ) : (
-            <Link href={`/study/${id}`}>
-              <Button>Study Deck</Button>
-            </Link>
+            <LinkButton href={`/study/${id}`}>Study Deck</LinkButton>
           )}
         </div>
 
@@ -279,7 +277,7 @@ function AddCardForm({
       }}
     >
       <DialogHeader>
-        <DialogTitle>Add a new card</DialogTitle>
+        <DialogTitle>Add Card</DialogTitle>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <form.Field name="front">

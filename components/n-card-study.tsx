@@ -1,11 +1,11 @@
 "use client";
 
+import BgPattern from "@/components/bg-pattern";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { useRef, useState } from "react";
 import { Rating, type Grade } from "ts-fsrs";
-import { useState, useRef } from "react";
-import { motion, useMotionValue, useTransform, animate } from "motion/react";
-import Dots from "@/components/dots";
 
 type TNCardStudyProps =
   | { isPlaceholder: true }
@@ -190,7 +190,7 @@ export function NCardStudy(props: TNCardStudyProps) {
               "border overflow-hidden border-border bg-card shadow-lg",
             )}
           >
-            <Dots />
+            <BgPattern />
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative">
               Back
             </p>

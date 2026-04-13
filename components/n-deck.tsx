@@ -1,6 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import BgPattern from "@/components/bg-pattern";
+import { Button, LinkButton } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -15,11 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { MoreVertical, Settings, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { motion } from "motion/react";
-import Dots from "@/components/dots";
 
 type TNDeckProps =
   | { isPlaceholder: true }
@@ -68,9 +66,16 @@ export function NDeck(props: TNDeckProps) {
         <Card className="flex flex-col shadow-md relative">
           {!isPlaceholder && (
             <DropdownMenu>
-              <DropdownMenuTrigger className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent">
-                <MoreVertical className="size-5 text-muted-foreground group-data-placeholder:opacity-0" />
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent"
+                  >
+                    <MoreVertical className="size-5 text-muted-foreground group-data-placeholder:opacity-0" />
+                  </Button>
+                }
+              ></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-40">
                 <DropdownMenuItem
                   className="cursor-pointer"
@@ -126,8 +131,8 @@ export function NDeck(props: TNDeckProps) {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col w-full gap-2 relative">
-            <Dots />
+          <CardFooter className="flex flex-col w-full gap-1 relative">
+            <BgPattern />
             {isPlaceholder ? (
               <Button
                 variant="default"
@@ -136,11 +141,9 @@ export function NDeck(props: TNDeckProps) {
                 Study
               </Button>
             ) : (
-              <Link href={props.studyHref} className="w-full">
-                <Button variant="default" className="w-full">
-                  Study
-                </Button>
-              </Link>
+              <LinkButton href={props.studyHref} className="w-full">
+                Study
+              </LinkButton>
             )}
             {isPlaceholder ? (
               <Button
@@ -150,11 +153,13 @@ export function NDeck(props: TNDeckProps) {
                 Manage
               </Button>
             ) : (
-              <Link href={props.manageHref} className="w-full">
-                <Button variant="outline" className="w-full">
-                  Manage
-                </Button>
-              </Link>
+              <LinkButton
+                variant="outline"
+                href={props.manageHref}
+                className="w-full"
+              >
+                Manage
+              </LinkButton>
             )}
           </CardFooter>
         </Card>

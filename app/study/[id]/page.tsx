@@ -13,7 +13,7 @@ import {
 import CardsIcon from "@/components/icons/cards";
 import { NCardStudy } from "@/components/n-card-study";
 import { Navbar } from "@/components/navbar";
-import { Button, LinkButton } from "@/components/ui/button";
+import { LinkButton } from "@/components/ui/button";
 import { useDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useRateCard } from "@/hooks/data/use-rate-card";
@@ -29,7 +29,6 @@ import {
 } from "@/lib/fsrs";
 import confetti from "canvas-confetti";
 import { CheckCircle2 } from "lucide-react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useMemo, useState } from "react";
@@ -223,9 +222,7 @@ export default function StudyPage() {
               </EmptyListContent>
             </EmptyListHeader>
             <EmptyListFooter>
-              <Button>
-                <Link href={`/deck/${id}`}>Add Cards</Link>
-              </Button>
+              <LinkButton href={`/deck/${id}`}>Add Cards</LinkButton>
             </EmptyListFooter>
           </EmptyList>
         ) : isFinished || hasNoDueCards ? (

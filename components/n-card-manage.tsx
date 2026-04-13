@@ -1,6 +1,6 @@
 "use client";
 
-import Dots from "@/components/dots";
+import BgPattern from "@/components/bg-pattern";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,6 @@ export function NCardManage(props: TNCardManageProps) {
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
       }}
     >
-      <Dots />
       {/* Menu */}
       {!isPlaceholder && (
         <div className="absolute top-1 right-1 z-10">
@@ -78,10 +77,11 @@ export function NCardManage(props: TNCardManageProps) {
 
       {/* Back */}
       <div className="px-5 py-4 relative w-full flex flex-col items-start gap-2">
-        <p className="shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <BgPattern />
+        <p className="relative shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
-        <p className="shrink max-w-full min-w-0 text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="relative shrink max-w-full min-w-0 text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {back}
         </p>
       </div>

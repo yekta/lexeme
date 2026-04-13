@@ -213,7 +213,9 @@ export default function Home() {
               <Plus
                 className={cn("size-5 -ml-1.5", showPlaceholder && "opacity-0")}
               />
-              Create Deck
+              <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+                Create Deck
+              </span>
             </DialogTrigger>
             <DialogContent>
               {isCreateDeckOpen && (
@@ -653,7 +655,9 @@ function DecksSection({
         </p>
         <Button onClick={onCreateDeck}>
           <Plus className="size-5 -ml-1.5" />
-          Create Deck
+          <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+            Create Deck
+          </span>
         </Button>
       </div>
     );

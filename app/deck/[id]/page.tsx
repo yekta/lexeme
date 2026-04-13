@@ -187,7 +187,9 @@ export default function DeckPage() {
               }
             >
               <Plus className={cn("h-4 w-4", showPlaceholder && "opacity-0")} />
-              Add Card
+              <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+                Add Card
+              </span>
             </DialogTrigger>
             <DialogContent>
               {isAddCardOpen && (

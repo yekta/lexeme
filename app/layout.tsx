@@ -36,7 +36,11 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
-        <NextTopLoader color="var(--primary)" showSpinner={false} />
+        <NextTopLoader
+          shadow={false}
+          color="var(--primary)"
+          showSpinner={false}
+        />
         <ErrorBoundary>
           <ThemeProvider
             attribute="class"

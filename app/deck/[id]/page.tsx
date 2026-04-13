@@ -186,7 +186,9 @@ export default function DeckPage() {
                 />
               }
             >
-              <Plus className={cn("h-4 w-4", showPlaceholder && "opacity-0")} />
+              <Plus
+                className={cn("size-5 -ml-1.5", showPlaceholder && "opacity-0")}
+              />
               <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
                 Add Card
               </span>

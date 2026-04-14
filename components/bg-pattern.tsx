@@ -8,7 +8,7 @@ export default function BgPattern({ className }: TProps) {
   return (
     <div
       className={cn(
-        "w-full h-full absolute left-0 top-0 opacity-30 dark:opacity-30 saturation-0 overflow-hidden",
+        "w-full h-full absolute left-0 top-0 opacity-30 dark:opacity-20 saturation-0 overflow-hidden",
         className,
       )}
     >

@@ -93,15 +93,15 @@ export function NDeck(props: TNDeckProps) {
     >
       {/* Ghost card 2 — bottom of stack */}
       {(isPlaceholder || totalCards > 2) && (
-        <div className="shadow-md absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left" />
+        <div className="shadow-md shadow-shadow/shadow absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left" />
       )}
       {/* Ghost card 1 */}
       {(isPlaceholder || totalCards > 1) && (
-        <div className="shadow-md absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left" />
+        <div className="shadow-md shadow-shadow/shadow absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left" />
       )}
       {/* Main card */}
       <motion.div className="relative z-10">
-        <Card className="flex flex-col shadow-md relative">
+        <Card className="flex flex-col shadow-md shadow-shadow/shadow relative">
           {!isPlaceholder && (
             <>
               <DropdownMenu>

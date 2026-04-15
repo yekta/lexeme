@@ -50,7 +50,7 @@ export function NCardManage(props: TNCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border border-border bg-card shadow-md overflow-hidden group-data-placeholder:border-skeleton"
+      className="group relative rounded-xl border border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden group-data-placeholder:border-skeleton"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",

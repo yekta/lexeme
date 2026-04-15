@@ -151,7 +151,7 @@ export function NCardStudy(props: TNCardStudyProps) {
           style={{ backfaceVisibility: "hidden", opacity: frontOpacity }}
           className={cn(
             faceBase,
-            "border border-border bg-card shadow-lg overflow-hidden flex flex-col items-center",
+            "border border-border bg-background shadow-lg shadow-shadow/shadow-muted overflow-hidden flex flex-col items-center",
           )}
         >
           <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
@@ -187,7 +187,7 @@ export function NCardStudy(props: TNCardStudyProps) {
             }}
             className={cn(
               faceBase,
-              "border overflow-hidden border-border shadow-lg",
+              "border overflow-hidden border-border shadow-lg shadow-shadow/shadow-muted",
             )}
           >
             <BgPattern />
@@ -195,7 +195,7 @@ export function NCardStudy(props: TNCardStudyProps) {
               Back
             </p>
             <div className="w-full flex-1 flex flex-col items-center justify-center py-6 min-h-[120px] relative">
-              <p className="max-w-full text-xl text-foreground/80 break-words text-center">
+              <p className="max-w-full text-xl text-foreground break-words text-center">
                 {isPlaceholder ? "Back text" : props.back}
               </p>
               <p className="opacity-0 max-w-full text-2xl font-medium text-transparent break-words text-center">
@@ -246,7 +246,7 @@ function RatingButtons({
     >
       <Button
         variant="outline"
-        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-again border-rating-again-border hover:bg-rating-again-border hover:text-rating-again-hover"
+        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-again border-rating-again-border hover:bg-rating-again-border active:bg-rating-again-border"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Again);
@@ -259,7 +259,7 @@ function RatingButtons({
       </Button>
       <Button
         variant="outline"
-        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-hard border-rating-hard-border hover:bg-rating-hard-border hover:text-rating-hard-hover"
+        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-hard border-rating-hard-border hover:bg-rating-hard-border active:bg-rating-hard-border"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Hard);
@@ -272,7 +272,7 @@ function RatingButtons({
       </Button>
       <Button
         variant="outline"
-        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-good border-rating-good-border hover:bg-rating-good-border hover:text-rating-good-hover"
+        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-good border-rating-good-border hover:bg-rating-good-border active:bg-rating-good-border"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Good);
@@ -285,7 +285,7 @@ function RatingButtons({
       </Button>
       <Button
         variant="outline"
-        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-easy border-rating-easy-border hover:bg-rating-easy-border hover:text-rating-easy-hover"
+        className="h-auto py-2.5 md:py-3 flex flex-col gap-0.5 bg-rating-easy border-rating-easy-border hover:bg-rating-easy-border active:bg-rating-easy-border"
         onClick={(e) => {
           e.stopPropagation();
           onRate(Rating.Easy);

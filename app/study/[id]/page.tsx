@@ -185,14 +185,14 @@ export default function StudyPage() {
         backHref="/"
         title={
           showPlaceholder ? (
-            <div className="h-5 w-36 bg-skeleton animate-pulse rounded" />
+            <div className="h-5 w-36 bg-foreground/20 animate-pulse rounded" />
           ) : (
             deckName
           )
         }
         rightActions={
           showPlaceholder ? (
-            <div className="text-sm font-medium text-transparent bg-skeleton animate-pulse rounded w-12">
+            <div className="text-sm font-medium text-transparent bg-foreground/20 animate-pulse rounded w-12">
               &nbsp;
             </div>
           ) : (

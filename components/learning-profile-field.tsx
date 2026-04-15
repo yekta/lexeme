@@ -42,7 +42,7 @@ export function LearningProfileField({
     <div className="w-full flex flex-col gap-2">
       <Label>Learning Profile</Label>
       {isLoading ? (
-        <div className="h-10 w-full rounded-lg bg-skeleton animate-pulse" />
+        <div className="h-10 w-full rounded-lg bg-foreground/20 animate-pulse" />
       ) : (
         <Combobox
           items={profileOptions}

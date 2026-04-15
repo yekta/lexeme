@@ -50,7 +50,7 @@ export function NCardManage(props: TNCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden group-data-placeholder:border-skeleton"
+      className="group relative rounded-xl border border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden group-data-placeholder:border-foreground/20"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
@@ -108,10 +108,10 @@ export function NCardManage(props: TNCardManageProps) {
 
       {/* Front */}
       <div className="px-5 py-4 w-full flex flex-col items-start relative bg-card gap-2">
-        <p className="shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Front
         </p>
-        <p className="shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {front}
         </p>
       </div>
@@ -122,10 +122,10 @@ export function NCardManage(props: TNCardManageProps) {
       {/* Back */}
       <div className="px-5 py-4 relative w-full flex flex-col items-start gap-2">
         <BgPattern />
-        <p className="relative shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="relative shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
-        <p className="relative shrink max-w-full min-w-0 text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="relative shrink max-w-full min-w-0 text-sm text-foreground/80 line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {back}
         </p>
       </div>

@@ -109,7 +109,7 @@ export function NDeck(props: TNDeckProps) {
                   render={
                     <Button
                       variant="ghost"
-                      className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:text-transparent"
+                      className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:text-transparent"
                     >
                       <MoreVertical className="size-5 text-muted-foreground group-data-placeholder:opacity-0" />
                     </Button>
@@ -155,11 +155,11 @@ export function NDeck(props: TNDeckProps) {
           )}
           <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
             <div className="space-y-1 min-w-0">
-              <CardTitle className="truncate pr-5 group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+              <CardTitle className="truncate pr-5 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {name}
               </CardTitle>
-              <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                {description || <>&nbsp;</>}
+              <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                {description}
               </CardDescription>
             </div>
           </CardHeader>
@@ -169,20 +169,20 @@ export function NDeck(props: TNDeckProps) {
                 data-updated={isRecentlyUpdated ? "true" : undefined}
                 className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-updated:bg-success-muted data-updated:text-success-foreground"
               >
-                <p className="max-w-full min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:select-none">
+                <p className="max-w-full min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
                   {totalCards} {totalCards === 1 ? "card" : "cards"}
                 </p>
               </div>
               <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5 text-state-new group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                <div className="flex items-center gap-1.5 text-state-new group-data-placeholder:text-transparent group-data-placeholder:bg-state-new/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-new group-data-placeholder:opacity-0" />
                   {newCount} New
                 </div>
-                <div className="flex items-center gap-1.5 text-state-learn group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                <div className="flex items-center gap-1.5 text-state-learn group-data-placeholder:text-transparent group-data-placeholder:bg-state-learn/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-learn group-data-placeholder:opacity-0" />
                   {learningCount} Learn
                 </div>
-                <div className="flex items-center gap-1.5 text-state-due group-data-placeholder:text-transparent group-data-placeholder:bg-skeleton group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                <div className="flex items-center gap-1.5 text-state-due group-data-placeholder:text-transparent group-data-placeholder:bg-state-due/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-due group-data-placeholder:opacity-0" />
                   {dueCount} Due
                 </div>
@@ -194,7 +194,7 @@ export function NDeck(props: TNDeckProps) {
             {isPlaceholder ? (
               <Button
                 variant="default"
-                className="w-full text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
+                className="w-full text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20"
               >
                 Study
               </Button>
@@ -206,7 +206,7 @@ export function NDeck(props: TNDeckProps) {
             {isPlaceholder ? (
               <Button
                 variant="outline"
-                className="w-full text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton"
+                className="w-full text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20"
               >
                 Manage
               </Button>

@@ -128,7 +128,7 @@ export default function Home() {
             className={cn(
               "text-2xl font-bold tracking-tight truncate min-w-0",
               showPlaceholder &&
-                "text-transparent bg-skeleton animate-pulse rounded w-48 select-none",
+                "text-transparent bg-foreground/20 animate-pulse rounded w-48 select-none",
             )}
           >
             Decks{" "}
@@ -146,7 +146,7 @@ export default function Home() {
                   className={cn(
                     "shrink-0",
                     showPlaceholder &&
-                      "text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton",
+                      "text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20",
                   )}
                 />
               }
@@ -326,7 +326,7 @@ function TodayStatsFooter({ showPlaceholder }: { showPlaceholder: boolean }) {
       data-placeholder={showPlaceholder ? "true" : undefined}
       className="w-full flex justify-center group"
     >
-      <p className="text-center text-sm max-w-2xl text-muted-foreground group-data-placeholder:bg-skeleton group-data-placeholder:text-transparent group-data-placeholder:animate-skeleton group-data-placeholder:rounded">
+      <p className="text-center text-sm max-w-2xl text-muted-foreground group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:text-transparent group-data-placeholder:animate-skeleton group-data-placeholder:rounded">
         {statsText}
       </p>
     </div>

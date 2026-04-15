@@ -79,13 +79,13 @@ export default function DeckPage() {
             </LinkButton>
             <h1
               data-placeholder={showPlaceholder ? "true" : undefined}
-              className="text-xl font-semibold truncate min-w-0 data-placeholder:animate-pulse data-placeholder:bg-skeleton data-placeholder:rounded data-placeholder:text-transparent"
+              className="text-xl font-semibold truncate min-w-0 data-placeholder:animate-pulse data-placeholder:bg-foreground/20 data-placeholder:rounded data-placeholder:text-transparent"
             >
               {deckName}
             </h1>
           </div>
           {showPlaceholder ? (
-            <Button className="text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton">
+            <Button className="text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20">
               Study Deck
             </Button>
           ) : (
@@ -100,7 +100,7 @@ export default function DeckPage() {
             className={cn(
               "text-2xl font-bold tracking-tight truncate min-w-0",
               showPlaceholder &&
-                "text-transparent bg-skeleton animate-pulse rounded w-32 select-none",
+                "text-transparent bg-foreground/20 animate-pulse rounded w-32 select-none",
             )}
           >
             Cards{" "}
@@ -118,7 +118,7 @@ export default function DeckPage() {
                   className={cn(
                     "shrink-0",
                     showPlaceholder &&
-                      "text-transparent bg-skeleton animate-pulse border-transparent pointer-events-none hover:bg-skeleton",
+                      "text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20",
                   )}
                 />
               }

@@ -84,7 +84,7 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
             href="/"
             className="flex items-center shrink-0 group/link size-12 -ml-2.75"
           >
-            <Logo className="size-6 group-active/link:rotate-5 group-active/link:translate-y-0.5 transition-transform" />
+            <Logo className="size-7 group-active/link:rotate-15 transition-transform" />
           </LinkButton>
 
           {(backHref || title) && (

@@ -17,11 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCards } from "@/hooks/data/use-cards";
-import {
-  useCreateDeck,
-  useDecks,
-  type TDeck,
-} from "@/hooks/data/use-decks";
+import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useTodayReviewLogs } from "@/hooks/data/use-review-logs";
 import { useTodayStats } from "@/hooks/data/use-stats";
@@ -120,23 +116,18 @@ export default function Home() {
   const showPlaceholder = loading || isPending;
 
   return (
-    <div className="min-h-screen relative">
+    <div
+      data-placeholder={showPlaceholder ? "true" : undefined}
+      className="min-h-screen relative group"
+    >
       <Navbar />
       <main className="max-w-5xl mx-auto px-5 pt-4 pb-16 flex flex-col gap-6">
         <div className="flex items-center justify-between gap-4">
-          <h2
-            className={cn(
-              "text-2xl font-bold tracking-tight truncate min-w-0",
-              showPlaceholder &&
-                "text-transparent bg-foreground/20 animate-pulse rounded w-48 select-none",
-            )}
-          >
+          <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Decks{" "}
-            {!showPlaceholder && (
-              <span className="font-normal text-muted-foreground">
-                ({decks.length})
-              </span>
-            )}
+            <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
+              ({showPlaceholder ? 5 : decks.length})
+            </span>
           </h2>
 
           <Dialog open={isCreateDeckOpen} onOpenChange={setIsCreateDeckOpen}>

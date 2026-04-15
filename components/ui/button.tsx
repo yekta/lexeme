@@ -9,7 +9,7 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "group/button max-w-full relative overflow-hidden overflow-ellipsis min-w-0 relative inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "group/button max-w-full relative overflow-hidden overflow-ellipsis min-w-0 relative inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 data-placeholder:pointer-events-none data-placeholder:opacity-100 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -45,9 +45,45 @@ const buttonVariants = cva(
   },
 );
 
+type TVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+
+const loaderColorClassMap: Record<TVariant, string> = {
+  default: "text-primary-foreground",
+  outline: "text-foreground",
+  secondary: "text-secondary-foreground",
+  ghost: "text-foreground",
+  destructive: "text-background",
+  link: "text-primary",
+};
+
+const placeholderTextClassMap: Record<TVariant, string> = {
+  default: "group-data-placeholder/button:bg-primary-foreground/20",
+  outline: "group-data-placeholder/button:bg-foreground/20",
+  secondary: "group-data-placeholder/button:bg-secondary-foreground/20",
+  ghost: "group-data-placeholder/button:bg-foreground/20",
+  destructive: "group-data-placeholder/button:bg-background/20",
+  link: "group-data-placeholder/button:bg-primary/20",
+};
+
+const placeholderIconClassMap: Record<TVariant, string> = {
+  default: "[&_svg]:group-data-placeholder/button:bg-primary-foreground/20",
+  outline: "[&_svg]:group-data-placeholder/button:bg-foreground/20",
+  secondary: "[&_svg]:group-data-placeholder/button:bg-secondary-foreground/20",
+  ghost: "[&_svg]:group-data-placeholder/button:bg-foreground/20",
+  destructive: "[&_svg]:group-data-placeholder/button:bg-background/20",
+  link: "[&_svg]:group-data-placeholder/button:bg-primary/20",
+};
+
+const placeholderTextSkeletonClass =
+  "group-data-placeholder/button:text-transparent group-data-placeholder/button:animate-skeleton group-data-placeholder/button:rounded group-data-placeholder/button:select-none";
+
+const placeholderIconSkeletonClass =
+  "[&_svg]:group-data-placeholder/button:text-transparent [&_svg]:group-data-placeholder/button:animate-skeleton [&_svg]:group-data-placeholder/button:rounded";
+
 type TButtonProps = ButtonPrimitive.Props &
   VariantProps<typeof buttonVariants> & {
     isPending?: boolean;
+    isPlaceholder?: boolean;
   };
 
 function Button({
@@ -55,28 +91,28 @@ function Button({
   variant = "default",
   size = "default",
   isPending,
+  isPlaceholder,
   children,
   disabled,
   ...props
 }: TButtonProps) {
-  const loaderColorClass = {
-    default: "text-primary-foreground",
-    outline: "text-foreground",
-    secondary: "text-secondary-foreground",
-    ghost: "text-foreground",
-    destructive: "text-background",
-    link: "text-primary",
-  }[variant || "default"];
+  const v = variant || "default";
+  const loaderColorClass = loaderColorClassMap[v];
+  const placeholderTextClass = placeholderTextClassMap[v];
+  const placeholderIconClass = placeholderIconClassMap[v];
 
   return (
     <ButtonPrimitive
       data-slot="button"
       data-pending={isPending ? "true" : undefined}
+      data-placeholder={isPlaceholder ? "true" : undefined}
       className={cn(
         buttonVariants({ variant, size, className }),
         "data-pending:text-transparent data-pending:transition-none",
+        placeholderIconClass,
+        placeholderIconSkeletonClass,
       )}
-      disabled={isPending || disabled}
+      disabled={isPending || isPlaceholder || disabled}
       {...props}
     >
       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-data-pending/button:opacity-100 pointer-events-none">
@@ -88,7 +124,13 @@ function Button({
         />
       </div>
       {typeof children === "string" ? (
-        <span className="shrink min-w-0 overflow-hidden overflow-ellipsis relative">
+        <span
+          className={cn(
+            "shrink min-w-0 overflow-hidden overflow-ellipsis relative",
+            placeholderTextClass,
+            placeholderTextSkeletonClass,
+          )}
+        >
           {children}
         </span>
       ) : (
@@ -101,6 +143,7 @@ function Button({
 type TLinkButtonProps = ComponentProps<typeof Link> &
   VariantProps<typeof buttonVariants> & {
     isPending?: boolean;
+    isPlaceholder?: boolean;
   };
 
 function LinkButton({
@@ -108,25 +151,35 @@ function LinkButton({
   variant = "default",
   size = "default",
   isPending,
+  isPlaceholder,
   children,
+  onClick,
   ...props
 }: TLinkButtonProps) {
-  const loaderColorClass = {
-    default: "text-primary-foreground",
-    outline: "text-foreground",
-    secondary: "text-secondary-foreground",
-    ghost: "text-foreground",
-    destructive: "text-destructive",
-    link: "text-primary",
-  }[variant || "default"];
+  const v = variant || "default";
+  const loaderColorClass = loaderColorClassMap[v];
+  const placeholderTextClass = placeholderTextClassMap[v];
+  const placeholderIconClass = placeholderIconClassMap[v];
 
   return (
     <Link
       data-slot="button"
       data-pending={isPending ? "true" : undefined}
+      data-placeholder={isPlaceholder ? "true" : undefined}
+      aria-disabled={isPlaceholder || undefined}
+      tabIndex={isPlaceholder ? -1 : undefined}
+      onClick={
+        isPlaceholder
+          ? (e) => {
+              e.preventDefault();
+            }
+          : onClick
+      }
       className={cn(
         buttonVariants({ variant, size, className }),
         "data-pending:text-transparent data-pending:transition-none",
+        placeholderIconClass,
+        placeholderIconSkeletonClass,
       )}
       {...props}
     >
@@ -139,7 +192,13 @@ function LinkButton({
         />
       </div>
       {typeof children === "string" ? (
-        <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+        <span
+          className={cn(
+            "shrink min-w-0 overflow-hidden overflow-ellipsis",
+            placeholderTextClass,
+            placeholderTextSkeletonClass,
+          )}
+        >
           {children}
         </span>
       ) : (

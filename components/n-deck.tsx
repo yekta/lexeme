@@ -191,34 +191,21 @@ export function NDeck(props: TNDeckProps) {
           </CardContent>
           <CardFooter className="flex flex-col w-full gap-1 relative">
             <BgPattern />
-            {isPlaceholder ? (
-              <Button
-                variant="default"
-                className="w-full text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20"
-              >
-                Study
-              </Button>
-            ) : (
-              <LinkButton href={props.studyHref} className="w-full">
-                Study
-              </LinkButton>
-            )}
-            {isPlaceholder ? (
-              <Button
-                variant="outline"
-                className="w-full text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20"
-              >
-                Manage
-              </Button>
-            ) : (
-              <LinkButton
-                variant="outline"
-                href={props.manageHref}
-                className="w-full"
-              >
-                Manage
-              </LinkButton>
-            )}
+            <LinkButton
+              href={isPlaceholder ? "#" : props.studyHref}
+              isPlaceholder={isPlaceholder}
+              className="w-full"
+            >
+              Study
+            </LinkButton>
+            <LinkButton
+              variant="outline"
+              href={isPlaceholder ? "#" : props.manageHref}
+              isPlaceholder={isPlaceholder}
+              className="w-full"
+            >
+              Manage
+            </LinkButton>
           </CardFooter>
         </Card>
       </motion.div>

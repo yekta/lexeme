@@ -84,13 +84,12 @@ export default function DeckPage() {
               {deckName}
             </h1>
           </div>
-          {showPlaceholder ? (
-            <Button className="text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20">
-              Study Deck
-            </Button>
-          ) : (
-            <LinkButton href={`/study/${id}`}>Study Deck</LinkButton>
-          )}
+          <LinkButton
+            href={`/study/${id}`}
+            isPlaceholder={showPlaceholder}
+          >
+            Study Deck
+          </LinkButton>
         </div>
 
         <div className="w-full h-px bg-border rounded-full" />

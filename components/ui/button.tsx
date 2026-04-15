@@ -64,7 +64,7 @@ function Button({
     outline: "text-foreground",
     secondary: "text-secondary-foreground",
     ghost: "text-foreground",
-    destructive: "text-destructive",
+    destructive: "text-background",
     link: "text-primary",
   }[variant || "default"];
 

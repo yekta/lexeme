@@ -65,7 +65,10 @@ export default function DeckPage() {
   const showPlaceholder = loading || isPending;
 
   return (
-    <div className="min-h-screen">
+    <div
+      data-placeholder={showPlaceholder ? "true" : undefined}
+      className="min-h-screen group"
+    >
       <Navbar />
       <main className="max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5">
         <div className="flex items-center justify-between gap-4">
@@ -84,10 +87,7 @@ export default function DeckPage() {
               {deckName}
             </h1>
           </div>
-          <LinkButton
-            href={`/study/${id}`}
-            isPlaceholder={showPlaceholder}
-          >
+          <LinkButton href={`/study/${id}`} isPlaceholder={showPlaceholder}>
             Study Deck
           </LinkButton>
         </div>
@@ -95,36 +95,16 @@ export default function DeckPage() {
         <div className="w-full h-px bg-border rounded-full" />
 
         <div className="flex items-center justify-between gap-4">
-          <h2
-            className={cn(
-              "text-2xl font-bold tracking-tight truncate min-w-0",
-              showPlaceholder &&
-                "text-transparent bg-foreground/20 animate-pulse rounded w-32 select-none",
-            )}
-          >
+          <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Cards{" "}
-            {!showPlaceholder && (
-              <span className="font-normal text-muted-foreground">
-                ({cards.length})
-              </span>
-            )}
+            <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
+              ({showPlaceholder ? 5 : cards.length})
+            </span>
           </h2>
 
           <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
-            <DialogTrigger
-              render={
-                <Button
-                  className={cn(
-                    "shrink-0",
-                    showPlaceholder &&
-                      "text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20",
-                  )}
-                />
-              }
-            >
-              <Plus
-                className={cn("size-5 -ml-1.5", showPlaceholder && "opacity-0")}
-              />
+            <DialogTrigger render={<Button isPlaceholder={showPlaceholder} />}>
+              <Plus className="size-5 -ml-1.5" />
               <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
                 Add Card
               </span>

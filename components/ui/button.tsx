@@ -65,6 +65,15 @@ const placeholderTextClassMap: Record<TVariant, string> = {
   link: "group-data-placeholder/button:bg-primary/20",
 };
 
+const placeholderDescendantTextClassMap: Record<TVariant, string> = {
+  default: "[&_span]:group-data-placeholder/button:bg-primary-foreground/20",
+  outline: "[&_span]:group-data-placeholder/button:bg-foreground/20",
+  secondary: "[&_span]:group-data-placeholder/button:bg-secondary-foreground/20",
+  ghost: "[&_span]:group-data-placeholder/button:bg-foreground/20",
+  destructive: "[&_span]:group-data-placeholder/button:bg-background/20",
+  link: "[&_span]:group-data-placeholder/button:bg-primary/20",
+};
+
 const placeholderIconClassMap: Record<TVariant, string> = {
   default: "[&_svg]:group-data-placeholder/button:bg-primary-foreground/20",
   outline: "[&_svg]:group-data-placeholder/button:bg-foreground/20",
@@ -76,6 +85,9 @@ const placeholderIconClassMap: Record<TVariant, string> = {
 
 const placeholderTextSkeletonClass =
   "group-data-placeholder/button:text-transparent group-data-placeholder/button:animate-skeleton group-data-placeholder/button:rounded group-data-placeholder/button:select-none";
+
+const placeholderDescendantTextSkeletonClass =
+  "[&_span]:group-data-placeholder/button:text-transparent [&_span]:group-data-placeholder/button:animate-skeleton [&_span]:group-data-placeholder/button:rounded [&_span]:group-data-placeholder/button:select-none";
 
 const placeholderIconSkeletonClass =
   "[&_svg]:group-data-placeholder/button:text-transparent [&_svg]:group-data-placeholder/button:animate-skeleton [&_svg]:group-data-placeholder/button:rounded";
@@ -100,6 +112,7 @@ function Button({
   const loaderColorClass = loaderColorClassMap[v];
   const placeholderTextClass = placeholderTextClassMap[v];
   const placeholderIconClass = placeholderIconClassMap[v];
+  const placeholderDescendantTextClass = placeholderDescendantTextClassMap[v];
 
   return (
     <ButtonPrimitive
@@ -111,6 +124,8 @@ function Button({
         "data-pending:text-transparent data-pending:transition-none",
         placeholderIconClass,
         placeholderIconSkeletonClass,
+        placeholderDescendantTextClass,
+        placeholderDescendantTextSkeletonClass,
       )}
       disabled={isPending || isPlaceholder || disabled}
       {...props}
@@ -160,6 +175,7 @@ function LinkButton({
   const loaderColorClass = loaderColorClassMap[v];
   const placeholderTextClass = placeholderTextClassMap[v];
   const placeholderIconClass = placeholderIconClassMap[v];
+  const placeholderDescendantTextClass = placeholderDescendantTextClassMap[v];
 
   return (
     <Link
@@ -180,6 +196,8 @@ function LinkButton({
         "data-pending:text-transparent data-pending:transition-none",
         placeholderIconClass,
         placeholderIconSkeletonClass,
+        placeholderDescendantTextClass,
+        placeholderDescendantTextSkeletonClass,
       )}
       {...props}
     >

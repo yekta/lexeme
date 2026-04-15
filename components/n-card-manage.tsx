@@ -50,19 +50,28 @@ export function NCardManage(props: TNCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden group-data-placeholder:border-foreground/20"
+      className="group relative rounded-xl border border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
       }}
     >
       {/* Menu */}
-      {!isPlaceholder && (
-        <div className="absolute top-1 right-1 z-10">
+      <div className="absolute top-1 right-1 z-10">
+        {isPlaceholder && (
+          <Button variant="ghost" isPlaceholder={true} className="size-9">
+            <MoreVertical className="size-5 text-muted-foreground" />
+          </Button>
+        )}
+        {!isPlaceholder && (
           <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none">
-              <MoreVertical className="size-5 text-muted-foreground" />
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" className="size-9">
+                  <MoreVertical className="size-5 text-muted-foreground" />
+                </Button>
+              }
+            ></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem
                 className="cursor-pointer"
@@ -81,7 +90,9 @@ export function NCardManage(props: TNCardManageProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        )}
 
+        {!isPlaceholder && (
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogContent>
               <EditCardForm
@@ -93,7 +104,9 @@ export function NCardManage(props: TNCardManageProps) {
               />
             </DialogContent>
           </Dialog>
+        )}
 
+        {!isPlaceholder && (
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DeleteCardForm
@@ -103,9 +116,8 @@ export function NCardManage(props: TNCardManageProps) {
               />
             </DialogContent>
           </Dialog>
-        </div>
-      )}
-
+        )}
+      </div>
       {/* Front */}
       <div className="px-5 py-4 w-full flex flex-col items-start relative bg-card gap-2">
         <p className="shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">

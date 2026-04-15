@@ -131,20 +131,8 @@ export default function Home() {
           </h2>
 
           <Dialog open={isCreateDeckOpen} onOpenChange={setIsCreateDeckOpen}>
-            <DialogTrigger
-              render={
-                <Button
-                  className={cn(
-                    "shrink-0",
-                    showPlaceholder &&
-                      "text-transparent bg-foreground/20 animate-pulse border-transparent pointer-events-none hover:bg-foreground/20",
-                  )}
-                />
-              }
-            >
-              <Plus
-                className={cn("size-5 -ml-1.5", showPlaceholder && "opacity-0")}
-              />
+            <DialogTrigger render={<Button isPlaceholder={showPlaceholder} />}>
+              <Plus className="size-5 -ml-1.5" />
               <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
                 Create Deck
               </span>

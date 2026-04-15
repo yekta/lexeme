@@ -153,8 +153,8 @@ export function NDeck(props: TNDeckProps) {
               </Dialog>
             </>
           )}
-          <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 gap-4">
-            <div className="space-y-1 min-w-0">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div className="w-full flex flex-col items-start gap-1">
               <CardTitle className="truncate pr-5 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {name}
               </CardTitle>

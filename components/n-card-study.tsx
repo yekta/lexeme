@@ -187,7 +187,7 @@ export function NCardStudy(props: TNCardStudyProps) {
             }}
             className={cn(
               faceBase,
-              "border overflow-hidden border-border bg-card shadow-lg",
+              "border overflow-hidden border-border shadow-lg",
             )}
           >
             <BgPattern />

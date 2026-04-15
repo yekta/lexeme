@@ -142,7 +142,7 @@ export default function DeckPage() {
 
         {showPlaceholder ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[1, 2, 3, 4].map((i) => (
+            {Array.from({ length: 12 }).map((_, i) => (
               <NCardManage key={i} isPlaceholder />
             ))}
           </div>

@@ -228,7 +228,7 @@ export default function StudyPage() {
         ) : isFinished || hasNoDueCards ? (
           <EmptyList>
             <EmptyListHeader>
-              <EmptyListIcon className="bg-success-muted text-success">
+              <EmptyListIcon className="bg-success/10 text-success">
                 <CheckCircle2 />
               </EmptyListIcon>
               <EmptyListContent>

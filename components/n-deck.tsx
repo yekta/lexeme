@@ -304,22 +304,20 @@ function DeckSettingsForm({
             </div>
           )}
         </form.Field>
-        <div className="border-t pt-4 space-y-4">
-          <form.Field name="learning_profile_id">
-            {(field) => (
-              <LearningProfileField
-                profiles={profiles}
-                isLoading={isLoading}
-                value={field.state.value}
-                onChange={field.handleChange}
-                fallbackId={
-                  profiles?.find((p) => p.is_default)?.id ??
-                  deck.learning_profile_id
-                }
-              />
-            )}
-          </form.Field>
-        </div>
+        <form.Field name="learning_profile_id">
+          {(field) => (
+            <LearningProfileField
+              profiles={profiles}
+              isLoading={isLoading}
+              value={field.state.value}
+              onChange={field.handleChange}
+              fallbackId={
+                profiles?.find((p) => p.is_default)?.id ??
+                deck.learning_profile_id
+              }
+            />
+          )}
+        </form.Field>
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>

@@ -162,67 +162,26 @@ type TLinkButtonProps = ComponentProps<typeof Link> &
   };
 
 function LinkButton({
-  className,
-  variant = "default",
-  size = "default",
+  variant,
+  size,
   isPending,
   isPlaceholder,
+  className,
   children,
-  onClick,
   ...props
 }: TLinkButtonProps) {
-  const v = variant || "default";
-  const loaderColorClass = loaderColorClassMap[v];
-  const placeholderTextClass = placeholderTextClassMap[v];
-  const placeholderIconClass = placeholderIconClassMap[v];
-  const placeholderDescendantTextClass = placeholderDescendantTextClassMap[v];
-
   return (
-    <Link
-      data-slot="button"
-      data-pending={isPending ? "true" : undefined}
-      data-placeholder={isPlaceholder ? "true" : undefined}
-      aria-disabled={isPlaceholder || undefined}
-      tabIndex={isPlaceholder ? -1 : undefined}
-      onClick={
-        isPlaceholder
-          ? (e) => {
-              e.preventDefault();
-            }
-          : onClick
-      }
-      className={cn(
-        buttonVariants({ variant, size, className }),
-        "data-pending:text-transparent data-pending:transition-none",
-        placeholderIconClass,
-        placeholderIconSkeletonClass,
-        placeholderDescendantTextClass,
-        placeholderDescendantTextSkeletonClass,
-      )}
-      {...props}
+    <Button
+      variant={variant}
+      size={size}
+      isPending={isPending}
+      isPlaceholder={isPlaceholder}
+      className={className}
+      nativeButton={!!isPlaceholder}
+      render={isPlaceholder ? undefined : <Link {...props} />}
     >
-      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-data-pending/button:opacity-100 pointer-events-none">
-        <LoaderIcon
-          className={cn(
-            "group-data-pending/button:animate-spin size-5",
-            loaderColorClass,
-          )}
-        />
-      </div>
-      {typeof children === "string" ? (
-        <span
-          className={cn(
-            "shrink min-w-0 overflow-hidden overflow-ellipsis",
-            placeholderTextClass,
-            placeholderTextSkeletonClass,
-          )}
-        >
-          {children}
-        </span>
-      ) : (
-        children
-      )}
-    </Link>
+      {children}
+    </Button>
   );
 }
 

@@ -16,7 +16,7 @@ const fontMain = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "DeckNinja",
+  title: "Lexeme",
   description:
     "A flashcard app using spaced repetition algorithm with Firebase authentication.",
 };

@@ -45,7 +45,7 @@ export default function SignInForm({ className }: TProps) {
         <div className="max-w-md text-center space-y-6">
           <Logo className="mx-auto size-16" />
           <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            DeckNinja
+            Lexeme
           </h1>
           <p className="text-lg text-muted-foreground">
             Master any subject with spaced repetition. Sign in to start

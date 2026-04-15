@@ -68,7 +68,8 @@ const placeholderTextClassMap: Record<TVariant, string> = {
 const placeholderDescendantTextClassMap: Record<TVariant, string> = {
   default: "[&_span]:group-data-placeholder/button:bg-primary-foreground/20",
   outline: "[&_span]:group-data-placeholder/button:bg-foreground/20",
-  secondary: "[&_span]:group-data-placeholder/button:bg-secondary-foreground/20",
+  secondary:
+    "[&_span]:group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "[&_span]:group-data-placeholder/button:bg-foreground/20",
   destructive: "[&_span]:group-data-placeholder/button:bg-background/20",
   link: "[&_span]:group-data-placeholder/button:bg-primary/20",

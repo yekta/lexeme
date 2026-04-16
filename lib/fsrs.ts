@@ -1,3 +1,4 @@
+import { appLocale } from "@/lib/constants";
 import {
   TCardStateEnum,
   TLearningProfile,
@@ -153,8 +154,8 @@ export function formatInterval(dueDate: Date, now: Date): string {
   const diffMs = dueDate.getTime() - now.getTime();
   const diffMinutes = Math.round(diffMs / 60_000);
 
-  if (diffMinutes < 1.1) return "This session (<1m)";
-  if (diffMinutes < 60) return `This session (<${diffMinutes}m)`;
+  if (diffMinutes < 1.1) return "This session | <1m";
+  if (diffMinutes < 60) return `This session | <${diffMinutes}m`;
 
   const diffHours = Math.round(diffMs / 3_600_000);
   if (diffHours < 24) return `${diffHours}h`;
@@ -162,6 +163,6 @@ export function formatInterval(dueDate: Date, now: Date): string {
   const diffDays = Math.round(diffMs / 86_400_000);
   if (diffDays < 31) return `${diffDays}d`;
 
-  const diffMonths = +(diffDays / 30.44).toFixed(1);
-  return `${diffMonths}mo`;
+  const diffMonths = diffDays / 30;
+  return `${diffMonths.toLocaleString(appLocale, { maximumFractionDigits: 1 })}mo`;
 }

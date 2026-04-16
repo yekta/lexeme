@@ -1,24 +1,20 @@
 import { appLocale } from "@/lib/constants";
+import { TCardStateEnum, TLearningProfileLoose } from "@/lib/db/schema";
 import {
-  TCardStateEnum,
-  TLearningProfile,
-  TLearningProfileLoose,
-} from "@/lib/db/schema";
-import {
-  fsrs,
   createEmptyCard,
+  fsrs,
   Rating,
   State,
-  type Card as FSRSCard,
-  type Grade,
   type FSRS,
-  type ReviewLog as FSRSReviewLog,
-  type StepUnit,
+  type Card as FSRSCard,
   type FSRSParameters,
+  type ReviewLog as FSRSReviewLog,
+  type Grade,
+  type StepUnit,
 } from "ts-fsrs";
 
-export { Rating, State, createEmptyCard };
-export type { FSRSCard, Grade, FSRS, FSRSParameters };
+export { createEmptyCard, Rating, State };
+export type { FSRS, FSRSCard, FSRSParameters, Grade };
 
 export const FSRS_DEFAULT_REQUEST_RETENTION = 0.9;
 export const FSRS_DEFAULT_MAXIMUM_INTERVAL = 36500;

@@ -190,7 +190,6 @@ export function NDeck(props: TNDeckProps) {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col w-full gap-1 relative">
-            <BgPattern />
             <LinkButton
               href={isPlaceholder ? "#" : props.studyHref}
               isPlaceholder={isPlaceholder}

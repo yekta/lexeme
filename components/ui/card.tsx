@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import BgPattern from "@/components/bg-pattern";
 
 function Card({
   className,
@@ -80,6 +81,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+  const { children, ...rest } = props;
   return (
     <div
       data-slot="card-footer"
@@ -87,8 +89,11 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
         "flex items-center bg-muted rounded-b-xl border-t p-4 group-data-[size=sm]/card:p-3",
         className,
       )}
-      {...props}
-    />
+      {...rest}
+    >
+      <BgPattern />
+      {children}
+    </div>
   );
 }
 

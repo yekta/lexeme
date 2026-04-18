@@ -36,7 +36,7 @@ export default async function RootLayout({
       )}
       suppressHydrationWarning
     >
-      <body suppressHydrationWarning>
+      <body suppressHydrationWarning className="relative">
         <BgPattern />
         <NextTopLoader
           shadow={false}

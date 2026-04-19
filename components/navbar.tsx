@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import BgPattern from "@/components/bg-pattern";
 import Logo from "@/components/icons/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -20,12 +19,11 @@ import {
 import {
   ArrowLeftIcon,
   LogOutIcon,
+  MonitorSmartphoneIcon,
   MoonIcon,
   SunIcon,
-  MonitorSmartphoneIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
@@ -78,7 +76,6 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
 
   return (
     <header className="bg-background border-b flex py-0.5 items-center sticky top-0 z-50">
-      <BgPattern />
       <div className="max-w-5xl mx-auto px-5 w-full flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <LinkButton

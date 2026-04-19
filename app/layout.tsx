@@ -9,7 +9,6 @@ import { ThemeProvider } from "next-themes";
 import { DM_Sans } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
-import BgPattern from "@/components/bg-pattern";
 
 const fontMain = DM_Sans({
   variable: "--font-sans",
@@ -37,7 +36,6 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning className="relative">
-        <BgPattern />
         <NextTopLoader
           shadow={false}
           color="var(--primary)"

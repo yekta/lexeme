@@ -133,11 +133,6 @@ export const cards = pgTable(
     deck_id: uuid("deck_id")
       .notNull()
       .references(() => decks.id, { onDelete: "cascade" }),
-    user_id: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    front: text("front").notNull(),
-    back: text("back").notNull(),
     due: timestamp("due", { withTimezone: true }).notNull().defaultNow(),
     stability: real("stability").notNull().default(0),
     difficulty: real("difficulty").notNull().default(0),
@@ -155,10 +150,24 @@ export const cards = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [
-    index("cards_deck_id_user_id_due_idx").on(t.deck_id, t.user_id, t.due),
-  ],
+  (t) => [index("cards_deck_id_due_idx").on(t.deck_id, t.due)],
 );
+
+export const cardContents = pgTable("card_contents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  card_id: uuid("card_id")
+    .notNull()
+    .unique()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  front: text("front").notNull(),
+  back: text("back").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 export const reviewLogs = pgTable(
   "review_logs",
@@ -185,6 +194,7 @@ export const reviewLogs = pgTable(
 
 export type TDeck = typeof decks.$inferSelect;
 export type TCard = typeof cards.$inferSelect;
+export type TCardContent = typeof cardContents.$inferSelect;
 export type TLearningProfile = typeof learningProfiles.$inferSelect;
 export type TReviewLog = typeof reviewLogs.$inferSelect;
 

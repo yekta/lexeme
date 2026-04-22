@@ -77,10 +77,20 @@ export function useCardsByDeck(deckId: string | undefined) {
       if (!user || !deckId) return [];
       const { data, error } = await supabase
         .from("cards")
-        .select("*")
+        .select("id, card_contents(front, back)")
         .eq("deck_id", deckId);
       if (error) await handleDbError(error, OperationType.GET, "cards");
-      return (data ?? []) as TCard[];
+      type Row = {
+        id: string;
+        card_contents: { front: string; back: string } | null;
+      };
+      return ((data ?? []) as Row[])
+        .filter((r) => r.card_contents !== null)
+        .map((r) => ({
+          id: r.id,
+          front: r.card_contents!.front,
+          back: r.card_contents!.back,
+        })) as TCard[];
     },
     enabled: !!user && !!deckId,
   });
@@ -97,11 +107,10 @@ export function useCreateCard() {
     }) => {
       if (!user || !input.front.trim() || !input.back.trim())
         throw new Error("Missing data");
-      const { error } = await supabase.from("cards").insert({
-        deck_id: input.deckId,
-        user_id: user.id,
-        front: input.front.trim(),
-        back: input.back.trim(),
+      const { error } = await supabase.rpc("create_card_with_content", {
+        p_deck_id: input.deckId,
+        p_front: input.front.trim(),
+        p_back: input.back.trim(),
       });
       if (error) await handleDbError(error, OperationType.CREATE, "cards");
     },
@@ -124,13 +133,13 @@ export function useUpdateCard() {
       if (!user || !input.front.trim() || !input.back.trim())
         throw new Error("Missing data");
       const { error } = await supabase
-        .from("cards")
+        .from("card_contents")
         .update({
           front: input.front.trim(),
           back: input.back.trim(),
           updated_at: new Date().toISOString(),
         })
-        .eq("id", input.id);
+        .eq("card_id", input.id);
       if (error)
         await handleDbError(error, OperationType.UPDATE, `cards/${input.id}`);
     },

@@ -5,6 +5,9 @@ ALTER TABLE decks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE card_contents ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE learning_profiles ENABLE ROW LEVEL SECURITY;
 
 
@@ -21,10 +24,54 @@ WITH
   CHECK (auth.uid () = user_id);
 
 
--- Cards
-CREATE POLICY "Users can CRUD own cards" ON cards FOR ALL USING (auth.uid () = user_id)
+-- Cards (ownership via deck)
+CREATE POLICY "Users can CRUD own cards" ON cards FOR ALL USING (
+  auth.uid () = (
+    SELECT
+      user_id
+    FROM
+      decks
+    WHERE
+      id = deck_id
+  )
+)
 WITH
-  CHECK (auth.uid () = user_id);
+  CHECK (
+    auth.uid () = (
+      SELECT
+        user_id
+      FROM
+        decks
+      WHERE
+        id = deck_id
+    )
+  );
+
+
+-- Card contents (ownership via card -> deck)
+CREATE POLICY "Users can CRUD own card_contents" ON card_contents FOR ALL USING (
+  auth.uid () = (
+    SELECT
+      d.user_id
+    FROM
+      cards c
+      JOIN decks d ON d.id = c.deck_id
+    WHERE
+      c.id = card_id
+  )
+)
+WITH
+  CHECK (
+    auth.uid () = (
+      SELECT
+        d.user_id
+      FROM
+        cards c
+        JOIN decks d ON d.id = c.deck_id
+      WHERE
+        c.id = card_id
+    )
+  );
 
 
 -- Learning Profiles
@@ -50,17 +97,18 @@ FOR DELETE
   USING (auth.uid () = user_id AND is_default = false);
 
 
--- Review Logs
+-- Review Logs (ownership via card -> deck)
 CREATE POLICY "Users can insert own review logs" ON review_logs FOR INSERT
 WITH
   CHECK (
     auth.uid () = (
       SELECT
-        user_id
+        d.user_id
       FROM
-        cards
+        cards c
+        JOIN decks d ON d.id = c.deck_id
       WHERE
-        id = card_id
+        c.id = card_id
     )
   );
 
@@ -70,10 +118,11 @@ SELECT
   USING (
     auth.uid () = (
       SELECT
-        user_id
+        d.user_id
       FROM
-        cards
+        cards c
+        JOIN decks d ON d.id = c.deck_id
       WHERE
-        id = card_id
+        c.id = card_id
     )
   );

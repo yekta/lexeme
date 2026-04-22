@@ -55,7 +55,7 @@ export function useStudyCards(
       const soonCutoff = new Date(Date.now() + SHORT_INTERVAL_MS).toISOString();
       const { data, error } = await supabase
         .from("cards")
-        .select("*")
+        .select("*, card_contents(front, back)")
         .eq("deck_id", deckId)
         .lte("due", soonCutoff);
 
@@ -63,7 +63,16 @@ export function useStudyCards(
         await handleDbError(countError, OperationType.GET, "cards");
       if (error) await handleDbError(error, OperationType.GET, "cards");
 
-      const allDueCards: TStudyCard[] = data ?? [];
+      type Row = Omit<TStudyCard, "front" | "back"> & {
+        card_contents: { front: string; back: string } | null;
+      };
+      const allDueCards: TStudyCard[] = ((data ?? []) as Row[])
+        .filter((r) => r.card_contents !== null)
+        .map(({ card_contents, ...rest }) => ({
+          ...rest,
+          front: card_contents!.front,
+          back: card_contents!.back,
+        }));
 
       // Count today's reviews to enforce daily limits
       const startOfDay = new Date();

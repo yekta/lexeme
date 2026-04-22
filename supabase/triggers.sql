@@ -67,6 +67,11 @@ CREATE TRIGGER set_updated_at
   EXECUTE FUNCTION public.set_updated_at ();
 
 CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON public."card_contents"
+  FOR EACH ROW
+  EXECUTE FUNCTION public.set_updated_at ();
+
+CREATE TRIGGER set_updated_at
   BEFORE UPDATE ON public."learning_profiles"
   FOR EACH ROW
   EXECUTE FUNCTION public.set_updated_at ();

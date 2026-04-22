@@ -2,6 +2,7 @@
 
 import BgPattern from "@/components/bg-pattern";
 import { LearningProfileField } from "@/components/learning-profile-field";
+import { useNow } from "@/components/now-provider";
 import { Button, LinkButton } from "@/components/ui/button";
 import {
   Card,
@@ -83,6 +84,12 @@ export function NDeck(props: TNDeckProps) {
   const dueCount = isPlaceholder ? 0 : props.dueCount;
   const isRecentlyUpdated = isPlaceholder ? false : props.isRecentlyUpdated;
 
+  const now = useNow();
+  const isNew =
+    !isPlaceholder &&
+    now - new Date(props.deck.created_at).getTime() < 3_500 &&
+    now - new Date(props.deck.created_at).getTime() >= 500;
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -93,15 +100,15 @@ export function NDeck(props: TNDeckProps) {
     >
       {/* Ghost card 2 — bottom of stack */}
       {(isPlaceholder || totalCards > 2) && (
-        <div className="shadow-md shadow-shadow/shadow absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left" />
+        <div className="shadow-md shadow-shadow/shadow absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left transition-colors" />
       )}
       {/* Ghost card 1 */}
       {(isPlaceholder || totalCards > 1) && (
-        <div className="shadow-md shadow-shadow/shadow absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left" />
+        <div className="shadow-md shadow-shadow/shadow absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left transition-colors" />
       )}
       {/* Main card */}
       <motion.div className="relative z-10">
-        <Card className="flex flex-col shadow-md shadow-shadow/shadow relative">
+        <Card className="flex flex-col shadow-md shadow-shadow/shadow relative transition-colors">
           {!isPlaceholder && (
             <>
               <DropdownMenu>
@@ -109,7 +116,7 @@ export function NDeck(props: TNDeckProps) {
                   render={
                     <Button
                       variant="ghost"
-                      className="inline-flex absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:text-transparent"
+                      className="inline-flex z-20 absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:text-transparent"
                     >
                       <MoreVertical className="size-5 text-muted-foreground group-data-placeholder:opacity-0" />
                     </Button>
@@ -153,7 +160,7 @@ export function NDeck(props: TNDeckProps) {
               </Dialog>
             </>
           )}
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 relative z-10">
             <div className="w-full flex flex-col items-start gap-1">
               <CardTitle className="truncate pr-5 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {name}
@@ -164,7 +171,19 @@ export function NDeck(props: TNDeckProps) {
             </div>
           </CardHeader>
           <CardContent className="flex-1">
-            <div className="flex flex-col items-start gap-3 mt-2">
+            {/* New Deck Indicator Start */}
+            <div
+              data-new={isNew || undefined}
+              className="h-1/2 pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br from-new-item/60 via-new-item/0 to-new-item/0 pl-px pt-px"
+            >
+              <div className="w-full h-full bg-card rounded-tl-[calc(var(--radius)*1.4-2px)]" />
+            </div>
+            <div
+              data-new={isNew || undefined}
+              className="h-1/3 aspect-square bg-new-item/30 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] transition duration-500 pointer-events-none"
+            />
+            {/* New Deck Indicator End */}
+            <div className="flex flex-col items-start gap-3 mt-2 relative">
               <div
                 data-updated={isRecentlyUpdated ? "true" : undefined}
                 className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-updated:bg-success-muted data-updated:text-success-foreground"

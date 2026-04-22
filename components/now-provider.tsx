@@ -14,7 +14,7 @@ export const NowProvider: React.FC<{
 
   useInterval(() => {
     setNow(Date.now());
-  }, 1000);
+  }, 250);
 
   return <NowContext.Provider value={now}>{children}</NowContext.Provider>;
 };

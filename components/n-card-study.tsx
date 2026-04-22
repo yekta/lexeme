@@ -158,10 +158,10 @@ export function NCardStudy(props: TNCardStudyProps) {
             Front
           </p>
           <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10 py-6 min-h-[calc((100svh-80px)*0.35)]">
-            <p className="max-w-full text-2xl font-medium text-foreground break-words text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+            <p className="max-w-full text-2xl font-medium text-foreground break-words text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none px-3">
               {isPlaceholder ? "Front text" : props.front}
             </p>
-            <p className="max-w-full text-xl text-foreground/80 break-words text-center opacity-0">
+            <p className="max-w-full text-xl text-foreground/80 break-words text-center opacity-0 px-3">
               {isPlaceholder ? "Back text" : props.back}
             </p>
           </div>
@@ -195,10 +195,10 @@ export function NCardStudy(props: TNCardStudyProps) {
               Back
             </p>
             <div className="w-full flex-1 flex flex-col items-center justify-center py-6 min-h-[120px] relative">
-              <p className="max-w-full text-xl text-foreground break-words text-center">
+              <p className="max-w-full text-xl text-foreground break-words text-center px-3">
                 {isPlaceholder ? "Back text" : props.back}
               </p>
-              <p className="opacity-0 max-w-full text-2xl font-medium text-transparent break-words text-center">
+              <p className="opacity-0 max-w-full text-2xl font-medium text-transparent break-words text-center px-3">
                 {isPlaceholder ? "Front text" : props.front}
               </p>
             </div>

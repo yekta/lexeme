@@ -14,15 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      cards: {
+      card_contents: {
         Row: {
           back: string
+          card_id: string
+          created_at: string
+          front: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          back: string
+          card_id: string
+          created_at?: string
+          front: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          back?: string
+          card_id?: string
+          created_at?: string
+          front?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_contents_card_id_cards_id_fk"
+            columns: ["card_id"]
+            isOneToOne: true
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards: {
+        Row: {
           created_at: string
           deck_id: string
           difficulty: number
           due: string
           elapsed_days: number
-          front: string
           id: string
           lapses: number
           last_review: string | null
@@ -32,16 +65,13 @@ export type Database = {
           stability: number
           state: Database["public"]["Enums"]["card_state"]
           updated_at: string
-          user_id: string
         }
         Insert: {
-          back: string
           created_at?: string
           deck_id: string
           difficulty?: number
           due?: string
           elapsed_days?: number
-          front: string
           id?: string
           lapses?: number
           last_review?: string | null
@@ -51,16 +81,13 @@ export type Database = {
           stability?: number
           state?: Database["public"]["Enums"]["card_state"]
           updated_at?: string
-          user_id: string
         }
         Update: {
-          back?: string
           created_at?: string
           deck_id?: string
           difficulty?: number
           due?: string
           elapsed_days?: number
-          front?: string
           id?: string
           lapses?: number
           last_review?: string | null
@@ -70,7 +97,6 @@ export type Database = {
           stability?: number
           state?: Database["public"]["Enums"]["card_state"]
           updated_at?: string
-          user_id?: string
         }
         Relationships: [
           {
@@ -78,13 +104,6 @@ export type Database = {
             columns: ["deck_id"]
             isOneToOne: false
             referencedRelation: "decks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cards_user_id_users_id_fk"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -278,7 +297,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_card_with_content: {
+        Args: { p_back: string; p_deck_id: string; p_front: string }
+        Returns: string
+      }
     }
     Enums: {
       card_state: "new" | "learning" | "review" | "relearning"

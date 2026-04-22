@@ -383,7 +383,7 @@ function DecksSection({
         const stats = getDeckStats(deck.id);
         const isRecentlyUpdated =
           stats.latestCardCreatedAt > 0 &&
-          nowTime - stats.latestCardCreatedAt <= 5000;
+          nowTime - stats.latestCardCreatedAt <= 3_000;
         return (
           <NDeck
             key={deck.id}

@@ -1,6 +1,7 @@
 "use client";
 
 import BgPattern from "@/components/bg-pattern";
+import { useNow } from "@/components/now-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +38,7 @@ type TNCardManageProps =
       deckId: string;
       front: string;
       back: string;
+      createdAt: string;
     };
 
 export function NCardManage(props: TNCardManageProps) {
@@ -45,12 +47,17 @@ export function NCardManage(props: TNCardManageProps) {
   const front = isPlaceholder ? "This is the front of the card" : props.front;
   const back = isPlaceholder ? "This is the back of the card" : props.back;
 
+  const now = useNow();
+  const isNew =
+    !isPlaceholder && now - new Date(props.createdAt).getTime() < 3_000;
+
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <div
-      className="group relative rounded-xl border border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden"
+      data-new={isNew || undefined}
+      className="group relative rounded-xl border border-border data-new:border-success bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden transition-colors"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",

@@ -26,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
 import { useDeck } from "@/hooks/data/use-decks";
-import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -151,6 +150,7 @@ export default function DeckPage() {
                 deckId={id}
                 front={card.front}
                 back={card.back}
+                createdAt={card.created_at}
               />
             ))}
           </div>

@@ -166,7 +166,8 @@ export function NDeck(props: TNDeckProps) {
                 {name}
               </CardTitle>
               <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                {description}
+                {/* Description or non-breaking space */}
+                {description || "\u00A0"}
               </CardDescription>
             </div>
           </CardHeader>

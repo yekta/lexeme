@@ -58,7 +58,7 @@ export function NCardManage(props: TNCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden transition-colors"
+      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden isolate transition-colors"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
@@ -131,13 +131,13 @@ export function NCardManage(props: TNCardManageProps) {
         {/* New Card Indicator Start */}
         <div
           data-new={isNew || undefined}
-          className="h-full pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br from-new-item/60 via-new-item/0 to-new-item/0 pl-px pt-px"
+          className="h-full pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br dark:from-new-item/70 from-new-item via-new-item/0 to-new-item/0 pl-px pt-px"
         >
           <div className="w-full h-full bg-card rounded-tl-[calc(var(--radius)*1.4-2px)]" />
         </div>
         <div
           data-new={isNew || undefined}
-          className="h-4/5 aspect-square bg-new-item/30 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] transition duration-500 pointer-events-none"
+          className="h-4/5 aspect-square bg-new-item/60 dark:bg-new-item/40 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] transition duration-500 pointer-events-none"
         />
         {/* New Card Indicator End */}
         <p className="shrink max-w-full relative pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">

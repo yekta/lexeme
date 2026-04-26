@@ -108,7 +108,7 @@ export function NDeck(props: TNDeckProps) {
       )}
       {/* Main card */}
       <motion.div className="relative z-10">
-        <Card className="flex flex-col shadow-md shadow-shadow/shadow relative transition-colors">
+        <Card className="flex flex-col shadow-md shadow-shadow/shadow relative isolate transition-colors">
           {!isPlaceholder && (
             <>
               <DropdownMenu>
@@ -175,13 +175,13 @@ export function NDeck(props: TNDeckProps) {
             {/* New Deck Indicator Start */}
             <div
               data-new={isNew || undefined}
-              className="h-1/2 pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br from-new-item/60 via-new-item/0 to-new-item/0 pl-px pt-px"
+              className="h-1/2 pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br dark:from-new-item/70 from-new-item via-new-item/0 to-new-item/0 pl-px pt-px"
             >
               <div className="w-full h-full bg-card rounded-tl-[calc(var(--radius)*1.4-2px)]" />
             </div>
             <div
               data-new={isNew || undefined}
-              className="h-1/3 aspect-square bg-new-item/30 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] transition duration-500 pointer-events-none"
+              className="h-1/3 aspect-square bg-new-item/60 dark:bg-new-item/40 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] transition duration-500 pointer-events-none"
             />
             {/* New Deck Indicator End */}
             <div className="flex flex-col items-start gap-3 mt-2 relative">

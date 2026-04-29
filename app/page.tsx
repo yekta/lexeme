@@ -326,7 +326,7 @@ function formatSecondsPerCard(msPerCard: number): string {
   return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
 }
 
-type TDeckStats = {
+export type TDeckStats = {
   total: number;
   new: number;
   learn: number;
@@ -338,7 +338,6 @@ function DecksSection({
   showPlaceholder,
   decks,
   getDeckStats,
-  nowTime,
   onCreateDeck,
 }: {
   showPlaceholder: boolean;
@@ -380,18 +379,15 @@ function DecksSection({
     <DeckWrapper>
       {decks.map((deck) => {
         const stats = getDeckStats(deck.id);
-        const isRecentlyUpdated =
-          stats.latestCardCreatedAt > 0 &&
-          nowTime - stats.latestCardCreatedAt <= 5_000;
         return (
           <NDeck
             key={deck.id}
             deck={deck}
+            stats={stats}
             totalCards={stats.total}
             newCount={stats.new}
             learningCount={stats.learn}
             dueCount={stats.due}
-            isRecentlyUpdated={isRecentlyUpdated}
             studyHref={`/study/${deck.id}`}
             manageHref={`/deck/${deck.id}`}
           />

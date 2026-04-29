@@ -88,7 +88,7 @@ export function NDeck(props: TNDeckProps) {
   const now = useNow();
   const isNew =
     !isPlaceholder &&
-    now - new Date(props.deck.created_at).getTime() < 3_500 &&
+    now - new Date(props.deck.created_at).getTime() < 4000 &&
     now - new Date(props.deck.created_at).getTime() >= 500;
 
   const [settingsOpen, setSettingsOpen] = useState(false);

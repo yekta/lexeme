@@ -50,7 +50,7 @@ export function NCardManage(props: TNCardManageProps) {
   const now = useNow();
   const isNew =
     !isPlaceholder &&
-    now - new Date(props.createdAt).getTime() < 3_500 &&
+    now - new Date(props.createdAt).getTime() < 4000 &&
     now - new Date(props.createdAt).getTime() >= 500;
 
   const [editOpen, setEditOpen] = useState(false);

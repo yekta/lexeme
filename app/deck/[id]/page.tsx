@@ -10,6 +10,7 @@ import {
   EmptyListIcon,
   EmptyListTitle,
 } from "@/components/empty-list";
+import { AddCardForm } from "@/components/add-card-form";
 import CardsIcon from "@/components/icons/cards";
 import { NCardManage } from "@/components/n-card-manage";
 import { Navbar } from "@/components/navbar";
@@ -17,26 +18,14 @@ import { Button, LinkButton } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
+import { useCardsByDeck } from "@/hooks/data/use-cards";
 import { useDeck } from "@/hooks/data/use-decks";
-import { useForm } from "@tanstack/react-form";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useState } from "react";
-import { z } from "zod";
-
-const cardSchema = z.object({
-  front: z.string().trim().min(1, "Front is required"),
-  back: z.string().trim().min(1, "Back is required"),
-});
 
 export default function DeckPage() {
   const { id } = useParams() as { id: string };
@@ -157,92 +146,5 @@ export default function DeckPage() {
         )}
       </main>
     </div>
-  );
-}
-
-function AddCardForm({
-  deckId,
-  onDone,
-}: {
-  deckId: string;
-  onDone: () => void;
-}) {
-  const mutation = useCreateCard();
-  const form = useForm({
-    defaultValues: { front: "", back: "" },
-    validators: {
-      onMount: cardSchema,
-      onChange: cardSchema,
-      onSubmit: cardSchema,
-    },
-    onSubmit: async ({ value }) => {
-      await mutation.mutateAsync({
-        deckId,
-        front: value.front,
-        back: value.back,
-      });
-      onDone();
-    },
-  });
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        form.handleSubmit();
-      }}
-    >
-      <DialogHeader>
-        <DialogTitle>Add Card</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-4 py-4">
-        <form.Field name="front">
-          {(field) => (
-            <div className="space-y-2">
-              <Label htmlFor={field.name}>Front (Question)</Label>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-              />
-            </div>
-          )}
-        </form.Field>
-        <form.Field name="back">
-          {(field) => (
-            <div className="space-y-2">
-              <Label htmlFor={field.name}>Back (Answer)</Label>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-              />
-            </div>
-          )}
-        </form.Field>
-      </div>
-      <DialogFooter>
-        <form.Subscribe
-          selector={(s) => ({
-            canSubmit: s.canSubmit,
-            isSubmitting: s.isSubmitting,
-          })}
-        >
-          {({ canSubmit, isSubmitting }) => (
-            <Button
-              type="submit"
-              disabled={!canSubmit}
-              isPending={isSubmitting}
-            >
-              Add Card
-            </Button>
-          )}
-        </form.Subscribe>
-      </DialogFooter>
-    </form>
   );
 }

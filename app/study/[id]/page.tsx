@@ -39,13 +39,18 @@ type TQueueItem = {
   dueTime: number;
 };
 
+type TStudySession = {
+  queueKey: string;
+  queue: TQueueItem[];
+  reviewedCount: number;
+};
+
 export default function StudyPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const { user, loading } = useAuth();
 
-  const [queue, setQueue] = useState<TQueueItem[]>([]);
-  const [reviewedCount, setReviewedCount] = useState(0);
+  const [studySession, setStudySession] = useState<TStudySession | null>(null);
 
   const { data: profiles = [], isPending: isPendingProfiles } =
     useLearningProfiles();
@@ -79,19 +84,23 @@ export default function StudyPage() {
   const isPending = isPendingDecks || isPendingCards || isPendingProfiles;
   const totalCards = studyData?.totalCards || 0;
 
-  // Initialize queue from fetched data
-  useEffect(() => {
-    if (studyData?.dueCards.length) {
-      setQueue(
-        studyData.dueCards.map((card) => ({
-          card,
-          isRequeued: false,
-          dueTime: new Date(card.due).getTime(),
-        })),
-      );
-      setReviewedCount(0);
-    }
-  }, [studyData]);
+  const queueKey = useMemo(
+    () => studyData?.dueCards.map((card) => card.id).join("|") ?? "",
+    [studyData?.dueCards],
+  );
+  const initialQueue = useMemo(
+    () =>
+      studyData?.dueCards.map((card) => ({
+        card,
+        isRequeued: false,
+        dueTime: new Date(card.due).getTime(),
+      })) ?? [],
+    [studyData?.dueCards],
+  );
+  const activeSession =
+    studySession?.queueKey === queueKey ? studySession : null;
+  const queue = activeSession?.queue ?? initialQueue;
+  const reviewedCount = activeSession?.reviewedCount ?? 0;
 
   const rateCardMutation = useRateCard(userScheduler, id);
 
@@ -114,9 +123,13 @@ export default function StudyPage() {
           const newDueMs = result.card.due.getTime();
           const intervalMs = newDueMs - now.getTime();
 
-          setQueue((prev) => {
-            const [current, ...rest] = prev;
-            if (!current) return prev;
+          setStudySession((prev) => {
+            const session =
+              prev?.queueKey === queueKey
+                ? prev
+                : { queueKey, queue, reviewedCount };
+            const [current, ...rest] = session.queue;
+            if (!current) return session;
 
             if (intervalMs < SHORT_INTERVAL_MS) {
               const updatedCard: TStudyCard = {
@@ -133,13 +146,19 @@ export default function StudyPage() {
                 ...rest.filter((item) => item.isRequeued),
                 requeued,
               ].sort((a, b) => a.dueTime - b.dueTime);
-              return [...firstPass, ...requeuedItems];
+              return {
+                queueKey,
+                queue: [...firstPass, ...requeuedItems],
+                reviewedCount: session.reviewedCount + 1,
+              };
             }
 
-            return rest;
+            return {
+              queueKey,
+              queue: rest,
+              reviewedCount: session.reviewedCount + 1,
+            };
           });
-
-          setReviewedCount((prev) => prev + 1);
         },
       },
     );
@@ -232,7 +251,7 @@ export default function StudyPage() {
                 <CheckCircle2 />
               </EmptyListIcon>
               <EmptyListContent>
-                <EmptyListTitle>You're all caught up!</EmptyListTitle>
+                <EmptyListTitle>You&apos;re all caught up!</EmptyListTitle>
                 <EmptyListDescription>
                   You have reviewed all the due cards in this deck.
                 </EmptyListDescription>

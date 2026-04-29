@@ -19,7 +19,7 @@ export default function SignInForm({ className }: TProps) {
 
   useEffect(() => {
     if (user) router.push("/");
-  }, [user]);
+  }, [user, router]);
 
   const handleSignIn = async () => {
     setIsSigningIn(true);

@@ -25,7 +25,6 @@ import {
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
 } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -33,8 +32,8 @@ import { z } from "zod";
 
 import { Navbar } from "@/components/navbar";
 import SignInForm from "@/components/sign-in-form";
-import { formatDuration, intervalToDuration } from "date-fns";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
+import { formatDuration, intervalToDuration } from "date-fns";
 
 const createDeckSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -196,7 +195,7 @@ function CreateDeckForm({
     if (defaultProfile && !form.state.values.learning_profile_id) {
       form.setFieldValue("learning_profile_id", defaultProfile.id);
     }
-  }, [defaultProfile]);
+  }, [defaultProfile, form]);
 
   const isLoading = isPendingProfiles;
 
@@ -291,7 +290,7 @@ function TodayStatsFooter({ showPlaceholder }: { showPlaceholder: boolean }) {
       "You haven't studied today."
     ) : (
       <>
-        You've studied{" "}
+        {"You've studied "}
         <span className="text-foreground">
           {data.count} {cardWord}
         </span>{" "}

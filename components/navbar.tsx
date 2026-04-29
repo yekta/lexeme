@@ -24,7 +24,7 @@ import {
   SunIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
   light: { label: "Light", icon: SunIcon },
@@ -32,15 +32,27 @@ const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
   system: { label: "System", icon: MonitorSmartphoneIcon },
 };
 
+const subscribeToHydration = (onStoreChange: () => void) => {
+  onStoreChange();
+  return () => {};
+};
+
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+function useIsHydrated() {
+  return useSyncExternalStore(
+    subscribeToHydration,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
+}
+
 function ThemeMenuItem() {
   const { theme, setTheme, themes } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const isHydrated = useIsHydrated();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const current = mounted ? theme : undefined;
+  const current = isHydrated ? theme : undefined;
 
   const themeForLabel = AvailableThemesEnum.safeParse(current);
   const label = themeForLabel.success

@@ -1,6 +1,6 @@
 "use client";
 
-import BgPattern from "@/components/bg-pattern";
+import { AddCardForm } from "@/components/add-card-form";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { useNow } from "@/components/now-provider";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -35,7 +36,7 @@ import {
 } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Settings, Trash2 } from "lucide-react";
+import { MoreVertical, Plus, Settings, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { z } from "zod";
@@ -92,6 +93,7 @@ export function NDeck(props: TNDeckProps) {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addCardOpen, setAddCardOpen] = useState(false);
 
   return (
     <div
@@ -187,7 +189,7 @@ export function NDeck(props: TNDeckProps) {
             <div className="flex flex-col items-start gap-3 mt-2 relative">
               <div
                 data-updated={isRecentlyUpdated ? "true" : undefined}
-                className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-updated:bg-success-muted data-updated:text-success-foreground"
+                className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-updated:bg-success/15 data-updated:text-success"
               >
                 <p className="max-w-full min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
                   {totalCards} {totalCards === 1 ? "card" : "cards"}
@@ -217,14 +219,42 @@ export function NDeck(props: TNDeckProps) {
             >
               Study
             </LinkButton>
-            <LinkButton
-              variant="outline"
-              href={isPlaceholder ? "#" : props.manageHref}
-              isPlaceholder={isPlaceholder}
-              className="w-full"
-            >
-              Manage
-            </LinkButton>
+            <div className="w-full flex gap-1">
+              <LinkButton
+                variant="outline"
+                href={isPlaceholder ? "#" : props.manageHref}
+                isPlaceholder={isPlaceholder}
+                className="min-w-0 flex-1 shrink"
+              >
+                Manage
+              </LinkButton>
+              {!isPlaceholder ? (
+                <Dialog open={addCardOpen} onOpenChange={setAddCardOpen}>
+                  <DialogTrigger
+                    render={
+                      <Button className="flex-1 min-w-0" variant="outline" />
+                    }
+                  >
+                    Add Card
+                  </DialogTrigger>
+                  <DialogContent>
+                    <AddCardForm
+                      key={String(addCardOpen)}
+                      deckId={props.deck.id}
+                      onDone={() => setAddCardOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              ) : (
+                <Button
+                  isPlaceholder
+                  className="flex-1 min-w-0"
+                  variant="outline"
+                >
+                  Add Card
+                </Button>
+              )}
+            </div>
           </CardFooter>
         </Card>
       </motion.div>

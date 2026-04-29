@@ -6,11 +6,12 @@ import { useInterval } from "usehooks-ts";
 type TNowContext = number;
 
 const NowContext = createContext<TNowContext | null>(null);
+const INITIAL_NOW = Date.now();
 
 export const NowProvider: React.FC<{
   children: ReactNode;
 }> = ({ children }) => {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(INITIAL_NOW);
 
   useInterval(() => {
     setNow(Date.now());
@@ -21,7 +22,7 @@ export const NowProvider: React.FC<{
 
 export const useNow = () => {
   const context = useContext(NowContext);
-  if (!context) {
+  if (context === null) {
     throw new Error("useNow must be used within an NowProvider");
   }
   return context;

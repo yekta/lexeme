@@ -190,7 +190,7 @@ export function NDeck(props: TNDeckProps) {
             <div
               data-new={isNew || undefined}
               data-recently-updated={isRecentlyUpdated || undefined}
-              className="h-1/3 aspect-square data-recently-updated:bg-success/20 dark:data-recently-updated:bg-success/20 bg-new-item/60 dark:bg-new-item/40 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] data-recently-updated:translate-[-25%] transition duration-500 pointer-events-none"
+              className="h-1/3 aspect-square data-new:opacity-100 data-recently-updated:opacity-100 opacity-0 data-recently-updated:bg-success/20 dark:data-recently-updated:bg-success/20 data-new:bg-new-item/60 dark:date-new:bg-new-item/40 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none"
             />
             {/* New Deck Indicator End */}
             <div className="flex flex-col items-start gap-3 mt-2 relative">

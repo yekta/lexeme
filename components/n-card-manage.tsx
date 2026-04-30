@@ -137,7 +137,7 @@ export function NCardManage(props: TNCardManageProps) {
         </div>
         <div
           data-new={isNew || undefined}
-          className="h-4/5 aspect-square bg-new-item/60 dark:bg-new-item/40 absolute left-0 top-0 blur-2xl -translate-x-[200%] -translate-y-[200%] data-new:translate-[-25%] transition duration-500 pointer-events-none"
+          className="h-4/5 aspect-square data-new:opacity-100 opacity-0 data-new:bg-new-item/60 dark:data-new:bg-new-item/40 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none"
         />
         {/* New Card Indicator End */}
         <p className="shrink max-w-full relative pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">

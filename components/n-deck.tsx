@@ -218,7 +218,7 @@ export function NDeck(props: TNDeckProps) {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col w-full gap-1 relative">
+          <CardFooter className="flex flex-col w-full gap-1.5 relative">
             <LinkButton
               href={isPlaceholder ? "#" : props.studyHref}
               isPlaceholder={isPlaceholder}
@@ -226,7 +226,7 @@ export function NDeck(props: TNDeckProps) {
             >
               Study
             </LinkButton>
-            <div className="w-full flex gap-1">
+            <div className="w-full flex gap-1.5">
               <LinkButton
                 variant="outline"
                 href={isPlaceholder ? "#" : props.manageHref}

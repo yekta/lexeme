@@ -48,8 +48,7 @@ export default function SignInForm({ className }: TProps) {
             Lexeme
           </h1>
           <p className="text-lg text-muted-foreground">
-            Master any subject with spaced repetition. Sign in to start
-            learning.
+            Master any subject with spaced repetition.
           </p>
           <Button
             onClick={handleSignIn}

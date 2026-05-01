@@ -8,3 +8,5 @@ export const DEFAULT_NON_SYSTEM_THEME: TTheme = "light";
 
 export const DEFAULT_NEW_CARDS_PER_DAY = 20;
 export const DEFAULT_MAX_REVIEWS_PER_DAY = 200;
+export const SIGN_IN_PATHNAME = "/sign-in";
+export const AUTH_PATHNAME = "/auth";

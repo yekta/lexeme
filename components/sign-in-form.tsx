@@ -42,14 +42,16 @@ export default function SignInForm({ className }: TProps) {
           <LoaderIcon className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="max-w-md text-center space-y-6">
-          <Logo className="mx-auto size-16" />
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">
-            Lexeme
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Master any subject with spaced repetition.
-          </p>
+        <div className="max-w-md text-center gap-6 flex flex-col w-full items-center">
+          <div className="w-full flex flex-col gap-1">
+            <Logo className="mx-auto size-14" />
+            <h1 className="text-4xl font-bold tracking-tight text-foreground mt-2">
+              Lexeme
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Master any subject with spaced repetition.
+            </p>
+          </div>
           <Button
             onClick={handleSignIn}
             className="w-full max-w-64"

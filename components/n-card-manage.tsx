@@ -68,7 +68,7 @@ export function NCardManage(props: TNCardManageProps) {
       <div className="absolute top-1 right-1 z-10">
         {isPlaceholder && (
           <Button variant="ghost" isPlaceholder={true} className="size-9">
-            <MoreVertical className="size-5 text-muted-foreground" />
+            <MoreVertical className="size-5 text-muted-foreground shrink-0" />
           </Button>
         )}
         {!isPlaceholder && (
@@ -76,7 +76,7 @@ export function NCardManage(props: TNCardManageProps) {
             <DropdownMenuTrigger
               render={
                 <Button variant="ghost" className="size-9">
-                  <MoreVertical className="size-5 text-muted-foreground" />
+                  <MoreVertical className="size-5 shrink-0 text-muted-foreground" />
                 </Button>
               }
             ></DropdownMenuTrigger>

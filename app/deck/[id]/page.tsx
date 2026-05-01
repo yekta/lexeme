@@ -15,11 +15,7 @@ import CardsIcon from "@/components/icons/cards";
 import { NCardManage } from "@/components/n-card-manage";
 import { Navbar } from "@/components/navbar";
 import { Button, LinkButton } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useCardsByDeck } from "@/hooks/data/use-cards";
 import { useDeck } from "@/hooks/data/use-decks";
 import { ArrowLeft, Plus } from "lucide-react";
@@ -66,7 +62,7 @@ export default function DeckPage() {
               href="/"
               className="shrink-0 -ml-2 size-9"
             >
-              <ArrowLeft className="size-5" />
+              <ArrowLeft className="size-5 shrink-0" />
             </LinkButton>
             <h1
               data-placeholder={showPlaceholder ? "true" : undefined}
@@ -92,7 +88,7 @@ export default function DeckPage() {
 
           <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
             <DialogTrigger render={<Button isPlaceholder={showPlaceholder} />}>
-              <Plus className="size-5 -ml-1.5" />
+              <Plus className="size-5 -ml-1.5 shrink-0" />
               <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
                 Add Card
               </span>

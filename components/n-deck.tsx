@@ -125,7 +125,7 @@ export function NDeck(props: TNDeckProps) {
                       variant="ghost"
                       className="inline-flex z-20 absolute right-1 top-1 items-center justify-center rounded-lg text-sm font-medium hover:bg-accent size-9 shrink-0 focus-visible:outline-none group-data-placeholder:pointer-events-none group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:text-transparent"
                     >
-                      <MoreVertical className="size-5 text-muted-foreground group-data-placeholder:opacity-0" />
+                      <MoreVertical className="size-5 shrink-0 text-muted-foreground group-data-placeholder:opacity-0" />
                     </Button>
                   }
                 ></DropdownMenuTrigger>
@@ -134,7 +134,7 @@ export function NDeck(props: TNDeckProps) {
                     className="cursor-pointer"
                     onClick={() => setSettingsOpen(true)}
                   >
-                    <Settings className="size-5" />
+                    <Settings className="size-5 shrink-0" />
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -142,7 +142,7 @@ export function NDeck(props: TNDeckProps) {
                     className="cursor-pointer"
                     onClick={() => setDeleteOpen(true)}
                   >
-                    <Trash2 className="size-5" />
+                    <Trash2 className="size-5 shrink-0" />
                     Delete Deck
                   </DropdownMenuItem>
                 </DropdownMenuContent>

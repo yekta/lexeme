@@ -131,7 +131,7 @@ export default function Home() {
 
           <Dialog open={isCreateDeckOpen} onOpenChange={setIsCreateDeckOpen}>
             <DialogTrigger render={<Button isPlaceholder={showPlaceholder} />}>
-              <Plus className="size-5 -ml-1.5" />
+              <Plus className="size-5 -ml-1.5 shrink-0" />
               <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
                 Create Deck
               </span>
@@ -366,7 +366,7 @@ function DecksSection({
           Create your first deck to start adding cards.
         </p>
         <Button onClick={onCreateDeck}>
-          <Plus className="size-5 -ml-1.5" />
+          <Plus className="size-5 -ml-1.5 shrink-0" />
           <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
             Create Deck
           </span>

@@ -17,6 +17,8 @@ export type TCard = {
   front: string;
   back: string;
   created_at: string;
+  updated_at: string;
+  content_updated_at: string;
 };
 
 export type TCardListItem = {
@@ -81,14 +83,21 @@ export function useCardsByDeck(deckId: string | undefined) {
       if (!user || !deckId) return [];
       const { data, error } = await supabase
         .from("cards")
-        .select("id, created_at, card_contents(front, back)")
+        .select(
+          "id, created_at, updated_at, card_contents(front, back, updated_at)",
+        )
         .eq("deck_id", deckId)
         .order("created_at", { ascending: false });
       if (error) await handleDbError(error, OperationType.GET, "cards");
       type Row = {
         id: string;
         created_at: string;
-        card_contents: { front: string; back: string } | null;
+        updated_at: string;
+        card_contents: {
+          front: string;
+          back: string;
+          updated_at: string;
+        } | null;
       };
       return ((data ?? []) as Row[])
         .filter((r) => r.card_contents !== null)
@@ -97,6 +106,8 @@ export function useCardsByDeck(deckId: string | undefined) {
           front: r.card_contents!.front,
           back: r.card_contents!.back,
           created_at: r.created_at,
+          updated_at: r.updated_at,
+          content_updated_at: r.card_contents!.updated_at,
         })) as TCard[];
     },
     enabled: !!user && !!deckId,

@@ -3,6 +3,7 @@
 import { TDeckStats } from "@/app/page";
 import { AddCardForm } from "@/components/add-card-form";
 import { LearningProfileField } from "@/components/learning-profile-field";
+import NewIndicator from "@/components/new-indicator";
 import { useNow } from "@/components/now-provider";
 import { Button, LinkButton } from "@/components/ui/button";
 import {
@@ -179,20 +180,11 @@ export function NDeck(props: TNDeckProps) {
             </div>
           </CardHeader>
           <CardContent className="flex-1">
-            {/* New Deck Indicator Start */}
-            <div
-              data-new={isNew || undefined}
-              data-recently-updated={isRecentlyUpdated || undefined}
-              className="h-1/2 pointer-events-none opacity-0 data-new:opacity-100 data-recently-updated:opacity-100 dark:data-recently-updated:from-success/40 data-recently-updated:from-success/40 data-recently-updated:via-success/0 data-recently-updated:to-success/0 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br dark:from-new-item/70 from-new-item via-new-item/0 to-new-item/0 pl-px pt-px"
-            >
-              <div className="w-full h-full bg-card rounded-tl-[calc(var(--radius)*1.4-2px)]" />
-            </div>
-            <div
-              data-new={isNew || undefined}
-              data-recently-updated={isRecentlyUpdated || undefined}
-              className="h-1/3 aspect-square data-new:opacity-100 data-recently-updated:opacity-100 opacity-0 data-recently-updated:bg-success/20 dark:data-recently-updated:bg-success/20 data-new:bg-new-item/60 dark:date-new:bg-new-item/40 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none"
+            <NewIndicator
+              isNew={isNew || isRecentlyUpdated}
+              className="rounded-tl-[calc(var(--radius)*1.4-1px)]"
+              classNameInner="rounded-tl-[calc(var(--radius)*1.4-2px)]"
             />
-            {/* New Deck Indicator End */}
             <div className="flex flex-col items-start gap-3 mt-2 relative">
               <div
                 data-recently-updated={isRecentlyUpdated ? "true" : undefined}

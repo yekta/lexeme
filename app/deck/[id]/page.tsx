@@ -136,6 +136,8 @@ export default function DeckPage() {
                 front={card.front}
                 back={card.back}
                 createdAt={card.created_at}
+                updatedAt={card.updated_at}
+                contentUpdatedAt={card.content_updated_at}
               />
             ))}
           </div>

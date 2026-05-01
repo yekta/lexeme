@@ -1,6 +1,7 @@
 "use client";
 
 import BgPattern from "@/components/bg-pattern";
+import NewIndicator from "@/components/new-indicator";
 import { useNow } from "@/components/now-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,8 @@ type TNCardManageProps =
       front: string;
       back: string;
       createdAt: string;
+      updatedAt: string;
+      contentUpdatedAt: string;
     };
 
 export function NCardManage(props: TNCardManageProps) {
@@ -52,6 +55,14 @@ export function NCardManage(props: TNCardManageProps) {
     !isPlaceholder &&
     now - new Date(props.createdAt).getTime() < 4000 &&
     now - new Date(props.createdAt).getTime() >= 500;
+  const updatedAt = isPlaceholder
+    ? null
+    : Math.max(
+        new Date(props.updatedAt).getTime(),
+        new Date(props.contentUpdatedAt).getTime(),
+      );
+  const isRecentlyUpdated =
+    updatedAt !== null && now - updatedAt < 4000 && now - updatedAt >= 500;
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -128,18 +139,12 @@ export function NCardManage(props: TNCardManageProps) {
       </div>
       {/* Front */}
       <div className="px-5 py-4 flex-1 w-full flex flex-col items-start relative bg-card gap-2">
-        {/* New Card Indicator Start */}
-        <div
-          data-new={isNew || undefined}
-          className="h-full pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 rounded-tl-[calc(var(--radius)*1.4-1px)] aspect-square absolute top-0 left-0 bg-gradient-to-br dark:from-new-item/70 from-new-item via-new-item/0 to-new-item/0 pl-px pt-px"
-        >
-          <div className="w-full h-full bg-card rounded-tl-[calc(var(--radius)*1.4-2px)]" />
-        </div>
-        <div
-          data-new={isNew || undefined}
-          className="h-4/5 aspect-square data-new:opacity-100 opacity-0 data-new:bg-new-item/60 dark:data-new:bg-new-item/40 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none"
+        <NewIndicator
+          isNew={isNew || isRecentlyUpdated}
+          className="h-full rounded-tl-[calc(var(--radius)*1.4-1px)]"
+          classNameInner="rounded-tl-[calc(var(--radius)*1.4-2px)]"
+          classNameBg="h-4/5"
         />
-        {/* New Card Indicator End */}
         <p className="shrink max-w-full relative pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Front
         </p>

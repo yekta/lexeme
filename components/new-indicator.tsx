@@ -32,7 +32,7 @@ export default function NewIndicator({
       <div
         data-new={isNew || undefined}
         className={cn(
-          "h-1/4 aspect-square data-new:opacity-100 opacity-0 bg-success/30 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none",
+          "h-1/4 aspect-square translate-3d translate-z-0 data-new:opacity-100 opacity-0 bg-success/30 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none",
           classNameBg,
         )}
       />

@@ -54,7 +54,7 @@ export function NCardManage(props: TNCardManageProps) {
   const isNew =
     !isPlaceholder &&
     now - new Date(props.createdAt).getTime() < 4000 &&
-    now - new Date(props.createdAt).getTime() >= 500;
+    now - new Date(props.createdAt).getTime() >= 250;
   const updatedAt = isPlaceholder
     ? null
     : Math.max(
@@ -62,7 +62,7 @@ export function NCardManage(props: TNCardManageProps) {
         new Date(props.contentUpdatedAt).getTime(),
       );
   const isRecentlyUpdated =
-    updatedAt !== null && now - updatedAt < 4000 && now - updatedAt >= 500;
+    updatedAt !== null && now - updatedAt < 4000 && now - updatedAt >= 250;
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);

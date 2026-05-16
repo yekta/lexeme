@@ -1,1 +1,0 @@
-ALTER TABLE "review_logs" ADD COLUMN "duration_ms" integer NOT NULL;

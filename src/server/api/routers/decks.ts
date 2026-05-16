@@ -20,7 +20,7 @@ export const decksRouter = createTRPCRouter({
       .orderBy(desc(decks.created_at)),
   ),
 
-  byId: protectedProcedure
+  get: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const [row] = await ctx.db

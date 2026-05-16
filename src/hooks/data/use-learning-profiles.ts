@@ -25,7 +25,7 @@ export function useUpdateLearningProfile() {
   return api.learningProfiles.update.useMutation({
     onSuccess: () => {
       utils.learningProfiles.list.invalidate();
-      utils.stats.deckStats.invalidate();
+      utils.stats.getDeckStats.invalidate();
     },
   });
 }

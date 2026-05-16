@@ -5,7 +5,8 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/api/root";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
-export type TStudyCard = RouterOutputs["cards"]["studyQueue"]["dueCards"][number];
+export type TStudyCard =
+  RouterOutputs["cards"]["studyQueue"]["dueCards"][number];
 
 export function useStudyCards(deckId: string | undefined) {
   return api.cards.studyQueue.useQuery(

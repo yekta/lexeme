@@ -24,7 +24,7 @@ import {
 } from "@/server/db/schema";
 
 export const cardsRouter = createTRPCRouter({
-  byDeck: protectedProcedure
+  get: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const rows = await ctx.db

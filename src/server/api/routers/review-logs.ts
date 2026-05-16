@@ -4,7 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { cards, decks, reviewLogs } from "@/server/db/schema";
 
 export const reviewLogsRouter = createTRPCRouter({
-  today: protectedProcedure.query(async ({ ctx }) => {
+  getToday: protectedProcedure.query(async ({ ctx }) => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     return ctx.db

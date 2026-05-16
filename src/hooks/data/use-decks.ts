@@ -6,17 +6,14 @@ import type { AppRouter } from "@/server/api/root";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 export type TDeck = RouterOutputs["decks"]["list"][number];
-export type TDeckSummary = NonNullable<RouterOutputs["decks"]["byId"]>;
+export type TDeckSummary = NonNullable<RouterOutputs["decks"]["get"]>;
 
 export function useDecks() {
   return api.decks.list.useQuery();
 }
 
 export function useDeck(id: string | undefined) {
-  return api.decks.byId.useQuery(
-    { id: id ?? "" },
-    { enabled: !!id },
-  );
+  return api.decks.get.useQuery({ id: id ?? "" }, { enabled: !!id });
 }
 
 export function useCreateDeck() {
@@ -24,7 +21,7 @@ export function useCreateDeck() {
   return api.decks.create.useMutation({
     onSuccess: () => {
       utils.decks.list.invalidate();
-      utils.stats.deckStats.invalidate();
+      utils.stats.getDeckStats.invalidate();
     },
   });
 }
@@ -34,7 +31,7 @@ export function useUpdateDeck() {
   return api.decks.update.useMutation({
     onSuccess: (_data, vars) => {
       utils.decks.list.invalidate();
-      utils.decks.byId.invalidate({ id: vars.id });
+      utils.decks.get.invalidate({ id: vars.id });
     },
   });
 }
@@ -44,8 +41,8 @@ export function useDeleteDeck() {
   return api.decks.delete.useMutation({
     onSuccess: () => {
       utils.decks.list.invalidate();
-      utils.stats.deckStats.invalidate();
-      utils.stats.today.invalidate();
+      utils.stats.getDeckStats.invalidate();
+      utils.stats.getToday.invalidate();
     },
   });
 }

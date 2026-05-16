@@ -3,9 +3,9 @@
 import { api } from "@/trpc/react";
 
 export function useTodayStats() {
-  return api.stats.today.useQuery();
+  return api.stats.getToday.useQuery();
 }
 
 export function useDeckStats() {
-  return api.stats.deckStats.useQuery();
+  return api.stats.getDeckStats.useQuery();
 }

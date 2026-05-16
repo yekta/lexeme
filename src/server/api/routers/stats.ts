@@ -1,15 +1,10 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import {
-  cards,
-  decks,
-  learningProfiles,
-  reviewLogs,
-} from "@/server/db/schema";
+import { cards, decks, learningProfiles, reviewLogs } from "@/server/db/schema";
 
 export const statsRouter = createTRPCRouter({
-  today: protectedProcedure.query(async ({ ctx }) => {
+  getToday: protectedProcedure.query(async ({ ctx }) => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const [row] = await ctx.db
@@ -35,7 +30,7 @@ export const statsRouter = createTRPCRouter({
     };
   }),
 
-  deckStats: protectedProcedure.query(async ({ ctx }) => {
+  getDeckStats: protectedProcedure.query(async ({ ctx }) => {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 

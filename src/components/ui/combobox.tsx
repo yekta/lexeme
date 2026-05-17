@@ -105,7 +105,7 @@ function ComboboxInput({
       {isPlaceholder && (
         <span
           aria-hidden
-          className="pointer-events-none absolute top-1/2 left-2.5 max-w-[calc(100%---spacing(12))] -translate-y-1/2 truncate animate-skeleton rounded bg-foreground/20 text-base text-transparent select-none md:text-sm"
+          className="pointer-events-none leading-tight absolute top-1/2 left-2.5 max-w-[calc(100%---spacing(12))] -translate-y-1/2 truncate animate-skeleton rounded bg-foreground/20 text-base text-transparent select-none md:text-sm"
         >
           {placeholderText}
         </span>

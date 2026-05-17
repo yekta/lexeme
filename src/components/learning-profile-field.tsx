@@ -18,13 +18,13 @@ type TLearningProfile = NonNullable<
 
 export function LearningProfileField({
   profiles,
-  isLoading,
+  isPending,
   value,
   onChange,
   fallbackId,
 }: {
   profiles: TLearningProfile[] | undefined;
-  isLoading: boolean;
+  isPending: boolean;
   value: string;
   onChange: (id: string) => void;
   fallbackId: string | undefined;
@@ -39,19 +39,19 @@ export function LearningProfileField({
   );
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isPending) return;
     if (!fallbackId) return;
     if (value && profileOptions.some((o) => o.value === value)) return;
     if (!profileOptions.some((o) => o.value === fallbackId)) return;
 
     onChange(fallbackId);
-  }, [fallbackId, isLoading, onChange, profileOptions, value]);
+  }, [fallbackId, isPending, onChange, profileOptions, value]);
 
   return (
     <div className="w-full flex flex-col gap-2">
       <Label>Learning Profile</Label>
       <Combobox
-        isPlaceholder={isLoading}
+        isPlaceholder={isPending}
         isPlaceholderText="Default"
         items={profileOptions}
         itemToStringValue={(i) => i.label}

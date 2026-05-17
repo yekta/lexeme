@@ -25,6 +25,7 @@ import { z } from "zod";
 
 import { Navbar } from "@/components/navbar";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
+import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { formatDuration, intervalToDuration } from "date-fns";
 
 const createDeckSchema = z.object({
@@ -42,6 +43,7 @@ const EMPTY_STATS: TDeckStats = {
 };
 
 export default function Home() {
+  const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
   const [asyncRouterPush] = useAsyncRouterPush();
   const nowTime = useNow();
 
@@ -67,7 +69,7 @@ export default function Home() {
     return map;
   }, [deckStatsRows]);
 
-  const isPending = isPendingDecks || isPendingStats;
+  const isPending = isPendingDecks || isPendingStats || isPendingAuth;
   const showPlaceholder = isPending;
 
   return (
@@ -206,7 +208,7 @@ function CreateDeckForm({
           {(field) => (
             <LearningProfileField
               profiles={profiles}
-              isLoading={isPendingProfiles}
+              isPending={isPendingProfiles}
               value={field.state.value}
               onChange={field.handleChange}
               fallbackId={defaultProfile?.id}

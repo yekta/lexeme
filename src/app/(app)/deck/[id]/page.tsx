@@ -21,8 +21,10 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useState } from "react";
+import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 
 export default function DeckPage() {
+  const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
   const { id } = useParams() as { id: string };
   const router = useRouter();
 
@@ -40,7 +42,7 @@ export default function DeckPage() {
 
   const deckName = deckData?.name ?? "Loading...";
 
-  const isPending = isPendingDecks || isPendingCards;
+  const isPending = isPendingDecks || isPendingCards || isPendingAuth;
   const showPlaceholder = isPending;
 
   return (

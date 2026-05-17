@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuth } from "@/components/auth-provider";
 import Logo from "@/components/icons/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/hooks/use-auth";
 import {
   AvailableThemesEnum,
   DEFAULT_NON_SYSTEM_THEME,

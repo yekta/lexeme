@@ -1,8 +1,8 @@
 "use client";
 
-import { useAuth } from "@/components/auth-provider";
 import Logo from "@/components/icons/logo";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useState } from "react";

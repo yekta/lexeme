@@ -22,12 +22,8 @@ export function useAuth() {
 
   return {
     user: session?.user ?? null,
-    loading: isPending,
+    isPending,
     signInWithGoogle,
     logout,
   };
-}
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
 }

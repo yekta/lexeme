@@ -300,7 +300,7 @@ function DeckSettingsForm({
     },
   });
 
-  const isLoading = isPendingProfiles || !profiles;
+  const isPending = isPendingProfiles || !profiles;
 
   return (
     <form
@@ -350,7 +350,7 @@ function DeckSettingsForm({
           {(field) => (
             <LearningProfileField
               profiles={profiles}
-              isLoading={isLoading}
+              isPending={isPending}
               value={field.state.value}
               onChange={field.handleChange}
               fallbackId={
@@ -375,7 +375,7 @@ function DeckSettingsForm({
           {({ canSubmit, isSubmitting, isDirty }) => (
             <Button
               type="submit"
-              disabled={!canSubmit || !isDirty || isLoading}
+              disabled={!canSubmit || !isDirty || isPending}
               isPending={isSubmitting}
             >
               Save

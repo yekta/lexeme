@@ -17,6 +17,7 @@ import { useDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useRateCard } from "@/hooks/data/use-rate-card";
 import { useStudyCards, type TStudyCard } from "@/hooks/data/use-study-cards";
+import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { useReviewTimer } from "@/hooks/use-review-timer";
 import {
   createUserScheduler,
@@ -45,6 +46,7 @@ type TStudySession = {
 };
 
 export default function StudyPage() {
+  const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
   const { id } = useParams() as { id: string };
   const router = useRouter();
 
@@ -76,7 +78,8 @@ export default function StudyPage() {
 
   const { data: studyData, isPending: isPendingCards } = useStudyCards(id);
 
-  const isPending = isPendingDecks || isPendingCards || isPendingProfiles;
+  const isPending =
+    isPendingDecks || isPendingCards || isPendingProfiles || isPendingAuth;
   const totalCards = studyData?.totalCards || 0;
 
   const queueKey = useMemo(

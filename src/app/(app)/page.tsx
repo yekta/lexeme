@@ -125,12 +125,13 @@ function CreateDeckForm({
   const { data: profiles, isPending: isPendingProfiles } =
     useLearningProfiles();
   const defaultProfile = profiles?.find((p) => p.is_default);
+  const defaultProfileId = defaultProfile?.id;
   const mutation = useCreateDeck();
   const form = useForm({
     defaultValues: {
       name: "",
       description: "",
-      learning_profile_id: defaultProfile?.id ?? "",
+      learning_profile_id: defaultProfileId ?? "",
     },
     validators: {
       onMount: createDeckSchema,
@@ -147,15 +148,15 @@ function CreateDeckForm({
     },
   });
 
-  // Profiles load async — once the default profile arrives, fill the field
-  // and force a form-level re-validate (setFieldValue alone won't clear the
-  // stale onMount error).
+  // Profiles load async, so the initial onMount validation can run before the
+  // default profile id exists. Fill it and re-run form-level validation.
   useEffect(() => {
-    if (defaultProfile && !form.state.values.learning_profile_id) {
-      form.setFieldValue("learning_profile_id", defaultProfile.id);
-      void form.validateAllFields("change");
-    }
-  }, [defaultProfile, form]);
+    if (!defaultProfileId) return;
+    if (form.getFieldValue("learning_profile_id")) return;
+
+    form.setFieldValue("learning_profile_id", defaultProfileId);
+    void form.validate("change");
+  }, [defaultProfileId, form]);
 
   return (
     <form

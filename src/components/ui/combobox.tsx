@@ -13,7 +13,27 @@ import {
 } from "@/components/ui/input-group";
 import { ChevronDownIcon, XIcon, CheckIcon } from "lucide-react";
 
-const Combobox = ComboboxPrimitive.Root;
+const ComboboxPlaceholderContext = React.createContext<{
+  isPlaceholder: boolean;
+  isPlaceholderText: string | undefined;
+}>({ isPlaceholder: false, isPlaceholderText: undefined });
+
+function Combobox<Value>({
+  isPlaceholder = false,
+  isPlaceholderText,
+  ...props
+}: ComboboxPrimitive.Root.Props<Value> & {
+  isPlaceholder?: boolean;
+  isPlaceholderText?: string;
+}) {
+  return (
+    <ComboboxPlaceholderContext.Provider
+      value={{ isPlaceholder, isPlaceholderText }}
+    >
+      <ComboboxPrimitive.Root {...props} />
+    </ComboboxPlaceholderContext.Provider>
+  );
+}
 
 function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
   return <ComboboxPrimitive.Value data-slot="combobox-value" {...props} />;
@@ -60,12 +80,36 @@ function ComboboxInput({
   showTrigger?: boolean;
   showClear?: boolean;
 }) {
+  const { isPlaceholder, isPlaceholderText } = React.useContext(
+    ComboboxPlaceholderContext,
+  );
+  const isDisabled = disabled || isPlaceholder;
+  const placeholderText =
+    isPlaceholderText ??
+    (typeof props.placeholder === "string" ? props.placeholder : "");
   return (
-    <InputGroup className={cn("w-auto", className)}>
+    <InputGroup
+      data-placeholder={isPlaceholder ? "true" : undefined}
+      className={cn(
+        "group/combobox relative w-auto",
+        "data-placeholder:opacity-100 data-placeholder:has-disabled:bg-transparent dark:data-placeholder:has-disabled:bg-input/30",
+        "[&>[data-slot=input-group-control]]:group-data-placeholder/combobox:pointer-events-none [&>[data-slot=input-group-control]]:group-data-placeholder/combobox:opacity-0",
+        "[&_svg]:group-data-placeholder/combobox:text-transparent [&_svg]:group-data-placeholder/combobox:bg-foreground/20 [&_svg]:group-data-placeholder/combobox:animate-skeleton [&_svg]:group-data-placeholder/combobox:rounded",
+        className,
+      )}
+    >
       <ComboboxPrimitive.Input
-        render={<InputGroupInput disabled={disabled} />}
+        render={<InputGroupInput disabled={isDisabled} />}
         {...props}
       />
+      {isPlaceholder && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-2.5 max-w-[calc(100%---spacing(12))] -translate-y-1/2 truncate animate-skeleton rounded bg-foreground/20 text-base text-transparent select-none md:text-sm"
+        >
+          {placeholderText}
+        </span>
+      )}
       <InputGroupAddon align="inline-end">
         {showTrigger && (
           <InputGroupButton
@@ -74,10 +118,10 @@ function ComboboxInput({
             render={<ComboboxTrigger />}
             data-slot="input-group-button"
             className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
-            disabled={disabled}
+            disabled={isDisabled}
           />
         )}
-        {showClear && <ComboboxClear disabled={disabled} />}
+        {showClear && <ComboboxClear disabled={isDisabled} />}
       </InputGroupAddon>
       {children}
     </InputGroup>

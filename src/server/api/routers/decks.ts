@@ -25,7 +25,9 @@ export const decksRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const deck = await requireDeck(ctx.db, input.id, ctx.session.user.id);
       return {
+        id: deck.id,
         name: deck.name,
+        description: deck.description,
         learning_profile_id: deck.learning_profile_id,
       };
     }),

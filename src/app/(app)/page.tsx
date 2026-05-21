@@ -1,7 +1,7 @@
 "use client";
 
 import { LearningProfileField } from "@/components/learning-profile-field";
-import { NDeck, type TDeckStats } from "@/components/n-deck";
+import { LDeck, type TDeckStats } from "@/components/l-deck";
 import { useNow } from "@/components/now-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import { Navbar } from "@/components/navbar";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { formatDuration, intervalToDuration } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const createDeckSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -113,7 +114,7 @@ export default function Home() {
           onCreateDeck={() => setIsCreateDeckOpen(true)}
         />
         <div className="w-full h-px rounded-full bg-border" />
-        <TodayStatsFooter showPlaceholder={showPlaceholder} />
+        <TodayStatsFooter showPlaceholder={showPlaceholder} className="-mt-1" />
       </main>
     </div>
   );
@@ -243,7 +244,13 @@ function CreateDeckForm({
   );
 }
 
-function TodayStatsFooter({ showPlaceholder }: { showPlaceholder: boolean }) {
+function TodayStatsFooter({
+  showPlaceholder,
+  className,
+}: {
+  showPlaceholder: boolean;
+  className?: string;
+}) {
   const { data, isPending } = useTodayStats();
   const humanDuration = formatHumanDuration(data?.totalMs ?? 0);
   const secondsPerCard = formatSecondsPerCard(data?.msPerCard ?? 0);
@@ -269,7 +276,7 @@ function TodayStatsFooter({ showPlaceholder }: { showPlaceholder: boolean }) {
   return (
     <div
       data-placeholder={showPlaceholder ? "true" : undefined}
-      className="w-full flex justify-center group"
+      className={cn("w-full flex justify-center group", className)}
     >
       <p className="text-center text-sm max-w-2xl text-muted-foreground group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:text-transparent group-data-placeholder:animate-skeleton group-data-placeholder:rounded">
         {statsText}
@@ -309,7 +316,7 @@ function DecksSection({
     return (
       <DeckWrapper>
         {Array.from({ length: 9 }).map((_, i) => (
-          <NDeck key={i} isPlaceholder />
+          <LDeck key={i} isPlaceholder />
         ))}
       </DeckWrapper>
     );
@@ -339,7 +346,7 @@ function DecksSection({
       {decks.map((deck) => {
         const stats = getDeckStats(deck.id);
         return (
-          <NDeck
+          <LDeck
             key={deck.id}
             deck={deck}
             stats={stats}

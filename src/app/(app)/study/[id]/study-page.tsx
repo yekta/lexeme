@@ -13,7 +13,7 @@ import { DeckNotFound } from "@/components/deck-not-found";
 import { LoadError } from "@/components/load-error";
 import { NoAccess } from "@/components/no-access";
 import CardsIcon from "@/components/icons/cards";
-import { NCardStudy } from "@/components/n-card-study";
+import { LCardStudy } from "@/components/l-card-study";
 import { Navbar } from "@/components/navbar";
 import { LinkButton } from "@/components/ui/button";
 import { useDeck } from "@/hooks/data/use-decks";
@@ -223,7 +223,7 @@ export function StudyPage() {
           )
         }
       />
-      <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 max-w-4xl mx-auto w-full overflow-hidden pb-[8%]">
+      <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 max-w-4xl mx-auto w-full overflow-hidden pb-[8vh]">
         {isUnavailable ? (
           state === "not-found" ? (
             <DeckNotFound />
@@ -240,7 +240,7 @@ export function StudyPage() {
             />
           )
         ) : showPlaceholder ? (
-          <NCardStudy isPlaceholder />
+          <LCardStudy isPlaceholder />
         ) : totalCards === 0 && !hasNoDueCards ? (
           <EmptyList>
             <EmptyListHeader>
@@ -279,7 +279,7 @@ export function StudyPage() {
             </EmptyListFooter>
           </EmptyList>
         ) : (
-          <NCardStudy
+          <LCardStudy
             key={`${currentCard.id}-${reviewedCount}`}
             front={currentCard.front}
             back={currentCard.back}

@@ -11,10 +11,11 @@ import {
 } from "@/components/empty-list";
 import { AddCardForm } from "@/components/add-card-form";
 import { DeckNotFound } from "@/components/deck-not-found";
+import { DeckSettingsMenu } from "@/components/deck-settings-menu";
 import { LoadError } from "@/components/load-error";
 import { NoAccess } from "@/components/no-access";
 import CardsIcon from "@/components/icons/cards";
-import { NCardManage } from "@/components/n-card-manage";
+import { LCardManage } from "@/components/l-card-manage";
 import { Navbar } from "@/components/navbar";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -23,12 +24,15 @@ import { useDeck } from "@/hooks/data/use-decks";
 import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import { useState } from "react";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
+import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 
 export function DeckPage() {
   const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
   const { id } = useParams() as { id: string };
+  const [asyncPush] = useAsyncRouterPush();
 
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
 
@@ -52,7 +56,7 @@ export function DeckPage() {
       <Navbar />
       <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5 flex-1 flex flex-col">
         {state === "not-found" || state === "forbidden" || state === "error" ? (
-          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8%]">
+          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
             {state === "not-found" ? (
               <DeckNotFound />
             ) : state === "forbidden" ? (
@@ -84,6 +88,14 @@ export function DeckPage() {
                 >
                   {deckName}
                 </h1>
+                {!showPlaceholder && deckData && (
+                  <DeckSettingsMenu
+                    deck={deckData}
+                    triggerClassName="shrink-0"
+                    align="start"
+                    onDeleted={() => asyncPush("/")}
+                  />
+                )}
               </div>
               <LinkButton href={`/study/${id}`} isPlaceholder={showPlaceholder}>
                 Study Deck
@@ -122,7 +134,7 @@ export function DeckPage() {
             {showPlaceholder ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <NCardManage key={i} isPlaceholder />
+                  <LCardManage key={i} isPlaceholder />
                 ))}
               </div>
             ) : cards.length === 0 ? (
@@ -147,7 +159,7 @@ export function DeckPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {cards.map((card) => (
-                  <NCardManage
+                  <LCardManage
                     key={card.id}
                     id={card.id}
                     deckId={id}

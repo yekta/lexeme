@@ -7,7 +7,7 @@ import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { useRef, useState } from "react";
 import { Rating, type Grade } from "ts-fsrs";
 
-type TNCardStudyProps =
+type TLCardStudyProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
@@ -47,7 +47,7 @@ const placeholderProps: Omit<TRatingButtonsProps, "visible"> = {
   easyLabel: "5d",
 };
 
-export function NCardStudy(props: TNCardStudyProps) {
+export function LCardStudy(props: TLCardStudyProps) {
   const { isPlaceholder } = props;
 
   const [isGrabbing, setIsGrabbing] = useState(false);

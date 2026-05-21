@@ -31,7 +31,7 @@ const cardSchema = z.object({
   back: z.string().trim().min(1, "Back is required"),
 });
 
-type TNCardManageProps =
+type TLCardManageProps =
   | { isPlaceholder: true }
   | {
       isPlaceholder?: never;
@@ -44,7 +44,7 @@ type TNCardManageProps =
       contentUpdatedAt: string | Date;
     };
 
-export function NCardManage(props: TNCardManageProps) {
+export function LCardManage(props: TLCardManageProps) {
   const { isPlaceholder } = props;
 
   const front = isPlaceholder ? "This is the front of the card" : props.front;

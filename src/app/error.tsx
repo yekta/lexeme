@@ -18,7 +18,7 @@ export default function Error({
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 w-full max-w-5xl mx-auto px-5 flex flex-col items-center justify-center pb-[10%]">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-5 flex flex-col items-center justify-center pb-[8vh]">
         <LoadError error={error} onRetry={reset} />
       </main>
     </div>

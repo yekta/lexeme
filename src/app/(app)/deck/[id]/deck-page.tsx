@@ -45,7 +45,7 @@ export function DeckPage() {
       className="min-h-screen group flex flex-col w-full"
     >
       <Navbar />
-      <main className="max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5 flex-1 flex flex-col">
+      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5 flex-1 flex flex-col">
         {deckNotFound ? (
           <div className="flex-1 w-full items-center justify-center flex flex-col pb-[15%]">
             <DeckNotFound />

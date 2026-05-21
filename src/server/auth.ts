@@ -1,7 +1,6 @@
-import "server-only";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { nextCookies } from "better-auth/next-js";
+import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { env } from "@/env";
 import { db } from "@/server/db";
 import {
@@ -78,5 +77,5 @@ export const auth = betterAuth({
       },
     },
   },
-  plugins: [nextCookies()],
+  plugins: [tanstackStartCookies()],
 });

@@ -1,12 +1,20 @@
-"use client";
-
+import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect } from "react";
 import { signIn, signOut, useSession } from "@/lib/auth-client";
-import { useRouter } from "nextjs-toploader/app";
-import { useCallback } from "react";
+import { setCurrentUserId } from "@/lib/session-store";
 
+/**
+ * Better Auth session, plus Google sign-in / sign-out helpers. Keeps the
+ * synchronous user-id cache (used to build optimistic write rows) up to date.
+ */
 export function useAuth() {
   const { data: session, isPending } = useSession();
-  const router = useRouter();
+  const navigate = useNavigate();
+  const userId = session?.user?.id ?? null;
+
+  useEffect(() => {
+    setCurrentUserId(userId);
+  }, [userId]);
 
   const signInWithGoogle = useCallback(async () => {
     await signIn.social({ provider: "google", callbackURL: "/" });
@@ -15,10 +23,10 @@ export function useAuth() {
   const logout = useCallback(async () => {
     await signOut({
       fetchOptions: {
-        onSuccess: () => router.push("/sign-in"),
+        onSuccess: () => navigate({ to: "/sign-in" }),
       },
     });
-  }, [router]);
+  }, [navigate]);
 
   return {
     user: session?.user ?? null,

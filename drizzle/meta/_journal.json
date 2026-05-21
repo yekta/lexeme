@@ -8,6 +8,13 @@
       "when": 1778914341744,
       "tag": "0000_steady_maelstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779323487178,
+      "tag": "0001_shallow_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

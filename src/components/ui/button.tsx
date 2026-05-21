@@ -1,14 +1,10 @@
-"use client";
-
 import { Button as ButtonPrimitive } from "@base-ui/react/button";
+import { Link } from "@tanstack/react-router";
 import { cva, type VariantProps } from "class-variance-authority";
 import { LoaderIcon } from "lucide-react";
-import Link from "next/link";
-import type { ComponentProps } from "react";
+import type React from "react";
 
 import { cn } from "@/lib/utils";
-import React from "react";
-import { useRouter } from "next/navigation";
 
 const buttonVariants = cva(
   "group/button max-w-full relative overflow-hidden overflow-ellipsis min-w-0 relative inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 data-placeholder:pointer-events-none data-placeholder:opacity-100 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -159,49 +155,29 @@ function Button({
   );
 }
 
-type TPrefetch = "hover" | false;
-type TLinkButtonProps = Omit<React.ComponentProps<typeof Link>, "prefetch"> & {
-  prefetch?: TPrefetch;
-} & VariantProps<typeof buttonVariants> & {
-    isPending?: boolean;
-    isPlaceholder?: boolean;
-  };
+// TanStack Router's <Link> is strongly typed to the route tree; LinkButton
+// accepts a plain resolved path, so route into it through a loose alias.
+const RouterLink = Link as unknown as React.ComponentType<
+  Record<string, unknown>
+>;
+
+type TLinkButtonProps = VariantProps<typeof buttonVariants> & {
+  href: string;
+  isPending?: boolean;
+  isPlaceholder?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+};
 
 function LinkButton({
-  onMouseEnter: onMouseEnterProp,
-  onTouchStart: onTouchStartProp,
   href,
-  prefetch = "hover",
   variant,
   size,
   isPending,
   isPlaceholder,
   className,
   children,
-  ...props
 }: TLinkButtonProps) {
-  const router = useRouter();
-
-  const onMouseEnter = React.useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-      onMouseEnterProp?.(e);
-      if (prefetch === "hover") {
-        router.prefetch(href.toString());
-      }
-    },
-    [onMouseEnterProp, href, router, prefetch],
-  );
-
-  const onTouchStart = React.useCallback(
-    (e: React.TouchEvent<HTMLAnchorElement>) => {
-      onTouchStartProp?.(e);
-      if (prefetch === "hover") {
-        router.prefetch(href.toString());
-      }
-    },
-    [onTouchStartProp, href, router, prefetch],
-  );
-
   return (
     <Button
       variant={variant}
@@ -210,17 +186,7 @@ function LinkButton({
       isPlaceholder={isPlaceholder}
       className={className}
       nativeButton={!!isPlaceholder}
-      render={
-        isPlaceholder ? undefined : (
-          <Link
-            {...props}
-            prefetch={false}
-            href={href}
-            onMouseEnter={onMouseEnter}
-            onTouchStart={onTouchStart}
-          />
-        )
-      }
+      render={isPlaceholder ? undefined : <RouterLink to={href} />}
     >
       {children}
     </Button>

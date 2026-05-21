@@ -1,17 +1,19 @@
-import { useAuth } from "@/hooks/use-auth";
-import { SIGN_IN_PATHNAME } from "@/lib/constants";
-import { useRouter } from "nextjs-toploader/app";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
+/**
+ * Client-side auth guard. The real security boundary lives on the server
+ * (shape proxy + server functions); this only handles the UX redirect.
+ */
 export default function useRedirectToSignInIfNecessary() {
   const { isPending, user } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (isPending) return;
-    if (user) return;
-    router.push(SIGN_IN_PATHNAME);
-  }, [isPending, user]);
+    if (isPending || user) return;
+    navigate({ to: "/sign-in" });
+  }, [isPending, user, navigate]);
 
   return { isPending, user };
 }

@@ -14,3 +14,10 @@ coverage/
 .env.keys
 .env.local
 .env.*.local
+# TanStack Start
+.output/
+.nitro/
+.vite/
+.tanstack/
+dist/
+src/routeTree.gen.ts

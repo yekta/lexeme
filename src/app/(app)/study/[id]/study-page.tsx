@@ -9,6 +9,7 @@ import {
   EmptyListIcon,
   EmptyListTitle,
 } from "@/components/empty-list";
+import { DeckNotFound } from "@/components/deck-not-found";
 import CardsIcon from "@/components/icons/cards";
 import { NCardStudy } from "@/components/n-card-study";
 import { Navbar } from "@/components/navbar";
@@ -30,7 +31,6 @@ import {
 import confetti from "canvas-confetti";
 import { CheckCircle2 } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useRouter } from "nextjs-toploader/app";
 import { useEffect, useMemo, useState } from "react";
 
 type TQueueItem = {
@@ -48,7 +48,6 @@ type TStudySession = {
 export function StudyPage() {
   const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
   const { id } = useParams() as { id: string };
-  const router = useRouter();
 
   const [studySession, setStudySession] = useState<TStudySession | null>(null);
 
@@ -56,6 +55,8 @@ export function StudyPage() {
     useLearningProfiles();
 
   const { data: deckData, isPending: isPendingDecks } = useDeck(id);
+
+  const deckNotFound = !isPendingDecks && deckData === null;
 
   const learningProfile =
     profiles.find((p) => p.id === deckData?.learning_profile_id) ??
@@ -66,13 +67,6 @@ export function StudyPage() {
     () => (learningProfile ? createUserScheduler(learningProfile) : null),
     [learningProfile],
   );
-
-  // Redirect home if the deck doesn't exist.
-  useEffect(() => {
-    if (!isPendingDecks && id && deckData === null) {
-      router.push("/");
-    }
-  }, [isPendingDecks, deckData, id, router]);
 
   const deckName = deckData?.name ?? "Loading...";
 
@@ -187,15 +181,21 @@ export function StudyPage() {
   const hasNoCards = !isPending && studyData && totalCards === 0;
   const showPlaceholder =
     isPending ||
-    !deckData ||
-    (!currentCard && !isFinished && !hasNoDueCards && !hasNoCards);
+    (!deckData && !deckNotFound) ||
+    (!currentCard &&
+      !isFinished &&
+      !hasNoDueCards &&
+      !hasNoCards &&
+      !deckNotFound);
 
   return (
     <div className="h-svh overflow-hidden flex flex-col">
       <Navbar
         backHref="/"
         title={
-          showPlaceholder ? (
+          deckNotFound ? (
+            ""
+          ) : showPlaceholder ? (
             <div className="h-5 w-36 bg-foreground/20 animate-pulse rounded" />
           ) : (
             deckName
@@ -219,6 +219,10 @@ export function StudyPage() {
       <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 pb-5 max-w-4xl mx-auto w-full overflow-hidden">
         {showPlaceholder ? (
           <NCardStudy isPlaceholder />
+        ) : deckNotFound ? (
+          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[15%]">
+            <DeckNotFound />
+          </div>
         ) : totalCards === 0 && !hasNoDueCards ? (
           <EmptyList>
             <EmptyListHeader>

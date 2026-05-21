@@ -6,10 +6,10 @@ import type { AppRouter } from "@/server/api/root";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 export type TStudyCard =
-  RouterOutputs["cards"]["studyQueue"]["dueCards"][number];
+  RouterOutputs["cards"]["getStudyQueue"]["dueCards"][number];
 
 export function useStudyCards(deckId: string | undefined) {
-  return api.cards.studyQueue.useQuery(
+  return api.cards.getStudyQueue.useQuery(
     { deckId: deckId ?? "" },
     { enabled: !!deckId, staleTime: 0, gcTime: 0 },
   );

@@ -15,10 +15,15 @@ import {
 } from "@/lib/fsrs";
 import { requireCard, requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { cardContents, cards, learningProfiles, reviewLogs } from "@/server/db/schema";
+import {
+  cardContents,
+  cards,
+  learningProfiles,
+  reviewLogs,
+} from "@/server/db/schema";
 
 export const cardsRouter = createTRPCRouter({
-  get: protectedProcedure
+  list: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
@@ -84,7 +89,7 @@ export const cardsRouter = createTRPCRouter({
       await ctx.db.delete(cards).where(eq(cards.id, input.id));
     }),
 
-  studyQueue: protectedProcedure
+  getStudyQueue: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const deck = await requireDeck(ctx.db, input.deckId, ctx.session.user.id);

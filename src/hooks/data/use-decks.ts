@@ -19,8 +19,8 @@ export function useDeck(id: string | undefined) {
 export function useCreateDeck() {
   const utils = api.useUtils();
   return api.decks.create.useMutation({
-    onSuccess: () => {
-      utils.decks.list.invalidate();
+    onSuccess: async () => {
+      await utils.decks.list.refetch();
       utils.stats.getDeckStats.invalidate();
     },
   });
@@ -29,8 +29,8 @@ export function useCreateDeck() {
 export function useUpdateDeck() {
   const utils = api.useUtils();
   return api.decks.update.useMutation({
-    onSuccess: (_data, vars) => {
-      utils.decks.list.invalidate();
+    onSuccess: async (_data, vars) => {
+      await utils.decks.list.refetch();
       utils.decks.get.invalidate({ id: vars.id });
     },
   });
@@ -39,8 +39,8 @@ export function useUpdateDeck() {
 export function useDeleteDeck() {
   const utils = api.useUtils();
   return api.decks.delete.useMutation({
-    onSuccess: () => {
-      utils.decks.list.invalidate();
+    onSuccess: async () => {
+      await utils.decks.list.refetch();
       utils.stats.getDeckStats.invalidate();
       utils.stats.getToday.invalidate();
     },

@@ -8,7 +8,7 @@ export function useRateCard(deckId: string | undefined) {
     onSuccess: () => {
       utils.stats.getToday.invalidate();
       utils.stats.getDeckStats.invalidate();
-      if (deckId) utils.cards.get.invalidate({ deckId });
+      if (deckId) utils.cards.list.invalidate({ deckId });
       // Don't invalidate studyQueue — the study page owns its in-memory queue
       // for the active session; re-fetching would disrupt it.
     },

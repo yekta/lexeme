@@ -5,10 +5,10 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/api/root";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
-export type TCard = RouterOutputs["cards"]["get"][number];
+export type TCard = RouterOutputs["cards"]["list"][number];
 
 export function useCardsByDeck(deckId: string | undefined) {
-  return api.cards.get.useQuery(
+  return api.cards.list.useQuery(
     { deckId: deckId ?? "" },
     { enabled: !!deckId },
   );
@@ -17,9 +17,9 @@ export function useCardsByDeck(deckId: string | undefined) {
 export function useCreateCard() {
   const utils = api.useUtils();
   return api.cards.create.useMutation({
-    onSuccess: (_data, vars) => {
-      utils.cards.get.invalidate({ deckId: vars.deckId });
-      utils.cards.studyQueue.invalidate({ deckId: vars.deckId });
+    onSuccess: async (_data, vars) => {
+      await utils.cards.list.refetch({ deckId: vars.deckId });
+      utils.cards.getStudyQueue.invalidate({ deckId: vars.deckId });
       utils.stats.getDeckStats.invalidate();
     },
   });
@@ -28,9 +28,9 @@ export function useCreateCard() {
 export function useUpdateCard() {
   const utils = api.useUtils();
   return api.cards.update.useMutation({
-    onSuccess: (_data, vars) => {
-      utils.cards.get.invalidate({ deckId: vars.deckId });
-      utils.cards.studyQueue.invalidate({ deckId: vars.deckId });
+    onSuccess: async (_data, vars) => {
+      await utils.cards.list.refetch({ deckId: vars.deckId });
+      utils.cards.getStudyQueue.invalidate({ deckId: vars.deckId });
     },
   });
 }
@@ -38,9 +38,9 @@ export function useUpdateCard() {
 export function useDeleteCard() {
   const utils = api.useUtils();
   return api.cards.delete.useMutation({
-    onSuccess: (_data, vars) => {
-      utils.cards.get.invalidate({ deckId: vars.deckId });
-      utils.cards.studyQueue.invalidate({ deckId: vars.deckId });
+    onSuccess: async (_data, vars) => {
+      await utils.cards.list.refetch({ deckId: vars.deckId });
+      utils.cards.getStudyQueue.invalidate({ deckId: vars.deckId });
       utils.stats.getDeckStats.invalidate();
     },
   });

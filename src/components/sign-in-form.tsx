@@ -1,9 +1,11 @@
-import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+"use client";
+
 import Logo from "@/components/icons/logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import { useRouter } from "nextjs-toploader/app";
+import { useEffect, useState } from "react";
 
 type TProps = {
   className?: string;
@@ -12,11 +14,11 @@ type TProps = {
 export default function SignInForm({ className }: TProps) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const { signInWithGoogle, user } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
-    if (user) navigate({ to: "/" });
-  }, [user, navigate]);
+    if (user) router.push("/");
+  }, [user, router]);
 
   const handleSignIn = async () => {
     setIsSigningIn(true);

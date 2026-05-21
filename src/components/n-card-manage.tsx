@@ -37,7 +37,6 @@ type TNCardManageProps =
       isPlaceholder?: never;
       id: string;
       deckId: string;
-      contentId: string;
       front: string;
       back: string;
       createdAt: string | Date;
@@ -116,7 +115,8 @@ export function NCardManage(props: TNCardManageProps) {
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogContent>
               <EditCardForm
-                contentId={props.contentId}
+                id={props.id}
+                deckId={props.deckId}
                 front={props.front}
                 back={props.back}
                 onDone={() => setEditOpen(false)}
@@ -130,6 +130,7 @@ export function NCardManage(props: TNCardManageProps) {
             <DialogContent>
               <DeleteCardForm
                 id={props.id}
+                deckId={props.deckId}
                 onDone={() => setDeleteOpen(false)}
               />
             </DialogContent>
@@ -170,12 +171,14 @@ export function NCardManage(props: TNCardManageProps) {
 }
 
 function EditCardForm({
-  contentId,
+  id,
+  deckId,
   front,
   back,
   onDone,
 }: {
-  contentId: string;
+  id: string;
+  deckId: string;
   front: string;
   back: string;
   onDone: () => void;
@@ -190,7 +193,8 @@ function EditCardForm({
     },
     onSubmit: async ({ value }) => {
       await mutation.mutateAsync({
-        contentId,
+        id,
+        deckId,
         front: value.front,
         back: value.back,
       });
@@ -266,9 +270,11 @@ function EditCardForm({
 
 function DeleteCardForm({
   id,
+  deckId,
   onDone,
 }: {
   id: string;
+  deckId: string;
   onDone: () => void;
 }) {
   const mutation = useDeleteCard();
@@ -289,7 +295,7 @@ function DeleteCardForm({
           variant="destructive"
           isPending={mutation.isPending}
           onClick={() => {
-            mutation.mutate({ id }, { onSuccess: onDone });
+            mutation.mutate({ id, deckId }, { onSuccess: onDone });
           }}
         >
           Delete

@@ -172,11 +172,6 @@ export const cards = pgTable(
   "cards",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // Denormalized from decks so ElectricSQL shapes can filter `cards` by
-    // user on a single table (shapes don't support joins).
-    user_id: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
     deck_id: uuid("deck_id")
       .notNull()
       .references(() => decks.id, { onDelete: "cascade" }),
@@ -193,40 +188,25 @@ export const cards = pgTable(
     created_at: createdAt(),
     updated_at: updatedAt(),
   },
-  (t) => [
-    index("cards_deck_id_due_idx").on(t.deck_id, t.due),
-    index("cards_user_id_idx").on(t.user_id),
-  ],
+  (t) => [index("cards_deck_id_due_idx").on(t.deck_id, t.due)],
 );
 
-export const cardContents = pgTable(
-  "card_contents",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    // Denormalized from decks (via cards) so ElectricSQL shapes can filter by user.
-    user_id: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    card_id: uuid("card_id")
-      .notNull()
-      .unique()
-      .references(() => cards.id, { onDelete: "cascade" }),
-    front: text("front").notNull(),
-    back: text("back").notNull(),
-    created_at: createdAt(),
-    updated_at: updatedAt(),
-  },
-  (t) => [index("card_contents_user_id_idx").on(t.user_id)],
-);
+export const cardContents = pgTable("card_contents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  card_id: uuid("card_id")
+    .notNull()
+    .unique()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  front: text("front").notNull(),
+  back: text("back").notNull(),
+  created_at: createdAt(),
+  updated_at: updatedAt(),
+});
 
 export const reviewLogs = pgTable(
   "review_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // Denormalized from decks (via cards) so ElectricSQL shapes can filter by user.
-    user_id: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
     card_id: uuid("card_id")
       .notNull()
       .references(() => cards.id, { onDelete: "cascade" }),
@@ -241,10 +221,7 @@ export const reviewLogs = pgTable(
     duration_ms: integer("duration_ms").notNull(),
     created_at: createdAt(),
   },
-  (t) => [
-    index("review_logs_card_id_review_idx").on(t.card_id, t.review),
-    index("review_logs_user_id_review_idx").on(t.user_id, t.review),
-  ],
+  (t) => [index("review_logs_card_id_review_idx").on(t.card_id, t.review)],
 );
 
 export type TUser = typeof user.$inferSelect;

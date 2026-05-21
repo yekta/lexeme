@@ -1,75 +1,48 @@
-import { useMemo } from "react";
-import { getCollections } from "@/lib/collections";
-import type { TDeckRow } from "@/lib/db-types";
-import { getCurrentUserId } from "@/lib/session-store";
-import { asMutation } from "./_mutation";
-import { useAllDecks } from "./_collections";
+"use client";
 
-export type TDeck = TDeckRow;
-export type TDeckSummary = TDeckRow;
+import { api } from "@/trpc/react";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@/server/api/root";
 
-function byCreatedDesc(a: TDeckRow, b: TDeckRow): number {
-  return b.created_at.localeCompare(a.created_at);
-}
+type RouterOutputs = inferRouterOutputs<AppRouter>;
+export type TDeck = RouterOutputs["decks"]["list"][number];
+export type TDeckSummary = NonNullable<RouterOutputs["decks"]["get"]>;
 
 export function useDecks() {
-  const { rows, isLoading } = useAllDecks();
-  const data = useMemo(() => [...rows].sort(byCreatedDesc), [rows]);
-  return { data, isPending: isLoading };
+  return api.decks.list.useQuery();
 }
 
 export function useDeck(id: string | undefined) {
-  const { rows, isLoading } = useAllDecks();
-  const data = useMemo(
-    () => (id ? (rows.find((d) => d.id === id) ?? null) : null),
-    [rows, id],
-  );
-  return { data, isPending: isLoading };
+  return api.decks.get.useQuery({ id: id ?? "" }, { enabled: !!id });
 }
 
-type CreateDeckInput = {
-  name: string;
-  description: string;
-  learning_profile_id: string;
-};
-
 export function useCreateDeck() {
-  return asMutation<CreateDeckInput, string>((input) => {
-    const now = new Date().toISOString();
-    const row: TDeckRow = {
-      id: crypto.randomUUID(),
-      user_id: getCurrentUserId(),
-      name: input.name,
-      description: input.description,
-      learning_profile_id: input.learning_profile_id,
-      created_at: now,
-      updated_at: now,
-    };
-    getCollections().decks.insert(row);
-    return row.id;
+  const utils = api.useUtils();
+  return api.decks.create.useMutation({
+    onSuccess: () => {
+      utils.decks.list.invalidate();
+      utils.stats.getDeckStats.invalidate();
+    },
   });
 }
 
-type UpdateDeckInput = {
-  id: string;
-  name: string;
-  description: string;
-  learning_profile_id: string;
-};
-
 export function useUpdateDeck() {
-  return asMutation<UpdateDeckInput, void>((input) => {
-    getCollections().decks.update(input.id, (draft) => {
-      draft.name = input.name;
-      draft.description = input.description;
-      draft.learning_profile_id = input.learning_profile_id;
-      draft.updated_at = new Date().toISOString();
-    });
+  const utils = api.useUtils();
+  return api.decks.update.useMutation({
+    onSuccess: (_data, vars) => {
+      utils.decks.list.invalidate();
+      utils.decks.get.invalidate({ id: vars.id });
+    },
   });
 }
 
 export function useDeleteDeck() {
-  return asMutation<{ id: string }, void>((input) => {
-    getCollections().decks.delete(input.id);
+  const utils = api.useUtils();
+  return api.decks.delete.useMutation({
+    onSuccess: () => {
+      utils.decks.list.invalidate();
+      utils.stats.getDeckStats.invalidate();
+      utils.stats.getToday.invalidate();
+    },
   });
 }

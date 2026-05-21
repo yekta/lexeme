@@ -1,11 +1,5 @@
 import { appLocale } from "@/lib/constants";
-import type {
-  TCardContentRow,
-  TCardRow,
-  TCardState,
-  TLearningProfileRow,
-  TReviewLogRow,
-} from "@/lib/db-types";
+import { TCardStateEnum, TLearningProfile } from "@/server/db/schema";
 import {
   createEmptyCard,
   fsrs,
@@ -14,6 +8,7 @@ import {
   type FSRS,
   type Card as FSRSCard,
   type FSRSParameters,
+  type ReviewLog as FSRSReviewLog,
   type Grade,
   type StepUnit,
 } from "ts-fsrs";
@@ -37,13 +32,31 @@ export const FSRS_DEFAULT_RELEARNING_STEPS: readonly StepUnit[] = Object.freeze(
 export const FSRS_DEFAULT_DECAY = 0.1542;
 
 export const FSRS_DEFAULT_W = Object.freeze([
-  0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666,
-  0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658,
+  0.212,
+  1.2931,
+  2.3065,
+  8.2956,
+  6.4133,
+  0.8334,
+  3.0194,
+  0.001,
+  1.8722,
+  0.1666,
+  0.796,
+  1.4835,
+  0.0614,
+  0.2629,
+  1.6483,
+  0.6014,
+  1.8729,
+  0.5425,
+  0.0912,
+  0.0658,
   FSRS_DEFAULT_DECAY,
 ]);
 
 type TSchedulerParams = Pick<
-  TLearningProfileRow,
+  TLearningProfile,
   | "request_retention"
   | "maximum_interval"
   | "enable_fuzz"
@@ -66,21 +79,39 @@ export function createUserScheduler(params: TSchedulerParams): FSRS {
   return fsrs(fsrsParams);
 }
 
-const stateToEnum: Record<State, TCardState> = {
+export function reviewLogToDbRow(
+  log: FSRSReviewLog,
+  cardId: string,
+  durationMs: number,
+) {
+  return {
+    card_id: cardId,
+    rating: log.rating as number,
+    state: stateToEnum[log.state] ?? stateToEnum[State.New],
+    due: new Date(log.due),
+    stability: log.stability,
+    difficulty: log.difficulty,
+    scheduled_days: log.scheduled_days,
+    learning_steps: log.learning_steps,
+    review: new Date(log.review),
+    duration_ms: durationMs,
+  };
+}
+
+const stateToEnum: Record<State, TCardStateEnum> = {
   [State.New]: "new",
   [State.Learning]: "learning",
   [State.Review]: "review",
   [State.Relearning]: "relearning",
 };
 
-const enumToState: Record<TCardState, State> = {
+const enumToState: Record<TCardStateEnum, State> = {
   new: State.New,
   learning: State.Learning,
   review: State.Review,
   relearning: State.Relearning,
 };
 
-/** Convert a synced card row into the shape `ts-fsrs` operates on. */
 export function dbRowToFSRSCard(row: {
   due: string | Date;
   stability: number;
@@ -89,7 +120,7 @@ export function dbRowToFSRSCard(row: {
   scheduled_days: number;
   reps: number;
   lapses: number;
-  state: TCardState;
+  state: TCardStateEnum;
   learning_steps: number;
   last_review: string | Date | null;
 }): FSRSCard {
@@ -107,111 +138,17 @@ export function dbRowToFSRSCard(row: {
   };
 }
 
-/** Build a brand-new card row (FSRS "new" state), keyed with a client UUID. */
-export function buildNewCard(opts: {
-  deckId: string;
-  userId: string;
-}): TCardRow {
-  const now = new Date();
-  const empty = createEmptyCard(now);
-  const iso = now.toISOString();
+export function fsrsCardToDbRow(card: FSRSCard) {
   return {
-    id: crypto.randomUUID(),
-    user_id: opts.userId,
-    deck_id: opts.deckId,
-    due: empty.due.toISOString(),
-    stability: empty.stability,
-    difficulty: empty.difficulty,
-    elapsed_days: empty.elapsed_days,
-    scheduled_days: empty.scheduled_days,
-    reps: empty.reps,
-    lapses: empty.lapses,
-    state: stateToEnum[empty.state] ?? "new",
-    learning_steps: empty.learning_steps,
-    last_review: empty.last_review
-      ? new Date(empty.last_review).toISOString()
-      : null,
-    created_at: iso,
-    updated_at: iso,
-  };
-}
-
-/** Build the front/back content row paired with a card. */
-export function buildCardContent(opts: {
-  cardId: string;
-  userId: string;
-  front: string;
-  back: string;
-}): TCardContentRow {
-  const iso = new Date().toISOString();
-  return {
-    id: crypto.randomUUID(),
-    user_id: opts.userId,
-    card_id: opts.cardId,
-    front: opts.front,
-    back: opts.back,
-    created_at: iso,
-    updated_at: iso,
-  };
-}
-
-/**
- * Run an FSRS review entirely on the client: given the current card row, the
- * deck's learning profile and a rating, produce the next card row and the
- * review-log row to write. No server round-trip is needed to schedule a card.
- */
-export function applyRating(opts: {
-  card: TCardRow;
-  profile: TSchedulerParams;
-  rating: Grade;
-  durationMs: number;
-  userId: string;
-}): { card: TCardRow; log: TReviewLogRow; intervalMs: number } {
-  const scheduler = createUserScheduler(opts.profile);
-  const now = new Date();
-  const result = scheduler.next(
-    dbRowToFSRSCard(opts.card),
-    now,
-    opts.rating,
-  );
-  const iso = now.toISOString();
-
-  const card: TCardRow = {
-    ...opts.card,
-    due: result.card.due.toISOString(),
-    stability: result.card.stability,
-    difficulty: result.card.difficulty,
-    scheduled_days: result.card.scheduled_days,
-    reps: result.card.reps,
-    lapses: result.card.lapses,
-    state: stateToEnum[result.card.state] ?? "new",
-    learning_steps: result.card.learning_steps,
-    last_review: result.card.last_review
-      ? new Date(result.card.last_review).toISOString()
-      : iso,
-    updated_at: iso,
-  };
-
-  const log: TReviewLogRow = {
-    id: crypto.randomUUID(),
-    user_id: opts.userId,
-    card_id: opts.card.id,
-    rating: result.log.rating as number,
-    state: stateToEnum[result.log.state] ?? "new",
-    due: new Date(result.log.due).toISOString(),
-    stability: result.log.stability,
-    difficulty: result.log.difficulty,
-    scheduled_days: result.log.scheduled_days,
-    learning_steps: result.log.learning_steps,
-    review: new Date(result.log.review).toISOString(),
-    duration_ms: opts.durationMs,
-    created_at: iso,
-  };
-
-  return {
-    card,
-    log,
-    intervalMs: result.card.due.getTime() - now.getTime(),
+    due: card.due,
+    stability: card.stability,
+    difficulty: card.difficulty,
+    scheduled_days: card.scheduled_days,
+    reps: card.reps,
+    lapses: card.lapses,
+    state: stateToEnum[card.state] ?? "new",
+    learning_steps: card.learning_steps,
+    last_review: card.last_review ? new Date(card.last_review) : null,
   };
 }
 

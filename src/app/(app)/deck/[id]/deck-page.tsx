@@ -52,7 +52,7 @@ export function DeckPage() {
       <Navbar />
       <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5 flex-1 flex flex-col">
         {state === "not-found" || state === "forbidden" || state === "error" ? (
-          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[15%]">
+          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8%]">
             {state === "not-found" ? (
               <DeckNotFound />
             ) : state === "forbidden" ? (

@@ -223,7 +223,7 @@ export function StudyPage() {
           )
         }
       />
-      <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 pb-5 max-w-4xl mx-auto w-full overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 max-w-4xl mx-auto w-full overflow-hidden pb-[8%]">
         {isUnavailable ? (
           state === "not-found" ? (
             <DeckNotFound />

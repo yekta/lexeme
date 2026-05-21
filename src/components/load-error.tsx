@@ -24,7 +24,7 @@ export function LoadError({
     <EmptyList>
       <EmptyListHeader>
         <EmptyListIcon className="bg-destructive/15">
-          <TriangleAlertIcon className="text-destructive" />
+          <TriangleAlertIcon className="text-destructive -mt-1" />
         </EmptyListIcon>
         <EmptyListContent className="max-w-2xl">
           <EmptyListTitle className="text-destructive">

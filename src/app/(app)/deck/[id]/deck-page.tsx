@@ -11,6 +11,8 @@ import {
 } from "@/components/empty-list";
 import { AddCardForm } from "@/components/add-card-form";
 import { DeckNotFound } from "@/components/deck-not-found";
+import { LoadError } from "@/components/load-error";
+import { NoAccess } from "@/components/no-access";
 import CardsIcon from "@/components/icons/cards";
 import { NCardManage } from "@/components/n-card-manage";
 import { Navbar } from "@/components/navbar";
@@ -18,6 +20,7 @@ import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useCardsByDeck } from "@/hooks/data/use-cards";
 import { useDeck } from "@/hooks/data/use-decks";
+import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -29,15 +32,17 @@ export function DeckPage() {
 
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
 
-  const { data: deckData, isPending: isPendingDecks } = useDeck(id);
-  const { data: cards = [], isPending: isPendingCards } = useCardsByDeck(id);
+  const deckQuery = useDeck(id);
+  const cardsQuery = useCardsByDeck(id);
+  const { data: deckData } = deckQuery;
+  const { data: cards = [] } = cardsQuery;
 
-  const deckNotFound = !isPendingDecks && deckData === null;
+  const state = mergeStates(dataStateOf(deckQuery), dataStateOf(cardsQuery));
 
   const deckName = deckData?.name ?? "Loading...";
 
-  const isPending = isPendingDecks || isPendingCards || isPendingAuth;
-  const showPlaceholder = isPending;
+  const showPlaceholder =
+    isPendingAuth || state === "pending" || state === "unauthorized";
 
   return (
     <div
@@ -46,9 +51,22 @@ export function DeckPage() {
     >
       <Navbar />
       <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5 flex-1 flex flex-col">
-        {deckNotFound ? (
+        {state === "not-found" ||
+        state === "forbidden" ||
+        state === "error" ? (
           <div className="flex-1 w-full items-center justify-center flex flex-col pb-[15%]">
-            <DeckNotFound />
+            {state === "not-found" ? (
+              <DeckNotFound />
+            ) : state === "forbidden" ? (
+              <NoAccess />
+            ) : (
+              <LoadError
+                onRetry={() => {
+                  deckQuery.refetch();
+                  cardsQuery.refetch();
+                }}
+              />
+            )}
           </div>
         ) : (
           <>

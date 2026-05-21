@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { requireProfile } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { learningProfiles } from "@/server/db/schema";
 
@@ -46,36 +47,29 @@ export const learningProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...fields } = input;
-      const result = await ctx.db
+      await requireProfile(ctx.db, id, ctx.session.user.id);
+      await ctx.db
         .update(learningProfiles)
         .set(fields)
-        .where(
-          and(
-            eq(learningProfiles.id, id),
-            eq(learningProfiles.user_id, ctx.session.user.id),
-          ),
-        )
-        .returning({ id: learningProfiles.id });
-      if (result.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+        .where(eq(learningProfiles.id, id));
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.db
-        .delete(learningProfiles)
-        .where(
-          and(
-            eq(learningProfiles.id, input.id),
-            eq(learningProfiles.user_id, ctx.session.user.id),
-            eq(learningProfiles.is_default, false),
-          ),
-        )
-        .returning({ id: learningProfiles.id });
-      if (result.length === 0)
+      const profile = await requireProfile(
+        ctx.db,
+        input.id,
+        ctx.session.user.id,
+      );
+      if (profile.is_default) {
         throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot delete default profile or profile not found",
+          code: "CONFLICT",
+          message: "Cannot delete the default profile.",
         });
+      }
+      await ctx.db
+        .delete(learningProfiles)
+        .where(eq(learningProfiles.id, input.id));
     }),
 });

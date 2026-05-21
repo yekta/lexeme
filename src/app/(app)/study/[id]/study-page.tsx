@@ -10,6 +10,8 @@ import {
   EmptyListTitle,
 } from "@/components/empty-list";
 import { DeckNotFound } from "@/components/deck-not-found";
+import { LoadError } from "@/components/load-error";
+import { NoAccess } from "@/components/no-access";
 import CardsIcon from "@/components/icons/cards";
 import { NCardStudy } from "@/components/n-card-study";
 import { Navbar } from "@/components/navbar";
@@ -28,6 +30,7 @@ import {
   SHORT_INTERVAL_MS,
   type Grade,
 } from "@/lib/fsrs";
+import { dataStateOf, mergeStates } from "@/lib/query-state";
 import confetti from "canvas-confetti";
 import { CheckCircle2 } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -51,12 +54,21 @@ export function StudyPage() {
 
   const [studySession, setStudySession] = useState<TStudySession | null>(null);
 
-  const { data: profiles = [], isPending: isPendingProfiles } =
-    useLearningProfiles();
+  const profilesQuery = useLearningProfiles();
+  const deckQuery = useDeck(id);
+  const studyQuery = useStudyCards(id);
 
-  const { data: deckData, isPending: isPendingDecks } = useDeck(id);
+  const { data: profiles = [] } = profilesQuery;
+  const { data: deckData } = deckQuery;
+  const { data: studyData } = studyQuery;
 
-  const deckNotFound = !isPendingDecks && deckData === null;
+  const state = mergeStates(
+    dataStateOf(deckQuery),
+    dataStateOf(studyQuery),
+    dataStateOf(profilesQuery),
+  );
+  const isUnavailable =
+    state === "not-found" || state === "forbidden" || state === "error";
 
   const learningProfile =
     profiles.find((p) => p.id === deckData?.learning_profile_id) ??
@@ -70,10 +82,8 @@ export function StudyPage() {
 
   const deckName = deckData?.name ?? "Loading...";
 
-  const { data: studyData, isPending: isPendingCards } = useStudyCards(id);
-
   const isPending =
-    isPendingDecks || isPendingCards || isPendingProfiles || isPendingAuth;
+    isPendingAuth || state === "pending" || state === "unauthorized";
   const totalCards = studyData?.totalCards || 0;
 
   const queueKey = useMemo(
@@ -180,20 +190,17 @@ export function StudyPage() {
 
   const hasNoCards = !isPending && studyData && totalCards === 0;
   const showPlaceholder =
-    isPending ||
-    (!deckData && !deckNotFound) ||
-    (!currentCard &&
-      !isFinished &&
-      !hasNoDueCards &&
-      !hasNoCards &&
-      !deckNotFound);
+    !isUnavailable &&
+    (isPending ||
+      !deckData ||
+      (!currentCard && !isFinished && !hasNoDueCards && !hasNoCards));
 
   return (
     <div className="h-svh overflow-hidden flex flex-col">
       <Navbar
         backHref="/"
         title={
-          deckNotFound ? (
+          isUnavailable ? (
             ""
           ) : showPlaceholder ? (
             <div className="h-5 w-36 bg-foreground/20 animate-pulse rounded" />
@@ -217,10 +224,22 @@ export function StudyPage() {
         }
       />
       <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 pb-5 max-w-4xl mx-auto w-full overflow-hidden">
-        {showPlaceholder ? (
+        {isUnavailable ? (
+          state === "not-found" ? (
+            <DeckNotFound />
+          ) : state === "forbidden" ? (
+            <NoAccess />
+          ) : (
+            <LoadError
+              onRetry={() => {
+                deckQuery.refetch();
+                studyQuery.refetch();
+                profilesQuery.refetch();
+              }}
+            />
+          )
+        ) : showPlaceholder ? (
           <NCardStudy isPlaceholder />
-        ) : deckNotFound ? (
-          <DeckNotFound />
         ) : totalCards === 0 && !hasNoDueCards ? (
           <EmptyList>
             <EmptyListHeader>

@@ -6,7 +6,7 @@ import type { AppRouter } from "@/server/api/root";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 export type TDeck = RouterOutputs["decks"]["list"][number];
-export type TDeckSummary = NonNullable<RouterOutputs["decks"]["get"]>;
+export type TDeckSummary = RouterOutputs["decks"]["get"];
 
 export function useDecks() {
   return api.decks.list.useQuery();

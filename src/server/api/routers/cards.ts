@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -14,20 +13,16 @@ import {
   SHORT_INTERVAL_MS,
   type Grade,
 } from "@/lib/fsrs";
+import { requireCard, requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import {
-  cardContents,
-  cards,
-  decks,
-  learningProfiles,
-  reviewLogs,
-} from "@/server/db/schema";
+import { cardContents, cards, learningProfiles, reviewLogs } from "@/server/db/schema";
 
 export const cardsRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      const rows = await ctx.db
+      await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
+      return ctx.db
         .select({
           id: cards.id,
           created_at: cards.created_at,
@@ -37,16 +32,9 @@ export const cardsRouter = createTRPCRouter({
           content_updated_at: cardContents.updated_at,
         })
         .from(cards)
-        .innerJoin(decks, eq(decks.id, cards.deck_id))
         .innerJoin(cardContents, eq(cardContents.card_id, cards.id))
-        .where(
-          and(
-            eq(cards.deck_id, input.deckId),
-            eq(decks.user_id, ctx.session.user.id),
-          ),
-        )
+        .where(eq(cards.deck_id, input.deckId))
         .orderBy(desc(cards.created_at));
-      return rows;
     }),
 
   create: protectedProcedure
@@ -58,17 +46,7 @@ export const cardsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [deck] = await ctx.db
-        .select({ id: decks.id })
-        .from(decks)
-        .where(
-          and(
-            eq(decks.id, input.deckId),
-            eq(decks.user_id, ctx.session.user.id),
-          ),
-        )
-        .limit(1);
-      if (!deck) throw new TRPCError({ code: "FORBIDDEN" });
+      await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
 
       return ctx.db.transaction(async (tx) => {
         const [card] = await tx
@@ -92,20 +70,7 @@ export const cardsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [owned] = await ctx.db
-        .select({ id: cards.id })
-        .from(cards)
-        .innerJoin(decks, eq(decks.id, cards.deck_id))
-        .where(
-          and(
-            eq(cards.id, input.id),
-            eq(cards.deck_id, input.deckId),
-            eq(decks.user_id, ctx.session.user.id),
-          ),
-        )
-        .limit(1);
-      if (!owned) throw new TRPCError({ code: "FORBIDDEN" });
-
+      await requireCard(ctx.db, input.id, ctx.session.user.id);
       await ctx.db
         .update(cardContents)
         .set({ front: input.front, back: input.back })
@@ -115,46 +80,21 @@ export const cardsRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.uuid(), deckId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [owned] = await ctx.db
-        .select({ id: cards.id })
-        .from(cards)
-        .innerJoin(decks, eq(decks.id, cards.deck_id))
-        .where(
-          and(
-            eq(cards.id, input.id),
-            eq(cards.deck_id, input.deckId),
-            eq(decks.user_id, ctx.session.user.id),
-          ),
-        )
-        .limit(1);
-      if (!owned) throw new TRPCError({ code: "FORBIDDEN" });
-
+      await requireCard(ctx.db, input.id, ctx.session.user.id);
       await ctx.db.delete(cards).where(eq(cards.id, input.id));
     }),
 
   studyQueue: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      const [ownedDeck] = await ctx.db
-        .select({
-          deckId: decks.id,
-          profile: learningProfiles,
-        })
-        .from(decks)
-        .innerJoin(
-          learningProfiles,
-          eq(learningProfiles.id, decks.learning_profile_id),
-        )
-        .where(
-          and(
-            eq(decks.id, input.deckId),
-            eq(decks.user_id, ctx.session.user.id),
-          ),
-        )
-        .limit(1);
-      if (!ownedDeck) throw new TRPCError({ code: "FORBIDDEN" });
+      const deck = await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
 
-      const profile = ownedDeck.profile;
+      const [profile] = await ctx.db
+        .select()
+        .from(learningProfiles)
+        .where(eq(learningProfiles.id, deck.learning_profile_id))
+        .limit(1);
+
       const newCardsPerDay =
         profile?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
       const maxReviewsPerDay =
@@ -257,28 +197,21 @@ export const cardsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [owned] = await ctx.db
-        .select({
-          card: cards,
-          profile: learningProfiles,
-        })
-        .from(cards)
-        .innerJoin(decks, eq(decks.id, cards.deck_id))
-        .innerJoin(
-          learningProfiles,
-          eq(learningProfiles.id, decks.learning_profile_id),
-        )
-        .where(
-          and(
-            eq(cards.id, input.cardId),
-            eq(decks.user_id, ctx.session.user.id),
-          ),
-        )
-        .limit(1);
-      if (!owned) throw new TRPCError({ code: "FORBIDDEN" });
+      const { card, deck } = await requireCard(
+        ctx.db,
+        input.cardId,
+        ctx.session.user.id,
+      );
 
-      const scheduler = createUserScheduler(owned.profile);
-      const fsrsCard = dbRowToFSRSCard(owned.card);
+      const [profile] = await ctx.db
+        .select()
+        .from(learningProfiles)
+        .where(eq(learningProfiles.id, deck.learning_profile_id))
+        .limit(1);
+
+      // The FK is notNull with onDelete: "restrict", so the profile always exists.
+      const scheduler = createUserScheduler(profile!);
+      const fsrsCard = dbRowToFSRSCard(card);
       const now = new Date();
       const result = scheduler.next(fsrsCard, now, input.rating as Grade);
       const dbFields = fsrsCardToDbRow(result.card);

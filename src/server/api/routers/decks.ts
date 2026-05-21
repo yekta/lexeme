@@ -1,9 +1,9 @@
-import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { requireDeck, requireProfile } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { decks, learningProfiles } from "@/server/db/schema";
+import { decks } from "@/server/db/schema";
 
 export const decksRouter = createTRPCRouter({
   list: protectedProcedure.query(({ ctx }) =>
@@ -23,17 +23,11 @@ export const decksRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      const [row] = await ctx.db
-        .select({
-          name: decks.name,
-          learning_profile_id: decks.learning_profile_id,
-        })
-        .from(decks)
-        .where(
-          and(eq(decks.id, input.id), eq(decks.user_id, ctx.session.user.id)),
-        )
-        .limit(1);
-      return row ?? null;
+      const deck = await requireDeck(ctx.db, input.id, ctx.session.user.id);
+      return {
+        name: deck.name,
+        learning_profile_id: deck.learning_profile_id,
+      };
     }),
 
   create: protectedProcedure
@@ -45,17 +39,11 @@ export const decksRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const [profile] = await ctx.db
-        .select({ id: learningProfiles.id })
-        .from(learningProfiles)
-        .where(
-          and(
-            eq(learningProfiles.id, input.learning_profile_id),
-            eq(learningProfiles.user_id, ctx.session.user.id),
-          ),
-        )
-        .limit(1);
-      if (!profile) throw new TRPCError({ code: "FORBIDDEN" });
+      await requireProfile(
+        ctx.db,
+        input.learning_profile_id,
+        ctx.session.user.id,
+      );
 
       const [row] = await ctx.db
         .insert(decks)
@@ -79,29 +67,26 @@ export const decksRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.db
+      await requireDeck(ctx.db, input.id, ctx.session.user.id);
+      await requireProfile(
+        ctx.db,
+        input.learning_profile_id,
+        ctx.session.user.id,
+      );
+      await ctx.db
         .update(decks)
         .set({
           name: input.name,
           description: input.description,
           learning_profile_id: input.learning_profile_id,
         })
-        .where(
-          and(eq(decks.id, input.id), eq(decks.user_id, ctx.session.user.id)),
-        )
-        .returning({ id: decks.id });
-      if (result.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+        .where(eq(decks.id, input.id));
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.db
-        .delete(decks)
-        .where(
-          and(eq(decks.id, input.id), eq(decks.user_id, ctx.session.user.id)),
-        )
-        .returning({ id: decks.id });
-      if (result.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      await requireDeck(ctx.db, input.id, ctx.session.user.id);
+      await ctx.db.delete(decks).where(eq(decks.id, input.id));
     }),
 });

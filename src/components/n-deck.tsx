@@ -334,7 +334,12 @@ function DeckSettingsForm({
         <form.Field name="description">
           {(field) => (
             <div className="space-y-2">
-              <Label htmlFor={field.name}>Description (optional)</Label>
+              <Label htmlFor={field.name}>
+                Description{" "}
+                <span className="text-muted-foreground font-normal">
+                  (optional)
+                </span>
+              </Label>
               <Input
                 id={field.name}
                 name={field.name}

@@ -231,6 +231,7 @@ export function StudyPage() {
             <NoAccess />
           ) : (
             <LoadError
+              error={deckQuery.error ?? studyQuery.error ?? profilesQuery.error}
               onRetry={() => {
                 deckQuery.refetch();
                 studyQuery.refetch();

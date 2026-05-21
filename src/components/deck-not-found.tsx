@@ -18,9 +18,9 @@ export function DeckNotFound() {
           <SearchIcon />
         </EmptyListIcon>
         <EmptyListContent>
-          <EmptyListTitle>Deck not found</EmptyListTitle>
+          <EmptyListTitle>Deck doesn't exist</EmptyListTitle>
           <EmptyListDescription>
-            This deck doesn&apos;t exist or may have been deleted.
+            This deck doesn&apos;t exist. It may have been deleted.
           </EmptyListDescription>
         </EmptyListContent>
       </EmptyListHeader>

@@ -33,7 +33,7 @@ function EmptyListIcon({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="empty-list-icon"
       className={cn(
-        "size-16 flex flex-col items-center justify-center rounded-full bg-border text-foreground [&_svg]:size-8",
+        "size-16 flex flex-col items-center justify-center rounded-full bg-foreground/10 text-foreground [&_svg]:size-8",
         className,
       )}
       {...props}

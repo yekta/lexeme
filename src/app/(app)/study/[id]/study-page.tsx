@@ -220,9 +220,7 @@ export function StudyPage() {
         {showPlaceholder ? (
           <NCardStudy isPlaceholder />
         ) : deckNotFound ? (
-          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[15%]">
-            <DeckNotFound />
-          </div>
+          <DeckNotFound />
         ) : totalCards === 0 && !hasNoDueCards ? (
           <EmptyList>
             <EmptyListHeader>

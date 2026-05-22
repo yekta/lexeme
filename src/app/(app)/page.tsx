@@ -23,9 +23,11 @@ import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
+import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
+import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { formatDuration, intervalToDuration } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -50,9 +52,10 @@ export default function Home() {
 
   const [isCreateDeckOpen, setIsCreateDeckOpen] = useState(false);
 
-  const { data: decks = [], isPending: isPendingDecks } = useDecks();
-  const { data: deckStatsRows = [], isPending: isPendingStats } =
-    useDeckStats();
+  const decksQuery = useDecks();
+  const deckStatsQuery = useDeckStats();
+  const { data: decks = [] } = decksQuery;
+  const { data: deckStatsRows = [] } = deckStatsQuery;
 
   const statsByDeck = useMemo(() => {
     const map = new Map<string, TDeckStats>();
@@ -70,51 +73,79 @@ export default function Home() {
     return map;
   }, [deckStatsRows]);
 
-  const isPending = isPendingDecks || isPendingStats || isPendingAuth;
-  const showPlaceholder = isPending;
+  const state = mergeStates(
+    dataStateOf(decksQuery),
+    dataStateOf(deckStatsQuery),
+  );
+  const showPlaceholder =
+    isPendingAuth || state === "pending" || state === "unauthorized";
+  const isError = state === "error";
 
   return (
     <div
       data-placeholder={showPlaceholder ? "true" : undefined}
-      className="min-h-screen relative group"
+      className="min-h-screen relative group flex flex-col"
     >
       <Navbar />
-      <main className="max-w-5xl mx-auto px-5 pt-4 pb-16 flex flex-col gap-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-            Decks{" "}
-            <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
-              ({showPlaceholder ? 5 : decks.length})
-            </span>
-          </h2>
+      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 flex-1 flex flex-col gap-6">
+        {isError ? (
+          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
+            <LoadError
+              error={decksQuery.error ?? deckStatsQuery.error}
+              onRetry={() => {
+                decksQuery.refetch();
+                deckStatsQuery.refetch();
+              }}
+              hideGoHome={true}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                Decks{" "}
+                <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
+                  ({showPlaceholder ? 5 : decks.length})
+                </span>
+              </h2>
 
-          <Dialog open={isCreateDeckOpen} onOpenChange={setIsCreateDeckOpen}>
-            <DialogTrigger render={<Button isPlaceholder={showPlaceholder} />}>
-              <Plus className="size-5 -ml-1.5 shrink-0" />
-              <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
-                Create Deck
-              </span>
-            </DialogTrigger>
-            <DialogContent>
-              <CreateDeckForm
-                key={String(isCreateDeckOpen)}
-                onAfterSubmit={async (id) => {
-                  await asyncRouterPush(`/deck/${id}`);
-                  setIsCreateDeckOpen(false);
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
-        <DecksSection
-          showPlaceholder={showPlaceholder}
-          decks={decks}
-          getDeckStats={(id) => statsByDeck.get(id) ?? EMPTY_STATS}
-          nowTime={nowTime}
-          onCreateDeck={() => setIsCreateDeckOpen(true)}
-        />
-        <div className="w-full h-px rounded-full bg-border" />
-        <TodayStatsFooter showPlaceholder={showPlaceholder} className="-mt-1" />
+              <Dialog
+                open={isCreateDeckOpen}
+                onOpenChange={setIsCreateDeckOpen}
+              >
+                <DialogTrigger
+                  render={<Button isPlaceholder={showPlaceholder} />}
+                >
+                  <Plus className="size-5 -ml-1.5 shrink-0" />
+                  <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+                    Create Deck
+                  </span>
+                </DialogTrigger>
+                <DialogContent>
+                  <CreateDeckForm
+                    key={String(isCreateDeckOpen)}
+                    onAfterSubmit={async (id) => {
+                      await asyncRouterPush(`/deck/${id}`);
+                      setIsCreateDeckOpen(false);
+                    }}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+            <DecksSection
+              showPlaceholder={showPlaceholder}
+              decks={decks}
+              getDeckStats={(id) => statsByDeck.get(id) ?? EMPTY_STATS}
+              nowTime={nowTime}
+              onCreateDeck={() => setIsCreateDeckOpen(true)}
+            />
+            <div className="w-full h-px rounded-full bg-border" />
+            <TodayStatsFooter
+              showPlaceholder={showPlaceholder}
+              className="-mt-1"
+            />
+          </>
+        )}
       </main>
     </div>
   );
@@ -251,7 +282,7 @@ function TodayStatsFooter({
   showPlaceholder: boolean;
   className?: string;
 }) {
-  const { data, isPending } = useTodayStats();
+  const { data, isPending, isError } = useTodayStats();
   const humanDuration = formatHumanDuration(data?.totalMs ?? 0);
   const secondsPerCard = formatSecondsPerCard(data?.msPerCard ?? 0);
   const count = data?.count ?? 0;
@@ -260,6 +291,8 @@ function TodayStatsFooter({
   const statsText =
     showPlaceholder || isPending ? (
       "Loading today's stats..."
+    ) : isError ? (
+      "Couldn't load today's stats."
     ) : count === 0 ? (
       "You haven't studied today."
     ) : (

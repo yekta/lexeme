@@ -14,9 +14,11 @@ import { TriangleAlertIcon } from "lucide-react";
 export function LoadError({
   error,
   onRetry,
+  hideGoHome = false,
 }: {
   error?: unknown;
   onRetry?: () => void;
+  hideGoHome?: boolean;
 }) {
   const message = error instanceof Error ? error.message : undefined;
 
@@ -46,9 +48,11 @@ export function LoadError({
       </EmptyListHeader>
       <EmptyListFooter>
         {onRetry && <Button onClick={onRetry}>Try Again</Button>}
-        <LinkButton variant={onRetry ? "outline" : "default"} href="/">
-          Go Home
-        </LinkButton>
+        {!hideGoHome && (
+          <LinkButton variant={onRetry ? "outline" : "default"} href="/">
+            Go Home
+          </LinkButton>
+        )}
       </EmptyListFooter>
     </EmptyList>
   );

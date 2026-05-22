@@ -6,8 +6,8 @@ import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { decks } from "@/server/db/schema";
 
 export const decksRouter = createTRPCRouter({
-  list: protectedProcedure.query(({ ctx }) =>
-    ctx.db
+  list: protectedProcedure.query(({ ctx }) => {
+    return ctx.db
       .select({
         id: decks.id,
         name: decks.name,
@@ -17,8 +17,8 @@ export const decksRouter = createTRPCRouter({
       })
       .from(decks)
       .where(eq(decks.user_id, ctx.session.user.id))
-      .orderBy(desc(decks.created_at)),
-  ),
+      .orderBy(desc(decks.created_at));
+  }),
 
   get: protectedProcedure
     .input(z.object({ id: z.uuid() }))

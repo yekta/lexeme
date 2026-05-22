@@ -22,20 +22,6 @@ type TLCardStudyProps =
       easyLabel: string;
     };
 
-const FLIP_THRESHOLD = 72; // degrees past which we complete the flip
-const PX_PER_DEG = 150 / 180; // px of drag per degree of rotation (150px = full 180°)
-
-/** iOS-style rubber-band resistance past ±180°. k controls stiffness — higher = harder to pull. */
-function rubberBand(raw: number): number {
-  const limit = 180;
-  const abs = Math.abs(raw);
-  if (abs <= limit) return raw;
-  const sign = raw > 0 ? 1 : -1;
-  const excess = abs - limit;
-  const k = 0.055; // very stiff — barely any give past the limit
-  return sign * (limit + excess / (1 + excess * k));
-}
-
 const placeholderProps: Omit<TRatingButtonsProps, "visible"> = {
   isPlaceholder: true,
   onRate: () => {},
@@ -50,82 +36,31 @@ const placeholderProps: Omit<TRatingButtonsProps, "visible"> = {
 export function LCardStudy(props: TLCardStudyProps) {
   const { isPlaceholder } = props;
 
-  const [isGrabbing, setIsGrabbing] = useState(false);
   const [isBack, setIsBack] = useState(false);
 
-  // The canonical Y rotation angle (0 = front, ±180 = back)
+  // The canonical Y rotation angle (0 = front, 180 = back)
   const rotateY = useMotionValue(0);
   const frontOpacity = useTransform(rotateY, (v) => (Math.abs(v) < 90 ? 1 : 0));
   const backOpacity = useTransform(rotateY, (v) => (Math.abs(v) >= 90 ? 1 : 0));
-  const baseAngle = useRef(0); // 0 or ±180 — updated on flip commit
-  const dragStartX = useRef(0);
-  const pointerDown = useRef(false);
-  const didDrag = useRef(false);
-
-  const springTo = (target: number) =>
-    animate(rotateY, target, { type: "spring", stiffness: 360, damping: 40 });
+  const baseAngle = useRef(0); // 0 or 180 — updated on flip commit
 
   const commitFlip = (targetAngle: number) => {
     baseAngle.current = targetAngle;
-    springTo(targetAngle);
+    animate(rotateY, targetAngle, {
+      type: "spring",
+      stiffness: 360,
+      damping: 40,
+    });
     setIsBack(targetAngle !== 0);
   };
 
-  /* ─── Pointer handlers ─── */
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isPlaceholder) return;
     // Don't interfere with button clicks
     if ((e.target as HTMLElement).closest("button")) return;
     // Back face is locked — must use buttons to rate
     if (baseAngle.current !== 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragStartX.current = e.clientX;
-    pointerDown.current = true;
-    didDrag.current = false;
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!pointerDown.current) return;
-    const dx = e.clientX - dragStartX.current;
-    if (!didDrag.current && Math.abs(dx) > 4) {
-      didDrag.current = true;
-      setIsGrabbing(true);
-    }
-    if (didDrag.current) {
-      rotateY.set(rubberBand(baseAngle.current + dx / PX_PER_DEG));
-    }
-  };
-
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!pointerDown.current) return;
-    pointerDown.current = false;
-    setIsGrabbing(false);
-
-    const dx = e.clientX - dragStartX.current;
-    const base = baseAngle.current; // always 0 here (back face blocks entry)
-    const diff = rotateY.get() - base;
-
-    if (!didDrag.current) {
-      // Pure tap — flip to back
-      commitFlip(180);
-      return;
-    }
-
-    if (Math.abs(diff) >= FLIP_THRESHOLD) {
-      // Complete the flip in the direction dragged
-      commitFlip(dx > 0 ? 180 : -180);
-    } else {
-      // Not far enough — spring back to front
-      springTo(base);
-    }
-  };
-
-  const onPointerCancel = () => {
-    if (!pointerDown.current) return;
-    pointerDown.current = false;
-    setIsGrabbing(false);
-    springTo(baseAngle.current);
+    commitFlip(180);
   };
 
   /* ─── Shared face structure ─── */
@@ -134,13 +69,9 @@ export function LCardStudy(props: TLCardStudyProps) {
   return (
     <div
       data-placeholder={isPlaceholder ? "true" : undefined}
-      data-grabbing={isGrabbing ? "true" : undefined}
       data-is-back={isBack ? "true" : undefined}
-      className="w-full group touch-pan-y perspective-distant md:perspective-[1600px] data-grabbing:cursor-grabbing cursor-grab data-is-back:cursor-default"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
+      className="w-full group perspective-distant md:perspective-[1600px] cursor-pointer data-is-back:cursor-default data-placeholder:cursor-default"
+      onClick={onClick}
     >
       <motion.div
         style={{ rotateY, transformStyle: "preserve-3d" }}
@@ -171,7 +102,7 @@ export function LCardStudy(props: TLCardStudyProps) {
             {...(isPlaceholder ? placeholderProps : props)}
           />
           <p className="text-xs text-muted-foreground text-center relative z-10 select-none group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-            Click or drag to flip
+            Click to flip
           </p>
         </motion.div>
 
@@ -202,7 +133,7 @@ export function LCardStudy(props: TLCardStudyProps) {
                 {isPlaceholder ? "Front text" : props.front}
               </p>
             </div>
-            {/* Invisible placeholder — matches "Tap or drag to flip" line height */}
+            {/* Invisible placeholder — matches "Click to flip" line height */}
             <p className="text-xs text-center mt-1 mb-0 opacity-0 select-none relative">
               placeholder
             </p>

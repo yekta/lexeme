@@ -19,12 +19,13 @@ import { LCardManage } from "@/components/l-card-manage";
 import { Navbar } from "@/components/navbar";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { isRowOptimistic } from "@/db/collections";
 import { useCardsByDeck, type TCard } from "@/hooks/data/use-cards";
 import { useDeck, type TDeck } from "@/hooks/data/use-decks";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCwIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -39,6 +40,10 @@ export function DeckPage() {
   const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
 
+  const isOptimistic =
+    (deckQuery.data ? isRowOptimistic(deckQuery.data) : false) ||
+    cardsQuery.data.some(isRowOptimistic);
+
   return (
     <DeckPageView
       isPlaceholder={isPlaceholder}
@@ -46,6 +51,7 @@ export function DeckPage() {
       deck={deckQuery.data}
       cards={cardsQuery.data}
       deckId={id}
+      isOptimistic={isOptimistic}
       error={deckQuery.error ?? cardsQuery.error}
       onRetry={() => {
         deckQuery.refetch();
@@ -71,6 +77,7 @@ function DeckPageView({
   deck,
   cards = [],
   deckId = "",
+  isOptimistic = false,
   error,
   onRetry = () => {},
 }: {
@@ -79,6 +86,7 @@ function DeckPageView({
   deck?: TDeck;
   cards?: TCard[];
   deckId?: string;
+  isOptimistic?: boolean;
   error?: unknown;
   onRetry?: () => void;
 }) {
@@ -117,7 +125,7 @@ function DeckPageView({
                 </LinkButton>
                 <h1
                   data-placeholder={isPlaceholder ? "true" : undefined}
-                  className="text-xl font-semibold truncate min-w-0 data-placeholder:animate-pulse data-placeholder:bg-foreground/20 data-placeholder:rounded data-placeholder:text-transparent"
+                  className="text-xl truncate items-center font-semibold data-placeholder:animate-pulse data-placeholder:bg-foreground/20 data-placeholder:rounded data-placeholder:text-transparent"
                 >
                   {deckName}
                 </h1>
@@ -128,6 +136,9 @@ function DeckPageView({
                     align="start"
                     onDeleted={() => asyncPush("/")}
                   />
+                )}
+                {isOptimistic && (
+                  <RefreshCwIcon className="shrink-0 animate-spin size-4 text-muted-more-foreground" />
                 )}
               </div>
               <LinkButton
@@ -204,6 +215,7 @@ function DeckPageView({
                     createdAt={card.created_at}
                     updatedAt={card.updated_at}
                     contentUpdatedAt={card.content_updated_at}
+                    isOptimistic={isRowOptimistic(card)}
                   />
                 ))}
               </div>

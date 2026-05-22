@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, RefreshCwIcon, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -42,6 +42,7 @@ type TLCardManageProps =
       createdAt: string | Date;
       updatedAt: string | Date;
       contentUpdatedAt: string | Date;
+      isOptimistic: boolean;
     };
 
 export function LCardManage(props: TLCardManageProps) {
@@ -63,6 +64,8 @@ export function LCardManage(props: TLCardManageProps) {
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const isOptimistic = isPlaceholder ? false : props.isOptimistic;
 
   return (
     <div
@@ -142,8 +145,11 @@ export function LCardManage(props: TLCardManageProps) {
           classNameInner="rounded-tl-[calc(var(--radius)*1.4-2px)]"
           classNameBg="h-4/5"
         />
-        <p className="shrink max-w-full relative pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
-          Front
+        <p className="shrink max-w-full flex items-center relative pr-6 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+          <span className="mr-[0.5ch] shrink min-w-0 truncate">Front</span>
+          {isOptimistic && (
+            <RefreshCwIcon className="shrink-0 animate-spin size-3 text-muted-more-foreground" />
+          )}
         </p>
         <p className="shrink relative max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {front}

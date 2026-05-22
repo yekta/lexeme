@@ -9,6 +9,7 @@ import {
   decksCollection,
   learningProfilesCollection,
   reviewLogsCollection,
+  isRowOptimistic,
   liveStatus,
 } from "@/db/collections";
 import {
@@ -23,6 +24,8 @@ export type TDeckStatsRow = {
   learn: number;
   due: number;
   latestCardCreatedAt: string | null;
+  /** A card in this deck has local changes the server hasn't confirmed yet. */
+  optimistic: boolean;
 };
 
 /**
@@ -86,6 +89,7 @@ export function useDeckStats() {
         learn: learnCount,
         due: Math.min(dueCount, reviewLimit),
         latestCardCreatedAt: latest > 0 ? new Date(latest).toISOString() : null,
+        optimistic: deckCards.some(isRowOptimistic),
       };
     });
   }, [decksLq.data, cardsLq.data, logsLq.data, profilesLq.data, now]);

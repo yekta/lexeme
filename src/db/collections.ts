@@ -190,6 +190,16 @@ export function newCardRow(input: {
   };
 }
 
+/**
+ * True when a row has local optimistic mutations the server hasn't confirmed
+ * yet. Reads TanStack DB's `$synced` virtual property, stamped at runtime on
+ * every row emitted by a collection or live query (the typed row aliases
+ * `TDeck`/`TCard` don't surface it, hence the `unknown` parameter).
+ */
+export function isRowOptimistic(row: unknown): boolean {
+  return (row as { $synced?: boolean }).$synced === false;
+}
+
 type QueryUtilsLike = {
   lastError: unknown;
   refetch: (opts?: { throwOnError?: boolean }) => Promise<unknown>;

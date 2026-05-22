@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isRowOptimistic } from "@/db/collections";
 import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useDeckStats, useTodayStats } from "@/hooks/data/use-stats";
@@ -42,6 +43,7 @@ const EMPTY_STATS: TDeckStats = {
   learn: 0,
   due: 0,
   latestCardCreatedAt: 0,
+  optimistic: false,
 };
 
 type TTodayStats = { count: number; totalMs: number; msPerCard: number };
@@ -79,6 +81,7 @@ function Home() {
         latestCardCreatedAt: r.latestCardCreatedAt
           ? new Date(r.latestCardCreatedAt).getTime()
           : 0,
+        optimistic: r.optimistic,
       });
     }
     return map;
@@ -445,6 +448,7 @@ function DecksSection({
             dueCount={stats.due}
             studyHref={`/study/${deck.id}`}
             manageHref={`/deck/${deck.id}`}
+            isOptimistic={isRowOptimistic(deck) || stats.optimistic}
           />
         );
       })}

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { type TDeck } from "@/hooks/data/use-decks";
+import { RefreshCwIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 
@@ -24,6 +25,8 @@ export type TDeckStats = {
   learn: number;
   due: number;
   latestCardCreatedAt: number;
+  /** A card in this deck has local changes the server hasn't confirmed yet. */
+  optimistic: boolean;
 };
 
 type TLDeckProps =
@@ -38,6 +41,7 @@ type TLDeckProps =
       stats: TDeckStats;
       studyHref: string;
       manageHref: string;
+      isOptimistic: boolean;
     };
 
 export function LDeck(props: TLDeckProps) {
@@ -63,6 +67,8 @@ export function LDeck(props: TLDeckProps) {
 
   const [addCardOpen, setAddCardOpen] = useState(false);
 
+  const isOptimistic = isPlaceholder ? false : props.isOptimistic;
+
   return (
     <div
       className="group relative"
@@ -87,8 +93,13 @@ export function LDeck(props: TLDeckProps) {
           )}
           <CardHeader className="flex flex-row items-start justify-between gap-4 relative z-10">
             <div className="w-full flex flex-col items-start gap-1">
-              <CardTitle className="truncate pr-5 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                {name}
+              <CardTitle className="w-full flex items-center shrink min-w-0 truncate pr-8 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                <span className="pr-[0.5ch] shrink min-w-0 truncate">
+                  {name}
+                </span>
+                {isOptimistic && (
+                  <RefreshCwIcon className="shrink-0 animate-spin size-3.5 text-muted-more-foreground" />
+                )}
               </CardTitle>
               <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {/* Description or non-breaking space */}

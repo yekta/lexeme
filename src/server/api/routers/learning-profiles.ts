@@ -47,7 +47,11 @@ export const learningProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...fields } = input;
-      await requireProfile(ctx.db, id, ctx.session.user.id);
+      await requireProfile({
+        db: ctx.db,
+        profileId: id,
+        userId: ctx.session.user.id,
+      });
       await ctx.db
         .update(learningProfiles)
         .set(fields)
@@ -57,11 +61,11 @@ export const learningProfilesRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const profile = await requireProfile(
-        ctx.db,
-        input.id,
-        ctx.session.user.id,
-      );
+      const profile = await requireProfile({
+        db: ctx.db,
+        profileId: input.id,
+        userId: ctx.session.user.id,
+      });
       if (profile.is_default) {
         throw new TRPCError({
           code: "CONFLICT",

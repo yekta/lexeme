@@ -26,7 +26,11 @@ export const cardsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
+      await requireDeck({
+        db: ctx.db,
+        deckId: input.deckId,
+        userId: ctx.session.user.id,
+      });
       return ctx.db
         .select({
           id: cards.id,
@@ -51,7 +55,11 @@ export const cardsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
+      await requireDeck({
+        db: ctx.db,
+        deckId: input.deckId,
+        userId: ctx.session.user.id,
+      });
 
       return ctx.db.transaction(async (tx) => {
         const [card] = await tx
@@ -75,7 +83,11 @@ export const cardsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireCard(ctx.db, input.id, ctx.session.user.id);
+      await requireCard({
+        db: ctx.db,
+        cardId: input.id,
+        userId: ctx.session.user.id,
+      });
       await ctx.db
         .update(cardContents)
         .set({ front: input.front, back: input.back })
@@ -85,14 +97,22 @@ export const cardsRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.uuid(), deckId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await requireCard(ctx.db, input.id, ctx.session.user.id);
+      await requireCard({
+        db: ctx.db,
+        cardId: input.id,
+        userId: ctx.session.user.id,
+      });
       await ctx.db.delete(cards).where(eq(cards.id, input.id));
     }),
 
   getStudyQueue: protectedProcedure
     .input(z.object({ deckId: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      const deck = await requireDeck(ctx.db, input.deckId, ctx.session.user.id);
+      const deck = await requireDeck({
+        db: ctx.db,
+        deckId: input.deckId,
+        userId: ctx.session.user.id,
+      });
 
       const [profile] = await ctx.db
         .select()
@@ -202,11 +222,11 @@ export const cardsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { card, deck } = await requireCard(
-        ctx.db,
-        input.cardId,
-        ctx.session.user.id,
-      );
+      const { card, deck } = await requireCard({
+        db: ctx.db,
+        cardId: input.cardId,
+        userId: ctx.session.user.id,
+      });
 
       const [profile] = await ctx.db
         .select()

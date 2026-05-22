@@ -23,7 +23,11 @@ export const decksRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .query(async ({ ctx, input }) => {
-      const deck = await requireDeck(ctx.db, input.id, ctx.session.user.id);
+      const deck = await requireDeck({
+        db: ctx.db,
+        deckId: input.id,
+        userId: ctx.session.user.id,
+      });
       return {
         id: deck.id,
         name: deck.name,
@@ -41,11 +45,11 @@ export const decksRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireProfile(
-        ctx.db,
-        input.learning_profile_id,
-        ctx.session.user.id,
-      );
+      await requireProfile({
+        db: ctx.db,
+        userId: ctx.session.user.id,
+        profileId: input.learning_profile_id,
+      });
 
       const [row] = await ctx.db
         .insert(decks)
@@ -69,12 +73,16 @@ export const decksRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await requireDeck(ctx.db, input.id, ctx.session.user.id);
-      await requireProfile(
-        ctx.db,
-        input.learning_profile_id,
-        ctx.session.user.id,
-      );
+      await requireDeck({
+        db: ctx.db,
+        deckId: input.id,
+        userId: ctx.session.user.id,
+      });
+      await requireProfile({
+        db: ctx.db,
+        profileId: input.learning_profile_id,
+        userId: ctx.session.user.id,
+      });
       await ctx.db
         .update(decks)
         .set({
@@ -88,7 +96,11 @@ export const decksRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await requireDeck(ctx.db, input.id, ctx.session.user.id);
+      await requireDeck({
+        db: ctx.db,
+        deckId: input.id,
+        userId: ctx.session.user.id,
+      });
       await ctx.db.delete(decks).where(eq(decks.id, input.id));
     }),
 });

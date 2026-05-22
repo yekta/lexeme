@@ -7,6 +7,7 @@ import { useNow } from "@/components/now-provider";
 import {
   cardsCollection,
   decksCollection,
+  isRowOptimistic,
   learningProfilesCollection,
   reviewLogsCollection,
   type CardRow,
@@ -32,6 +33,7 @@ export type TStudyQueue = {
  */
 export function useStudyCards(deckId: string | undefined): {
   data: TStudyQueue | undefined;
+  isOptimistic: boolean;
   isPending: boolean;
   isError: boolean;
   error: unknown;
@@ -114,8 +116,14 @@ export function useStudyCards(deckId: string | undefined): {
     profilesLq.data,
   ]);
 
+  // True when any card in the deck has local mutations the server hasn't
+  // confirmed yet — e.g. a card just rated this session. Covers the full deck,
+  // not just `dueCards`, since a rated card leaves the due set.
+  const isOptimistic = (cardsLq.data ?? []).some(isRowOptimistic);
+
   return {
     data,
+    isOptimistic,
     isPending: !isReady && !isError,
     isError,
     error: isError

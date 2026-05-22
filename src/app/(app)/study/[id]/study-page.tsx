@@ -16,6 +16,7 @@ import CardsIcon from "@/components/icons/cards";
 import { LCardStudy } from "@/components/l-card-study";
 import { Navbar } from "@/components/navbar";
 import { LinkButton } from "@/components/ui/button";
+import { isRowOptimistic } from "@/db/collections";
 import { useDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useRateCard } from "@/hooks/data/use-rate-card";
@@ -32,7 +33,7 @@ import {
 } from "@/lib/fsrs";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
 import confetti from "canvas-confetti";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, RefreshCwIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -122,6 +123,9 @@ export function StudyPage() {
   const isPending =
     isPendingAuth || state === "pending" || state === "unauthorized";
   const totalCards = studyData?.totalCards || 0;
+
+  const isOptimistic =
+    (deckData ? isRowOptimistic(deckData) : false) || studyQuery.isOptimistic;
 
   // The shuffled due queue. Reactive to the collections until the session
   // starts (first rating), after which `studySession` owns the queue so rating
@@ -246,6 +250,7 @@ export function StudyPage() {
       onRate={handleRate}
       reviewedCount={reviewedCount}
       queueLength={queue.length}
+      isOptimistic={isOptimistic}
     />
   );
 }
@@ -275,6 +280,7 @@ function StudyPageView({
   onRate = () => {},
   reviewedCount = 0,
   queueLength = 0,
+  isOptimistic = false,
 }: {
   isPlaceholder?: boolean;
   state?: DataState;
@@ -290,6 +296,7 @@ function StudyPageView({
   onRate?: (rating: Grade) => void;
   reviewedCount?: number;
   queueLength?: number;
+  isOptimistic?: boolean;
 }) {
   const isUnavailable =
     state === "not-found" || state === "forbidden" || state === "error";
@@ -302,9 +309,16 @@ function StudyPageView({
           isUnavailable ? (
             ""
           ) : isPlaceholder ? (
-            <div className="h-5 w-36 bg-foreground/20 animate-pulse rounded" />
+            <p className="text-transparent bg-foreground/15 rounded leading-tight">
+              Loading
+            </p>
           ) : (
-            deckName
+            <div className="flex items-center shrink min-w-0">
+              <span className="pr-[0.5ch] truncate">{deckName}</span>
+              {isOptimistic && (
+                <RefreshCwIcon className="shrink-0 animate-spin size-3.5 text-muted-more-foreground" />
+              )}
+            </div>
           )
         }
         rightActions={

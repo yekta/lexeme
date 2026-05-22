@@ -54,9 +54,7 @@ export function LDeck(props: TLDeckProps) {
 
   const now = useNow();
   const isNew =
-    !isPlaceholder &&
-    now - new Date(props.deck.created_at).getTime() < 4000 &&
-    now - new Date(props.deck.created_at).getTime() >= 500;
+    !isPlaceholder && now - new Date(props.deck.created_at).getTime() < 4000;
 
   const isRecentlyUpdated = isPlaceholder
     ? false

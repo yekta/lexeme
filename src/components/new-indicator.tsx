@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 type TProps = {
   isNew: boolean;
@@ -13,10 +16,23 @@ export default function NewIndicator({
   classNameInner,
   classNameBg,
 }: TProps) {
+  // Render the non-new state first, then flip on the next frame so the
+  // opacity transition always starts from 0 and is visible.
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (!isNew) {
+      setShow(false);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(raf);
+  }, [isNew]);
+
   return (
     <>
       <div
-        data-new={isNew || undefined}
+        data-new={show || undefined}
         className={cn(
           "h-1/2 pointer-events-none opacity-0 data-new:opacity-100 transition duration-500 aspect-square absolute top-0 left-0 bg-gradient-to-br from-success/60 via-success/0 to-success/0 pl-px pt-px",
           className,
@@ -30,7 +46,7 @@ export default function NewIndicator({
         />
       </div>
       <div
-        data-new={isNew || undefined}
+        data-new={show || undefined}
         className={cn(
           "h-1/4 aspect-square translate-3d translate-z-0 data-new:opacity-100 opacity-0 bg-success/30 absolute left-0 top-0 blur-2xl translate-[-25%] transition-opacity duration-500 pointer-events-none",
           classNameBg,

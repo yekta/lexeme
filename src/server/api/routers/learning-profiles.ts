@@ -16,11 +16,12 @@ export const learningProfilesRouter = createTRPCRouter({
   ),
 
   create: protectedProcedure
-    .input(z.object({ name: z.string().trim().min(1) }))
+    .input(z.object({ id: z.uuid(), name: z.string().trim().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const [row] = await ctx.db
         .insert(learningProfiles)
         .values({
+          id: input.id,
           user_id: ctx.session.user.id,
           name: input.name,
           is_default: false,

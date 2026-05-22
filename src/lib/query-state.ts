@@ -13,6 +13,19 @@ export type DataState =
   | "unauthorized"
   | "error";
 
+/**
+ * A settled, non-retryable data condition derived on the client rather than
+ * thrown by the server — e.g. a deck that simply isn't in the synced
+ * collection. `code` mirrors the tRPC error codes so `trpcErrorCode` (and thus
+ * `dataStateOf`) classifies it identically.
+ */
+export class DataError extends Error {
+  constructor(public code: "NOT_FOUND" | "FORBIDDEN" | "UNAUTHORIZED") {
+    super(code);
+    this.name = "DataError";
+  }
+}
+
 type QueryLike = {
   isPending: boolean;
   isError: boolean;

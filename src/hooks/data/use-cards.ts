@@ -1,47 +1,78 @@
 "use client";
 
-import { api } from "@/trpc/react";
-import type { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "@/server/api/root";
+import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useMemo } from "react";
 
-type RouterOutputs = inferRouterOutputs<AppRouter>;
-export type TCard = RouterOutputs["cards"]["list"][number];
+import {
+  cardsCollection,
+  liveStatus,
+  newCardRow,
+  type CardRow,
+} from "@/db/collections";
 
+export type TCard = CardRow;
+
+/** Cards in a deck, newest first. */
 export function useCardsByDeck(deckId: string | undefined) {
-  return api.cards.list.useQuery(
-    { deckId: deckId ?? "" },
-    { enabled: !!deckId },
+  const lq = useLiveQuery(
+    (q) =>
+      q
+        .from({ card: cardsCollection })
+        .where(({ card }) => eq(card.deck_id, deckId ?? "")),
+    [deckId],
   );
+  const data = useMemo(
+    () =>
+      [...(lq.data ?? [])].sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    [lq.data],
+  );
+  return { data, ...liveStatus(lq, cardsCollection) };
 }
 
 export function useCreateCard() {
-  const utils = api.useUtils();
-  return api.cards.create.useMutation({
-    onSuccess: async (_data, vars) => {
-      await utils.cards.list.refetch({ deckId: vars.deckId });
-      utils.cards.getStudyQueue.invalidate({ deckId: vars.deckId });
-      utils.stats.getDeckStats.invalidate();
+  return {
+    mutateAsync: async (input: {
+      deckId: string;
+      front: string;
+      back: string;
+    }) => {
+      const id = crypto.randomUUID();
+      cardsCollection.insert(
+        newCardRow({
+          id,
+          deckId: input.deckId,
+          front: input.front,
+          back: input.back,
+        }),
+      );
+      return id;
     },
-  });
+  };
 }
 
 export function useUpdateCard() {
-  const utils = api.useUtils();
-  return api.cards.update.useMutation({
-    onSuccess: async (_data, vars) => {
-      await utils.cards.list.refetch({ deckId: vars.deckId });
-      utils.cards.getStudyQueue.invalidate({ deckId: vars.deckId });
+  return {
+    mutateAsync: async (input: {
+      id: string;
+      deckId: string;
+      front: string;
+      back: string;
+    }) => {
+      cardsCollection.update(input.id, (c) => {
+        c.front = input.front;
+        c.back = input.back;
+      });
     },
-  });
+  };
 }
 
 export function useDeleteCard() {
-  const utils = api.useUtils();
-  return api.cards.delete.useMutation({
-    onSuccess: async (_data, vars) => {
-      await utils.cards.list.refetch({ deckId: vars.deckId });
-      utils.cards.getStudyQueue.invalidate({ deckId: vars.deckId });
-      utils.stats.getDeckStats.invalidate();
+  return {
+    mutateAsync: async (input: { id: string; deckId: string }) => {
+      cardsCollection.delete(input.id);
     },
-  });
+  };
 }

@@ -1,38 +1,25 @@
 "use client";
 
-import { api } from "@/trpc/react";
+import { useLiveQuery } from "@tanstack/react-db";
+import { useMemo } from "react";
 
+import { learningProfilesCollection, liveStatus } from "@/db/collections";
+
+/** The user's learning profiles — default first, then alphabetical. */
 export function useLearningProfiles() {
-  return api.learningProfiles.list.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-  });
+  const lq = useLiveQuery((q) => q.from({ profile: learningProfilesCollection }));
+  const data = useMemo(
+    () =>
+      [...(lq.data ?? [])].sort((a, b) => {
+        if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      }),
+    [lq.data],
+  );
+  return { data, ...liveStatus(lq, learningProfilesCollection) };
 }
 
 export function useDefaultLearningProfile() {
-  const { data: profiles = [], ...rest } = useLearningProfiles();
-  return { data: profiles.find((p) => p.is_default) ?? null, ...rest };
-}
-
-export function useCreateLearningProfile() {
-  const utils = api.useUtils();
-  return api.learningProfiles.create.useMutation({
-    onSuccess: () => utils.learningProfiles.list.invalidate(),
-  });
-}
-
-export function useUpdateLearningProfile() {
-  const utils = api.useUtils();
-  return api.learningProfiles.update.useMutation({
-    onSuccess: () => {
-      utils.learningProfiles.list.invalidate();
-      utils.stats.getDeckStats.invalidate();
-    },
-  });
-}
-
-export function useDeleteLearningProfile() {
-  const utils = api.useUtils();
-  return api.learningProfiles.delete.useMutation({
-    onSuccess: () => utils.learningProfiles.list.invalidate(),
-  });
+  const { data, ...rest } = useLearningProfiles();
+  return { data: data.find((p) => p.is_default) ?? null, ...rest };
 }

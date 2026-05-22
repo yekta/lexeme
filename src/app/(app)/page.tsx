@@ -1,8 +1,10 @@
 "use client";
 
+import { ClientOnly } from "@/components/client-only";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
-import { useNow } from "@/components/now-provider";
+import { LoadError } from "@/components/load-error";
+import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,18 +20,15 @@ import { Label } from "@/components/ui/label";
 import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useDeckStats, useTodayStats } from "@/hooks/data/use-stats";
-import { useForm } from "@tanstack/react-form";
-import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { z } from "zod";
-
-import { LoadError } from "@/components/load-error";
-import { Navbar } from "@/components/navbar";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates } from "@/lib/query-state";
-import { formatDuration, intervalToDuration } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useForm } from "@tanstack/react-form";
+import { formatDuration, intervalToDuration } from "date-fns";
+import { Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 
 const createDeckSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -45,15 +44,27 @@ const EMPTY_STATS: TDeckStats = {
   latestCardCreatedAt: 0,
 };
 
-export default function Home() {
-  const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
-  const [asyncRouterPush] = useAsyncRouterPush();
-  const nowTime = useNow();
+type TTodayStats = { count: number; totalMs: number; msPerCard: number };
 
-  const [isCreateDeckOpen, setIsCreateDeckOpen] = useState(false);
+export default function Page() {
+  return (
+    <ClientOnly fallback={<HomeSkeleton />}>
+      <Home />
+    </ClientOnly>
+  );
+}
+
+/** The home page's loading state — the view in placeholder mode. */
+function HomeSkeleton() {
+  return <HomePageView isPlaceholder />;
+}
+
+function Home() {
+  const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
 
   const decksQuery = useDecks();
   const deckStatsQuery = useDeckStats();
+  const todayQuery = useTodayStats();
   const { data: decks = [] } = decksQuery;
   const { data: deckStatsRows = [] } = deckStatsQuery;
 
@@ -77,27 +88,66 @@ export default function Home() {
     dataStateOf(decksQuery),
     dataStateOf(deckStatsQuery),
   );
-  const showPlaceholder =
+  const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
-  const isError = state === "error";
+
+  return (
+    <HomePageView
+      isPlaceholder={isPlaceholder}
+      isError={state === "error"}
+      error={decksQuery.error ?? deckStatsQuery.error}
+      decks={decks}
+      statsByDeck={statsByDeck}
+      todayStats={todayQuery.data}
+      todayStatsPending={todayQuery.isPending}
+      todayStatsError={todayQuery.isError}
+      onRetry={() => {
+        decksQuery.refetch();
+        deckStatsQuery.refetch();
+      }}
+    />
+  );
+}
+
+/**
+ * The home page layout — the single source of the page's markup, shared by the
+ * live page (`Home`) and its skeleton (`HomeSkeleton`). `isPlaceholder` threads
+ * through to swap real content for skeleton primitives.
+ */
+function HomePageView({
+  isPlaceholder = false,
+  isError = false,
+  error,
+  decks = [],
+  statsByDeck,
+  todayStats,
+  todayStatsPending = false,
+  todayStatsError = false,
+  onRetry = () => {},
+}: {
+  isPlaceholder?: boolean;
+  isError?: boolean;
+  error?: unknown;
+  decks?: TDeck[];
+  statsByDeck?: Map<string, TDeckStats>;
+  todayStats?: TTodayStats;
+  todayStatsPending?: boolean;
+  todayStatsError?: boolean;
+  onRetry?: () => void;
+}) {
+  const [asyncRouterPush] = useAsyncRouterPush();
+  const [isCreateDeckOpen, setIsCreateDeckOpen] = useState(false);
 
   return (
     <div
-      data-placeholder={showPlaceholder ? "true" : undefined}
+      data-placeholder={isPlaceholder ? "true" : undefined}
       className="min-h-screen relative group flex flex-col"
     >
       <Navbar />
       <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 flex-1 flex flex-col gap-6">
         {isError ? (
           <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
-            <LoadError
-              error={decksQuery.error ?? deckStatsQuery.error}
-              onRetry={() => {
-                decksQuery.refetch();
-                deckStatsQuery.refetch();
-              }}
-              hideGoHome={true}
-            />
+            <LoadError error={error} onRetry={onRetry} hideGoHome={true} />
           </div>
         ) : (
           <>
@@ -105,7 +155,7 @@ export default function Home() {
               <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 Decks{" "}
                 <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
-                  ({showPlaceholder ? 5 : decks.length})
+                  ({isPlaceholder ? 5 : decks.length})
                 </span>
               </h2>
 
@@ -114,7 +164,7 @@ export default function Home() {
                 onOpenChange={setIsCreateDeckOpen}
               >
                 <DialogTrigger
-                  render={<Button isPlaceholder={showPlaceholder} />}
+                  render={<Button isPlaceholder={isPlaceholder} />}
                 >
                   <Plus className="size-5 -ml-1.5 shrink-0" />
                   <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
@@ -133,15 +183,17 @@ export default function Home() {
               </Dialog>
             </div>
             <DecksSection
-              showPlaceholder={showPlaceholder}
+              isPlaceholder={isPlaceholder}
               decks={decks}
-              getDeckStats={(id) => statsByDeck.get(id) ?? EMPTY_STATS}
-              nowTime={nowTime}
+              getDeckStats={(id) => statsByDeck?.get(id) ?? EMPTY_STATS}
               onCreateDeck={() => setIsCreateDeckOpen(true)}
             />
             <div className="w-full h-px rounded-full bg-border" />
             <TodayStatsFooter
-              showPlaceholder={showPlaceholder}
+              isPlaceholder={isPlaceholder}
+              stats={todayStats}
+              isPending={todayStatsPending}
+              isError={todayStatsError}
               className="-mt-1"
             />
           </>
@@ -276,20 +328,25 @@ function CreateDeckForm({
 }
 
 function TodayStatsFooter({
-  showPlaceholder,
+  isPlaceholder,
+  stats,
+  isPending,
+  isError,
   className,
 }: {
-  showPlaceholder: boolean;
+  isPlaceholder: boolean;
+  stats: TTodayStats | undefined;
+  isPending: boolean;
+  isError: boolean;
   className?: string;
 }) {
-  const { data, isPending, isError } = useTodayStats();
-  const humanDuration = formatHumanDuration(data?.totalMs ?? 0);
-  const secondsPerCard = formatSecondsPerCard(data?.msPerCard ?? 0);
-  const count = data?.count ?? 0;
+  const count = stats?.count ?? 0;
+  const humanDuration = formatHumanDuration(stats?.totalMs ?? 0);
+  const secondsPerCard = formatSecondsPerCard(stats?.msPerCard ?? 0);
   const cardWord = count === 1 ? "card" : "cards";
 
   const statsText =
-    showPlaceholder || isPending ? (
+    isPlaceholder || isPending ? (
       "Loading today's stats..."
     ) : isError ? (
       "Couldn't load today's stats."
@@ -308,7 +365,7 @@ function TodayStatsFooter({
 
   return (
     <div
-      data-placeholder={showPlaceholder ? "true" : undefined}
+      data-placeholder={isPlaceholder ? "true" : undefined}
       className={cn("w-full flex justify-center group", className)}
     >
       <p className="text-center text-sm max-w-2xl text-muted-foreground group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:text-transparent group-data-placeholder:animate-skeleton group-data-placeholder:rounded">
@@ -334,18 +391,17 @@ function formatSecondsPerCard(msPerCard: number): string {
 }
 
 function DecksSection({
-  showPlaceholder,
+  isPlaceholder,
   decks,
   getDeckStats,
   onCreateDeck,
 }: {
-  showPlaceholder: boolean;
+  isPlaceholder: boolean;
   decks: TDeck[];
   getDeckStats: (deckId: string) => TDeckStats;
-  nowTime: number;
   onCreateDeck: () => void;
 }) {
-  if (showPlaceholder) {
+  if (isPlaceholder) {
     return (
       <DeckWrapper>
         {Array.from({ length: 9 }).map((_, i) => (

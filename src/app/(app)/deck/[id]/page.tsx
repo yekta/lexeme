@@ -1,4 +1,5 @@
-import { DeckPage } from "./deck-page";
+import { ClientOnly } from "@/components/client-only";
+import { DeckPage, DeckPageSkeleton } from "./deck-page";
 
 export const dynamic = "force-static";
 export const dynamicParams = true;
@@ -8,5 +9,9 @@ export function generateStaticParams() {
 }
 
 export default function Page() {
-  return <DeckPage />;
+  return (
+    <ClientOnly fallback={<DeckPageSkeleton />}>
+      <DeckPage />
+    </ClientOnly>
+  );
 }

@@ -39,6 +39,7 @@ export const decksRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
+        id: z.uuid(),
         name: z.string().trim().min(1),
         description: z.string().trim(),
         learning_profile_id: z.uuid(),
@@ -51,9 +52,12 @@ export const decksRouter = createTRPCRouter({
         profileId: input.learning_profile_id,
       });
 
+      // The id is generated on the client so it can be used immediately for
+      // the optimistic row and navigation; we just persist it here.
       const [row] = await ctx.db
         .insert(decks)
         .values({
+          id: input.id,
           user_id: ctx.session.user.id,
           name: input.name,
           description: input.description,

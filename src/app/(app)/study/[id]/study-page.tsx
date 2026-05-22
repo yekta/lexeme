@@ -30,7 +30,7 @@ import {
   SHORT_INTERVAL_MS,
   type Grade,
 } from "@/lib/fsrs";
-import { dataStateOf, mergeStates } from "@/lib/query-state";
+import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
 import confetti from "canvas-confetti";
 import { CheckCircle2 } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -42,8 +42,47 @@ type TQueueItem = {
   dueTime: number;
 };
 
+type TPreviewLabels = {
+  againLabel: string;
+  hardLabel: string;
+  goodLabel: string;
+  easyLabel: string;
+};
+
+/**
+ * Fisher–Yates shuffle driven by a seeded PRNG (mulberry32). Deterministic —
+ * the same set of cards always yields the same order — so it's safe to run
+ * during render without reshuffling on every re-render.
+ */
+function seededShuffle<T>(items: readonly T[], seed: string): T[] {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let state = h >>> 0;
+  const random = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j]!, result[i]!];
+  }
+  return result;
+}
+
+/**
+ * A study session is a one-time snapshot of the due queue, keyed by deck id.
+ * The underlying collections stay live, but the session is owned in memory so
+ * rating a card (which moves it forward in the collection) doesn't reshuffle
+ * or reset the run in progress.
+ */
 type TStudySession = {
-  queueKey: string;
+  deckId: string;
   queue: TQueueItem[];
   reviewedCount: number;
 };
@@ -80,90 +119,82 @@ export function StudyPage() {
     [learningProfile],
   );
 
-  const deckName = deckData?.name ?? "Loading...";
-
   const isPending =
     isPendingAuth || state === "pending" || state === "unauthorized";
   const totalCards = studyData?.totalCards || 0;
 
-  const queueKey = useMemo(
-    () => studyData?.dueCards.map((card) => card.id).join("|") ?? "",
-    [studyData?.dueCards],
-  );
-  const initialQueue = useMemo(
-    () =>
-      studyData?.dueCards.map((card) => ({
-        card,
-        isRequeued: false,
-        dueTime: new Date(card.due).getTime(),
-      })) ?? [],
-    [studyData?.dueCards],
-  );
-  const activeSession =
-    studySession?.queueKey === queueKey ? studySession : null;
+  // The shuffled due queue. Reactive to the collections until the session
+  // starts (first rating), after which `studySession` owns the queue so rating
+  // a card can't reshuffle or reset the run in progress.
+  const initialQueue = useMemo<TQueueItem[]>(() => {
+    const cards = studyData?.dueCards ?? [];
+    const items = cards.map((card) => ({
+      card,
+      isRequeued: false,
+      dueTime: new Date(card.due).getTime(),
+    }));
+    return seededShuffle(items, cards.map((c) => c.id).join(""));
+  }, [studyData?.dueCards]);
+
+  const activeSession = studySession?.deckId === id ? studySession : null;
   const queue = activeSession?.queue ?? initialQueue;
   const reviewedCount = activeSession?.reviewedCount ?? 0;
 
-  const rateCardMutation = useRateCard(id);
+  const { rate } = useRateCard();
 
   const currentCard = queue[0]?.card ?? null;
   const { getElapsedMs } = useReviewTimer(currentCard?.id ?? null);
   const isFinished = queue.length === 0 && reviewedCount > 0;
   const hasNoDueCards =
     !isPending &&
-    studyData &&
+    !!studyData &&
     studyData.dueCards.length === 0 &&
     totalCards > 0;
 
   const handleRate = (rating: Grade) => {
-    if (!currentCard) return;
+    if (!currentCard || !userScheduler) return;
     const durationMs = getElapsedMs();
-    rateCardMutation.mutate(
-      { cardId: currentCard.id, rating, durationMs },
-      {
-        onSuccess: ({ intervalMs, dbFields }) => {
-          setStudySession((prev) => {
-            const session =
-              prev?.queueKey === queueKey
-                ? prev
-                : { queueKey, queue, reviewedCount };
-            const [current, ...rest] = session.queue;
-            if (!current) return session;
+    const { intervalMs, dbFields } = rate({
+      card: currentCard,
+      scheduler: userScheduler,
+      rating,
+      durationMs,
+    });
 
-            if (intervalMs < SHORT_INTERVAL_MS) {
-              const updatedCard: TStudyCard = {
-                ...current.card,
-                ...dbFields,
-              };
-              const requeued: TQueueItem = {
-                card: updatedCard,
-                isRequeued: true,
-                dueTime: new Date(dbFields.due).getTime(),
-              };
-              const firstPass = rest.filter((item) => !item.isRequeued);
-              const requeuedItems = [
-                ...rest.filter((item) => item.isRequeued),
-                requeued,
-              ].sort((a, b) => a.dueTime - b.dueTime);
-              return {
-                queueKey,
-                queue: [...firstPass, ...requeuedItems],
-                reviewedCount: session.reviewedCount + 1,
-              };
-            }
+    setStudySession((prev) => {
+      const session =
+        prev?.deckId === id ? prev : { deckId: id, queue, reviewedCount };
+      const [current, ...rest] = session.queue;
+      if (!current) return session;
 
-            return {
-              queueKey,
-              queue: rest,
-              reviewedCount: session.reviewedCount + 1,
-            };
-          });
-        },
-      },
-    );
+      if (intervalMs < SHORT_INTERVAL_MS) {
+        const updatedCard: TStudyCard = { ...current.card, ...dbFields };
+        const requeued: TQueueItem = {
+          card: updatedCard,
+          isRequeued: true,
+          dueTime: new Date(dbFields.due).getTime(),
+        };
+        const firstPass = rest.filter((item) => !item.isRequeued);
+        const requeuedItems = [
+          ...rest.filter((item) => item.isRequeued),
+          requeued,
+        ].sort((a, b) => a.dueTime - b.dueTime);
+        return {
+          deckId: id,
+          queue: [...firstPass, ...requeuedItems],
+          reviewedCount: session.reviewedCount + 1,
+        };
+      }
+
+      return {
+        deckId: id,
+        queue: rest,
+        reviewedCount: session.reviewedCount + 1,
+      };
+    });
   };
 
-  const previewLabels =
+  const previewLabels: TPreviewLabels | null =
     currentCard && userScheduler
       ? (() => {
           const fsrsCard = dbRowToFSRSCard(currentCard);
@@ -188,12 +219,80 @@ export function StudyPage() {
     }
   }, [isFinished]);
 
-  const hasNoCards = !isPending && studyData && totalCards === 0;
-  const showPlaceholder =
+  const hasNoCards = !isPending && !!studyData && totalCards === 0;
+  const isPlaceholder =
     !isUnavailable &&
     (isPending ||
       !deckData ||
       (!currentCard && !isFinished && !hasNoDueCards && !hasNoCards));
+
+  return (
+    <StudyPageView
+      isPlaceholder={isPlaceholder}
+      state={state}
+      deckName={deckData?.name ?? "Loading..."}
+      deckId={id}
+      error={deckQuery.error ?? studyQuery.error ?? profilesQuery.error}
+      onRetry={() => {
+        deckQuery.refetch();
+        studyQuery.refetch();
+        profilesQuery.refetch();
+      }}
+      totalCards={totalCards}
+      hasNoDueCards={hasNoDueCards}
+      isFinished={isFinished}
+      currentCard={currentCard}
+      previewLabels={previewLabels}
+      onRate={handleRate}
+      reviewedCount={reviewedCount}
+      queueLength={queue.length}
+    />
+  );
+}
+
+/** The study page's loading state — the view in placeholder mode. */
+export function StudyPageSkeleton() {
+  return <StudyPageView isPlaceholder />;
+}
+
+/**
+ * The study page layout — the single source of the page's markup, shared by
+ * the live page (`StudyPage`) and its skeleton (`StudyPageSkeleton`).
+ * `isPlaceholder` threads through to swap real content for skeleton primitives.
+ */
+function StudyPageView({
+  isPlaceholder = false,
+  state = "pending",
+  deckName = "Loading...",
+  deckId = "",
+  error,
+  onRetry = () => {},
+  totalCards = 0,
+  hasNoDueCards = false,
+  isFinished = false,
+  currentCard = null,
+  previewLabels = null,
+  onRate = () => {},
+  reviewedCount = 0,
+  queueLength = 0,
+}: {
+  isPlaceholder?: boolean;
+  state?: DataState;
+  deckName?: string;
+  deckId?: string;
+  error?: unknown;
+  onRetry?: () => void;
+  totalCards?: number;
+  hasNoDueCards?: boolean;
+  isFinished?: boolean;
+  currentCard?: TStudyCard | null;
+  previewLabels?: TPreviewLabels | null;
+  onRate?: (rating: Grade) => void;
+  reviewedCount?: number;
+  queueLength?: number;
+}) {
+  const isUnavailable =
+    state === "not-found" || state === "forbidden" || state === "error";
 
   return (
     <div className="h-svh overflow-hidden flex flex-col">
@@ -202,22 +301,23 @@ export function StudyPage() {
         title={
           isUnavailable ? (
             ""
-          ) : showPlaceholder ? (
+          ) : isPlaceholder ? (
             <div className="h-5 w-36 bg-foreground/20 animate-pulse rounded" />
           ) : (
             deckName
           )
         }
         rightActions={
-          showPlaceholder ? (
+          isPlaceholder ? (
             <div className="text-sm font-medium text-transparent bg-foreground/20 animate-pulse rounded w-12">
               &nbsp;
             </div>
           ) : (
+            !isUnavailable &&
             !isFinished &&
-            queue.length > 0 && (
+            queueLength > 0 && (
               <div className="text-sm font-medium text-muted-foreground">
-                {reviewedCount + 1} / {reviewedCount + queue.length}
+                {reviewedCount + 1} / {reviewedCount + queueLength}
               </div>
             )
           )
@@ -230,16 +330,9 @@ export function StudyPage() {
           ) : state === "forbidden" ? (
             <NoAccess />
           ) : (
-            <LoadError
-              error={deckQuery.error ?? studyQuery.error ?? profilesQuery.error}
-              onRetry={() => {
-                deckQuery.refetch();
-                studyQuery.refetch();
-                profilesQuery.refetch();
-              }}
-            />
+            <LoadError error={error} onRetry={onRetry} />
           )
-        ) : showPlaceholder ? (
+        ) : isPlaceholder ? (
           <LCardStudy isPlaceholder />
         ) : totalCards === 0 && !hasNoDueCards ? (
           <EmptyList>
@@ -255,7 +348,7 @@ export function StudyPage() {
               </EmptyListContent>
             </EmptyListHeader>
             <EmptyListFooter>
-              <LinkButton href={`/deck/${id}`}>Add Cards</LinkButton>
+              <LinkButton href={`/deck/${deckId}`}>Add Cards</LinkButton>
             </EmptyListFooter>
           </EmptyList>
         ) : isFinished || hasNoDueCards ? (
@@ -273,25 +366,25 @@ export function StudyPage() {
             </EmptyListHeader>
             <EmptyListFooter>
               <LinkButton href="/">Back to Dashboard</LinkButton>
-              <LinkButton variant="outline" href={`/deck/${id}`}>
+              <LinkButton variant="outline" href={`/deck/${deckId}`}>
                 Manage Deck
               </LinkButton>
             </EmptyListFooter>
           </EmptyList>
-        ) : (
+        ) : currentCard ? (
           <LCardStudy
             key={`${currentCard.id}-${reviewedCount}`}
             front={currentCard.front}
             back={currentCard.back}
-            onRate={handleRate}
-            ratingPending={rateCardMutation.isPending}
-            pendingRating={rateCardMutation.variables?.rating ?? null}
-            againLabel={previewLabels!.againLabel}
-            hardLabel={previewLabels!.hardLabel}
-            goodLabel={previewLabels!.goodLabel}
-            easyLabel={previewLabels!.easyLabel}
+            onRate={onRate}
+            ratingPending={false}
+            pendingRating={null}
+            againLabel={previewLabels?.againLabel ?? ""}
+            hardLabel={previewLabels?.hardLabel ?? ""}
+            goodLabel={previewLabels?.goodLabel ?? ""}
+            easyLabel={previewLabels?.easyLabel ?? ""}
           />
-        )}
+        ) : null}
       </main>
     </div>
   );

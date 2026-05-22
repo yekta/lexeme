@@ -293,9 +293,11 @@ function DeleteCardForm({
         </Button>
         <Button
           variant="destructive"
-          isPending={mutation.isPending}
           onClick={() => {
-            mutation.mutate({ id, deckId }, { onSuccess: onDone });
+            // Optimistic — the card disappears immediately; the server catches
+            // up in the background.
+            void mutation.mutateAsync({ id, deckId });
+            onDone();
           }}
         >
           Delete

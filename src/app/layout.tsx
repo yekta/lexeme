@@ -1,5 +1,6 @@
 import { ErrorBoundary } from "@/components/error-boundary";
 import { NowProvider } from "@/components/now-provider";
+import { CollectionsPreloader } from "@/db/collections-preloader";
 import { TRPCReactProvider } from "@/trpc/react";
 import { DEFAULT_THEME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,7 @@ export default async function RootLayout({
             enableSystem
           >
             <TRPCReactProvider>
+              <CollectionsPreloader />
               <NowProvider>{children}</NowProvider>
             </TRPCReactProvider>
           </ThemeProvider>

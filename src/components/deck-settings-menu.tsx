@@ -20,10 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
+import { deckExportFilename } from "@/lib/deck-export";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/trpc/vanilla";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Settings, Trash2 } from "lucide-react";
+import { MoreVertical, Settings, Trash2, UploadIcon } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 const DELETE_DECK_CONFIRMATION = "I want to delete this deck";
@@ -68,6 +71,35 @@ export function DeckSettingsMenu({
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function handleExport() {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const payload = await trpc.decks.export.query({ id: deck.id });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = deckExportFilename(payload.deck.name);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const description =
+        error instanceof Error ? error.message : "Please try again.";
+      toast.error("Failed to export deck", {
+        description,
+        position: "top-center",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <>
@@ -90,6 +122,14 @@ export function DeckSettingsMenu({
           >
             <Settings className="size-5 shrink-0" />
             Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer"
+            disabled={isExporting}
+            onClick={handleExport}
+          >
+            <UploadIcon className="size-5 shrink-0" />
+            Export Deck
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"

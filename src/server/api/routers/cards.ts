@@ -44,10 +44,16 @@ export const cardsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        id: z.uuid(),
         deckId: z.uuid(),
-        front: z.string().trim().min(1),
-        back: z.string().trim().min(1),
+        cards: z
+          .array(
+            z.object({
+              id: z.uuid(),
+              front: z.string().trim().min(1),
+              back: z.string().trim().min(1),
+            }),
+          )
+          .min(1),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -57,13 +63,19 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      // The card id is client-generated; the content row's id is not
-      // user-facing, so the database default covers it.
+      // Card ids are client-generated; content row ids fall back to the
+      // database default. One transaction so partial imports never leak.
       await ctx.db.transaction(async (tx) => {
-        await tx.insert(cards).values({ id: input.id, deck_id: input.deckId });
         await tx
-          .insert(cardContents)
-          .values({ card_id: input.id, front: input.front, back: input.back });
+          .insert(cards)
+          .values(input.cards.map((c) => ({ id: c.id, deck_id: input.deckId })));
+        await tx.insert(cardContents).values(
+          input.cards.map((c) => ({
+            card_id: c.id,
+            front: c.front,
+            back: c.back,
+          })),
+        );
       });
     }),
 

@@ -72,15 +72,23 @@ export const cardsCollection = createCollection(
     staleTime: Infinity,
     getKey: (row) => row.id,
     onInsert: async ({ transaction }) => {
+      // Group by deck so a multi-card insert (e.g. deck import) hits the
+      // server once per deck instead of once per card.
+      const byDeck = new Map<
+        string,
+        { id: string; front: string; back: string }[]
+      >();
       for (const m of transaction.mutations) {
         const c = m.modified;
-        await trpc.cards.create.mutate({
-          id: c.id,
-          deckId: c.deck_id,
-          front: c.front,
-          back: c.back,
-        });
+        const list = byDeck.get(c.deck_id) ?? [];
+        list.push({ id: c.id, front: c.front, back: c.back });
+        byDeck.set(c.deck_id, list);
       }
+      await Promise.all(
+        [...byDeck.entries()].map(([deckId, cards]) =>
+          trpc.cards.create.mutate({ deckId, cards }),
+        ),
+      );
     },
     // Direct card updates only ever carry content edits — review scheduling
     // goes through the rate transaction (see use-rate-card.ts), which bypasses

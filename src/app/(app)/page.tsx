@@ -1,6 +1,7 @@
 "use client";
 
 import { ClientOnly } from "@/components/client-only";
+import { CreateOrImportDeckButton } from "@/components/import-deck-button";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { LoadError } from "@/components/load-error";
@@ -14,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -182,18 +182,17 @@ function HomePageView({
                 </h2>
                 <OptimisticIndicator isOptimistic={isOptimistic} />
               </div>
+              <CreateOrImportDeckButton
+                isPlaceholder={isPlaceholder}
+                onCreate={() => setIsCreateDeckOpen(true)}
+                onImported={async (id) => {
+                  await asyncRouterPush(`/deck/${id}`);
+                }}
+              />
               <Dialog
                 open={isCreateDeckOpen}
                 onOpenChange={setIsCreateDeckOpen}
               >
-                <DialogTrigger
-                  render={<Button isPlaceholder={isPlaceholder} />}
-                >
-                  <Plus className="size-5 -ml-1.5 shrink-0" />
-                  <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
-                    Create Deck
-                  </span>
-                </DialogTrigger>
                 <DialogContent>
                   <CreateDeckForm
                     key={String(isCreateDeckOpen)}

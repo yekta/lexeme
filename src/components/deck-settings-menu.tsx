@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toastIncompleteOptimisticOperation } from "@/db/toast-on-error";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { deckExportFilename } from "@/lib/deck-export";
@@ -26,7 +27,6 @@ import { trpc } from "@/trpc/vanilla";
 import { useForm } from "@tanstack/react-form";
 import { MoreVertical, Settings, Trash2, UploadIcon } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 
 const DELETE_DECK_CONFIRMATION = "I want to delete this deck";
@@ -92,9 +92,9 @@ export function DeckSettingsMenu({
     } catch (error) {
       const description =
         error instanceof Error ? error.message : "Please try again.";
-      toast.error("Failed to export deck", {
+      toastIncompleteOptimisticOperation({
+        message: "Failed to export deck",
         description,
-        position: "top-center",
       });
     } finally {
       setIsExporting(false);

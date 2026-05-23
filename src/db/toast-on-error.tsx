@@ -15,16 +15,27 @@ export function toastOnPersistError(tx: Tx, message: string): void {
   void tx.isPersisted.promise.catch((error: unknown) => {
     const description =
       error instanceof Error ? error.message : "Please try again.";
-    const id: string | number = toast.error(message, {
-      description,
-      position: "top-center",
-      duration: Infinity,
-      closeButton: false,
-      action: (
-        <Button size="xs" onClick={() => toast.dismiss(id)}>
-          Okay
-        </Button>
-      ),
-    });
+    toastIncompleteOptimisticOperation({ message, description });
   });
+}
+
+export function toastIncompleteOptimisticOperation({
+  message,
+  description,
+}: {
+  message: string;
+  description?: string;
+}) {
+  const id: string | number = toast.error(message, {
+    description,
+    position: "top-center",
+    duration: Infinity,
+    closeButton: false,
+    action: (
+      <Button size="xs" onClick={() => toast.dismiss(id)}>
+        Okay
+      </Button>
+    ),
+  });
+  return id;
 }

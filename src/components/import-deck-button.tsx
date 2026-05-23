@@ -9,10 +9,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toastIncompleteOptimisticOperation } from "@/db/toast-on-error";
 import { deckExportSchema, type DeckExport } from "@/lib/deck-export";
 import { ChevronDown, DownloadIcon, Plus } from "lucide-react";
 import { useRef, useState } from "react";
-import { toast } from "sonner";
 
 /**
  * Split button for the home page header: primary action creates a deck, the
@@ -37,17 +37,17 @@ export function CreateOrImportDeckButton({
       const text = await file.text();
       payload = JSON.parse(text);
     } catch {
-      toast.error("Invalid deck file", {
+      toastIncompleteOptimisticOperation({
+        message: "Invalid deck file",
         description: "The selected file is not valid JSON.",
-        position: "top-center",
       });
       return;
     }
     const result = deckExportSchema.safeParse(payload);
     if (!result.success) {
-      toast.error("Invalid deck file", {
-        description: "This file isn't a Lexeme deck export.",
-        position: "top-center",
+      toastIncompleteOptimisticOperation({
+        message: "Invalid deck file",
+        description: "This file isn't a valid Lexeme deck export.",
       });
       return;
     }

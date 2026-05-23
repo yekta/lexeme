@@ -1,5 +1,6 @@
 "use client";
 
+import { DeckNotFound } from "@/components/deck-not-found";
 import {
   EmptyList,
   EmptyListContent,
@@ -9,12 +10,12 @@ import {
   EmptyListIcon,
   EmptyListTitle,
 } from "@/components/empty-list";
-import { DeckNotFound } from "@/components/deck-not-found";
-import { LoadError } from "@/components/load-error";
-import { NoAccess } from "@/components/no-access";
 import CardsIcon from "@/components/icons/cards";
 import { LCardStudy } from "@/components/l-card-study";
+import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
+import { NoAccess } from "@/components/no-access";
+import OptimisticIndicator from "@/components/optimistic-indicator";
 import { LinkButton } from "@/components/ui/button";
 import { isRowOptimistic } from "@/db/collections";
 import { useDeck } from "@/hooks/data/use-decks";
@@ -33,7 +34,7 @@ import {
 } from "@/lib/fsrs";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
 import confetti from "canvas-confetti";
-import { CheckCircle2, RefreshCwIcon } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -315,9 +316,10 @@ function StudyPageView({
           ) : (
             <div className="flex items-center shrink min-w-0">
               <span className="pr-[0.5ch] truncate">{deckName}</span>
-              {isOptimistic && (
-                <RefreshCwIcon className="shrink-0 animate-spin size-3.5 text-muted-more-foreground" />
-              )}
+              <OptimisticIndicator
+                isOptimistic={isOptimistic}
+                className="size-3.5"
+              />
             </div>
           )
         }

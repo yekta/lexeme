@@ -1,10 +1,11 @@
 "use client";
 
 import { ClientOnly } from "@/components/client-only";
-import { LearningProfileField } from "@/components/learning-profile-field";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
+import { LearningProfileField } from "@/components/learning-profile-field";
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
+import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isRowOptimistic } from "@/db/collections";
+import { usePendingMutations } from "@/db/pending-mutations";
 import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useDeckStats, useTodayStats } from "@/hooks/data/use-stats";
@@ -94,6 +96,15 @@ function Home() {
   const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
 
+  // Pending deck deletes aren't visible via `$synced` because the row is
+  // removed from the live state immediately; the sidecar counter fills that
+  // gap. Insert/update optimism still rides on `$synced` via `isRowOptimistic`.
+  const hasPendingDeckMutations = usePendingMutations("decks");
+  const isOptimistic =
+    hasPendingDeckMutations ||
+    decks.some(isRowOptimistic) ||
+    deckStatsRows.some((r) => r.optimistic);
+
   return (
     <HomePageView
       isPlaceholder={isPlaceholder}
@@ -101,6 +112,7 @@ function Home() {
       error={decksQuery.error ?? deckStatsQuery.error}
       decks={decks}
       statsByDeck={statsByDeck}
+      isOptimistic={isOptimistic}
       todayStats={todayQuery.data}
       todayStatsPending={todayQuery.isPending}
       todayStatsError={todayQuery.isError}
@@ -123,6 +135,7 @@ function HomePageView({
   error,
   decks = [],
   statsByDeck,
+  isOptimistic = false,
   todayStats,
   todayStatsPending = false,
   todayStatsError = false,
@@ -133,6 +146,7 @@ function HomePageView({
   error?: unknown;
   decks?: TDeck[];
   statsByDeck?: Map<string, TDeckStats>;
+  isOptimistic?: boolean;
   todayStats?: TTodayStats;
   todayStatsPending?: boolean;
   todayStatsError?: boolean;
@@ -155,13 +169,15 @@ function HomePageView({
         ) : (
           <>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                Decks{" "}
-                <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
-                  ({isPlaceholder ? 5 : decks.length})
-                </span>
-              </h2>
-
+              <div className="shrink min-w-0 flex items-center gap-2">
+                <h2 className="text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                  Decks{" "}
+                  <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
+                    ({isPlaceholder ? 5 : decks.length})
+                  </span>
+                </h2>
+                <OptimisticIndicator isOptimistic={isOptimistic} />
+              </div>
               <Dialog
                 open={isCreateDeckOpen}
                 onOpenChange={setIsCreateDeckOpen}

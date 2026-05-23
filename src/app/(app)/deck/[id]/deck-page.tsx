@@ -1,5 +1,8 @@
 "use client";
 
+import { AddCardForm } from "@/components/add-card-form";
+import { DeckNotFound } from "@/components/deck-not-found";
+import { DeckSettingsMenu } from "@/components/deck-settings-menu";
 import {
   EmptyList,
   EmptyListContent,
@@ -9,14 +12,12 @@ import {
   EmptyListIcon,
   EmptyListTitle,
 } from "@/components/empty-list";
-import { AddCardForm } from "@/components/add-card-form";
-import { DeckNotFound } from "@/components/deck-not-found";
-import { DeckSettingsMenu } from "@/components/deck-settings-menu";
-import { LoadError } from "@/components/load-error";
-import { NoAccess } from "@/components/no-access";
 import CardsIcon from "@/components/icons/cards";
 import { LCardManage } from "@/components/l-card-manage";
+import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
+import { NoAccess } from "@/components/no-access";
+import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { isRowOptimistic } from "@/db/collections";
@@ -25,7 +26,7 @@ import { useDeck, type TDeck } from "@/hooks/data/use-decks";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
-import { ArrowLeft, Plus, RefreshCwIcon } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -137,9 +138,10 @@ function DeckPageView({
                     onDeleted={() => asyncPush("/")}
                   />
                 )}
-                {isOptimistic && (
-                  <RefreshCwIcon className="shrink-0 animate-spin size-4 text-muted-more-foreground" />
-                )}
+                <OptimisticIndicator
+                  isOptimistic={isOptimistic}
+                  className="size-4"
+                />
               </div>
               <LinkButton
                 href={`/study/${deckId}`}

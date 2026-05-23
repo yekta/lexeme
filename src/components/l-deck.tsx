@@ -4,6 +4,7 @@ import { AddCardForm } from "@/components/add-card-form";
 import { DeckSettingsMenu } from "@/components/deck-settings-menu";
 import NewIndicator from "@/components/new-indicator";
 import { useNow } from "@/components/now-provider";
+import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button, LinkButton } from "@/components/ui/button";
 import {
   Card,
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { type TDeck } from "@/hooks/data/use-decks";
-import { RefreshCwIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 
@@ -97,9 +97,10 @@ export function LDeck(props: TLDeckProps) {
                 <span className="pr-[0.5ch] shrink min-w-0 truncate">
                   {name}
                 </span>
-                {isOptimistic && (
-                  <RefreshCwIcon className="shrink-0 animate-spin size-3.5 text-muted-more-foreground" />
-                )}
+                <OptimisticIndicator
+                  isOptimistic={isOptimistic}
+                  className="size-3.5"
+                />
               </CardTitle>
               <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {/* Description or non-breaking space */}

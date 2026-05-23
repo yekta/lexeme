@@ -4,6 +4,7 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { useMemo } from "react";
 
 import { decksCollection, liveStatus, type DeckRow } from "@/db/collections";
+import { trackPending } from "@/db/pending-mutations";
 import { DataError } from "@/lib/query-state";
 
 export type TDeck = DeckRow;
@@ -76,7 +77,8 @@ export function useUpdateDeck() {
 export function useDeleteDeck() {
   return {
     mutateAsync: async (input: { id: string }) => {
-      decksCollection.delete(input.id);
+      const tx = decksCollection.delete(input.id);
+      trackPending("decks", tx);
     },
   };
 }

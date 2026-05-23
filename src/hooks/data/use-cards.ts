@@ -9,6 +9,7 @@ import {
   newCardRow,
   type CardRow,
 } from "@/db/collections";
+import { trackPending } from "@/db/pending-mutations";
 
 export type TCard = CardRow;
 
@@ -72,7 +73,8 @@ export function useUpdateCard() {
 export function useDeleteCard() {
   return {
     mutateAsync: async (input: { id: string; deckId: string }) => {
-      cardsCollection.delete(input.id);
+      const tx = cardsCollection.delete(input.id);
+      trackPending("cards", tx);
     },
   };
 }

@@ -3,6 +3,7 @@
 import BgPattern from "@/components/bg-pattern";
 import NewIndicator from "@/components/new-indicator";
 import { useNow } from "@/components/now-provider";
+import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Pencil, RefreshCwIcon, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -147,9 +148,7 @@ export function LCardManage(props: TLCardManageProps) {
         />
         <p className="shrink max-w-full flex items-center relative pr-6 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           <span className="mr-[0.5ch] shrink min-w-0 truncate">Front</span>
-          {isOptimistic && (
-            <RefreshCwIcon className="shrink-0 animate-spin size-3 text-muted-more-foreground" />
-          )}
+          <OptimisticIndicator isOptimistic={isOptimistic} className="size-3" />
         </p>
         <p className="shrink relative max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {front}

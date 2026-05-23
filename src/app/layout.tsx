@@ -1,5 +1,6 @@
 import { ErrorBoundary } from "@/components/error-boundary";
 import { NowProvider } from "@/components/now-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { CollectionsPreloader } from "@/db/collections-preloader";
 import { TRPCReactProvider } from "@/trpc/react";
 import { DEFAULT_THEME } from "@/lib/constants";
@@ -50,6 +51,7 @@ export default async function RootLayout({
             <TRPCReactProvider>
               <CollectionsPreloader />
               <NowProvider>{children}</NowProvider>
+              <Toaster closeButton position="bottom-right" />
             </TRPCReactProvider>
           </ThemeProvider>
         </ErrorBoundary>

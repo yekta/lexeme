@@ -60,9 +60,7 @@ export const cardsRouter = createTRPCRouter({
       // The card id is client-generated; the content row's id is not
       // user-facing, so the database default covers it.
       await ctx.db.transaction(async (tx) => {
-        await tx
-          .insert(cards)
-          .values({ id: input.id, deck_id: input.deckId });
+        await tx.insert(cards).values({ id: input.id, deck_id: input.deckId });
         await tx
           .insert(cardContents)
           .values({ card_id: input.id, front: input.front, back: input.back });

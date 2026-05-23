@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { decksCollection, liveStatus, type DeckRow } from "@/db/collections";
 import { trackPending } from "@/db/pending-mutations";
+import { toastOnPersistError } from "@/db/toast-on-error";
 import { DataError } from "@/lib/query-state";
 
 export type TDeck = DeckRow;
@@ -45,13 +46,14 @@ export function useCreateDeck() {
       learning_profile_id: string;
     }) => {
       const id = crypto.randomUUID();
-      decksCollection.insert({
+      const tx = decksCollection.insert({
         id,
         name: input.name,
         description: input.description,
         learning_profile_id: input.learning_profile_id,
         created_at: new Date(),
       });
+      toastOnPersistError(tx, "Failed to create deck");
       return id;
     },
   };
@@ -65,11 +67,12 @@ export function useUpdateDeck() {
       description: string;
       learning_profile_id: string;
     }) => {
-      decksCollection.update(input.id, (d) => {
+      const tx = decksCollection.update(input.id, (d) => {
         d.name = input.name;
         d.description = input.description;
         d.learning_profile_id = input.learning_profile_id;
       });
+      toastOnPersistError(tx, "Failed to update deck");
     },
   };
 }
@@ -79,6 +82,7 @@ export function useDeleteDeck() {
     mutateAsync: async (input: { id: string }) => {
       const tx = decksCollection.delete(input.id);
       trackPending("decks", tx);
+      toastOnPersistError(tx, "Failed to delete deck");
     },
   };
 }

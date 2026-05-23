@@ -7,6 +7,7 @@ import {
   reviewLogsCollection,
   type CardRow,
 } from "@/db/collections";
+import { toastOnPersistError } from "@/db/toast-on-error";
 import {
   dbRowToFSRSCard,
   fsrsCardToDbRow,
@@ -39,7 +40,12 @@ export type RateResult = {
  * is returned synchronously so the study session can advance immediately.
  */
 export function useRateCard() {
-  const rate = ({ card, scheduler, rating, durationMs }: RateArgs): RateResult => {
+  const rate = ({
+    card,
+    scheduler,
+    rating,
+    durationMs,
+  }: RateArgs): RateResult => {
     const now = new Date();
     const result = scheduler.next(dbRowToFSRSCard(card), now, rating);
     const cardPatch = fsrsCardToDbRow(result.card);
@@ -85,9 +91,7 @@ export function useRateCard() {
       });
     });
 
-    void tx.isPersisted.promise.catch((error: unknown) => {
-      console.error("Failed to persist review", error);
-    });
+    toastOnPersistError(tx, "Failed to save rating");
 
     return {
       intervalMs: result.card.due.getTime() - now.getTime(),

@@ -10,6 +10,7 @@ import {
   type CardRow,
 } from "@/db/collections";
 import { trackPending } from "@/db/pending-mutations";
+import { toastOnPersistError } from "@/db/toast-on-error";
 
 export type TCard = CardRow;
 
@@ -41,7 +42,7 @@ export function useCreateCard() {
       back: string;
     }) => {
       const id = crypto.randomUUID();
-      cardsCollection.insert(
+      const tx = cardsCollection.insert(
         newCardRow({
           id,
           deckId: input.deckId,
@@ -49,6 +50,7 @@ export function useCreateCard() {
           back: input.back,
         }),
       );
+      toastOnPersistError(tx, "Failed to create card");
       return id;
     },
   };
@@ -62,10 +64,11 @@ export function useUpdateCard() {
       front: string;
       back: string;
     }) => {
-      cardsCollection.update(input.id, (c) => {
+      const tx = cardsCollection.update(input.id, (c) => {
         c.front = input.front;
         c.back = input.back;
       });
+      toastOnPersistError(tx, "Failed to update card");
     },
   };
 }
@@ -75,6 +78,7 @@ export function useDeleteCard() {
     mutateAsync: async (input: { id: string; deckId: string }) => {
       const tx = cardsCollection.delete(input.id);
       trackPending("cards", tx);
+      toastOnPersistError(tx, "Failed to delete card");
     },
   };
 }

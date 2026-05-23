@@ -96,12 +96,16 @@ function Home() {
   const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
 
-  // Pending deck deletes aren't visible via `$synced` because the row is
-  // removed from the live state immediately; the sidecar counter fills that
-  // gap. Insert/update optimism still rides on `$synced` via `isRowOptimistic`.
+  // Pending deletes aren't visible via `$synced` because the row is removed
+  // from the live state immediately; the sidecar counter fills that gap for
+  // both decks (deleted here) and cards (deleted on the deck page, but still
+  // worth reflecting in the global indicator). Insert/update optimism still
+  // rides on `$synced` via `isRowOptimistic`.
   const hasPendingDeckMutations = usePendingMutations("decks");
+  const hasPendingCardMutations = usePendingMutations("cards");
   const isOptimistic =
     hasPendingDeckMutations ||
+    hasPendingCardMutations ||
     decks.some(isRowOptimistic) ||
     deckStatsRows.some((r) => r.optimistic);
 

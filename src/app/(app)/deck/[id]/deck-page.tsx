@@ -21,6 +21,7 @@ import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { isRowOptimistic } from "@/db/collections";
+import { usePendingMutations } from "@/db/pending-mutations";
 import { useCardsByDeck, type TCard } from "@/hooks/data/use-cards";
 import { useDeck, type TDeck } from "@/hooks/data/use-decks";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
@@ -41,7 +42,15 @@ export function DeckPage() {
   const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
 
+  // Optimistic deletes remove rows from the live state immediately, so
+  // `$synced` checks can't see them — the sidecar counter fills that gap for
+  // card deletes (from `LCardManage`) and the brief deck-delete window before
+  // `DeckSettingsMenu` navigates away.
+  const hasPendingCards = usePendingMutations("cards");
+  const hasPendingDecks = usePendingMutations("decks");
   const isOptimistic =
+    hasPendingCards ||
+    hasPendingDecks ||
     (deckQuery.data ? isRowOptimistic(deckQuery.data) : false) ||
     cardsQuery.data.some(isRowOptimistic);
 

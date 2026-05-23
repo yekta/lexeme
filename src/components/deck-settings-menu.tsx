@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toastIncompleteOptimisticOperation } from "@/db/toast-on-error";
+import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { deckExportFilename } from "@/lib/deck-export";
@@ -92,7 +92,7 @@ export function DeckSettingsMenu({
     } catch (error) {
       const description =
         error instanceof Error ? error.message : "Please try again.";
-      toastIncompleteOptimisticOperation({
+      toastErrorOnOptimisticOperation({
         message: "Failed to export deck",
         description,
       });

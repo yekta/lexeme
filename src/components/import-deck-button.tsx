@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toastIncompleteOptimisticOperation } from "@/db/toast-on-error";
+import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { deckExportSchema, type DeckExport } from "@/lib/deck-export";
 import { ChevronDown, DownloadIcon, Plus } from "lucide-react";
 import { useRef, useState } from "react";
@@ -37,7 +37,7 @@ export function CreateOrImportDeckButton({
       const text = await file.text();
       payload = JSON.parse(text);
     } catch {
-      toastIncompleteOptimisticOperation({
+      toastErrorOnOptimisticOperation({
         message: "Invalid deck file",
         description: "The selected file is not valid JSON.",
       });
@@ -45,7 +45,7 @@ export function CreateOrImportDeckButton({
     }
     const result = deckExportSchema.safeParse(payload);
     if (!result.success) {
-      toastIncompleteOptimisticOperation({
+      toastErrorOnOptimisticOperation({
         message: "Invalid deck file",
         description: "This file isn't a valid Lexeme deck export.",
       });

@@ -15,11 +15,11 @@ export function toastOnPersistError(tx: Tx, message: string): void {
   void tx.isPersisted.promise.catch((error: unknown) => {
     const description =
       error instanceof Error ? error.message : "Please try again.";
-    toastIncompleteOptimisticOperation({ message, description });
+    toastErrorOnOptimisticOperation({ message, description });
   });
 }
 
-export function toastIncompleteOptimisticOperation({
+export function toastErrorOnOptimisticOperation({
   message,
   description,
 }: {

@@ -72,11 +72,11 @@ export function CreateOrImportDeckButton({
         <Button
           isPlaceholder={isPlaceholder}
           onClick={onCreate}
-          className="rounded-r-none px-3 gap-1"
+          className="rounded-r-none px-3.5 gap-1"
         >
-          <Plus className="size-5 -ml-1 shrink-0" />
+          <Plus className="size-5 -ml-1.25 shrink-0" />
           <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
-            Create Deck
+            Create
           </span>
         </Button>
         <DropdownMenu>
@@ -85,11 +85,11 @@ export function CreateOrImportDeckButton({
               <Button
                 isPlaceholder={isPlaceholder}
                 aria-label="More create options"
-                className="rounded-l-none border-l-transparent px-2"
+                className="rounded-l-none border-l-transparent px-1.75"
               />
             }
           >
-            <ChevronDown className="size-4 shrink-0" />
+            <ChevronDown className="size-5 shrink-0" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-40">
             <DropdownMenuItem

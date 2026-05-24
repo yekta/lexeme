@@ -1,5 +1,3 @@
-"use client";
-
 import { ClientOnly } from "@/components/client-only";
 import { CreateOrImportDeckButton } from "@/components/import-deck-button";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
@@ -16,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FormInput, Input } from "@/components/ui/input";
+import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isRowOptimistic } from "@/db/collections";
 import { usePendingMutations } from "@/db/pending-mutations";
@@ -28,6 +26,7 @@ import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-n
 import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
+import { createFileRoute } from "@tanstack/react-router";
 import { formatDuration, intervalToDuration } from "date-fns";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -50,7 +49,11 @@ const EMPTY_STATS: TDeckStats = {
 
 type TTodayStats = { count: number; totalMs: number; msPerCard: number };
 
-export default function Page() {
+export const Route = createFileRoute("/")({
+  component: HomeRoute,
+});
+
+function HomeRoute() {
   return (
     <ClientOnly fallback={<HomeSkeleton />}>
       <Home />
@@ -58,7 +61,6 @@ export default function Page() {
   );
 }
 
-/** The home page's loading state — the view in placeholder mode. */
 function HomeSkeleton() {
   return <HomePageView isPlaceholder />;
 }
@@ -96,11 +98,6 @@ function Home() {
   const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
 
-  // Pending deletes aren't visible via `$synced` because the row is removed
-  // from the live state immediately; the sidecar counter fills that gap for
-  // both decks (deleted here) and cards (deleted on the deck page, but still
-  // worth reflecting in the global indicator). Insert/update optimism still
-  // rides on `$synced` via `isRowOptimistic`.
   const hasPendingDeckMutations = usePendingMutations("decks");
   const hasPendingCardMutations = usePendingMutations("cards");
   const isOptimistic =
@@ -128,11 +125,6 @@ function Home() {
   );
 }
 
-/**
- * The home page layout — the single source of the page's markup, shared by the
- * live page (`Home`) and its skeleton (`HomeSkeleton`). `isPlaceholder` threads
- * through to swap real content for skeleton primitives.
- */
 function HomePageView({
   isPlaceholder = false,
   isError = false,
@@ -256,8 +248,6 @@ function CreateDeckForm({
     },
   });
 
-  // Profiles load async, so the initial onMount validation can run before the
-  // default profile id exists. Fill it and re-run form-level validation.
   useEffect(() => {
     if (!defaultProfileId) return;
     if (form.getFieldValue("learning_profile_id")) return;

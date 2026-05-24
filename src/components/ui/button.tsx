@@ -1,12 +1,8 @@
-"use client";
-
 import { Button as ButtonPrimitive } from "@base-ui/react/button";
+import { cn } from "@/lib/utils";
+import { Link, type LinkProps } from "@tanstack/react-router";
 import { cva, type VariantProps } from "class-variance-authority";
 import { LoaderIcon } from "lucide-react";
-import Link from "next/link";
-
-import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 import React from "react";
 
 const buttonVariants = cva(
@@ -158,19 +154,20 @@ function Button({
   );
 }
 
-type TPrefetch = "hover" | false;
-type TLinkButtonProps = Omit<React.ComponentProps<typeof Link>, "prefetch"> & {
-  prefetch?: TPrefetch;
+type TLinkButtonProps = Omit<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>,
+  "href"
+> & {
+  href: string;
+  preload?: LinkProps["preload"];
 } & VariantProps<typeof buttonVariants> & {
     isPending?: boolean;
     isPlaceholder?: boolean;
   };
 
 function LinkButton({
-  onMouseEnter: onMouseEnterProp,
-  onTouchStart: onTouchStartProp,
   href,
-  prefetch = "hover",
+  preload,
   variant,
   size,
   isPending,
@@ -179,28 +176,6 @@ function LinkButton({
   children,
   ...props
 }: TLinkButtonProps) {
-  const router = useRouter();
-
-  const onMouseEnter = React.useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
-      onMouseEnterProp?.(e);
-      if (prefetch === "hover") {
-        router.prefetch(href.toString());
-      }
-    },
-    [onMouseEnterProp, href, router, prefetch],
-  );
-
-  const onTouchStart = React.useCallback(
-    (e: React.TouchEvent<HTMLAnchorElement>) => {
-      onTouchStartProp?.(e);
-      if (prefetch === "hover") {
-        router.prefetch(href.toString());
-      }
-    },
-    [onTouchStartProp, href, router, prefetch],
-  );
-
   return (
     <Button
       variant={variant}
@@ -211,13 +186,7 @@ function LinkButton({
       nativeButton={!!isPlaceholder}
       render={
         isPlaceholder ? undefined : (
-          <Link
-            {...props}
-            prefetch={false}
-            href={href}
-            onMouseEnter={onMouseEnter}
-            onTouchStart={onTouchStart}
-          />
+          <Link {...props} to={href} preload={preload} />
         )
       }
     >

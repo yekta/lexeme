@@ -1,51 +1,24 @@
-// Taken from https://github.com/vercel/next.js/issues/61737#issuecomment-2248830960
+import { useRouter } from "@tanstack/react-router";
+import { useState } from "react";
 
-"use client";
-import { useRouter } from "nextjs-toploader/app";
-import { useEffect, useTransition } from "react";
-
-// Define the type for the observer callback function
-type ObserverCallback = () => void;
-
-const createRouteObserver = () => {
-  let observer: ObserverCallback | null = null;
-
-  const setObserver = (callback: ObserverCallback) => {
-    observer = callback;
-  };
-
-  const notify = () => {
-    if (observer) {
-      observer();
-    }
-  };
-
-  return { setObserver, notify };
-};
-
-const routeObserver = createRouteObserver();
-
+/**
+ * Navigate to `path` and resolve once the router has committed. TanStack
+ * Router's `navigate()` returns a Promise that resolves on commit, so this is
+ * just a thin wrapper that also exposes an `isPending` flag for callers that
+ * want to disable buttons during the transition.
+ */
 export const useAsyncRouterPush = () => {
-  const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const [isPending, setIsPending] = useState(false);
 
   const asyncPush = async (path: string) => {
-    return new Promise<void>((resolve) => {
-      startTransition(async () => {
-        router.push(path);
-      });
-
-      routeObserver.setObserver(() => {
-        resolve();
-      });
-    });
-  };
-
-  useEffect(() => {
-    if (!isPending) {
-      routeObserver.notify();
+    setIsPending(true);
+    try {
+      await router.navigate({ to: path });
+    } finally {
+      setIsPending(false);
     }
-  }, [isPending]);
+  };
 
   return [asyncPush, isPending] as const;
 };

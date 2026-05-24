@@ -14,3 +14,5 @@ coverage/
 .env.keys
 .env.local
 .env.*.local
+dist
+.tanstack

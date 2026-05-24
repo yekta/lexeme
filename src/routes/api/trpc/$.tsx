@@ -1,18 +1,15 @@
-import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { type NextRequest } from "next/server";
+import { env } from "@/env";
 import { appRouter } from "@/server/api/root";
 import { createTRPCContext } from "@/server/api/trpc";
-import { env } from "@/env";
+import { createFileRoute } from "@tanstack/react-router";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
-const createContext = (req: NextRequest) =>
-  createTRPCContext({ headers: req.headers });
-
-const handler = (req: NextRequest) =>
+const handler = ({ request }: { request: Request }) =>
   fetchRequestHandler({
     endpoint: "/api/trpc",
-    req,
+    req: request,
     router: appRouter,
-    createContext: () => createContext(req),
+    createContext: () => createTRPCContext({ headers: request.headers }),
     onError:
       env.NODE_ENV === "development"
         ? ({ path, error }) => {
@@ -29,4 +26,11 @@ const handler = (req: NextRequest) =>
         : undefined,
   });
 
-export { handler as GET, handler as POST };
+export const Route = createFileRoute("/api/trpc/$")({
+  server: {
+    handlers: {
+      GET: handler,
+      POST: handler,
+    },
+  },
+});

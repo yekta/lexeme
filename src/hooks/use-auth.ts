@@ -1,7 +1,5 @@
-"use client";
-
 import { signIn, signOut, useSession } from "@/lib/auth-client";
-import { useRouter } from "nextjs-toploader/app";
+import { useRouter } from "@tanstack/react-router";
 import { useCallback } from "react";
 
 export function useAuth() {
@@ -15,7 +13,7 @@ export function useAuth() {
   const logout = useCallback(async () => {
     await signOut({
       fetchOptions: {
-        onSuccess: () => router.push("/sign-in"),
+        onSuccess: () => router.navigate({ to: "/sign-in" }),
       },
     });
   }, [router]);

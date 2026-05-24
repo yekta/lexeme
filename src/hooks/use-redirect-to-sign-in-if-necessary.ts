@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { SIGN_IN_PATHNAME } from "@/lib/constants";
-import { useRouter } from "nextjs-toploader/app";
+import { useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 export default function useRedirectToSignInIfNecessary() {
@@ -10,8 +10,8 @@ export default function useRedirectToSignInIfNecessary() {
   useEffect(() => {
     if (isPending) return;
     if (user) return;
-    router.push(SIGN_IN_PATHNAME);
-  }, [isPending, user]);
+    router.navigate({ to: SIGN_IN_PATHNAME });
+  }, [isPending, user, router]);
 
   return { isPending, user };
 }

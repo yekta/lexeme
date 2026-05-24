@@ -18,13 +18,14 @@ import {
 } from "@/lib/constants";
 import {
   ArrowLeftIcon,
+  LoaderIcon,
   LogOutIcon,
   MonitorSmartphoneIcon,
   MoonIcon,
   SunIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
   light: { label: "Light", icon: SunIcon },
@@ -85,6 +86,7 @@ type TNavbarProps = {
 
 export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
   const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   return (
     <header className="bg-background border-b flex py-0.5 items-center sticky top-0 z-50">
@@ -127,7 +129,7 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                 render={
                   <Button
                     variant="ghost"
-                    className="relative size-8 p-0 rounded-full border-[2px] border-border hover:border-foreground/50 active:border-foreground/50"
+                    className="relative size-8 p-0 rounded-full border-2 border-border hover:border-foreground/50 active:border-foreground/50"
                   />
                 }
               >
@@ -148,9 +150,23 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <ThemeMenuItem />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer">
-                  <LogOutIcon className="size-5 shrink-0" />
-                  <span>Sign out</span>
+                <DropdownMenuItem
+                  disabled={isLoggingOut}
+                  closeOnClick={false}
+                  onClick={() => {
+                    setIsLoggingOut(true);
+                    logout().finally(() => setIsLoggingOut(false));
+                  }}
+                  className="cursor-pointer"
+                >
+                  {isLoggingOut ? (
+                    <LoaderIcon className="size-5 shrink-0 animate-spin" />
+                  ) : (
+                    <LogOutIcon className="size-5 shrink-0" />
+                  )}
+                  <span className="truncate">
+                    {isLoggingOut ? "Signing out..." : "Sign out"}
+                  </span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

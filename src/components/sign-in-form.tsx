@@ -1,10 +1,8 @@
-"use client";
-
 import Logo from "@/components/icons/logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { useRouter } from "nextjs-toploader/app";
+import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 type TProps = {
@@ -17,7 +15,7 @@ export default function SignInForm({ className }: TProps) {
   const router = useRouter();
 
   useEffect(() => {
-    if (user) router.push("/");
+    if (user) router.navigate({ to: "/" });
   }, [user, router]);
 
   const handleSignIn = async () => {
@@ -32,7 +30,7 @@ export default function SignInForm({ className }: TProps) {
   return (
     <div
       className={cn(
-        "flex min-h-screen flex-col items-center justify-center p-4",
+        "flex flex-1 flex-col items-center justify-center p-4",
         className,
       )}
     >

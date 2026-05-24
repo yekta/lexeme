@@ -1,5 +1,4 @@
-"use client";
-
+import { ClientOnly } from "@/components/client-only";
 import { DeckNotFound } from "@/components/deck-not-found";
 import {
   EmptyList,
@@ -33,9 +32,9 @@ import {
   type Grade,
 } from "@/lib/fsrs";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
+import { createFileRoute } from "@tanstack/react-router";
 import confetti from "canvas-confetti";
 import { CheckCircle2 } from "lucide-react";
-import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type TQueueItem = {
@@ -50,6 +49,18 @@ type TPreviewLabels = {
   goodLabel: string;
   easyLabel: string;
 };
+
+export const Route = createFileRoute("/study/$id/")({
+  component: StudyRoute,
+});
+
+function StudyRoute() {
+  return (
+    <ClientOnly fallback={<StudyPageSkeleton />}>
+      <StudyPage />
+    </ClientOnly>
+  );
+}
 
 /**
  * Fisher–Yates shuffle driven by a seeded PRNG (mulberry32). Deterministic —
@@ -89,9 +100,9 @@ type TStudySession = {
   reviewedCount: number;
 };
 
-export function StudyPage() {
+function StudyPage() {
   const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
-  const { id } = useParams() as { id: string };
+  const { id } = Route.useParams();
 
   const [studySession, setStudySession] = useState<TStudySession | null>(null);
 
@@ -128,9 +139,6 @@ export function StudyPage() {
   const isOptimistic =
     (deckData ? isRowOptimistic(deckData) : false) || studyQuery.isOptimistic;
 
-  // The shuffled due queue. Reactive to the collections until the session
-  // starts (first rating), after which `studySession` owns the queue so rating
-  // a card can't reshuffle or reset the run in progress.
   const initialQueue = useMemo<TQueueItem[]>(() => {
     const cards = studyData?.dueCards ?? [];
     const items = cards.map((card) => ({
@@ -256,16 +264,10 @@ export function StudyPage() {
   );
 }
 
-/** The study page's loading state — the view in placeholder mode. */
-export function StudyPageSkeleton() {
+function StudyPageSkeleton() {
   return <StudyPageView isPlaceholder />;
 }
 
-/**
- * The study page layout — the single source of the page's markup, shared by
- * the live page (`StudyPage`) and its skeleton (`StudyPageSkeleton`).
- * `isPlaceholder` threads through to swap real content for skeleton primitives.
- */
 function StudyPageView({
   isPlaceholder = false,
   state = "pending",

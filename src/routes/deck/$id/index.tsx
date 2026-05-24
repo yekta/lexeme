@@ -1,6 +1,5 @@
-"use client";
-
 import { AddCardForm } from "@/components/add-card-form";
+import { ClientOnly } from "@/components/client-only";
 import { DeckNotFound } from "@/components/deck-not-found";
 import { DeckSettingsMenu } from "@/components/deck-settings-menu";
 import {
@@ -27,13 +26,25 @@ import { useDeck, type TDeck } from "@/hooks/data/use-decks";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
+import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft, Plus } from "lucide-react";
-import { useParams } from "next/navigation";
 import { useState } from "react";
 
-export function DeckPage() {
+export const Route = createFileRoute("/deck/$id/")({
+  component: DeckRoute,
+});
+
+function DeckRoute() {
+  return (
+    <ClientOnly fallback={<DeckPageSkeleton />}>
+      <DeckPage />
+    </ClientOnly>
+  );
+}
+
+function DeckPage() {
   const { isPending: isPendingAuth } = useRedirectToSignInIfNecessary();
-  const { id } = useParams() as { id: string };
+  const { id } = Route.useParams();
 
   const deckQuery = useDeck(id);
   const cardsQuery = useCardsByDeck(id);
@@ -42,10 +53,6 @@ export function DeckPage() {
   const isPlaceholder =
     isPendingAuth || state === "pending" || state === "unauthorized";
 
-  // Optimistic deletes remove rows from the live state immediately, so
-  // `$synced` checks can't see them — the sidecar counter fills that gap for
-  // card deletes (from `LCardManage`) and the brief deck-delete window before
-  // `DeckSettingsMenu` navigates away.
   const hasPendingCards = usePendingMutations("cards");
   const hasPendingDecks = usePendingMutations("decks");
   const isOptimistic =
@@ -71,16 +78,10 @@ export function DeckPage() {
   );
 }
 
-/** The deck page's loading state — the view in placeholder mode. */
-export function DeckPageSkeleton() {
+function DeckPageSkeleton() {
   return <DeckPageView isPlaceholder />;
 }
 
-/**
- * The deck page layout — the single source of the page's markup, shared by the
- * live page (`DeckPage`) and its skeleton (`DeckPageSkeleton`). `isPlaceholder`
- * threads through to swap real content for skeleton primitives.
- */
 function DeckPageView({
   isPlaceholder = false,
   state = "pending",

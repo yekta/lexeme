@@ -172,9 +172,11 @@ function DeckPageView({
 
               <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
                 <DialogTrigger
-                  render={<Button isPlaceholder={isPlaceholder} />}
+                  render={
+                    <Button isPlaceholder={isPlaceholder} className="px-3.5" />
+                  }
                 >
-                  <Plus className="size-5 -ml-1.5 shrink-0" />
+                  <Plus className="size-5 -ml-1.25 shrink-0" />
                   <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
                     Add Card
                   </span>

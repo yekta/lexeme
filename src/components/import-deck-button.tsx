@@ -72,7 +72,7 @@ export function CreateOrImportDeckButton({
         <Button
           isPlaceholder={isPlaceholder}
           onClick={onCreate}
-          className="rounded-r-none px-3.5 gap-1"
+          className="rounded-r-none px-3.5"
         >
           <Plus className="size-5 -ml-1.25 shrink-0" />
           <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">

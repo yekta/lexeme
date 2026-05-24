@@ -165,7 +165,7 @@ function DeckPageView({
             <div className="flex items-center justify-between gap-4">
               <h2 className="px-1 text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 Cards{" "}
-                <span className="font-normal text-muted-foreground group-data-placeholder:text-transparent">
+                <span className="font-normal text-xl text-muted-foreground group-data-placeholder:text-transparent">
                   ({isPlaceholder ? 5 : cards.length})
                 </span>
               </h2>
@@ -210,7 +210,10 @@ function DeckPageView({
                 </EmptyListHeader>
                 <EmptyListFooter>
                   <Button onClick={() => setIsAddCardOpen(true)}>
-                    Add Card
+                    <Plus className="size-5 -ml-1.5 shrink-0" />
+                    <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+                      Add Card
+                    </span>
                   </Button>
                 </EmptyListFooter>
               </EmptyList>

@@ -89,7 +89,7 @@ export function CreateOrImportDeckButton({
               />
             }
           >
-            <ChevronDown className="size-5 shrink-0" />
+            <ChevronDown className="size-5 shrink-0 group-data-popup-open/button:rotate-180 transition" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-40">
             <DropdownMenuItem

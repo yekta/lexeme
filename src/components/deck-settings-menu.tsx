@@ -69,8 +69,9 @@ export function DeckSettingsMenu({
   /** Called after the deck is successfully deleted (e.g. to redirect away). */
   onDeleted?: () => void;
 }) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSettingsFormOpen, setIsSettingsFormOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   async function handleExport() {
@@ -103,7 +104,7 @@ export function DeckSettingsMenu({
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
         <DropdownMenuTrigger
           render={
             <Button
@@ -111,14 +112,14 @@ export function DeckSettingsMenu({
               size="icon-lg"
               className={cn(triggerClassName)}
             >
-              <MoreVertical className="size-5 shrink-0 text-muted-foreground" />
+              <MoreVertical className="size-5 shrink-0 text-muted-foreground group-data-popup-open/button:rotate-90 transition" />
             </Button>
           }
         ></DropdownMenuTrigger>
         <DropdownMenuContent align={align} className="min-w-40">
           <DropdownMenuItem
             className="cursor-pointer"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => setIsSettingsFormOpen(true)}
           >
             <Settings className="size-5 shrink-0" />
             Settings
@@ -134,7 +135,7 @@ export function DeckSettingsMenu({
           <DropdownMenuItem
             variant="destructive"
             className="cursor-pointer"
-            onClick={() => setDeleteOpen(true)}
+            onClick={() => setIsDeleteOpen(true)}
           >
             <Trash2 className="size-5 shrink-0" />
             Delete Deck
@@ -142,18 +143,21 @@ export function DeckSettingsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+      <Dialog open={isSettingsFormOpen} onOpenChange={setIsSettingsFormOpen}>
         <DialogContent>
-          <DeckSettingsForm deck={deck} onDone={() => setSettingsOpen(false)} />
+          <DeckSettingsForm
+            deck={deck}
+            onDone={() => setIsSettingsFormOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
           <DeleteDeckForm
             deck={deck}
             onDeleted={onDeleted}
-            onDone={() => setDeleteOpen(false)}
+            onDone={() => setIsDeleteOpen(false)}
           />
         </DialogContent>
       </Dialog>

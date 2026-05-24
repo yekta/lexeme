@@ -66,7 +66,10 @@ export function LearningProfileField({
           onChange(fallbackId);
         }}
       >
-        <ComboboxInput placeholder="Search profiles..." className="w-full" />
+        <ComboboxInput
+          placeholder="Search profiles..."
+          className="-mx-1 w-[calc(100%+0.5rem)]"
+        />
         <ComboboxContent>
           <ComboboxEmpty>No profiles found.</ComboboxEmpty>
           <ComboboxList>

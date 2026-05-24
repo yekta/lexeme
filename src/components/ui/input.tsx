@@ -17,4 +17,13 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   );
 }
 
-export { Input };
+function FormInput({ className, ...props }: React.ComponentProps<"input">) {
+  return (
+    <Input
+      className={cn("-mx-1 w-[calc(100%+0.5rem)]", className)}
+      {...props}
+    />
+  );
+}
+
+export { Input, FormInput };

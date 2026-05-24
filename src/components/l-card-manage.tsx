@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
 import { useForm } from "@tanstack/react-form";
@@ -219,7 +219,7 @@ function EditCardForm({
           {(field) => (
             <div className="space-y-2">
               <Label htmlFor={field.name}>Front (Question)</Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 value={field.state.value}
@@ -233,7 +233,7 @@ function EditCardForm({
           {(field) => (
             <div className="space-y-2">
               <Label htmlFor={field.name}>Back (Answer)</Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 value={field.state.value}

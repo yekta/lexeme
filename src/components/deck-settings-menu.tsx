@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { FormInput, Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
@@ -217,7 +217,7 @@ function DeckSettingsForm({
           {(field) => (
             <div className="space-y-2">
               <Label htmlFor={field.name}>Name</Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 value={field.state.value}
@@ -237,7 +237,7 @@ function DeckSettingsForm({
                   (optional)
                 </span>
               </Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 value={field.state.value}

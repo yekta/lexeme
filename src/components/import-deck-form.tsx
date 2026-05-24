@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useImportDeck } from "@/hooks/data/use-import-deck";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
@@ -90,7 +90,7 @@ export function ImportDeckForm({
           {(field) => (
             <div className="space-y-2">
               <Label htmlFor={field.name}>Name</Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 placeholder="e.g. Spanish Vocabulary"
@@ -110,7 +110,7 @@ export function ImportDeckForm({
                   (optional)
                 </span>
               </Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 placeholder="e.g. Words from chapter 1-5"

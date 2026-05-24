@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { FormInput, Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isRowOptimistic } from "@/db/collections";
 import { usePendingMutations } from "@/db/pending-mutations";
@@ -284,7 +284,7 @@ function CreateDeckForm({
           {(field) => (
             <div className="space-y-2">
               <Label htmlFor={field.name}>Name</Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 placeholder="e.g. Spanish Vocabulary"
@@ -304,7 +304,7 @@ function CreateDeckForm({
                   (optional)
                 </span>
               </Label>
-              <Input
+              <FormInput
                 id={field.name}
                 name={field.name}
                 placeholder="e.g. Words from chapter 1-5"

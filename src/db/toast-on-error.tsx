@@ -32,7 +32,7 @@ export function toastErrorOnOptimisticOperation({
     duration: Infinity,
     closeButton: false,
     action: (
-      <Button size="xs" onClick={() => toast.dismiss(id)}>
+      <Button className="ml-auto" size="xs" onClick={() => toast.dismiss(id)}>
         Okay
       </Button>
     ),

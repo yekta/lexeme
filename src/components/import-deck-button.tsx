@@ -28,6 +28,7 @@ export function CreateOrImportDeckButton({
   onCreate: () => void;
   onImported: (id: string) => Promise<void> | void;
 }) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<DeckExport | null>(null);
 
@@ -62,6 +63,7 @@ export function CreateOrImportDeckButton({
         accept="application/json,.json"
         className="hidden"
         onChange={(e) => {
+          setIsDropdownOpen(false);
           const file = e.target.files?.[0];
           // Reset value so picking the same file twice still fires onChange.
           e.target.value = "";
@@ -79,7 +81,7 @@ export function CreateOrImportDeckButton({
             Create
           </span>
         </Button>
-        <DropdownMenu>
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger
             render={
               <Button
@@ -95,6 +97,7 @@ export function CreateOrImportDeckButton({
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
+              closeOnClick={false}
             >
               <DownloadIcon className="size-5 shrink-0" />
               Import Deck

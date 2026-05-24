@@ -178,7 +178,7 @@ function DeckPageView({
                   }
                 >
                   <Plus className="size-5 -ml-1.25 shrink-0" />
-                  <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+                  <span className="shrink min-w-0 overflow-hidden text-ellipsis">
                     Add Card
                   </span>
                 </DialogTrigger>
@@ -214,7 +214,7 @@ function DeckPageView({
                 <EmptyListFooter>
                   <Button onClick={() => setIsAddCardOpen(true)}>
                     <Plus className="size-5 -ml-1.5 shrink-0" />
-                    <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+                    <span className="shrink min-w-0 overflow-hidden text-ellipsis">
                       Add Card
                     </span>
                   </Button>

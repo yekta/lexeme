@@ -146,7 +146,7 @@ export function LCardManage(props: TLCardManageProps) {
           classNameInner="rounded-tl-[calc(var(--radius)*1.4-2px)]"
           classNameBg="h-4/5"
         />
-        <p className="shrink max-w-full flex items-center relative pr-6 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="shrink max-w-full flex items-center relative pr-6 min-w-0 overflow-hidden text-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           <span className="mr-[0.5ch] shrink min-w-0 truncate">Front</span>
           <OptimisticIndicator isOptimistic={isOptimistic} className="size-3" />
         </p>
@@ -161,7 +161,7 @@ export function LCardManage(props: TLCardManageProps) {
       {/* Back */}
       <div className="px-5 flex-1 py-4 relative w-full flex flex-col items-start gap-2">
         <BgPattern />
-        <p className="relative shrink max-w-full pr-5 min-w-0 overflow-hidden overflow-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
+        <p className="relative shrink max-w-full pr-5 min-w-0 overflow-hidden text-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
         <p className="relative shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">

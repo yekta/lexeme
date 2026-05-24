@@ -75,7 +75,7 @@ export function CreateOrImportDeckButton({
           className="rounded-r-none px-3.5"
         >
           <Plus className="size-5 -ml-1.25 shrink-0" />
-          <span className="shrink min-w-0 overflow-hidden overflow-ellipsis">
+          <span className="shrink min-w-0 overflow-hidden text-ellipsis">
             Create
           </span>
         </Button>

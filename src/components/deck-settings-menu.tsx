@@ -25,7 +25,13 @@ import { deckExportFilename } from "@/lib/deck-export";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/trpc/vanilla";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Settings, Trash2, UploadIcon } from "lucide-react";
+import {
+  LoaderIcon,
+  MoreVertical,
+  Settings,
+  Trash2,
+  UploadIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -90,6 +96,7 @@ export function DeckSettingsMenu({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      setIsDropdownOpen(false);
     } catch (error) {
       const description =
         error instanceof Error ? error.message : "Please try again.";
@@ -127,10 +134,15 @@ export function DeckSettingsMenu({
           <DropdownMenuItem
             className="cursor-pointer"
             disabled={isExporting}
+            closeOnClick={false}
             onClick={handleExport}
           >
-            <UploadIcon className="size-5 shrink-0" />
-            Export Deck
+            {isExporting ? (
+              <LoaderIcon className="size-5 shrink-0 animate-spin" />
+            ) : (
+              <UploadIcon className="size-5 shrink-0" />
+            )}
+            {isExporting ? "Exporting..." : "Export Deck"}
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"

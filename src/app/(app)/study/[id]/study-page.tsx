@@ -324,19 +324,13 @@ function StudyPageView({
           )
         }
         rightActions={
-          isPlaceholder ? (
-            <div className="text-sm font-medium text-transparent bg-foreground/20 animate-pulse rounded w-12">
-              &nbsp;
-            </div>
-          ) : (
-            !isUnavailable &&
-            !isFinished &&
-            queueLength > 0 && (
-              <div className="text-sm font-medium text-muted-foreground">
-                {reviewedCount + 1} / {reviewedCount + queueLength}
-              </div>
-            )
-          )
+          <NavbarRightActions
+            isPlaceholder={isPlaceholder}
+            isUnavailable={isUnavailable}
+            isFinished={isFinished}
+            queueLength={queueLength}
+            reviewedCount={reviewedCount}
+          />
         }
       />
       <main className="flex-1 flex flex-col items-center justify-center px-5 pt-4 max-w-4xl mx-auto w-full overflow-hidden pb-[8vh]">
@@ -402,6 +396,38 @@ function StudyPageView({
           />
         ) : null}
       </main>
+    </div>
+  );
+}
+
+function NavbarRightActions({
+  isPlaceholder,
+  isUnavailable,
+  isFinished,
+  queueLength,
+  reviewedCount,
+}: {
+  isPlaceholder: boolean;
+  isUnavailable: boolean;
+  isFinished: boolean;
+  queueLength: number;
+  reviewedCount: number;
+}) {
+  if (isPlaceholder) {
+    return (
+      <div className="text-sm font-medium text-transparent bg-foreground/20 animate-pulse rounded w-12">
+        &nbsp;
+      </div>
+    );
+  }
+
+  if (isUnavailable || isFinished || queueLength < 1) {
+    return null;
+  }
+
+  return (
+    <div className="text-sm font-medium text-muted-foreground">
+      {reviewedCount + 1} / {reviewedCount + queueLength}
     </div>
   );
 }

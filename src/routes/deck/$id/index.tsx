@@ -1,4 +1,5 @@
 import { AddCardForm } from "@/components/add-card-form";
+import { AddOrImportCardsButton } from "@/components/add-or-import-cards-button";
 import { ClientOnly } from "@/components/client-only";
 import { DeckNotFound } from "@/components/deck-not-found";
 import { DeckSettingsMenu } from "@/components/deck-settings-menu";
@@ -18,7 +19,7 @@ import { Navbar } from "@/components/navbar";
 import { NoAccess } from "@/components/no-access";
 import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button, LinkButton } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { isRowOptimistic } from "@/db/collections";
 import { usePendingMutations } from "@/db/pending-mutations";
 import { useCardsByDeck, type TCard } from "@/hooks/data/use-cards";
@@ -171,17 +172,13 @@ function DeckPageView({
                 </span>
               </h2>
 
+              <AddOrImportCardsButton
+                isPlaceholder={isPlaceholder}
+                deckId={deckId}
+                deckName={deckName}
+                onAdd={() => setIsAddCardOpen(true)}
+              />
               <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
-                <DialogTrigger
-                  render={
-                    <Button isPlaceholder={isPlaceholder} className="px-3.5" />
-                  }
-                >
-                  <Plus className="size-5 -ml-1.25 shrink-0" />
-                  <span className="shrink min-w-0 overflow-hidden text-ellipsis">
-                    Add Card
-                  </span>
-                </DialogTrigger>
                 <DialogContent>
                   <AddCardForm
                     key={String(isAddCardOpen)}

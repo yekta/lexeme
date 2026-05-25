@@ -56,6 +56,31 @@ export function useCreateCard() {
   };
 }
 
+/**
+ * Bulk-insert cards into a deck. The collection's `onInsert` handler groups by
+ * deck and dispatches a single `cards.create` mutation, so this stays one
+ * server round-trip regardless of card count.
+ */
+export function useImportCards() {
+  return {
+    mutate: (input: {
+      deckId: string;
+      cards: { front: string; back: string }[];
+    }) => {
+      const rows = input.cards.map((c) =>
+        newCardRow({
+          id: crypto.randomUUID(),
+          deckId: input.deckId,
+          front: c.front,
+          back: c.back,
+        }),
+      );
+      const tx = cardsCollection.insert(rows);
+      toastOnPersistError(tx, "Failed to import cards");
+    },
+  };
+}
+
 export function useUpdateCard() {
   return {
     mutateAsync: async (input: {

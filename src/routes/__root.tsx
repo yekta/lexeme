@@ -28,8 +28,7 @@ export const Route = createRootRoute({
       { title: "Lexeme" },
       {
         name: "description",
-        content:
-          "A flashcard app using spaced repetition algorithm with Firebase authentication.",
+        content: "Master any subject with spaced repetition.",
       },
     ],
     links: [{ rel: "stylesheet", href: globalsCss }],

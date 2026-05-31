@@ -8,8 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePersistentForm } from "@/components/form-draft-provider";
 import { useCreateCard } from "@/hooks/data/use-cards";
-import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
 
 const cardSchema = z.object({
@@ -25,7 +25,9 @@ export function AddCardForm({
   onDone: () => void;
 }) {
   const mutation = useCreateCard();
-  const form = useForm({
+  const form = usePersistentForm({
+    id: "add-card",
+    instanceId: deckId,
     defaultValues: { front: "", back: "" },
     validators: {
       onMount: cardSchema,

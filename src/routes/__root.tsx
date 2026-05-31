@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { ErrorBoundary } from "@/components/error-boundary";
 import { LoadError } from "@/components/load-error";
+import { FormDraftProvider } from "@/components/form-draft-provider";
 import { Navbar } from "@/components/navbar";
 import { NowProvider } from "@/components/now-provider";
 import { PageNotFound } from "@/components/page-not-found";
@@ -66,7 +67,9 @@ function RootComponent() {
           <TRPCReactProvider>
             <CollectionsPreloader />
             <NowProvider>
-              <Outlet />
+              <FormDraftProvider>
+                <Outlet />
+              </FormDraftProvider>
             </NowProvider>
             <Toaster closeButton position="bottom-right" />
           </TRPCReactProvider>

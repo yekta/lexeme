@@ -76,11 +76,11 @@ export function LDeck(props: TLDeckProps) {
     >
       {/* Ghost card 2 — bottom of stack */}
       {(isPlaceholder || totalCards > 2) && (
-        <div className="shadow-md shadow-shadow/shadow absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left transition-colors" />
+        <div className="shadow-md shadow-shadow/shadow absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-1 origin-bottom-left transition-colors" />
       )}
       {/* Ghost card 1 */}
       {(isPlaceholder || totalCards > 1) && (
-        <div className="shadow-md shadow-shadow/shadow absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-[1deg] origin-bottom-left transition-colors" />
+        <div className="shadow-md shadow-shadow/shadow absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-1 origin-bottom-left transition-colors" />
       )}
       {/* Main card */}
       <motion.div className="relative z-10">

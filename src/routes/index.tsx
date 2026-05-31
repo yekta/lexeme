@@ -1,4 +1,5 @@
 import { ClientOnly } from "@/components/client-only";
+import { usePersistentForm } from "@/components/form-draft-provider";
 import { CreateOrImportDeckButton } from "@/components/import-deck-button";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
 import { LearningProfileField } from "@/components/learning-profile-field";
@@ -25,7 +26,6 @@ import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { cn } from "@/lib/utils";
-import { useForm } from "@tanstack/react-form";
 import { createFileRoute } from "@tanstack/react-router";
 import { formatDuration, intervalToDuration } from "date-fns";
 import { Plus } from "lucide-react";
@@ -187,7 +187,6 @@ function HomePageView({
               >
                 <DialogContent>
                   <CreateDeckForm
-                    key={String(isCreateDeckOpen)}
                     onAfterSubmit={async (id) => {
                       await asyncRouterPush(`/deck/${id}`);
                       setIsCreateDeckOpen(false);
@@ -227,7 +226,8 @@ function CreateDeckForm({
   const defaultProfile = profiles?.find((p) => p.is_default);
   const defaultProfileId = defaultProfile?.id;
   const mutation = useCreateDeck();
-  const form = useForm({
+  const form = usePersistentForm({
+    id: "create-deck",
     defaultValues: {
       name: "",
       description: "",

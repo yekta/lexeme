@@ -14,7 +14,7 @@ export default function PlusIcon({ className, style }: ComponentProps<"svg">) {
     >
       <path
         d="M12 5V12M12 19V12M12 12H5M12 12H19"
-        stroke="black"
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"

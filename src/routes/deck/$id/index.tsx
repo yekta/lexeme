@@ -13,6 +13,7 @@ import {
   EmptyListTitle,
 } from "@/components/empty-list";
 import CardsIcon from "@/components/icons/cards";
+import PlusIcon from "@/components/icons/plus-icon";
 import { LCardManage } from "@/components/l-card-manage";
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
@@ -28,7 +29,7 @@ import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/deck/$id/")({
@@ -210,7 +211,7 @@ function DeckPageView({
                 </EmptyListHeader>
                 <EmptyListFooter>
                   <Button onClick={() => setIsAddCardOpen(true)}>
-                    <Plus className="size-5 -ml-1.5 shrink-0" />
+                    <PlusIcon className="size-5 -ml-1.5 shrink-0" />
                     <span className="shrink min-w-0 overflow-hidden text-ellipsis">
                       Add Card
                     </span>

@@ -1,5 +1,6 @@
 "use client";
 
+import PlusIcon from "@/components/icons/plus-icon";
 import { ImportDeckForm } from "@/components/import-deck-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { deckExportSchema, type DeckExport } from "@/lib/deck-export";
-import { ChevronDown, DownloadIcon, Plus } from "lucide-react";
+import { ChevronDown, DownloadIcon } from "lucide-react";
 import { useRef, useState } from "react";
 
 /**
@@ -76,7 +77,7 @@ export function CreateOrImportDeckButton({
           onClick={onCreate}
           className="rounded-r-none px-3.5"
         >
-          <Plus className="size-5 -ml-1.25 shrink-0" />
+          <PlusIcon className="size-5 -ml-1.25 shrink-0" />
           <span className="shrink min-w-0 overflow-hidden text-ellipsis">
             Create
           </span>

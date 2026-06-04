@@ -1,5 +1,6 @@
 import { ClientOnly } from "@/components/client-only";
 import { usePersistentForm } from "@/components/form-draft-provider";
+import PlusIcon from "@/components/icons/plus-icon";
 import { CreateOrImportDeckButton } from "@/components/import-deck-button";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
 import { LearningProfileField } from "@/components/learning-profile-field";
@@ -28,7 +29,6 @@ import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { cn } from "@/lib/utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { formatDuration, intervalToDuration } from "date-fns";
-import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -433,7 +433,7 @@ function DecksSection({
           Create your first deck to start adding cards.
         </p>
         <Button onClick={onCreateDeck}>
-          <Plus className="size-5 -ml-1.5 shrink-0" />
+          <PlusIcon className="size-5 -ml-1.5 shrink-0" />
           <span className="shrink min-w-0 overflow-hidden text-ellipsis">
             Create Deck
           </span>

@@ -1,5 +1,6 @@
 "use client";
 
+import PlusIcon from "@/components/icons/plus-icon";
 import { ImportCardsForm } from "@/components/import-cards-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { cardsImportSchema } from "@/lib/cards-import";
-import { ChevronDown, DownloadIcon, Plus } from "lucide-react";
+import { ChevronDown, DownloadIcon } from "lucide-react";
 import { useRef, useState } from "react";
 
 /**
@@ -88,7 +89,7 @@ export function AddOrImportCardsButton({
           onClick={onAdd}
           className="rounded-r-none px-3.5"
         >
-          <Plus className="size-5 -ml-1.25 shrink-0" />
+          <PlusIcon className="size-5 -ml-1.25 shrink-0" />
           <span className="shrink min-w-0 overflow-hidden text-ellipsis">
             Add Card
           </span>

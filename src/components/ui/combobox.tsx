@@ -93,7 +93,7 @@ function ComboboxInput({
       className={cn(
         "group/combobox relative w-auto",
         "data-placeholder:opacity-100 data-placeholder:has-disabled:bg-transparent dark:data-placeholder:has-disabled:bg-input/30",
-        "[&>[data-slot=input-group-control]]:group-data-placeholder/combobox:pointer-events-none [&>[data-slot=input-group-control]]:group-data-placeholder/combobox:opacity-0",
+        "*:data-[slot=input-group-control]:group-data-placeholder/combobox:pointer-events-none *:data-[slot=input-group-control]:group-data-placeholder/combobox:opacity-0",
         "[&_svg]:group-data-placeholder/combobox:text-transparent [&_svg]:group-data-placeholder/combobox:bg-foreground/20 [&_svg]:group-data-placeholder/combobox:animate-skeleton [&_svg]:group-data-placeholder/combobox:rounded",
         className,
       )}
@@ -105,7 +105,7 @@ function ComboboxInput({
       {isPlaceholder && (
         <span
           aria-hidden
-          className="pointer-events-none leading-tight absolute top-1/2 left-2.5 max-w-[calc(100%---spacing(12))] -translate-y-1/2 truncate animate-skeleton rounded bg-foreground/20 text-base text-transparent select-none md:text-sm"
+          className="pointer-events-none leading-tight absolute top-1/2 left-2.5 max-w-[calc(100%-(--spacing(12)))] -translate-y-1/2 truncate animate-skeleton rounded bg-foreground/20 text-base text-transparent select-none"
         >
           {placeholderText}
         </span>
@@ -155,7 +155,7 @@ function ComboboxContent({
           data-slot="combobox-content"
           data-chips={!!anchor}
           className={cn(
-            "group/combobox-content relative max-h-(--available-height) w-(--anchor-width) max-w-(--available-width) min-w-[calc(var(--anchor-width)+--spacing(7))] origin-(--transform-origin) overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md shadow-shadow/shadow ring-1 ring-border duration-100 data-[chips=true]:min-w-(--anchor-width) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 *:data-[slot=input-group]:m-1 *:data-[slot=input-group]:mb-0 *:data-[slot=input-group]:h-10 *:data-[slot=input-group]:border-input/30 *:data-[slot=input-group]:bg-input/30 *:data-[slot=input-group]:shadow-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            "group/combobox-content relative max-h-(--available-height) w-(--anchor-width) max-w-(--available-width) min-w-[calc(var(--anchor-width)+(--spacing(7)))] origin-(--transform-origin) overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-md shadow-shadow/shadow ring-1 ring-border duration-100 data-[chips=true]:min-w-(--anchor-width) data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 *:data-[slot=input-group]:m-1 *:data-[slot=input-group]:mb-0 *:data-[slot=input-group]:h-10 *:data-[slot=input-group]:border-input/30 *:data-[slot=input-group]:bg-input/30 *:data-[slot=input-group]:shadow-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
             className,
           )}
           {...props}
@@ -170,7 +170,7 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
     <ComboboxPrimitive.List
       data-slot="combobox-list"
       className={cn(
-        "no-scrollbar max-h-[min(calc(--spacing(72)---spacing(9)),calc(var(--available-height)---spacing(9)))] scroll-py-1 overflow-y-auto overscroll-contain p-1 data-empty:p-0",
+        "no-scrollbar max-h-[min(calc(--spacing(72)-(--spacing(9))),calc(var(--available-height)-(--spacing(9))))] scroll-py-1 overflow-y-auto overscroll-contain p-1 data-empty:p-0",
         className,
       )}
       {...props}

@@ -67,7 +67,7 @@ function DialogContent({
               render={
                 <Button
                   variant="ghost"
-                  className="absolute top-1 right-1"
+                  className="absolute top-1 right-1 text-muted-foreground"
                   size="icon-sm"
                 />
               }
@@ -110,7 +110,9 @@ function DialogFooter({
       {...props}
     >
       <BgPattern className="rounded-b-xl" />
-      {children}
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end -mx-1 w-[calc(100%+0.5rem)]">
+        {children}
+      </div>
       {showCloseButton && (
         <DialogPrimitive.Close render={<Button variant="outline" />}>
           Close

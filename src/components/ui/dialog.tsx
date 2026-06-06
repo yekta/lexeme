@@ -110,7 +110,7 @@ function DialogFooter({
       {...props}
     >
       <BgPattern className="rounded-b-xl" />
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end -mx-1 w-[calc(100%+0.5rem)]">
+      <div className="flex gap-2 flex-col-reverse sm:flex-row sm:justify-end -m-1 w-[calc(100%+0.5rem)]">
         {children}
       </div>
       {showCloseButton && (

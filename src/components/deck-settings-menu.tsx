@@ -21,11 +21,13 @@ import { Label } from "@/components/ui/label";
 import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
+import { useImportCardsFlow } from "@/hooks/use-import-cards-flow";
 import { deckExportFilename } from "@/lib/deck-export";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/trpc/vanilla";
 import { useForm } from "@tanstack/react-form";
 import {
+  DownloadIcon,
   LoaderIcon,
   MoreVertical,
   Settings,
@@ -79,6 +81,10 @@ export function DeckSettingsMenu({
   const [isSettingsFormOpen, setIsSettingsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const { openFilePicker, importElements } = useImportCardsFlow({
+    deckId: deck.id,
+    deckName: deck.name,
+  });
 
   async function handleExport() {
     if (isExporting) return;
@@ -133,6 +139,17 @@ export function DeckSettingsMenu({
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
+            closeOnClick={false}
+            onClick={() => {
+              setIsDropdownOpen(false);
+              openFilePicker();
+            }}
+          >
+            <DownloadIcon className="size-5 shrink-0" />
+            Import Cards
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="cursor-pointer"
             disabled={isExporting}
             closeOnClick={false}
             onClick={handleExport}
@@ -173,6 +190,8 @@ export function DeckSettingsMenu({
           />
         </DialogContent>
       </Dialog>
+
+      {importElements}
     </>
   );
 }

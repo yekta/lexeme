@@ -1,19 +1,16 @@
 "use client";
 
 import PlusIcon from "@/components/icons/plus-icon";
-import { ImportCardsForm } from "@/components/import-cards-form";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
-import { cardsImportSchema } from "@/lib/cards-import";
+import { useImportCardsFlow } from "@/hooks/use-import-cards-flow";
 import { ChevronDown, DownloadIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 /**
  * Split button for the deck-detail header: primary action opens the single-card
@@ -34,55 +31,13 @@ export function AddOrImportCardsButton({
   onAdd: () => void;
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  // `parsedCards` deliberately persists through the dialog's close animation —
-  // unmounting the form synchronously on submit leaves an empty dialog visible
-  // for a frame. Reopening with a new file overwrites it.
-  const [parsedCards, setParsedCards] = useState<
-    { front: string; back: string }[] | null
-  >(null);
-  const [isImportOpen, setIsImportOpen] = useState(false);
-
-  async function handleFile(file: File) {
-    let payload: unknown;
-    try {
-      const text = await file.text();
-      payload = JSON.parse(text);
-    } catch {
-      toastErrorOnOptimisticOperation({
-        message: "Invalid card file",
-        description: "The selected file is not valid JSON.",
-      });
-      return;
-    }
-    const result = cardsImportSchema.safeParse(payload);
-    if (!result.success) {
-      toastErrorOnOptimisticOperation({
-        message: "Invalid card file",
-        description:
-          "Expected a Lexeme deck export or an array of {front, back} cards.",
-      });
-      return;
-    }
-    setParsedCards(result.data);
-    setIsImportOpen(true);
-  }
+  const { openFilePicker, importElements } = useImportCardsFlow({
+    deckId,
+    deckName,
+  });
 
   return (
     <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        onChange={(e) => {
-          setIsDropdownOpen(false);
-          const file = e.target.files?.[0];
-          // Reset value so picking the same file twice still fires onChange.
-          e.target.value = "";
-          if (file) void handleFile(file);
-        }}
-      />
       <div className="flex">
         <Button
           isPlaceholder={isPlaceholder}
@@ -109,7 +64,10 @@ export function AddOrImportCardsButton({
           <DropdownMenuContent align="end" className="min-w-40">
             <DropdownMenuItem
               className="cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                setIsDropdownOpen(false);
+                openFilePicker();
+              }}
               closeOnClick={false}
             >
               <DownloadIcon className="size-5 shrink-0" />
@@ -119,18 +77,7 @@ export function AddOrImportCardsButton({
         </DropdownMenu>
       </div>
 
-      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent>
-          {parsedCards && (
-            <ImportCardsForm
-              deckId={deckId}
-              deckName={deckName}
-              cards={parsedCards}
-              onAfterSubmit={() => setIsImportOpen(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {importElements}
     </>
   );
 }

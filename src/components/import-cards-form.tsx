@@ -43,12 +43,13 @@ export function ImportCardsForm({
     >
       <DialogHeader>
         <DialogTitle>Import Cards</DialogTitle>
-        <DialogDescription>
-          Importing{" "}
-          <span className="font-medium text-foreground">
+        <DialogDescription className="w-full flex flex-col">
+          <p className="leading-tight mt-1">Found:</p>
+          <p className="font-medium text-foreground text-base">
             {cardCount} {cardWord}
-          </span>{" "}
-          into <span className="font-medium text-foreground">{deckName}</span>.
+          </p>
+          <p className="mt-2.5 leading-tight">Importing into:</p>
+          <p className="font-medium text-foreground text-base">{deckName}</p>
         </DialogDescription>
       </DialogHeader>
       <div className="h-4" />

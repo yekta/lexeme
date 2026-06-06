@@ -12,7 +12,7 @@ import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useState } from "react";
 import { z } from "zod";
 
 const normalizeFront = (front: string) => front.trim().toLowerCase();
@@ -33,9 +33,12 @@ export function AddCardForm({
 }) {
   const mutation = useCreateCard();
   const { data: cards } = useCardsByDeck(deckId);
-  const existingFronts = useMemo(
+  // Snapshot the existing fronts once, on mount. The form remounts every time
+  // the dialog opens (keyed on open state), so this is always current when
+  // shown — and it never includes the card being added this session, which is
+  // what caused the duplicate notice to flicker as the form closed.
+  const [existingFronts] = useState(
     () => new Set(cards.map((c) => normalizeFront(c.front))),
-    [cards],
   );
   const form = usePersistentForm({
     id: "add-card",

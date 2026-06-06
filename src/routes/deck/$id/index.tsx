@@ -182,7 +182,6 @@ function DeckPageView({
               <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
                 <DialogContent>
                   <AddCardForm
-                    key={String(isAddCardOpen)}
                     deckId={deckId}
                     deckName={deckName}
                     onDone={() => setIsAddCardOpen(false)}

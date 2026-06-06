@@ -20,6 +20,8 @@ const buttonVariants = cva(
           "hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
           "bg-destructive text-background border-destructive hover:bg-destructive/80 active:bg-destructive/80 focus-visible:border-destructive focus-visible:ring-destructive/25 shadow-md shadow-shadow/shadow-muted-more",
+        warning:
+          "bg-warning text-background border-warning hover:bg-warning/80 active:bg-warning/80 focus-visible:border-warning focus-visible:ring-warning/25 shadow-md shadow-shadow/shadow-muted-more",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
@@ -51,6 +53,7 @@ const loaderColorClassMap: Record<TVariant, string> = {
   secondary: "text-secondary-foreground",
   ghost: "text-foreground",
   destructive: "text-background",
+  warning: "text-background",
   link: "text-primary",
 };
 
@@ -60,6 +63,7 @@ const placeholderTextClassMap: Record<TVariant, string> = {
   secondary: "group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "group-data-placeholder/button:bg-foreground/20",
   destructive: "group-data-placeholder/button:bg-background/20",
+  warning: "group-data-placeholder/button:bg-background/20",
   link: "group-data-placeholder/button:bg-primary/20",
 };
 
@@ -70,6 +74,7 @@ const placeholderDescendantTextClassMap: Record<TVariant, string> = {
     "[&_span]:group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "[&_span]:group-data-placeholder/button:bg-foreground/20",
   destructive: "[&_span]:group-data-placeholder/button:bg-background/20",
+  warning: "[&_span]:group-data-placeholder/button:bg-background/20",
   link: "[&_span]:group-data-placeholder/button:bg-primary/20",
 };
 
@@ -79,6 +84,7 @@ const placeholderIconClassMap: Record<TVariant, string> = {
   secondary: "[&_svg]:group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "[&_svg]:group-data-placeholder/button:bg-foreground/20",
   destructive: "[&_svg]:group-data-placeholder/button:bg-background/20",
+  warning: "[&_svg]:group-data-placeholder/button:bg-background/20",
   link: "[&_svg]:group-data-placeholder/button:bg-primary/20",
 };
 

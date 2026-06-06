@@ -1,16 +1,21 @@
 "use client";
 
+import { usePersistentForm } from "@/components/form-draft-provider";
 import { Button } from "@/components/ui/button";
 import {
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePersistentForm } from "@/components/form-draft-provider";
-import { useCreateCard } from "@/hooks/data/use-cards";
+import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
+import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import { z } from "zod";
+
+const normalizeFront = (front: string) => front.trim().toLowerCase();
 
 const cardSchema = z.object({
   front: z.string().trim().min(1, "Front is required"),
@@ -19,12 +24,19 @@ const cardSchema = z.object({
 
 export function AddCardForm({
   deckId,
+  deckName,
   onDone,
 }: {
   deckId: string;
+  deckName: string;
   onDone: () => void;
 }) {
   const mutation = useCreateCard();
+  const { data: cards } = useCardsByDeck(deckId);
+  const existingFronts = useMemo(
+    () => new Set(cards.map((c) => normalizeFront(c.front))),
+    [cards],
+  );
   const form = usePersistentForm({
     id: "add-card",
     instanceId: deckId,
@@ -53,6 +65,10 @@ export function AddCardForm({
     >
       <DialogHeader>
         <DialogTitle>Add Card</DialogTitle>
+        <DialogDescription>
+          The card will be added to "
+          <span className="font-medium text-foreground">{deckName}</span>".
+        </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <form.Field name="front">
@@ -84,24 +100,51 @@ export function AddCardForm({
           )}
         </form.Field>
       </div>
-      <DialogFooter>
-        <form.Subscribe
-          selector={(s) => ({
-            canSubmit: s.canSubmit,
-            isSubmitting: s.isSubmitting,
-          })}
-        >
-          {({ canSubmit, isSubmitting }) => (
-            <Button
-              type="submit"
-              disabled={!canSubmit}
-              isPending={isSubmitting}
-            >
-              Add Card
-            </Button>
-          )}
-        </form.Subscribe>
-      </DialogFooter>
+      <form.Subscribe
+        selector={(s) => ({
+          canSubmit: s.canSubmit,
+          isSubmitting: s.isSubmitting,
+          front: s.values.front,
+        })}
+      >
+        {({ canSubmit, isSubmitting, front }) => {
+          const trimmed = front.trim();
+          const isDuplicate =
+            trimmed !== "" && existingFronts.has(normalizeFront(front));
+          return (
+            <>
+              {isDuplicate && (
+                <div className="w-[calc(100%+0.5rem)] -mx-1 pb-4">
+                  <DuplicateNotice />
+                </div>
+              )}
+              <DialogFooter>
+                <Button
+                  type="submit"
+                  disabled={!canSubmit}
+                  isPending={isSubmitting}
+                  variant={isDuplicate ? "warning" : "default"}
+                >
+                  {isDuplicate ? "Add Duplicate" : "Add Card"}
+                </Button>
+              </DialogFooter>
+            </>
+          );
+        }}
+      </form.Subscribe>
     </form>
+  );
+}
+
+function DuplicateNotice({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "w-full flex flex-col gap-2 rounded-lg border bg-warning/10 border-warning/20 px-2.5 py-2.5",
+        className,
+      )}
+    >
+      <p className="text-sm text-warning">This card is already in the deck.</p>
+    </div>
   );
 }

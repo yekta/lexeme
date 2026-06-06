@@ -169,6 +169,7 @@ export function LDeck(props: TLDeckProps) {
                     <AddCardForm
                       key={String(addCardOpen)}
                       deckId={props.deck.id}
+                      deckName={props.deck.name}
                       onDone={() => setAddCardOpen(false)}
                     />
                   </DialogContent>

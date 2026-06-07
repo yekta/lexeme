@@ -23,7 +23,6 @@
     "@cloudflare/vite-plugin": "^1.40.0",
     "@fontsource-variable/dm-sans": "^5.2.8",
     "@google/genai": "^1.17.0",
-    "@neondatabase/serverless": "^1.1.0",
     "@t3-oss/env-core": "^0.13.11",
     "@tanstack/db": "^0.6.6",
     "@tanstack/query-db-collection": "^1.0.37",
@@ -54,7 +53,6 @@
     "tailwind-merge": "^3.5.0",
     "ts-fsrs": "^5.3.2",
     "usehooks-ts": "^3.1.1",
-    "ws": "^8.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -65,7 +63,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.0",
     "dotenv": "^17.4.1",
     "drizzle-kit": "^0.31.10",

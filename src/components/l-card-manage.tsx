@@ -70,7 +70,7 @@ export function LCardManage(props: TLCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/[var(--opacity-shadow)] overflow-hidden isolate transition-colors"
+      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/(--opacity-shadow) overflow-hidden isolate transition-colors"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
@@ -150,7 +150,7 @@ export function LCardManage(props: TLCardManageProps) {
           <span className="mr-[0.5ch] shrink min-w-0 truncate">Front</span>
           <OptimisticIndicator isOptimistic={isOptimistic} className="size-3" />
         </p>
-        <p className="shrink relative max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="shrink relative max-w-full min-w-0 text-sm text-foreground line-clamp-3 wrap-break-word font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {front}
         </p>
       </div>
@@ -164,7 +164,7 @@ export function LCardManage(props: TLCardManageProps) {
         <p className="relative shrink max-w-full pr-5 min-w-0 overflow-hidden text-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           Back
         </p>
-        <p className="relative shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 break-words leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+        <p className="relative shrink max-w-full min-w-0 text-sm text-foreground line-clamp-3 wrap-break-word leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {back}
         </p>
       </div>

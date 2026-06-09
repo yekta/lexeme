@@ -1,5 +1,6 @@
 import { AddCardForm } from "@/components/add-card-form";
 import { AddOrImportCardsButton } from "@/components/add-or-import-cards-button";
+import { CardsVirtualGrid } from "@/components/cards-virtual-grid";
 import { ClientOnly } from "@/components/client-only";
 import { DeckNotFound } from "@/components/deck-not-found";
 import { DeckSettingsMenu } from "@/components/deck-settings-menu";
@@ -219,21 +220,7 @@ function DeckPageView({
                 </EmptyListFooter>
               </EmptyList>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {cards.map((card) => (
-                  <LCardManage
-                    key={card.id}
-                    id={card.id}
-                    deckId={deckId}
-                    front={card.front}
-                    back={card.back}
-                    createdAt={card.created_at}
-                    updatedAt={card.updated_at}
-                    contentUpdatedAt={card.content_updated_at}
-                    isOptimistic={isRowOptimistic(card)}
-                  />
-                ))}
-              </div>
+              <CardsVirtualGrid cards={cards} deckId={deckId} />
             )}
           </>
         )}

@@ -35,7 +35,7 @@ export function LoadError({
           {message ? (
             <div className="mt-3 max-h-[max(30vh,20rem)] bg-card overflow-hidden flex flex-col relative rounded-md border">
               <BgPattern />
-              <pre className="h-full overflow-auto relative px-3 py-2 text-left text-sm font-mono whitespace-pre-wrap break-words">
+              <pre className="h-full overflow-auto relative px-3 py-2 text-left text-sm font-mono whitespace-pre-wrap wrap-anywhere">
                 {message}
               </pre>
             </div>

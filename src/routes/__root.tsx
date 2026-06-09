@@ -45,7 +45,7 @@ export const Route = createRootRoute({
     </RootDocument>
   ),
   notFoundComponent: () => (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col wrap-anywhere">
       <Navbar />
       <main className="flex-1 w-full max-w-5xl mx-auto px-5 flex flex-col items-center justify-center pb-[8vh]">
         <PageNotFound />

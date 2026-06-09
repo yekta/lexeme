@@ -89,10 +89,10 @@ export function LCardStudy(props: TLCardStudyProps) {
             Front
           </p>
           <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10 py-6 min-h-[calc((100svh-80px)*0.35)]">
-            <p className="max-w-full text-2xl font-medium text-foreground break-words text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none px-3">
+            <p className="max-w-full text-2xl font-medium text-foreground wrap-anywhere text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none px-3">
               {isPlaceholder ? "Front text" : props.front}
             </p>
-            <p className="max-w-full text-xl text-foreground/80 break-words text-center opacity-0 px-3">
+            <p className="max-w-full text-xl text-foreground/80 wrap-anywhere text-center opacity-0 px-3">
               {isPlaceholder ? "Back text" : props.back}
             </p>
           </div>
@@ -125,11 +125,11 @@ export function LCardStudy(props: TLCardStudyProps) {
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative">
               Back
             </p>
-            <div className="w-full flex-1 flex flex-col items-center justify-center py-6 min-h-[120px] relative">
-              <p className="max-w-full text-xl text-foreground break-words text-center px-3">
+            <div className="w-full flex-1 flex flex-col items-center justify-center py-6 min-h-30 relative">
+              <p className="max-w-full text-xl text-foreground wrap-anywhere text-center px-3">
                 {isPlaceholder ? "Back text" : props.back}
               </p>
-              <p className="opacity-0 max-w-full text-2xl font-medium text-transparent break-words text-center px-3">
+              <p className="opacity-0 max-w-full text-2xl font-medium text-transparent wrap-anywhere text-center px-3">
                 {isPlaceholder ? "Front text" : props.front}
               </p>
             </div>

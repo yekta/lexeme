@@ -2,6 +2,7 @@
 
 import type { Transaction, PendingMutation } from "@tanstack/db";
 import {
+  NonRetriableError,
   startOfflineExecutor,
   type OfflineExecutor,
 } from "@tanstack/offline-transactions";
@@ -23,8 +24,7 @@ import { trpc } from "@/trpc/vanilla";
  * instant it's made, *before* the server call. If the tab closes (or the
  * network is down) mid-flight, the outbox survives; on the next load the
  * executor replays the queued mutations to Postgres. This is what makes
- * optimistic changes safe to make offline — see also the SQLite read-cache in
- * `persistence.ts`, which is a separate concern (caching synced reads).
+ * optimistic changes safe to make offline.
  *
  * Writes are driven by `transaction.mutations` rather than the action's
  * variables, because only the mutations are durably serialized (and the
@@ -237,6 +237,43 @@ export type RateLogRow = ReviewLogRow & {
   learning_steps: number;
 };
 
+/**
+ * tRPC codes that describe a settled answer — replaying the same payload can
+ * only repeat the same response, so retrying is pointless. UNAUTHORIZED is
+ * deliberately absent: an expired session can be restored by signing back in,
+ * and failing permanently there would drop the queued writes.
+ */
+const NON_RETRIABLE_TRPC_CODES = new Set([
+  "BAD_REQUEST",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "CONFLICT",
+  "PRECONDITION_FAILED",
+  "UNPROCESSABLE_CONTENT",
+  "METHOD_NOT_SUPPORTED",
+  "PARSE_ERROR",
+]);
+
+// The executor's default retry policy only recognises HTTP status substrings
+// ("400", "403", …) in error messages, which tRPC client errors never contain
+// (they carry the zod/server message). Without this mapping a rejected payload
+// retries forever with no visible error.
+function failFastOnSettledError(fn: MutationFn): MutationFn {
+  return async (params) => {
+    try {
+      return await fn(params);
+    } catch (error) {
+      if (
+        error instanceof TRPCClientError &&
+        NON_RETRIABLE_TRPC_CODES.has(error.data?.code as string)
+      ) {
+        throw new NonRetriableError(error.message);
+      }
+      throw error;
+    }
+  };
+}
+
 let executor: OfflineExecutor | undefined;
 
 /** The browser-only outbox executor, created on first use. */
@@ -249,7 +286,12 @@ function getExecutor(): OfflineExecutor | undefined {
       learning_profiles: learningProfilesCollection,
       review_logs: reviewLogsCollection,
     },
-    mutationFns,
+    mutationFns: Object.fromEntries(
+      Object.entries(mutationFns).map(([name, fn]) => [
+        name,
+        failFastOnSettledError(fn),
+      ]),
+    ) as typeof mutationFns,
   });
   return executor;
 }
@@ -257,9 +299,47 @@ function getExecutor(): OfflineExecutor | undefined {
 /**
  * Start the executor and replay any outbox entries left over from a previous
  * session. Call once on app mount (alongside `preloadCollections`).
+ *
+ * Once the replay drains, every collection the queued mutations touched is
+ * refetched. Two reasons: replayed (restored) transactions never deliver the
+ * `$synced` flip to live queries — rows stay visually optimistic forever
+ * (upstream bug in offline-transactions) — and the synced store ends up
+ * holding client-computed values. The refetch fixes both at once: the server
+ * rows carry DB-side timestamps, so the diff emits real updates that re-stamp
+ * the rows as synced.
  */
 export function startOutboxReplay(): void {
-  void getExecutor()?.waitForInit();
+  const ex = getExecutor();
+  if (!ex) return;
+  void (async () => {
+    await ex.waitForInit();
+    const queued = await ex.peekOutbox();
+    if (queued.length === 0) return;
+    const touched = new Set<string>();
+    for (const tx of queued) {
+      for (const m of tx.mutations) {
+        touched.add(m.collection.id);
+      }
+    }
+    // The executor works the queue in the background; both success and
+    // permanent failure remove entries, so this always settles once the
+    // server is reachable.
+    while (ex.getPendingCount() > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    const collectionsById: Record<
+      string,
+      { utils: { refetch: () => Promise<unknown> } } | undefined
+    > = {
+      decks: decksCollection,
+      cards: cardsCollection,
+      learning_profiles: learningProfilesCollection,
+      review_logs: reviewLogsCollection,
+    };
+    for (const id of touched) {
+      void collectionsById[id]?.utils.refetch();
+    }
+  })();
 }
 
 /** A write that applies `onMutate` optimistically and durably queues the server call. */

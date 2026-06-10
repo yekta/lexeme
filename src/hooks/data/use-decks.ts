@@ -4,11 +4,41 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { useMemo } from "react";
 
 import { decksCollection, liveStatus, type DeckRow } from "@/db/collections";
+import { offlineAction } from "@/db/offline";
 import { trackPending } from "@/db/pending-mutations";
 import { toastOnPersistError } from "@/db/toast-on-error";
 import { DataError } from "@/lib/query-state";
 
 export type TDeck = DeckRow;
+
+type DeckInput = {
+  id: string;
+  name: string;
+  description: string;
+  learning_profile_id: string;
+};
+
+const createDeckAction = offlineAction<DeckInput>("createDeck", (v) => {
+  decksCollection.insert({
+    id: v.id,
+    name: v.name,
+    description: v.description,
+    learning_profile_id: v.learning_profile_id,
+    created_at: new Date(),
+  });
+});
+
+const updateDeckAction = offlineAction<DeckInput>("updateDeck", (v) => {
+  decksCollection.update(v.id, (d) => {
+    d.name = v.name;
+    d.description = v.description;
+    d.learning_profile_id = v.learning_profile_id;
+  });
+});
+
+const deleteDeckAction = offlineAction<{ id: string }>("deleteDeck", (v) => {
+  decksCollection.delete(v.id);
+});
 
 /** Every deck the user owns, newest first. */
 export function useDecks() {
@@ -46,13 +76,7 @@ export function useCreateDeck() {
       learning_profile_id: string;
     }) => {
       const id = crypto.randomUUID();
-      const tx = decksCollection.insert({
-        id,
-        name: input.name,
-        description: input.description,
-        learning_profile_id: input.learning_profile_id,
-        created_at: new Date(),
-      });
+      const tx = createDeckAction({ id, ...input });
       toastOnPersistError(tx, "Failed to create deck");
       return id;
     },
@@ -67,11 +91,7 @@ export function useUpdateDeck() {
       description: string;
       learning_profile_id: string;
     }) => {
-      const tx = decksCollection.update(input.id, (d) => {
-        d.name = input.name;
-        d.description = input.description;
-        d.learning_profile_id = input.learning_profile_id;
-      });
+      const tx = updateDeckAction(input);
       toastOnPersistError(tx, "Failed to update deck");
     },
   };
@@ -80,7 +100,7 @@ export function useUpdateDeck() {
 export function useDeleteDeck() {
   return {
     mutateAsync: async (input: { id: string }) => {
-      const tx = decksCollection.delete(input.id);
+      const tx = deleteDeckAction(input);
       trackPending("decks", tx);
       toastOnPersistError(tx, "Failed to delete deck");
     },

@@ -49,6 +49,16 @@ export function useDeckStats() {
     const profiles = profilesLq.data ?? [];
     const profileById = new Map(profiles.map((p) => [p.id, p]));
 
+    // Anki-style deck counts: a learning/review card counts toward "learn"/"due"
+    // if it's due any time today (or overdue) — not only if it's already past
+    // due this instant. A new card rated "Good" lands in learning due ~10 min
+    // out; it should still show as a learning card, not vanish from every
+    // bucket. Mirrors Anki's deck list (the study screen separately gates what's
+    // studyable right now via the short-interval learn-ahead window).
+    const endOfToday = new Date(now);
+    endOfToday.setHours(24, 0, 0, 0);
+    const dayEnd = endOfToday.getTime();
+
     return decks.map((deck) => {
       const deckCards = cards.filter((c) => c.deck_id === deck.id);
       const profile = profileById.get(deck.learning_profile_id);
@@ -66,8 +76,8 @@ export function useDeckStats() {
         const dueTime = new Date(c.due).getTime();
         if (c.state === "new") newCount++;
         else if (c.state === "learning" || c.state === "relearning") {
-          if (dueTime <= now) learnCount++;
-        } else if (c.state === "review" && dueTime <= now) dueCount++;
+          if (dueTime < dayEnd) learnCount++;
+        } else if (c.state === "review" && dueTime < dayEnd) dueCount++;
         latest = Math.max(latest, new Date(c.created_at).getTime());
       }
 

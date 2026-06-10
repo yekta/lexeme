@@ -9,10 +9,29 @@ import {
   newCardRow,
   type CardRow,
 } from "@/db/collections";
+import { offlineAction } from "@/db/offline";
 import { trackPending } from "@/db/pending-mutations";
 import { toastOnPersistError } from "@/db/toast-on-error";
 
 export type TCard = CardRow;
+
+const insertCardsAction = offlineAction<CardRow[]>("insertCards", (rows) => {
+  cardsCollection.insert(rows);
+});
+
+const updateCardAction = offlineAction<{ id: string; front: string; back: string }>(
+  "updateCard",
+  (v) => {
+    cardsCollection.update(v.id, (c) => {
+      c.front = v.front;
+      c.back = v.back;
+    });
+  },
+);
+
+const deleteCardAction = offlineAction<{ id: string }>("deleteCard", (v) => {
+  cardsCollection.delete(v.id);
+});
 
 /** Cards in a deck, newest first. */
 export function useCardsByDeck(deckId: string | undefined) {
@@ -42,14 +61,14 @@ export function useCreateCard() {
       back: string;
     }) => {
       const id = crypto.randomUUID();
-      const tx = cardsCollection.insert(
+      const tx = insertCardsAction([
         newCardRow({
           id,
           deckId: input.deckId,
           front: input.front,
           back: input.back,
         }),
-      );
+      ]);
       toastOnPersistError(tx, "Failed to create card");
       return id;
     },
@@ -57,9 +76,9 @@ export function useCreateCard() {
 }
 
 /**
- * Bulk-insert cards into a deck. The collection's `onInsert` handler groups by
- * deck and dispatches a single `cards.create` mutation, so this stays one
- * server round-trip regardless of card count.
+ * Bulk-insert cards into a deck. The `insertCards` mutationFn groups by deck
+ * and dispatches a single `cards.create` per deck, so this stays one server
+ * round-trip regardless of card count.
  */
 export function useImportCards() {
   return {
@@ -75,7 +94,7 @@ export function useImportCards() {
           back: c.back,
         }),
       );
-      const tx = cardsCollection.insert(rows);
+      const tx = insertCardsAction(rows);
       toastOnPersistError(tx, "Failed to import cards");
     },
   };
@@ -89,10 +108,7 @@ export function useUpdateCard() {
       front: string;
       back: string;
     }) => {
-      const tx = cardsCollection.update(input.id, (c) => {
-        c.front = input.front;
-        c.back = input.back;
-      });
+      const tx = updateCardAction(input);
       toastOnPersistError(tx, "Failed to update card");
     },
   };
@@ -101,7 +117,7 @@ export function useUpdateCard() {
 export function useDeleteCard() {
   return {
     mutateAsync: async (input: { id: string; deckId: string }) => {
-      const tx = cardsCollection.delete(input.id);
+      const tx = deleteCardAction(input);
       trackPending("cards", tx);
       toastOnPersistError(tx, "Failed to delete card");
     },

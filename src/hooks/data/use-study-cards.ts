@@ -12,11 +12,7 @@ import {
   reviewLogsCollection,
   type CardRow,
 } from "@/db/collections";
-import {
-  DEFAULT_MAX_REVIEWS_PER_DAY,
-  DEFAULT_NEW_CARDS_PER_DAY,
-} from "@/lib/constants";
-import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
+import { computeStudyBuckets } from "@/lib/study-buckets";
 
 export type TStudyCard = CardRow;
 
@@ -26,10 +22,11 @@ export type TStudyQueue = {
 };
 
 /**
- * The cards due for study in a deck, capped by the profile's daily new/review
- * limits — derived live from the collections. Order is deterministic (new,
- * then learning, then review); the study page shuffles it into a session.
- * Replaces the old `cards.getStudyQueue` query.
+ * The cards due for study in a deck, derived live from the collections via
+ * `computeStudyBuckets` — the same function behind the deck-list badges, so
+ * the queue always contains exactly the cards the badges count. Order is
+ * deterministic (new, then learning, then review); the study page shuffles it
+ * into a session. Replaces the old `cards.getStudyQueue` query.
  */
 export function useStudyCards(deckId: string | undefined): {
   data: TStudyQueue | undefined;
@@ -71,39 +68,19 @@ export function useStudyCards(deckId: string | undefined): {
     const profile = (profilesLq.data ?? []).find(
       (p) => p.id === deck?.learning_profile_id,
     );
-    const newPerDay = profile?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
-    const maxReviews =
-      profile?.max_reviews_per_day ?? DEFAULT_MAX_REVIEWS_PER_DAY;
-
-    const deckCardIds = new Set(deckCards.map((c) => c.id));
-    const newReviewed = new Set<string>();
-    const reviewReviewed = new Set<string>();
-    for (const log of logsLq.data ?? []) {
-      if (!deckCardIds.has(log.card_id)) continue;
-      if (log.state === "new") newReviewed.add(log.card_id);
-      else if (log.state === "review") reviewReviewed.add(log.card_id);
-    }
-
-    // Cards due within the short-interval window are studyable this session.
-    const soonCutoff = now + SHORT_INTERVAL_MS;
-    const dueRows = deckCards.filter(
-      (c) => new Date(c.due).getTime() <= soonCutoff,
-    );
-    const newCards = dueRows.filter((c) => c.state === "new");
-    const reviewCards = dueRows.filter((c) => c.state === "review");
-    const learningCards = dueRows.filter(
-      (c) => c.state === "learning" || c.state === "relearning",
-    );
-
-    const newLimit = Math.max(0, newPerDay - newReviewed.size);
-    const reviewLimit = Math.max(0, maxReviews - reviewReviewed.size);
+    const buckets = computeStudyBuckets({
+      deckCards,
+      logs: logsLq.data ?? [],
+      profile,
+      now,
+    });
 
     return {
       totalCards: deckCards.length,
       dueCards: [
-        ...newCards.slice(0, newLimit),
-        ...learningCards,
-        ...reviewCards.slice(0, reviewLimit),
+        ...buckets.newCards,
+        ...buckets.learningCards,
+        ...buckets.reviewCards,
       ],
     };
   }, [

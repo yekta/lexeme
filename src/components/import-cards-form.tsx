@@ -11,6 +11,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useCardsByDeck, useImportCards } from "@/hooks/data/use-cards";
 import { appLocale } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { useForm } from "@tanstack/react-form";
 import { useMemo, useState } from "react";
 
@@ -79,31 +80,41 @@ export function ImportCardsForm({
     >
       <DialogHeader>
         <DialogTitle>Import Cards</DialogTitle>
-        <DialogDescription className="w-full flex flex-col">
-          <p className="leading-tight mt-1">Found:</p>
-          <p className="font-medium text-foreground text-base">
-            {cards.length} {pluralize(cards.length)}
-          </p>
+        <DialogDescription className="w-full flex flex-col gap-4">
+          <DescriptionSection className="pt-2">
+            <p className="w-full leading-tight">Importing into:</p>
+            <p className="w-full font-medium text-foreground text-base">
+              {deckName}
+            </p>
+          </DescriptionSection>
+          <DescriptionSection>
+            <p className="w-full leading-tight">Found:</p>
+            <p className="w-full font-medium text-foreground text-base">
+              {cards.length} {pluralize(cards.length)}
+            </p>
+          </DescriptionSection>
           {hasDuplicates && (
             <>
-              <p className="mt-2.5 leading-tight">Duplicates:</p>
-              <p className="font-medium text-warning text-base">
-                {duplicateCards.length} {pluralize(duplicateCards.length)}
-              </p>
-              <p className="mt-2.5 leading-tight">Unique:</p>
-              <p className="font-medium text-foreground text-base">
-                {uniqueCards.length} {pluralize(uniqueCards.length)}
-              </p>
+              <DescriptionSection>
+                <p className="w-full leading-tight">Unique:</p>
+                <p className="w-full font-medium text-foreground text-base">
+                  {uniqueCards.length} {pluralize(uniqueCards.length)}
+                </p>
+              </DescriptionSection>
+              <DescriptionSection>
+                <p className="w-full leading-tight">Duplicates:</p>
+                <p className="w-full font-medium text-warning text-base">
+                  {duplicateCards.length} {pluralize(duplicateCards.length)}
+                </p>
+              </DescriptionSection>
             </>
           )}
-          <p className="mt-2.5 leading-tight">Importing into:</p>
-          <p className="font-medium text-foreground text-base">{deckName}</p>
         </DialogDescription>
       </DialogHeader>
       {hasDuplicates && (
         <form.Field name="importDuplicates">
           {(field) => (
-            <div className="max-w-full pt-4 pb-1 flex items-center gap-2">
+            <div className="max-w-full pt-5 pb-1 flex items-center gap-2">
               <Label
                 htmlFor="import-duplicates"
                 className="cursor-pointer text-warning flex shrink min-w-0 hover:bg-warning/10 active:bg-warning/10 px-2 py-2 rounded-md -mx-2 -my-2 max-w-[calc(100%+1rem)]"
@@ -147,5 +158,22 @@ export function ImportCardsForm({
         </form.Subscribe>
       </DialogFooter>
     </form>
+  );
+}
+
+function DescriptionSection({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("w-full flex flex-col items-center gap-0.5", className)}
+      role="group"
+    >
+      {children}
+    </div>
   );
 }

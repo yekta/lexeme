@@ -97,10 +97,12 @@ export function LDeck(props: TLDeckProps) {
                 <span className="pr-[0.5ch] shrink min-w-0 truncate">
                   {name}
                 </span>
-                <OptimisticIndicator
-                  isOptimistic={isOptimistic}
-                  className="size-3.5"
-                />
+                {!isPlaceholder && (
+                  <OptimisticIndicator
+                    isOptimistic={isOptimistic}
+                    className="size-3.5"
+                  />
+                )}
               </CardTitle>
               <CardDescription className="truncate group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 {/* Description or non-breaking space */}

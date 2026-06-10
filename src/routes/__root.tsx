@@ -31,7 +31,22 @@ export const Route = createRootRoute({
         content: "Master any subject with spaced repetition.",
       },
     ],
-    links: [{ rel: "stylesheet", href: globalsCss }],
+    links: [
+      { rel: "stylesheet", href: globalsCss },
+      {
+        rel: "apple-touch-icon",
+        sizes: "180x180",
+        href: "/apple-touch-icon.png",
+      },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "/favicon-32.png",
+      },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+    ],
   }),
   component: RootComponent,
   errorComponent: ({ error, reset }) => (

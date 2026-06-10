@@ -151,10 +151,12 @@ function DeckPageView({
                     onDeleted={() => asyncPush("/")}
                   />
                 )}
-                <OptimisticIndicator
-                  isOptimistic={isOptimistic}
-                  className="size-4"
-                />
+                {!isPlaceholder && (
+                  <OptimisticIndicator
+                    isOptimistic={isOptimistic}
+                    className="size-4"
+                  />
+                )}
               </div>
               <LinkButton
                 href={`/study/${deckId}`}

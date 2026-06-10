@@ -65,17 +65,22 @@ export const cardsRouter = createTRPCRouter({
 
       // Card ids are client-generated; content row ids fall back to the
       // database default. One transaction so partial imports never leak.
+      // onConflictDoNothing keeps an outbox replay idempotent.
       await ctx.db.transaction(async (tx) => {
         await tx
           .insert(cards)
-          .values(input.cards.map((c) => ({ id: c.id, deck_id: input.deckId })));
-        await tx.insert(cardContents).values(
-          input.cards.map((c) => ({
-            card_id: c.id,
-            front: c.front,
-            back: c.back,
-          })),
-        );
+          .values(input.cards.map((c) => ({ id: c.id, deck_id: input.deckId })))
+          .onConflictDoNothing();
+        await tx
+          .insert(cardContents)
+          .values(
+            input.cards.map((c) => ({
+              card_id: c.id,
+              front: c.front,
+              back: c.back,
+            })),
+          )
+          .onConflictDoNothing();
       });
     }),
 
@@ -156,19 +161,25 @@ export const cardsRouter = createTRPCRouter({
           .update(cards)
           .set(input.card)
           .where(eq(cards.id, input.cardId));
-        await tx.insert(reviewLogs).values({
-          id: input.reviewLogId,
-          card_id: input.cardId,
-          rating: input.log.rating,
-          state: input.log.state,
-          due: input.log.due,
-          stability: input.log.stability,
-          difficulty: input.log.difficulty,
-          scheduled_days: input.log.scheduled_days,
-          learning_steps: input.log.learning_steps,
-          review: input.log.review,
-          duration_ms: input.durationMs,
-        });
+        // onConflictDoNothing on the review-log id keeps an outbox replay
+        // idempotent — re-applying the same rating is a no-op. The card update
+        // is naturally idempotent (it sets absolute FSRS values).
+        await tx
+          .insert(reviewLogs)
+          .values({
+            id: input.reviewLogId,
+            card_id: input.cardId,
+            rating: input.log.rating,
+            state: input.log.state,
+            due: input.log.due,
+            stability: input.log.stability,
+            difficulty: input.log.difficulty,
+            scheduled_days: input.log.scheduled_days,
+            learning_steps: input.log.learning_steps,
+            review: input.log.review,
+            duration_ms: input.durationMs,
+          })
+          .onConflictDoNothing();
       });
     }),
 });

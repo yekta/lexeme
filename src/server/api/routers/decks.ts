@@ -59,7 +59,10 @@ export const decksRouter = createTRPCRouter({
 
       // The id is generated on the client so it can be used immediately for
       // the optimistic row and navigation; we just persist it here.
-      const [row] = await ctx.db
+      // onConflictDoNothing keeps the durable-outbox replay idempotent: a
+      // retry after a prior success is a no-op, not a duplicate-key error.
+      // The id is client-owned, so return it directly.
+      await ctx.db
         .insert(decks)
         .values({
           id: input.id,
@@ -68,8 +71,8 @@ export const decksRouter = createTRPCRouter({
           description: input.description,
           learning_profile_id: input.learning_profile_id,
         })
-        .returning({ id: decks.id });
-      return row!.id;
+        .onConflictDoNothing();
+      return input.id;
     }),
 
   update: protectedProcedure
@@ -141,25 +144,34 @@ export const decksRouter = createTRPCRouter({
         profileId: input.learning_profile_id,
       });
 
+      // onConflictDoNothing on every insert keeps an outbox replay of this
+      // import idempotent (a retry after a prior success is a no-op).
       await ctx.db.transaction(async (tx) => {
-        await tx.insert(decks).values({
-          id: input.id,
-          user_id: ctx.session.user.id,
-          name: input.name,
-          description: input.description,
-          learning_profile_id: input.learning_profile_id,
-        });
+        await tx
+          .insert(decks)
+          .values({
+            id: input.id,
+            user_id: ctx.session.user.id,
+            name: input.name,
+            description: input.description,
+            learning_profile_id: input.learning_profile_id,
+          })
+          .onConflictDoNothing();
         if (input.cards.length > 0) {
           await tx
             .insert(cards)
-            .values(input.cards.map((c) => ({ id: c.id, deck_id: input.id })));
-          await tx.insert(cardContents).values(
-            input.cards.map((c) => ({
-              card_id: c.id,
-              front: c.front,
-              back: c.back,
-            })),
-          );
+            .values(input.cards.map((c) => ({ id: c.id, deck_id: input.id })))
+            .onConflictDoNothing();
+          await tx
+            .insert(cardContents)
+            .values(
+              input.cards.map((c) => ({
+                card_id: c.id,
+                front: c.front,
+                back: c.back,
+              })),
+            )
+            .onConflictDoNothing();
         }
       });
     }),

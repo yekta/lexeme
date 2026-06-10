@@ -1,12 +1,11 @@
 "use client";
 
-import { createTransaction } from "@tanstack/react-db";
-
 import {
   cardsCollection,
   reviewLogsCollection,
   type CardRow,
 } from "@/db/collections";
+import { offlineAction, type RateLogRow } from "@/db/offline";
 import { toastOnPersistError } from "@/db/toast-on-error";
 import {
   dbRowToFSRSCard,
@@ -15,7 +14,6 @@ import {
   type FSRS,
   type Grade,
 } from "@/lib/fsrs";
-import { trpc } from "@/trpc/vanilla";
 
 export type RateArgs = {
   /** The card being reviewed. */
@@ -33,11 +31,42 @@ export type RateResult = {
   dbFields: ReturnType<typeof fsrsCardToDbRow>;
 };
 
+type RateInput = {
+  cardId: string;
+  cardPatch: ReturnType<typeof fsrsCardToDbRow>;
+  log: ReturnType<typeof reviewLogToDbRow>;
+  reviewLogId: string;
+  durationMs: number;
+};
+
+// Applies the card patch + review log optimistically; the `rateCard`
+// mutationFn rebuilds the server payload from these mutations. The review log
+// carries its full FSRS fields (wider than ReviewLogRow) so a replay after a
+// tab close still has everything `cards.rate` needs.
+const rateCardAction = offlineAction<RateInput>("rateCard", (v) => {
+  cardsCollection.update(v.cardId, (c) => {
+    Object.assign(c, v.cardPatch);
+  });
+  reviewLogsCollection.insert({
+    id: v.reviewLogId,
+    card_id: v.cardId,
+    rating: v.log.rating,
+    state: v.log.state,
+    due: v.log.due,
+    stability: v.log.stability,
+    difficulty: v.log.difficulty,
+    scheduled_days: v.log.scheduled_days,
+    learning_steps: v.log.learning_steps,
+    review: v.log.review,
+    duration_ms: v.durationMs,
+  } as RateLogRow);
+});
+
 /**
  * Records a review. FSRS scheduling runs here on the client, the new card
  * state and review log are applied optimistically across both collections in
- * one transaction, and the server persists them in the background. The result
- * is returned synchronously so the study session can advance immediately.
+ * one durable transaction, and the server persists them in the background. The
+ * result is returned synchronously so the study session can advance immediately.
  */
 export function useRateCard() {
   const rate = ({
@@ -49,46 +78,15 @@ export function useRateCard() {
     const now = new Date();
     const result = scheduler.next(dbRowToFSRSCard(card), now, rating);
     const cardPatch = fsrsCardToDbRow(result.card);
-    const logRow = reviewLogToDbRow(result.log, card.id, durationMs);
+    const log = reviewLogToDbRow(result.log, card.id, durationMs);
     const reviewLogId = crypto.randomUUID();
 
-    const tx = createTransaction({
-      mutationFn: async () => {
-        await trpc.cards.rate.mutate({
-          cardId: card.id,
-          reviewLogId,
-          durationMs,
-          card: cardPatch,
-          log: {
-            rating: logRow.rating,
-            state: logRow.state,
-            due: logRow.due,
-            stability: logRow.stability,
-            difficulty: logRow.difficulty,
-            scheduled_days: logRow.scheduled_days,
-            learning_steps: logRow.learning_steps,
-            review: logRow.review,
-          },
-        });
-        // Reconcile the optimistic overlay with the persisted server rows.
-        await Promise.all([
-          cardsCollection.utils.refetch(),
-          reviewLogsCollection.utils.refetch(),
-        ]);
-      },
-    });
-
-    tx.mutate(() => {
-      cardsCollection.update(card.id, (c) => {
-        Object.assign(c, cardPatch);
-      });
-      reviewLogsCollection.insert({
-        id: reviewLogId,
-        card_id: card.id,
-        state: logRow.state,
-        duration_ms: durationMs,
-        review: logRow.review,
-      });
+    const tx = rateCardAction({
+      cardId: card.id,
+      cardPatch,
+      log,
+      reviewLogId,
+      durationMs,
     });
 
     toastOnPersistError(tx, "Failed to save rating");

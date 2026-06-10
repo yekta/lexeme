@@ -318,10 +318,12 @@ function StudyPageView({
           ) : (
             <div className="flex items-center shrink min-w-0">
               <span className="pr-[0.5ch] truncate">{deckName}</span>
-              <OptimisticIndicator
-                isOptimistic={isOptimistic}
-                className="size-3.5"
-              />
+              {!isPlaceholder && (
+                <OptimisticIndicator
+                  isOptimistic={isOptimistic}
+                  className="size-3.5"
+                />
+              )}
             </div>
           )
         }

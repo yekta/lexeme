@@ -172,7 +172,9 @@ function HomePageView({
                     ({isPlaceholder ? 5 : decks.length})
                   </span>
                 </h2>
-                <OptimisticIndicator isOptimistic={isOptimistic} />
+                {!isPlaceholder && (
+                  <OptimisticIndicator isOptimistic={isOptimistic} />
+                )}
               </div>
               <CreateOrImportDeckButton
                 isPlaceholder={isPlaceholder}

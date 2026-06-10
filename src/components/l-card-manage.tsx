@@ -148,7 +148,12 @@ export function LCardManage(props: TLCardManageProps) {
         />
         <p className="shrink max-w-full flex items-center relative pr-6 min-w-0 overflow-hidden text-ellipsis text-xs font-semibold uppercase tracking-wider text-muted-foreground group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:w-10 group-data-placeholder:select-none">
           <span className="mr-[0.5ch] shrink min-w-0 truncate">Front</span>
-          <OptimisticIndicator isOptimistic={isOptimistic} className="size-3" />
+          {!isPlaceholder && (
+            <OptimisticIndicator
+              isOptimistic={isOptimistic}
+              className="size-3"
+            />
+          )}
         </p>
         <p className="shrink relative max-w-full min-w-0 text-sm text-foreground line-clamp-3 wrap-break-word font-medium leading-relaxed group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
           {front}

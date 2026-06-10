@@ -1,14 +1,13 @@
 "use client";
 
-import { createTransaction } from "@tanstack/react-db";
-
 import {
   cardsCollection,
   decksCollection,
   newCardRow,
+  type CardRow,
 } from "@/db/collections";
+import { offlineAction } from "@/db/offline";
 import { toastOnPersistError } from "@/db/toast-on-error";
-import { trpc } from "@/trpc/vanilla";
 
 export type ImportDeckArgs = {
   name: string;
@@ -17,12 +16,30 @@ export type ImportDeckArgs = {
   cards: { front: string; back: string }[];
 };
 
-/**
- * Import a deck and its cards in a single optimistic transaction. Both
- * collections receive their rows immediately so the destination page renders
- * fully on first paint; the server call goes through `decks.import` which
- * commits everything in one DB transaction (no orphan deck on partial fail).
- */
+type ImportDeckInput = {
+  deckId: string;
+  name: string;
+  description: string;
+  learning_profile_id: string;
+  cardRows: CardRow[];
+};
+
+// Deck + cards land in one transaction so the destination page renders fully
+// on first paint; the `importDeck` mutationFn commits them atomically server
+// side (no orphan deck on partial fail) and the outbox replays it if the tab
+// closes before the server confirms.
+const importDeckAction = offlineAction<ImportDeckInput>("importDeck", (v) => {
+  decksCollection.insert({
+    id: v.deckId,
+    name: v.name,
+    description: v.description,
+    learning_profile_id: v.learning_profile_id,
+    created_at: new Date(),
+  });
+  if (v.cardRows.length > 0) cardsCollection.insert(v.cardRows);
+});
+
+/** Import a deck and its cards in a single durable, optimistic transaction. */
 export function useImportDeck() {
   const mutate = (input: ImportDeckArgs): string => {
     const deckId = crypto.randomUUID();
@@ -35,36 +52,12 @@ export function useImportDeck() {
       }),
     );
 
-    const tx = createTransaction({
-      mutationFn: async () => {
-        await trpc.decks.import.mutate({
-          id: deckId,
-          name: input.name,
-          description: input.description,
-          learning_profile_id: input.learning_profile_id,
-          cards: cardRows.map((r) => ({
-            id: r.id,
-            front: r.front,
-            back: r.back,
-          })),
-        });
-        // Reconcile optimistic rows with the persisted server state.
-        await Promise.all([
-          decksCollection.utils.refetch(),
-          cardsCollection.utils.refetch(),
-        ]);
-      },
-    });
-
-    tx.mutate(() => {
-      decksCollection.insert({
-        id: deckId,
-        name: input.name,
-        description: input.description,
-        learning_profile_id: input.learning_profile_id,
-        created_at: new Date(),
-      });
-      if (cardRows.length > 0) cardsCollection.insert(cardRows);
+    const tx = importDeckAction({
+      deckId,
+      name: input.name,
+      description: input.description,
+      learning_profile_id: input.learning_profile_id,
+      cardRows,
     });
 
     toastOnPersistError(tx, "Failed to import deck");

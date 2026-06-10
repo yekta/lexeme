@@ -31,33 +31,8 @@ export const decksCollection = createCollection(
     enabled,
     staleTime: Infinity,
     getKey: (row) => row.id,
-    onInsert: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        const d = m.modified;
-        await trpc.decks.create.mutate({
-          id: d.id,
-          name: d.name,
-          description: d.description,
-          learning_profile_id: d.learning_profile_id,
-        });
-      }
-    },
-    onUpdate: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        const d = m.modified;
-        await trpc.decks.update.mutate({
-          id: d.id,
-          name: d.name,
-          description: d.description,
-          learning_profile_id: d.learning_profile_id,
-        });
-      }
-    },
-    onDelete: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        await trpc.decks.delete.mutate({ id: m.key });
-      }
-    },
+    // Writes go through the durable outbox (see db/offline.ts), not collection
+    // handlers — a handler here would double-write to the server.
   }),
 );
 
@@ -71,77 +46,23 @@ export const cardsCollection = createCollection(
     enabled,
     staleTime: Infinity,
     getKey: (row) => row.id,
-    onInsert: async ({ transaction }) => {
-      // Group by deck so a multi-card insert (e.g. deck import) hits the
-      // server once per deck instead of once per card.
-      const byDeck = new Map<
-        string,
-        { id: string; front: string; back: string }[]
-      >();
-      for (const m of transaction.mutations) {
-        const c = m.modified;
-        const list = byDeck.get(c.deck_id) ?? [];
-        list.push({ id: c.id, front: c.front, back: c.back });
-        byDeck.set(c.deck_id, list);
-      }
-      await Promise.all(
-        [...byDeck.entries()].map(([deckId, cards]) =>
-          trpc.cards.create.mutate({ deckId, cards }),
-        ),
-      );
-    },
-    // Direct card updates only ever carry content edits — review scheduling
-    // goes through the rate transaction (see use-rate-card.ts), which bypasses
-    // this handler.
-    onUpdate: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        const c = m.modified;
-        await trpc.cards.update.mutate({
-          id: c.id,
-          front: c.front,
-          back: c.back,
-        });
-      }
-    },
-    onDelete: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        await trpc.cards.delete.mutate({ id: m.key });
-      }
-    },
+    // Writes (create/import/update/rate/delete) go through the durable outbox
+    // (see db/offline.ts), not collection handlers.
   }),
 );
 
 /** The user's learning (FSRS) profiles. */
 export const learningProfilesCollection = createCollection(
   queryCollectionOptions({
-    id: "learning-profiles",
-    queryKey: ["learning-profiles"],
+    id: "learning_profiles",
+    queryKey: ["learning_profiles"],
     queryFn: () => trpc.learningProfiles.list.query(),
     queryClient,
     enabled,
     staleTime: Infinity,
     getKey: (row) => row.id,
-    onInsert: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        await trpc.learningProfiles.create.mutate({
-          id: m.modified.id,
-          name: m.modified.name,
-        });
-      }
-    },
-    onUpdate: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        await trpc.learningProfiles.update.mutate({
-          id: m.key,
-          ...m.changes,
-        });
-      }
-    },
-    onDelete: async ({ transaction }) => {
-      for (const m of transaction.mutations) {
-        await trpc.learningProfiles.delete.mutate({ id: m.key });
-      }
-    },
+    // Read-only on the client today. Any future writes should go through the
+    // durable outbox (see db/offline.ts), not a collection handler.
   }),
 );
 
@@ -151,8 +72,8 @@ export const learningProfilesCollection = createCollection(
  */
 export const reviewLogsCollection = createCollection(
   queryCollectionOptions({
-    id: "review-logs",
-    queryKey: ["review-logs"],
+    id: "review_logs",
+    queryKey: ["review_logs"],
     queryFn: () => trpc.reviewLogs.list.query(),
     queryClient,
     enabled,

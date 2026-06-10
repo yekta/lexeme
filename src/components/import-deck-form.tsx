@@ -78,14 +78,16 @@ export function ImportDeckForm({
       <DialogHeader>
         <DialogTitle>Import Deck</DialogTitle>
         <DialogDescription>
-          Importing{" "}
-          <span className="font-medium text-foreground">
-            {cardCount} {cardWord}
-          </span>
-          . Adjust the name, description, or learning profile before importing.
+          Adjust the name, description, or learning profile.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4">
+      <div className="w-full flex flex-col gap-5 py-4">
+        <div className="w-full flex flex-col -my-1 gap-0.5">
+          <p className="text-muted-foreground w-full leading-tight">Found:</p>
+          <p className="text-base font-medium w-full">
+            {cardCount} {cardWord}
+          </p>
+        </div>
         <form.Field name="name">
           {(field) => (
             <div className="space-y-2">

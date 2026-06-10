@@ -6,21 +6,27 @@ import { Navbar } from "@/components/navbar";
 import { NowProvider } from "@/components/now-provider";
 import { PageNotFound } from "@/components/page-not-found";
 import { Toaster } from "@/components/ui/sonner";
-import { CollectionsPreloader } from "@/db/collections-preloader";
+import { authClient } from "@/lib/auth-client";
+import { getToken } from "@/lib/auth-server";
 import { DEFAULT_THEME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { TRPCReactProvider } from "@/trpc/react";
+import type { RouterContext } from "@/router";
 import globalsCss from "@/styles/globals.css?url";
+import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { createServerFn } from "@tanstack/react-start";
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   HeadContent,
   Outlet,
   Scripts,
+  useRouteContext,
 } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 
-export const Route = createRootRoute({
+const fetchToken = createServerFn({ method: "GET" }).handler(() => getToken());
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -33,6 +39,14 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: "stylesheet", href: globalsCss }],
   }),
+  // Authenticate SSR Convex queries with the current session token.
+  beforeLoad: async ({ context }) => {
+    const token = await fetchToken();
+    if (token) {
+      context.convexQueryClient.serverHttpClient?.setAuth(token);
+    }
+    return { token };
+  },
   component: RootComponent,
   errorComponent: ({ error, reset }) => (
     <RootDocument>
@@ -55,6 +69,7 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const { convexQueryClient, token } = useRouteContext({ from: Route.id });
   return (
     <RootDocument>
       <ErrorBoundary>
@@ -63,15 +78,18 @@ function RootComponent() {
           defaultTheme={DEFAULT_THEME}
           enableSystem
         >
-          <TRPCReactProvider>
-            <CollectionsPreloader />
+          <ConvexBetterAuthProvider
+            client={convexQueryClient.convexClient}
+            authClient={authClient}
+            initialToken={token}
+          >
             <NowProvider>
               <FormDraftProvider>
                 <Outlet />
               </FormDraftProvider>
             </NowProvider>
             <Toaster closeButton position="bottom-right" />
-          </TRPCReactProvider>
+          </ConvexBetterAuthProvider>
         </ThemeProvider>
       </ErrorBoundary>
     </RootDocument>

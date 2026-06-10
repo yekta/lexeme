@@ -1,7 +1,6 @@
 "use client";
 
 import { LCardManage } from "@/components/l-card-manage";
-import { isRowOptimistic } from "@/db/collections";
 import { type TCard } from "@/hooks/data/use-cards";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
@@ -101,7 +100,7 @@ export function CardsVirtualGrid({
                     createdAt={card.created_at}
                     updatedAt={card.updated_at}
                     contentUpdatedAt={card.content_updated_at}
-                    isOptimistic={isRowOptimistic(card)}
+                    isOptimistic={false}
                   />
                 ))}
               </div>

@@ -1,5 +1,5 @@
 import { appLocale } from "@/lib/constants";
-import { TCardStateEnum, TLearningProfile } from "@/server/db/schema";
+import type { TCardStateEnum, TLearningProfile } from "@/lib/types";
 import {
   createEmptyCard,
   fsrs,
@@ -88,12 +88,12 @@ export function reviewLogToDbRow(
     card_id: cardId,
     rating: log.rating as number,
     state: stateToEnum[log.state] ?? stateToEnum[State.New],
-    due: new Date(log.due),
+    due: new Date(log.due).getTime(),
     stability: log.stability,
     difficulty: log.difficulty,
     scheduled_days: log.scheduled_days,
     learning_steps: log.learning_steps,
-    review: new Date(log.review),
+    review: new Date(log.review).getTime(),
     duration_ms: durationMs,
   };
 }
@@ -113,7 +113,7 @@ const enumToState: Record<TCardStateEnum, State> = {
 };
 
 export function dbRowToFSRSCard(row: {
-  due: string | Date;
+  due: number | string | Date;
   stability: number;
   difficulty: number;
   elapsed_days: number;
@@ -122,7 +122,7 @@ export function dbRowToFSRSCard(row: {
   lapses: number;
   state: TCardStateEnum;
   learning_steps: number;
-  last_review: string | Date | null;
+  last_review: number | string | Date | null;
 }): FSRSCard {
   return {
     due: new Date(row.due),
@@ -140,7 +140,7 @@ export function dbRowToFSRSCard(row: {
 
 export function fsrsCardToDbRow(card: FSRSCard) {
   return {
-    due: card.due,
+    due: card.due.getTime(),
     stability: card.stability,
     difficulty: card.difficulty,
     scheduled_days: card.scheduled_days,
@@ -148,7 +148,7 @@ export function fsrsCardToDbRow(card: FSRSCard) {
     lapses: card.lapses,
     state: stateToEnum[card.state] ?? "new",
     learning_steps: card.learning_steps,
-    last_review: card.last_review ? new Date(card.last_review) : null,
+    last_review: card.last_review ? new Date(card.last_review).getTime() : null,
   };
 }
 

@@ -16,7 +16,6 @@ import { Navbar } from "@/components/navbar";
 import { NoAccess } from "@/components/no-access";
 import OptimisticIndicator from "@/components/optimistic-indicator";
 import { LinkButton } from "@/components/ui/button";
-import { isRowOptimistic } from "@/db/collections";
 import { useDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useRateCard } from "@/hooks/data/use-rate-card";
@@ -136,8 +135,7 @@ function StudyPage() {
     isPendingAuth || state === "pending" || state === "unauthorized";
   const totalCards = studyData?.totalCards || 0;
 
-  const isOptimistic =
-    (deckData ? isRowOptimistic(deckData) : false) || studyQuery.isOptimistic;
+  const isOptimistic = studyQuery.isOptimistic;
 
   const initialQueue = useMemo<TQueueItem[]>(() => {
     const cards = studyData?.dueCards ?? [];

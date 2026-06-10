@@ -20,7 +20,7 @@ import { z } from "zod";
 const importDeckSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   description: z.string().trim(),
-  learning_profile_id: z.uuid(),
+  learning_profile_id: z.string().min(1),
 });
 
 export function ImportDeckForm({
@@ -51,7 +51,7 @@ export function ImportDeckForm({
       onSubmit: importDeckSchema,
     },
     onSubmit: async ({ value }) => {
-      const deckId = importDeck.mutate({
+      const deckId = await importDeck.mutate({
         name: value.name,
         description: value.description,
         learning_profile_id: value.learning_profile_id,

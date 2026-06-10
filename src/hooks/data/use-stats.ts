@@ -1,21 +1,17 @@
 "use client";
 
-import { useLiveQuery } from "@tanstack/react-db";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useNow } from "@/components/now-provider";
-import {
-  cardsCollection,
-  decksCollection,
-  learningProfilesCollection,
-  reviewLogsCollection,
-  isRowOptimistic,
-  liveStatus,
-} from "@/db/collections";
+import { usePendingMutations } from "@/db/pending-mutations";
+import { api } from "@/lib/convex-api";
 import {
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
 } from "@/lib/constants";
+import { startOfDayMs } from "@/lib/time";
 
 export type TDeckStatsRow = {
   deckId: string;
@@ -24,29 +20,29 @@ export type TDeckStatsRow = {
   learn: number;
   due: number;
   latestCardCreatedAt: string | null;
-  /** A card in this deck has local changes the server hasn't confirmed yet. */
+  /** A card mutation is in flight (global — Convex has no per-row flag). */
   optimistic: boolean;
 };
 
 /**
  * Per-deck card counts (capped by each profile's daily new/review limits),
- * derived live from the card, review-log and profile collections. Replaces the
- * old `stats.getDeckStats` aggregation query.
+ * derived live from the card, review-log and profile queries.
  */
 export function useDeckStats() {
-  const decksLq = useLiveQuery((q) => q.from({ deck: decksCollection }));
-  const cardsLq = useLiveQuery((q) => q.from({ card: cardsCollection }));
-  const logsLq = useLiveQuery((q) => q.from({ log: reviewLogsCollection }));
-  const profilesLq = useLiveQuery((q) =>
-    q.from({ profile: learningProfilesCollection }),
-  );
   const now = useNow();
+  const since = startOfDayMs(now);
+
+  const decksQ = useQuery(convexQuery(api.decks.list, {}));
+  const cardsQ = useQuery(convexQuery(api.cards.listByUser, {}));
+  const logsQ = useQuery(convexQuery(api.reviewLogs.listToday, { since }));
+  const profilesQ = useQuery(convexQuery(api.learningProfiles.list, {}));
+  const cardsPending = usePendingMutations("cards");
 
   const data = useMemo<TDeckStatsRow[]>(() => {
-    const decks = decksLq.data ?? [];
-    const cards = cardsLq.data ?? [];
-    const logs = logsLq.data ?? [];
-    const profiles = profilesLq.data ?? [];
+    const decks = decksQ.data ?? [];
+    const cards = cardsQ.data ?? [];
+    const logs = logsQ.data ?? [];
+    const profiles = profilesQ.data ?? [];
     const profileById = new Map(profiles.map((p) => [p.id, p]));
 
     return decks.map((deck) => {
@@ -89,49 +85,47 @@ export function useDeckStats() {
         learn: learnCount,
         due: Math.min(dueCount, reviewLimit),
         latestCardCreatedAt: latest > 0 ? new Date(latest).toISOString() : null,
-        optimistic: deckCards.some(isRowOptimistic),
+        optimistic: cardsPending,
       };
     });
-  }, [decksLq.data, cardsLq.data, logsLq.data, profilesLq.data, now]);
+  }, [decksQ.data, cardsQ.data, logsQ.data, profilesQ.data, now, cardsPending]);
 
   const isError =
-    decksLq.isError ||
-    cardsLq.isError ||
-    logsLq.isError ||
-    profilesLq.isError;
+    decksQ.isError || cardsQ.isError || logsQ.isError || profilesQ.isError;
   const isReady =
-    decksLq.isReady &&
-    cardsLq.isReady &&
-    logsLq.isReady &&
-    profilesLq.isReady;
+    !decksQ.isPending &&
+    !cardsQ.isPending &&
+    !logsQ.isPending &&
+    !profilesQ.isPending;
 
   return {
     data,
     isPending: !isReady && !isError,
     isError,
     error: isError
-      ? (decksCollection.utils.lastError ??
-        cardsCollection.utils.lastError ??
-        reviewLogsCollection.utils.lastError ??
-        learningProfilesCollection.utils.lastError)
+      ? (decksQ.error ?? cardsQ.error ?? logsQ.error ?? profilesQ.error)
       : undefined,
     refetch: () => {
-      void decksCollection.utils.refetch();
-      void cardsCollection.utils.refetch();
-      void reviewLogsCollection.utils.refetch();
-      void learningProfilesCollection.utils.refetch();
+      void decksQ.refetch();
+      void cardsQ.refetch();
+      void logsQ.refetch();
+      void profilesQ.refetch();
     },
   };
 }
 
 /** Today's review count and time spent, derived live from the review logs. */
 export function useTodayStats() {
-  const lq = useLiveQuery((q) => q.from({ log: reviewLogsCollection }));
-  const data = useMemo(() => {
-    const logs = lq.data ?? [];
+  const now = useNow();
+  const since = startOfDayMs(now);
+  const { data, isPending, isError, error, refetch } = useQuery(
+    convexQuery(api.reviewLogs.listToday, { since }),
+  );
+  const stats = useMemo(() => {
+    const logs = data ?? [];
     const count = logs.length;
     const totalMs = logs.reduce((sum, l) => sum + l.duration_ms, 0);
     return { count, totalMs, msPerCard: count > 0 ? totalMs / count : 0 };
-  }, [lq.data]);
-  return { data, ...liveStatus(lq, reviewLogsCollection) };
+  }, [data]);
+  return { data: stats, isPending, isError, error, refetch };
 }

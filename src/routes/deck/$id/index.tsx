@@ -22,7 +22,6 @@ import { NoAccess } from "@/components/no-access";
 import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { isRowOptimistic } from "@/db/collections";
 import { usePendingMutations } from "@/db/pending-mutations";
 import { useCardsByDeck, type TCard } from "@/hooks/data/use-cards";
 import { useDeck, type TDeck } from "@/hooks/data/use-decks";
@@ -58,11 +57,7 @@ function DeckPage() {
 
   const hasPendingCards = usePendingMutations("cards");
   const hasPendingDecks = usePendingMutations("decks");
-  const isOptimistic =
-    hasPendingCards ||
-    hasPendingDecks ||
-    (deckQuery.data ? isRowOptimistic(deckQuery.data) : false) ||
-    cardsQuery.data.some(isRowOptimistic);
+  const isOptimistic = hasPendingCards || hasPendingDecks;
 
   return (
     <DeckPageView

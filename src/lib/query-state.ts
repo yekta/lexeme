@@ -1,4 +1,27 @@
-import { trpcErrorCode } from "@/trpc/query-client";
+import { ConvexError } from "convex/values";
+
+/**
+ * Read the error code (e.g. "NOT_FOUND") off a thrown Convex error. Convex
+ * functions throw `new ConvexError({ code })`; the code rides along in
+ * `error.data`. Also recognises any error carrying a plain string `code`
+ * property — used by `DataError` so collection-derived states classify the
+ * same way a server error would.
+ */
+export function convexErrorCode(error: unknown): string | undefined {
+  if (error instanceof ConvexError) {
+    const data = error.data as { code?: unknown } | undefined;
+    if (data && typeof data.code === "string") return data.code;
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+}
 
 /**
  * The four data states a resource query can settle into, plus the in-flight
@@ -15,8 +38,8 @@ export type DataState =
 
 /**
  * A settled, non-retryable data condition derived on the client rather than
- * thrown by the server — e.g. a deck that simply isn't in the synced
- * collection. `code` mirrors the tRPC error codes so `trpcErrorCode` (and thus
+ * thrown by the server — e.g. a deck that simply isn't in the synced data.
+ * `code` mirrors the server error codes so `convexErrorCode` (and thus
  * `dataStateOf`) classifies it identically.
  */
 export class DataError extends Error {
@@ -35,7 +58,7 @@ type QueryLike = {
 /** Classify a React Query result into a single `DataState`. */
 export function dataStateOf(query: QueryLike): DataState {
   if (query.isError) {
-    switch (trpcErrorCode(query.error)) {
+    switch (convexErrorCode(query.error)) {
       case "NOT_FOUND":
         return "not-found";
       case "FORBIDDEN":

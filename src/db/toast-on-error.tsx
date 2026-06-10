@@ -4,15 +4,16 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 
-type Tx = { isPersisted: { promise: Promise<unknown> } };
-
 /**
- * Show an error toast if an optimistic mutation fails to persist. Pair with
- * every `collection.insert/update/delete` (and any `createTransaction`) so the
- * user sees what went wrong when TanStack DB rolls a row back.
+ * Show an error toast if an optimistic mutation fails. Pair with every Convex
+ * mutation so the user sees what went wrong when its optimistic update rolls
+ * back.
  */
-export function toastOnPersistError(tx: Tx, message: string): void {
-  void tx.isPersisted.promise.catch((error: unknown) => {
+export function toastOnMutationError(
+  promise: Promise<unknown>,
+  message: string,
+): void {
+  void promise.catch((error: unknown) => {
     const description =
       error instanceof Error ? error.message : "Please try again.";
     toastErrorOnOptimisticOperation({ message, description });

@@ -1,22 +1,16 @@
 "use client";
 
-import { useLiveQuery } from "@tanstack/react-db";
-import { useMemo } from "react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 
-import { learningProfilesCollection, liveStatus } from "@/db/collections";
+import { api } from "@/lib/convex-api";
 
-/** The user's learning profiles — default first, then alphabetical. */
+/** The user's learning profiles — default first, then alphabetical (backend). */
 export function useLearningProfiles() {
-  const lq = useLiveQuery((q) => q.from({ profile: learningProfilesCollection }));
-  const data = useMemo(
-    () =>
-      [...(lq.data ?? [])].sort((a, b) => {
-        if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      }),
-    [lq.data],
+  const { data, isPending, isError, error, refetch } = useQuery(
+    convexQuery(api.learningProfiles.list, {}),
   );
-  return { data, ...liveStatus(lq, learningProfilesCollection) };
+  return { data: data ?? [], isPending, isError, error, refetch };
 }
 
 export function useDefaultLearningProfile() {

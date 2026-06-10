@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isRowOptimistic } from "@/db/collections";
 import { usePendingMutations } from "@/db/pending-mutations";
 import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
@@ -35,7 +34,7 @@ import { z } from "zod";
 const createDeckSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   description: z.string().trim(),
-  learning_profile_id: z.uuid(),
+  learning_profile_id: z.string().min(1),
 });
 
 const EMPTY_STATS: TDeckStats = {
@@ -103,7 +102,6 @@ function Home() {
   const isOptimistic =
     hasPendingDeckMutations ||
     hasPendingCardMutations ||
-    decks.some(isRowOptimistic) ||
     deckStatsRows.some((r) => r.optimistic);
 
   return (
@@ -457,7 +455,7 @@ function DecksSection({
             dueCount={stats.due}
             studyHref={`/study/${deck.id}`}
             manageHref={`/deck/${deck.id}`}
-            isOptimistic={isRowOptimistic(deck) || stats.optimistic}
+            isOptimistic={stats.optimistic}
           />
         );
       })}

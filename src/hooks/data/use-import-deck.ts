@@ -1,14 +1,10 @@
 "use client";
 
-import { createTransaction } from "@tanstack/react-db";
+import { useMutation } from "convex/react";
 
-import {
-  cardsCollection,
-  decksCollection,
-  newCardRow,
-} from "@/db/collections";
-import { toastOnPersistError } from "@/db/toast-on-error";
-import { trpc } from "@/trpc/vanilla";
+import { runMutation } from "@/db/mutations";
+import { newCardRow, tempId } from "@/db/optimistic";
+import { api } from "@/lib/convex-api";
 
 export type ImportDeckArgs = {
   name: string;
@@ -18,57 +14,48 @@ export type ImportDeckArgs = {
 };
 
 /**
- * Import a deck and its cards in a single optimistic transaction. Both
- * collections receive their rows immediately so the destination page renders
- * fully on first paint; the server call goes through `decks.import` which
- * commits everything in one DB transaction (no orphan deck on partial fail).
+ * Import a deck and its cards in a single optimistic Convex mutation. Both the
+ * deck list and the card store receive their rows immediately so the
+ * destination page renders fully on first paint; the backend commits everything
+ * in one (atomic) mutation. Resolves to the new deck id for navigation.
  */
 export function useImportDeck() {
-  const mutate = (input: ImportDeckArgs): string => {
-    const deckId = crypto.randomUUID();
-    const cardRows = input.cards.map((c) =>
-      newCardRow({
-        id: crypto.randomUUID(),
-        deckId,
-        front: c.front,
-        back: c.back,
-      }),
-    );
+  const importDeck = useMutation(api.decks.importDeck).withOptimisticUpdate(
+    (store, args) => {
+      const tempDeckId = tempId();
+      const decks = store.getQuery(api.decks.list, {});
+      if (decks !== undefined) {
+        const temp = {
+          id: tempDeckId,
+          name: args.name,
+          description: args.description,
+          learning_profile_id: args.learning_profile_id,
+          created_at: Date.now(),
+        } as (typeof decks)[number];
+        store.setQuery(api.decks.list, {}, [temp, ...decks]);
+      }
+      const cards = store.getQuery(api.cards.listByUser, {});
+      if (cards !== undefined && args.cards.length > 0) {
+        const rows = args.cards.map((c) =>
+          newCardRow({ deckId: tempDeckId, front: c.front, back: c.back }),
+        ) as typeof cards;
+        store.setQuery(api.cards.listByUser, {}, [...rows, ...cards]);
+      }
+    },
+  );
 
-    const tx = createTransaction({
-      mutationFn: async () => {
-        await trpc.decks.import.mutate({
-          id: deckId,
-          name: input.name,
-          description: input.description,
-          learning_profile_id: input.learning_profile_id,
-          cards: cardRows.map((r) => ({
-            id: r.id,
-            front: r.front,
-            back: r.back,
-          })),
-        });
-        // Reconcile optimistic rows with the persisted server state.
-        await Promise.all([
-          decksCollection.utils.refetch(),
-          cardsCollection.utils.refetch(),
-        ]);
-      },
-    });
-
-    tx.mutate(() => {
-      decksCollection.insert({
-        id: deckId,
+  const mutate = async (input: ImportDeckArgs): Promise<string> => {
+    const id = await runMutation(
+      "decks",
+      importDeck({
         name: input.name,
         description: input.description,
         learning_profile_id: input.learning_profile_id,
-        created_at: new Date(),
-      });
-      if (cardRows.length > 0) cardsCollection.insert(cardRows);
-    });
-
-    toastOnPersistError(tx, "Failed to import deck");
-    return deckId;
+        cards: input.cards,
+      }),
+      "Failed to import deck",
+    );
+    return id as string;
   };
 
   return { mutate };

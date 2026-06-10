@@ -1,22 +1,19 @@
 "use client";
 
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useNow } from "@/components/now-provider";
-import {
-  cardsCollection,
-  decksCollection,
-  isRowOptimistic,
-  learningProfilesCollection,
-  reviewLogsCollection,
-  type CardRow,
-} from "@/db/collections";
+import { usePendingMutations } from "@/db/pending-mutations";
+import { api } from "@/lib/convex-api";
 import {
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
 } from "@/lib/constants";
 import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
+import { startOfDayMs } from "@/lib/time";
+import type { CardRow } from "@/lib/types";
 
 export type TStudyCard = CardRow;
 
@@ -27,9 +24,8 @@ export type TStudyQueue = {
 
 /**
  * The cards due for study in a deck, capped by the profile's daily new/review
- * limits — derived live from the collections. Order is deterministic (new,
+ * limits — derived live from the Convex queries. Order is deterministic (new,
  * then learning, then review); the study page shuffles it into a session.
- * Replaces the old `cards.getStudyQueue` query.
  */
 export function useStudyCards(deckId: string | undefined): {
   data: TStudyQueue | undefined;
@@ -39,36 +35,27 @@ export function useStudyCards(deckId: string | undefined): {
   error: unknown;
   refetch: () => void;
 } {
-  const cardsLq = useLiveQuery(
-    (q) =>
-      q
-        .from({ card: cardsCollection })
-        .where(({ card }) => eq(card.deck_id, deckId ?? "")),
-    [deckId],
-  );
-  const decksLq = useLiveQuery((q) => q.from({ deck: decksCollection }));
-  const logsLq = useLiveQuery((q) => q.from({ log: reviewLogsCollection }));
-  const profilesLq = useLiveQuery((q) =>
-    q.from({ profile: learningProfilesCollection }),
-  );
   const now = useNow();
+  const since = startOfDayMs(now);
+
+  const cardsQ = useQuery(convexQuery(api.cards.listByUser, {}));
+  const decksQ = useQuery(convexQuery(api.decks.list, {}));
+  const logsQ = useQuery(convexQuery(api.reviewLogs.listToday, { since }));
+  const profilesQ = useQuery(convexQuery(api.learningProfiles.list, {}));
 
   const isError =
-    cardsLq.isError ||
-    decksLq.isError ||
-    logsLq.isError ||
-    profilesLq.isError;
+    cardsQ.isError || decksQ.isError || logsQ.isError || profilesQ.isError;
   const isReady =
-    cardsLq.isReady &&
-    decksLq.isReady &&
-    logsLq.isReady &&
-    profilesLq.isReady;
+    !cardsQ.isPending &&
+    !decksQ.isPending &&
+    !logsQ.isPending &&
+    !profilesQ.isPending;
 
   const data = useMemo<TStudyQueue | undefined>(() => {
     if (!isReady) return undefined;
-    const deckCards = cardsLq.data ?? [];
-    const deck = (decksLq.data ?? []).find((d) => d.id === deckId);
-    const profile = (profilesLq.data ?? []).find(
+    const deckCards = (cardsQ.data ?? []).filter((c) => c.deck_id === deckId);
+    const deck = (decksQ.data ?? []).find((d) => d.id === deckId);
+    const profile = (profilesQ.data ?? []).find(
       (p) => p.id === deck?.learning_profile_id,
     );
     const newPerDay = profile?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
@@ -78,7 +65,7 @@ export function useStudyCards(deckId: string | undefined): {
     const deckCardIds = new Set(deckCards.map((c) => c.id));
     const newReviewed = new Set<string>();
     const reviewReviewed = new Set<string>();
-    for (const log of logsLq.data ?? []) {
+    for (const log of logsQ.data ?? []) {
       if (!deckCardIds.has(log.card_id)) continue;
       if (log.state === "new") newReviewed.add(log.card_id);
       else if (log.state === "review") reviewReviewed.add(log.card_id);
@@ -110,16 +97,13 @@ export function useStudyCards(deckId: string | undefined): {
     isReady,
     deckId,
     now,
-    cardsLq.data,
-    decksLq.data,
-    logsLq.data,
-    profilesLq.data,
+    cardsQ.data,
+    decksQ.data,
+    logsQ.data,
+    profilesQ.data,
   ]);
 
-  // True when any card in the deck has local mutations the server hasn't
-  // confirmed yet — e.g. a card just rated this session. Covers the full deck,
-  // not just `dueCards`, since a rated card leaves the due set.
-  const isOptimistic = (cardsLq.data ?? []).some(isRowOptimistic);
+  const isOptimistic = usePendingMutations("cards");
 
   return {
     data,
@@ -127,16 +111,13 @@ export function useStudyCards(deckId: string | undefined): {
     isPending: !isReady && !isError,
     isError,
     error: isError
-      ? (cardsCollection.utils.lastError ??
-        decksCollection.utils.lastError ??
-        reviewLogsCollection.utils.lastError ??
-        learningProfilesCollection.utils.lastError)
+      ? (cardsQ.error ?? decksQ.error ?? logsQ.error ?? profilesQ.error)
       : undefined,
     refetch: () => {
-      void cardsCollection.utils.refetch();
-      void decksCollection.utils.refetch();
-      void reviewLogsCollection.utils.refetch();
-      void learningProfilesCollection.utils.refetch();
+      void cardsQ.refetch();
+      void decksQ.refetch();
+      void logsQ.refetch();
+      void profilesQ.refetch();
     },
   };
 }

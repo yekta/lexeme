@@ -22,10 +22,11 @@ import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useImportCardsFlow } from "@/hooks/use-import-cards-flow";
+import { api } from "@/lib/convex-api";
 import { deckExportFilename } from "@/lib/deck-export";
 import { cn } from "@/lib/utils";
-import { trpc } from "@/trpc/vanilla";
 import { useForm } from "@tanstack/react-form";
+import { useConvex } from "convex/react";
 import {
   DownloadIcon,
   LoaderIcon,
@@ -42,7 +43,7 @@ const DELETE_DECK_CONFIRMATION = "I want to delete this deck";
 const deckSettingsSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   description: z.string().trim(),
-  learning_profile_id: z.uuid(),
+  learning_profile_id: z.string().min(1),
 });
 
 const deleteDeckSchema = z.object({
@@ -81,6 +82,7 @@ export function DeckSettingsMenu({
   const [isSettingsFormOpen, setIsSettingsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const convex = useConvex();
   const { openFilePicker, importElements } = useImportCardsFlow({
     deckId: deck.id,
     deckName: deck.name,
@@ -90,7 +92,7 @@ export function DeckSettingsMenu({
     if (isExporting) return;
     setIsExporting(true);
     try {
-      const payload = await trpc.decks.export.query({ id: deck.id });
+      const payload = await convex.query(api.decks.exportDeck, { id: deck.id });
       const blob = new Blob([JSON.stringify(payload, null, 2)], {
         type: "application/json",
       });

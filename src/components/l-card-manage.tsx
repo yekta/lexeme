@@ -40,9 +40,9 @@ type TLCardManageProps =
       deckId: string;
       front: string;
       back: string;
-      createdAt: string | Date;
-      updatedAt: string | Date;
-      contentUpdatedAt: string | Date;
+      createdAt: number | string | Date;
+      updatedAt: number | string | Date;
+      contentUpdatedAt: number | string | Date;
       isOptimistic: boolean;
     };
 

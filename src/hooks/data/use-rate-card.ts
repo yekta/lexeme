@@ -1,13 +1,10 @@
 "use client";
 
-import { createTransaction } from "@tanstack/react-db";
+import { useMutation } from "convex/react";
 
-import {
-  cardsCollection,
-  reviewLogsCollection,
-  type CardRow,
-} from "@/db/collections";
-import { toastOnPersistError } from "@/db/toast-on-error";
+import { runMutation } from "@/db/mutations";
+import { tempId } from "@/db/optimistic";
+import { api } from "@/lib/convex-api";
 import {
   dbRowToFSRSCard,
   fsrsCardToDbRow,
@@ -15,7 +12,8 @@ import {
   type FSRS,
   type Grade,
 } from "@/lib/fsrs";
-import { trpc } from "@/trpc/vanilla";
+import { startOfDayMs } from "@/lib/time";
+import type { CardRow } from "@/lib/types";
 
 export type RateArgs = {
   /** The card being reviewed. */
@@ -34,64 +32,64 @@ export type RateResult = {
 };
 
 /**
- * Records a review. FSRS scheduling runs here on the client, the new card
- * state and review log are applied optimistically across both collections in
- * one transaction, and the server persists them in the background. The result
- * is returned synchronously so the study session can advance immediately.
+ * Records a review. FSRS scheduling runs here on the client; the new card state
+ * and review log are applied optimistically across both queries in one Convex
+ * mutation, persisted in the background. The result is returned synchronously
+ * so the study session can advance immediately.
  */
 export function useRateCard() {
-  const rate = ({
-    card,
-    scheduler,
-    rating,
-    durationMs,
-  }: RateArgs): RateResult => {
+  const rateMutation = useMutation(api.cards.rate).withOptimisticUpdate(
+    (store, args) => {
+      const cards = store.getQuery(api.cards.listByUser, {});
+      if (cards !== undefined) {
+        store.setQuery(
+          api.cards.listByUser,
+          {},
+          cards.map((c) =>
+            c.id === args.cardId ? ({ ...c, ...args.card } as typeof c) : c,
+          ),
+        );
+      }
+      const since = startOfDayMs(Date.now());
+      const logs = store.getQuery(api.reviewLogs.listToday, { since });
+      if (logs !== undefined) {
+        const tempLog = {
+          id: tempId(),
+          card_id: args.cardId,
+          state: args.log.state,
+          duration_ms: args.durationMs,
+          review: args.log.review,
+        } as (typeof logs)[number];
+        store.setQuery(api.reviewLogs.listToday, { since }, [...logs, tempLog]);
+      }
+    },
+  );
+
+  const rate = ({ card, scheduler, rating, durationMs }: RateArgs): RateResult => {
     const now = new Date();
     const result = scheduler.next(dbRowToFSRSCard(card), now, rating);
     const cardPatch = fsrsCardToDbRow(result.card);
     const logRow = reviewLogToDbRow(result.log, card.id, durationMs);
-    const reviewLogId = crypto.randomUUID();
 
-    const tx = createTransaction({
-      mutationFn: async () => {
-        await trpc.cards.rate.mutate({
-          cardId: card.id,
-          reviewLogId,
-          durationMs,
-          card: cardPatch,
-          log: {
-            rating: logRow.rating,
-            state: logRow.state,
-            due: logRow.due,
-            stability: logRow.stability,
-            difficulty: logRow.difficulty,
-            scheduled_days: logRow.scheduled_days,
-            learning_steps: logRow.learning_steps,
-            review: logRow.review,
-          },
-        });
-        // Reconcile the optimistic overlay with the persisted server rows.
-        await Promise.all([
-          cardsCollection.utils.refetch(),
-          reviewLogsCollection.utils.refetch(),
-        ]);
-      },
-    });
-
-    tx.mutate(() => {
-      cardsCollection.update(card.id, (c) => {
-        Object.assign(c, cardPatch);
-      });
-      reviewLogsCollection.insert({
-        id: reviewLogId,
-        card_id: card.id,
-        state: logRow.state,
-        duration_ms: durationMs,
-        review: logRow.review,
-      });
-    });
-
-    toastOnPersistError(tx, "Failed to save rating");
+    void runMutation(
+      "cards",
+      rateMutation({
+        cardId: card.id,
+        durationMs,
+        card: cardPatch,
+        log: {
+          rating: logRow.rating,
+          state: logRow.state,
+          due: logRow.due,
+          stability: logRow.stability,
+          difficulty: logRow.difficulty,
+          scheduled_days: logRow.scheduled_days,
+          learning_steps: logRow.learning_steps,
+          review: logRow.review,
+        },
+      }),
+      "Failed to save rating",
+    );
 
     return {
       intervalMs: result.card.due.getTime() - now.getTime(),

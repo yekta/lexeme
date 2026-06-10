@@ -1,27 +1,23 @@
 "use client";
 
-import { useLiveQuery } from "@tanstack/react-db";
-import { useMemo } from "react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
 
-import { decksCollection, liveStatus, type DeckRow } from "@/db/collections";
-import { trackPending } from "@/db/pending-mutations";
-import { toastOnPersistError } from "@/db/toast-on-error";
+import { runMutation } from "@/db/mutations";
+import { tempId } from "@/db/optimistic";
+import { api } from "@/lib/convex-api";
 import { DataError } from "@/lib/query-state";
+import type { DeckRow } from "@/lib/types";
 
 export type TDeck = DeckRow;
 
-/** Every deck the user owns, newest first. */
+/** Every deck the user owns, newest first (sorted by the backend). */
 export function useDecks() {
-  const lq = useLiveQuery((q) => q.from({ deck: decksCollection }));
-  const data = useMemo(
-    () =>
-      [...(lq.data ?? [])].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      ),
-    [lq.data],
+  const { data, isPending, isError, error, refetch } = useQuery(
+    convexQuery(api.decks.list, {}),
   );
-  return { data, ...liveStatus(lq, decksCollection) };
+  return { data: data ?? [], isPending, isError, error, refetch };
 }
 
 /** A single deck by id. Resolves to a NOT_FOUND state once loaded and absent. */
@@ -39,27 +35,57 @@ export function useDeck(id: string | undefined) {
 }
 
 export function useCreateDeck() {
+  const create = useMutation(api.decks.create).withOptimisticUpdate(
+    (store, args) => {
+      const decks = store.getQuery(api.decks.list, {});
+      if (decks === undefined) return;
+      const temp = {
+        id: tempId(),
+        name: args.name,
+        description: args.description,
+        learning_profile_id: args.learning_profile_id,
+        created_at: Date.now(),
+      } as (typeof decks)[number];
+      store.setQuery(api.decks.list, {}, [temp, ...decks]);
+    },
+  );
   return {
     mutateAsync: async (input: {
       name: string;
       description: string;
       learning_profile_id: string;
     }) => {
-      const id = crypto.randomUUID();
-      const tx = decksCollection.insert({
-        id,
-        name: input.name,
-        description: input.description,
-        learning_profile_id: input.learning_profile_id,
-        created_at: new Date(),
-      });
-      toastOnPersistError(tx, "Failed to create deck");
-      return id;
+      const id = await runMutation(
+        "decks",
+        create(input),
+        "Failed to create deck",
+      );
+      return id as string;
     },
   };
 }
 
 export function useUpdateDeck() {
+  const update = useMutation(api.decks.update).withOptimisticUpdate(
+    (store, args) => {
+      const decks = store.getQuery(api.decks.list, {});
+      if (decks === undefined) return;
+      store.setQuery(
+        api.decks.list,
+        {},
+        decks.map((d) =>
+          d.id === args.id
+            ? ({
+                ...d,
+                name: args.name,
+                description: args.description,
+                learning_profile_id: args.learning_profile_id,
+              } as typeof d)
+            : d,
+        ),
+      );
+    },
+  );
   return {
     mutateAsync: async (input: {
       id: string;
@@ -67,22 +93,35 @@ export function useUpdateDeck() {
       description: string;
       learning_profile_id: string;
     }) => {
-      const tx = decksCollection.update(input.id, (d) => {
-        d.name = input.name;
-        d.description = input.description;
-        d.learning_profile_id = input.learning_profile_id;
-      });
-      toastOnPersistError(tx, "Failed to update deck");
+      await runMutation("decks", update(input), "Failed to update deck");
     },
   };
 }
 
 export function useDeleteDeck() {
+  const remove = useMutation(api.decks.remove).withOptimisticUpdate(
+    (store, args) => {
+      const decks = store.getQuery(api.decks.list, {});
+      if (decks !== undefined) {
+        store.setQuery(
+          api.decks.list,
+          {},
+          decks.filter((d) => d.id !== args.id),
+        );
+      }
+      const cards = store.getQuery(api.cards.listByUser, {});
+      if (cards !== undefined) {
+        store.setQuery(
+          api.cards.listByUser,
+          {},
+          cards.filter((c) => c.deck_id !== args.id),
+        );
+      }
+    },
+  );
   return {
     mutateAsync: async (input: { id: string }) => {
-      const tx = decksCollection.delete(input.id);
-      trackPending("decks", tx);
-      toastOnPersistError(tx, "Failed to delete deck");
+      await runMutation("decks", remove(input), "Failed to delete deck");
     },
   };
 }

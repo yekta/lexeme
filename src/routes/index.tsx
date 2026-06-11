@@ -359,6 +359,8 @@ function TodayStatsFooter({
   const secondsPerCard = formatSecondsPerCard(stats?.msPerCard ?? 0);
   const cardWord = count === 1 ? "card" : "cards";
 
+  const showPlaceholder = isPlaceholder || isPending;
+
   const statsText =
     isPlaceholder || isPending ? (
       "Loading today's stats..."
@@ -379,7 +381,7 @@ function TodayStatsFooter({
 
   return (
     <div
-      data-placeholder={isPlaceholder ? "true" : undefined}
+      data-placeholder={showPlaceholder ? "true" : undefined}
       className={cn("w-full flex justify-center group", className)}
     >
       <p className="text-center text-sm max-w-2xl text-muted-foreground group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:text-transparent group-data-placeholder:animate-skeleton group-data-placeholder:rounded">

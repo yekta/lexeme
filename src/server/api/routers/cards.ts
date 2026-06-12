@@ -1,46 +1,17 @@
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireCard, requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { cardContents, cards, decks, reviewLogs } from "@/server/db/schema";
+import { cards, reviewLogs } from "@/server/db/schema";
+import { generateTxId } from "@/server/db/txid";
 
 const cardState = z.enum(["new", "learning", "review", "relearning"]);
 
+// Reads come from Electric shapes (see src/db/collections.ts); this router
+// only carries writes. Every mutation runs in one transaction and returns the
+// Postgres txid so the client can await that transaction on the shape stream.
 export const cardsRouter = createTRPCRouter({
-  /**
-   * Every card the user owns, across all decks — the local-first card store.
-   * FSRS fields and content are returned together so the client can derive
-   * deck stats and study queues without further round trips.
-   */
-  list: protectedProcedure.query(({ ctx }) => {
-    return ctx.db
-      .select({
-        id: cards.id,
-        deck_id: cards.deck_id,
-        due: cards.due,
-        stability: cards.stability,
-        difficulty: cards.difficulty,
-        elapsed_days: cards.elapsed_days,
-        scheduled_days: cards.scheduled_days,
-        reps: cards.reps,
-        lapses: cards.lapses,
-        state: cards.state,
-        learning_steps: cards.learning_steps,
-        last_review: cards.last_review,
-        created_at: cards.created_at,
-        updated_at: cards.updated_at,
-        front: cardContents.front,
-        back: cardContents.back,
-        content_updated_at: cardContents.updated_at,
-      })
-      .from(cards)
-      .innerJoin(cardContents, eq(cardContents.card_id, cards.id))
-      .innerJoin(decks, eq(decks.id, cards.deck_id))
-      .where(eq(decks.user_id, ctx.session.user.id))
-      .orderBy(desc(cards.created_at));
-  }),
-
   create: protectedProcedure
     .input(
       z.object({
@@ -63,24 +34,23 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      // Card ids are client-generated; content row ids fall back to the
-      // database default. One transaction so partial imports never leak.
-      // onConflictDoNothing keeps an outbox replay idempotent.
-      await ctx.db.transaction(async (tx) => {
+      // Card ids are client-generated. onConflictDoNothing keeps an outbox
+      // replay idempotent.
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
         await tx
           .insert(cards)
-          .values(input.cards.map((c) => ({ id: c.id, deck_id: input.deckId })))
-          .onConflictDoNothing();
-        await tx
-          .insert(cardContents)
           .values(
             input.cards.map((c) => ({
-              card_id: c.id,
+              id: c.id,
+              deck_id: input.deckId,
+              user_id: ctx.session.user.id,
               front: c.front,
               back: c.back,
             })),
           )
           .onConflictDoNothing();
+        return { txid };
       });
     }),
 
@@ -98,10 +68,14 @@ export const cardsRouter = createTRPCRouter({
         cardId: input.id,
         userId: ctx.session.user.id,
       });
-      await ctx.db
-        .update(cardContents)
-        .set({ front: input.front, back: input.back })
-        .where(eq(cardContents.card_id, input.id));
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
+        await tx
+          .update(cards)
+          .set({ front: input.front, back: input.back })
+          .where(eq(cards.id, input.id));
+        return { txid };
+      });
     }),
 
   delete: protectedProcedure
@@ -112,7 +86,11 @@ export const cardsRouter = createTRPCRouter({
         cardId: input.id,
         userId: ctx.session.user.id,
       });
-      await ctx.db.delete(cards).where(eq(cards.id, input.id));
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
+        await tx.delete(cards).where(eq(cards.id, input.id));
+        return { txid };
+      });
     }),
 
   /**
@@ -156,7 +134,8 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      await ctx.db.transaction(async (tx) => {
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
         await tx
           .update(cards)
           .set(input.card)
@@ -169,6 +148,7 @@ export const cardsRouter = createTRPCRouter({
           .values({
             id: input.reviewLogId,
             card_id: input.cardId,
+            user_id: ctx.session.user.id,
             rating: input.log.rating,
             state: input.log.state,
             due: input.log.due,
@@ -180,6 +160,7 @@ export const cardsRouter = createTRPCRouter({
             duration_ms: input.durationMs,
           })
           .onConflictDoNothing();
+        return { txid };
       });
     }),
 });

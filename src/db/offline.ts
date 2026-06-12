@@ -29,6 +29,11 @@ import { trpc } from "@/trpc/vanilla";
  * Writes are driven by `transaction.mutations` rather than the action's
  * variables, because only the mutations are durably serialized (and the
  * serializer preserves `Date` values across a reload — metadata does not).
+ *
+ * Confirmation comes from Electric, not from us: each tRPC mutation commits
+ * in one Postgres transaction and returns its txid, and `awaitTxId` holds the
+ * optimistic state until that transaction arrives back over the shape stream.
+ * No manual `writeUpsert`/refetch — the stream is the source of truth.
  */
 
 /** Row carried by an optimistic mutation (always defined for insert/update). */
@@ -43,107 +48,132 @@ type MutationFn = (params: {
 const mutationsFor = (tx: { mutations: Array<PendingMutation> }, id: string) =>
   tx.mutations.filter((m) => m.collection.id === id);
 
+type AwaitableCollection = {
+  utils: { awaitTxId: (txid: number, timeout?: number) => Promise<boolean> };
+};
+
+// Best-effort sync-back: the server transaction is already committed, so a
+// timeout here (e.g. the shape stream is still catching up) must not fail the
+// outbox entry — the row lands whenever the stream delivers it.
+async function awaitTxIds(
+  collection: AwaitableCollection,
+  txids: Array<number>,
+): Promise<void> {
+  await Promise.all(
+    txids.map((txid) => collection.utils.awaitTxId(txid).catch(() => {})),
+  );
+}
+
 // A replayed delete may land after the row is already gone (e.g. the server
 // committed it but the tab closed before the outbox entry cleared). Treat a
 // NOT_FOUND from such a retry as success so it drains instead of error-looping.
-function ignoreNotFound(error: unknown): void {
-  if (error instanceof TRPCClientError && error.data?.code === "NOT_FOUND") {
-    return;
-  }
-  throw error;
-}
-
-// After the server confirms a write, we promote the row we already have into
-// the collection's synced store with writeUpsert/writeDelete — a local write,
-// no refetch. This is what keeps rating fast: a study session of 20 cards used
-// to pull the whole cards + review-logs lists 20 times (the executor drains the
-// outbox one transaction at a time). Now each rate is just its own small POST.
-// The synced baseline ends up holding the client-computed values; a natural
-// refetch on reload reconciles any server-side defaults (e.g. timestamps).
-function syncedDelete(
-  collection: { utils: { writeDelete: (key: string) => void } },
-  key: string,
-): void {
-  try {
-    collection.utils.writeDelete(key);
-  } catch {
-    // Already absent from the synced store (e.g. a replayed delete) — fine.
-  }
+function isNotFound(error: unknown): boolean {
+  return (
+    error instanceof TRPCClientError && error.data?.code === "NOT_FOUND"
+  );
 }
 
 const mutationFns = {
   createDeck: async ({ transaction }) => {
     const rows = mutationsFor(transaction, "decks") as Mutated<DeckRow>[];
+    const txids: number[] = [];
     for (const m of rows) {
       const d = m.modified;
-      await trpc.decks.create.mutate({
+      const { txid } = await trpc.decks.create.mutate({
         id: d.id,
         name: d.name,
         description: d.description,
         learning_profile_id: d.learning_profile_id,
       });
+      txids.push(txid);
     }
-    decksCollection.utils.writeUpsert(rows.map((m) => m.modified));
+    await awaitTxIds(decksCollection, txids);
   },
 
   updateDeck: async ({ transaction }) => {
     const rows = mutationsFor(transaction, "decks") as Mutated<DeckRow>[];
+    const txids: number[] = [];
     for (const m of rows) {
       const d = m.modified;
-      await trpc.decks.update.mutate({
+      const { txid } = await trpc.decks.update.mutate({
         id: d.id,
         name: d.name,
         description: d.description,
         learning_profile_id: d.learning_profile_id,
       });
+      txids.push(txid);
     }
-    decksCollection.utils.writeUpsert(rows.map((m) => m.modified));
+    await awaitTxIds(decksCollection, txids);
   },
 
   deleteDeck: async ({ transaction }) => {
+    const txids: number[] = [];
     for (const m of mutationsFor(transaction, "decks")) {
-      await trpc.decks.delete
-        .mutate({ id: m.key as string })
-        .catch(ignoreNotFound);
-      syncedDelete(decksCollection, m.key as string);
+      try {
+        const { txid } = await trpc.decks.delete.mutate({
+          id: m.key as string,
+        });
+        txids.push(txid);
+      } catch (error) {
+        if (!isNotFound(error)) throw error;
+      }
     }
+    await awaitTxIds(decksCollection, txids);
   },
 
   // Shared by single-card creates and bulk imports. Grouped by deck so a
   // multi-card insert hits the server once per deck (matches the old handler).
   insertCards: async ({ transaction }) => {
     const rows = mutationsFor(transaction, "cards") as Mutated<CardRow>[];
-    const byDeck = new Map<string, { id: string; front: string; back: string }[]>();
+    const byDeck = new Map<
+      string,
+      { id: string; front: string; back: string }[]
+    >();
     for (const m of rows) {
       const c = m.modified;
       const list = byDeck.get(c.deck_id) ?? [];
       list.push({ id: c.id, front: c.front, back: c.back });
       byDeck.set(c.deck_id, list);
     }
-    await Promise.all(
+    const results = await Promise.all(
       [...byDeck.entries()].map(([deckId, cards]) =>
         trpc.cards.create.mutate({ deckId, cards }),
       ),
     );
-    cardsCollection.utils.writeUpsert(rows.map((m) => m.modified));
+    await awaitTxIds(
+      cardsCollection,
+      results.map((r) => r.txid),
+    );
   },
 
   updateCard: async ({ transaction }) => {
     const rows = mutationsFor(transaction, "cards") as Mutated<CardRow>[];
+    const txids: number[] = [];
     for (const m of rows) {
       const c = m.modified;
-      await trpc.cards.update.mutate({ id: c.id, front: c.front, back: c.back });
+      const { txid } = await trpc.cards.update.mutate({
+        id: c.id,
+        front: c.front,
+        back: c.back,
+      });
+      txids.push(txid);
     }
-    cardsCollection.utils.writeUpsert(rows.map((m) => m.modified));
+    await awaitTxIds(cardsCollection, txids);
   },
 
   deleteCard: async ({ transaction }) => {
+    const txids: number[] = [];
     for (const m of mutationsFor(transaction, "cards")) {
-      await trpc.cards.delete
-        .mutate({ id: m.key as string })
-        .catch(ignoreNotFound);
-      syncedDelete(cardsCollection, m.key as string);
+      try {
+        const { txid } = await trpc.cards.delete.mutate({
+          id: m.key as string,
+        });
+        txids.push(txid);
+      } catch (error) {
+        if (!isNotFound(error)) throw error;
+      }
     }
+    await awaitTxIds(cardsCollection, txids);
   },
 
   // Deck + its cards committed atomically server-side. The transaction carries
@@ -153,7 +183,7 @@ const mutationFns = {
     if (!deck) return;
     const d = deck.modified;
     const cardMuts = mutationsFor(transaction, "cards") as Mutated<CardRow>[];
-    await trpc.decks.import.mutate({
+    const { txid } = await trpc.decks.import.mutate({
       id: d.id,
       name: d.name,
       description: d.description,
@@ -164,10 +194,12 @@ const mutationFns = {
         back: m.modified.back,
       })),
     });
-    decksCollection.utils.writeUpsert(d);
-    if (cardMuts.length > 0) {
-      cardsCollection.utils.writeUpsert(cardMuts.map((m) => m.modified));
-    }
+    await Promise.all([
+      awaitTxIds(decksCollection, [txid]),
+      cardMuts.length > 0
+        ? awaitTxIds(cardsCollection, [txid])
+        : Promise.resolve(),
+    ]);
   },
 
   // FSRS is computed client-side; this just persists the card patch + review
@@ -178,11 +210,11 @@ const mutationFns = {
     const [logMut] = mutationsFor(
       transaction,
       "review_logs",
-    ) as Mutated<RateLogRow>[];
+    ) as Mutated<ReviewLogRow>[];
     if (!cardMut || !logMut) return;
     const c = cardMut.modified;
     const l = logMut.modified;
-    await trpc.cards.rate.mutate({
+    const { txid } = await trpc.cards.rate.mutate({
       cardId: c.id,
       reviewLogId: l.id,
       durationMs: l.duration_ms,
@@ -208,34 +240,14 @@ const mutationFns = {
         review: l.review,
       },
     });
-    // Promote both rows into the synced store locally — no list refetch.
-    cardsCollection.utils.writeUpsert(c);
-    reviewLogsCollection.utils.writeUpsert({
-      id: l.id,
-      card_id: l.card_id,
-      state: l.state,
-      duration_ms: l.duration_ms,
-      review: l.review,
-    });
+    await Promise.all([
+      awaitTxIds(cardsCollection, [txid]),
+      awaitTxIds(reviewLogsCollection, [txid]),
+    ]);
   },
 } satisfies Record<string, MutationFn>;
 
 export type MutationFnName = keyof typeof mutationFns;
-
-/**
- * The review-log shape carried by the rate mutation. Wider than `ReviewLogRow`
- * (which only surfaces what the server lists) — the extra FSRS fields exist
- * just long enough to build the `rate` payload, then the post-rate refetch
- * normalizes the row back to `ReviewLogRow`.
- */
-export type RateLogRow = ReviewLogRow & {
-  rating: number;
-  due: Date;
-  stability: number;
-  difficulty: number;
-  scheduled_days: number;
-  learning_steps: number;
-};
 
 /**
  * tRPC codes that describe a settled answer — replaying the same payload can
@@ -297,49 +309,23 @@ function getExecutor(): OfflineExecutor | undefined {
 }
 
 /**
- * Start the executor and replay any outbox entries left over from a previous
- * session. Call once on app mount (alongside `preloadCollections`).
- *
- * Once the replay drains, every collection the queued mutations touched is
- * refetched. Two reasons: replayed (restored) transactions never deliver the
- * `$synced` flip to live queries — rows stay visually optimistic forever
- * (upstream bug in offline-transactions) — and the synced store ends up
- * holding client-computed values. The refetch fixes both at once: the server
- * rows carry DB-side timestamps, so the diff emits real updates that re-stamp
- * the rows as synced.
+ * Start the executor; it replays any outbox entries left over from a previous
+ * session on its own. Call once on app mount (alongside `preloadCollections`).
+ * Replayed rows reconcile through the Electric stream like any other write —
+ * no refetching needed.
  */
-export function startOutboxReplay(): void {
+export function startOutbox(): void {
+  void getExecutor();
+}
+
+/**
+ * Drop every queued (not yet replayed) write. Only used on sign-out: queued
+ * mutations belong to the signed-out user and must not replay into whichever
+ * account signs in next on this device.
+ */
+export async function clearOutbox(): Promise<void> {
   const ex = getExecutor();
-  if (!ex) return;
-  void (async () => {
-    await ex.waitForInit();
-    const queued = await ex.peekOutbox();
-    if (queued.length === 0) return;
-    const touched = new Set<string>();
-    for (const tx of queued) {
-      for (const m of tx.mutations) {
-        touched.add(m.collection.id);
-      }
-    }
-    // The executor works the queue in the background; both success and
-    // permanent failure remove entries, so this always settles once the
-    // server is reachable.
-    while (ex.getPendingCount() > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-    const collectionsById: Record<
-      string,
-      { utils: { refetch: () => Promise<unknown> } } | undefined
-    > = {
-      decks: decksCollection,
-      cards: cardsCollection,
-      learning_profiles: learningProfilesCollection,
-      review_logs: reviewLogsCollection,
-    };
-    for (const id of touched) {
-      void collectionsById[id]?.utils.refetch();
-    }
-  })();
+  if (ex) await ex.clearOutbox();
 }
 
 /** A write that applies `onMutate` optimistically and durably queues the server call. */

@@ -12,6 +12,7 @@ import {
 import { offlineAction } from "@/db/offline";
 import { trackPending } from "@/db/pending-mutations";
 import { toastOnPersistError } from "@/db/toast-on-error";
+import { useAuth } from "@/hooks/use-auth";
 
 export type TCard = CardRow;
 
@@ -54,17 +55,20 @@ export function useCardsByDeck(deckId: string | undefined) {
 }
 
 export function useCreateCard() {
+  const { user } = useAuth();
   return {
     mutateAsync: async (input: {
       deckId: string;
       front: string;
       back: string;
     }) => {
+      if (!user) throw new Error("Not signed in.");
       const id = crypto.randomUUID();
       const tx = insertCardsAction([
         newCardRow({
           id,
           deckId: input.deckId,
+          userId: user.id,
           front: input.front,
           back: input.back,
         }),
@@ -81,15 +85,18 @@ export function useCreateCard() {
  * round-trip regardless of card count.
  */
 export function useImportCards() {
+  const { user } = useAuth();
   return {
     mutate: (input: {
       deckId: string;
       cards: { front: string; back: string }[];
     }) => {
+      if (!user) throw new Error("Not signed in.");
       const rows = input.cards.map((c) =>
         newCardRow({
           id: crypto.randomUUID(),
           deckId: input.deckId,
+          userId: user.id,
           front: c.front,
           back: c.back,
         }),

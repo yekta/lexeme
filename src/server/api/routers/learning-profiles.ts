@@ -1,33 +1,32 @@
 import { TRPCError } from "@trpc/server";
-import { asc, desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireProfile } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { learningProfiles } from "@/server/db/schema";
+import { generateTxId } from "@/server/db/txid";
 
+// Reads come from Electric shapes (see src/db/collections.ts); this router
+// only carries writes. Every mutation runs in one transaction and returns the
+// Postgres txid so the client can await that transaction on the shape stream.
 export const learningProfilesRouter = createTRPCRouter({
-  list: protectedProcedure.query(({ ctx }) =>
-    ctx.db
-      .select()
-      .from(learningProfiles)
-      .where(eq(learningProfiles.user_id, ctx.session.user.id))
-      .orderBy(desc(learningProfiles.is_default), asc(learningProfiles.name)),
-  ),
-
   create: protectedProcedure
     .input(z.object({ id: z.uuid(), name: z.string().trim().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const [row] = await ctx.db
-        .insert(learningProfiles)
-        .values({
-          id: input.id,
-          user_id: ctx.session.user.id,
-          name: input.name,
-          is_default: false,
-        })
-        .returning({ id: learningProfiles.id });
-      return row!.id;
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
+        await tx
+          .insert(learningProfiles)
+          .values({
+            id: input.id,
+            user_id: ctx.session.user.id,
+            name: input.name,
+            is_default: false,
+          })
+          .onConflictDoNothing();
+        return { txid };
+      });
     }),
 
   update: protectedProcedure
@@ -53,10 +52,14 @@ export const learningProfilesRouter = createTRPCRouter({
         profileId: id,
         userId: ctx.session.user.id,
       });
-      await ctx.db
-        .update(learningProfiles)
-        .set(fields)
-        .where(eq(learningProfiles.id, id));
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
+        await tx
+          .update(learningProfiles)
+          .set(fields)
+          .where(eq(learningProfiles.id, id));
+        return { txid };
+      });
     }),
 
   delete: protectedProcedure
@@ -73,8 +76,12 @@ export const learningProfilesRouter = createTRPCRouter({
           message: "Cannot delete the default profile.",
         });
       }
-      await ctx.db
-        .delete(learningProfiles)
-        .where(eq(learningProfiles.id, input.id));
+      return ctx.db.transaction(async (tx) => {
+        const txid = await generateTxId(tx);
+        await tx
+          .delete(learningProfiles)
+          .where(eq(learningProfiles.id, input.id));
+        return { txid };
+      });
     }),
 });

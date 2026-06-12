@@ -9,6 +9,7 @@ import {
   decksCollection,
   isRowOptimistic,
   learningProfilesCollection,
+  restartCollections,
   reviewLogsCollection,
   type CardRow,
 } from "@/db/collections";
@@ -104,16 +105,15 @@ export function useStudyCards(deckId: string | undefined): {
     isPending: !isReady && !isError,
     isError,
     error: isError
-      ? (cardsCollection.utils.lastError ??
-        decksCollection.utils.lastError ??
-        reviewLogsCollection.utils.lastError ??
-        learningProfilesCollection.utils.lastError)
+      ? new Error("Syncing failed. Check your connection and retry.")
       : undefined,
     refetch: () => {
-      void cardsCollection.utils.refetch();
-      void decksCollection.utils.refetch();
-      void reviewLogsCollection.utils.refetch();
-      void learningProfilesCollection.utils.refetch();
+      restartCollections([
+        cardsCollection,
+        decksCollection,
+        reviewLogsCollection,
+        learningProfilesCollection,
+      ]);
     },
   };
 }

@@ -42,7 +42,6 @@ type TLCardManageProps =
       back: string;
       createdAt: string | Date;
       updatedAt: string | Date;
-      contentUpdatedAt: string | Date;
       isOptimistic: boolean;
     };
 
@@ -55,12 +54,7 @@ export function LCardManage(props: TLCardManageProps) {
   const now = useNow();
   const isNew =
     !isPlaceholder && now - new Date(props.createdAt).getTime() < 4000;
-  const updatedAt = isPlaceholder
-    ? null
-    : Math.max(
-        new Date(props.updatedAt).getTime(),
-        new Date(props.contentUpdatedAt).getTime(),
-      );
+  const updatedAt = isPlaceholder ? null : new Date(props.updatedAt).getTime();
   const isRecentlyUpdated = updatedAt !== null && now - updatedAt < 4000;
 
   const [editOpen, setEditOpen] = useState(false);

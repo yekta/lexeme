@@ -8,6 +8,7 @@ import {
 } from "@/db/collections";
 import { offlineAction } from "@/db/offline";
 import { toastOnPersistError } from "@/db/toast-on-error";
+import { useAuth } from "@/hooks/use-auth";
 
 export type ImportDeckArgs = {
   name: string;
@@ -18,6 +19,7 @@ export type ImportDeckArgs = {
 
 type ImportDeckInput = {
   deckId: string;
+  userId: string;
   name: string;
   description: string;
   learning_profile_id: string;
@@ -29,24 +31,31 @@ type ImportDeckInput = {
 // side (no orphan deck on partial fail) and the outbox replays it if the tab
 // closes before the server confirms.
 const importDeckAction = offlineAction<ImportDeckInput>("importDeck", (v) => {
+  const now = new Date();
   decksCollection.insert({
     id: v.deckId,
+    user_id: v.userId,
     name: v.name,
     description: v.description,
     learning_profile_id: v.learning_profile_id,
-    created_at: new Date(),
+    created_at: now,
+    updated_at: now,
   });
   if (v.cardRows.length > 0) cardsCollection.insert(v.cardRows);
 });
 
 /** Import a deck and its cards in a single durable, optimistic transaction. */
 export function useImportDeck() {
+  const { user } = useAuth();
+
   const mutate = (input: ImportDeckArgs): string => {
+    if (!user) throw new Error("Not signed in.");
     const deckId = crypto.randomUUID();
     const cardRows = input.cards.map((c) =>
       newCardRow({
         id: crypto.randomUUID(),
         deckId,
+        userId: user.id,
         front: c.front,
         back: c.back,
       }),
@@ -54,6 +63,7 @@ export function useImportDeck() {
 
     const tx = importDeckAction({
       deckId,
+      userId: user.id,
       name: input.name,
       description: input.description,
       learning_profile_id: input.learning_profile_id,

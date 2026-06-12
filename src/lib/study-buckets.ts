@@ -16,6 +16,21 @@ export type StudyBuckets = {
 };
 
 /**
+ * The review logs written since the start of today (local time). The synced
+ * review-log collection holds the full history, but daily limits and today's
+ * stats only care about today's entries.
+ */
+export function filterTodayLogs(
+  logs: ReviewLogRow[],
+  now: number,
+): ReviewLogRow[] {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const dayStart = startOfToday.getTime();
+  return logs.filter((log) => new Date(log.review).getTime() >= dayStart);
+}
+
+/**
  * The single source of truth for what is studyable in a deck right now. The
  * deck-list badges (`useDeckStats`) and the study queue (`useStudyCards`) both
  * derive from this, so a non-zero badge count always means the study page has
@@ -36,7 +51,7 @@ export function computeStudyBuckets({
   now,
 }: {
   deckCards: CardRow[];
-  /** Today's review logs (any deck — filtered to `deckCards` internally). */
+  /** Review logs from any deck or day — filtered to `deckCards` and today internally. */
   logs: ReviewLogRow[];
   profile: LearningProfileRow | undefined;
   now: number;
@@ -49,7 +64,7 @@ export function computeStudyBuckets({
   const deckCardIds = new Set(deckCards.map((c) => c.id));
   const newReviewed = new Set<string>();
   const reviewReviewed = new Set<string>();
-  for (const log of logs) {
+  for (const log of filterTodayLogs(logs, now)) {
     if (!deckCardIds.has(log.card_id)) continue;
     if (log.state === "new") newReviewed.add(log.card_id);
     else if (log.state === "review") reviewReviewed.add(log.card_id);

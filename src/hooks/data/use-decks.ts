@@ -7,6 +7,7 @@ import { decksCollection, liveStatus, type DeckRow } from "@/db/collections";
 import { offlineAction } from "@/db/offline";
 import { trackPending } from "@/db/pending-mutations";
 import { toastOnPersistError } from "@/db/toast-on-error";
+import { useAuth } from "@/hooks/use-auth";
 import { DataError } from "@/lib/query-state";
 
 export type TDeck = DeckRow;
@@ -18,15 +19,21 @@ type DeckInput = {
   learning_profile_id: string;
 };
 
-const createDeckAction = offlineAction<DeckInput>("createDeck", (v) => {
-  decksCollection.insert({
-    id: v.id,
-    name: v.name,
-    description: v.description,
-    learning_profile_id: v.learning_profile_id,
-    created_at: new Date(),
-  });
-});
+const createDeckAction = offlineAction<DeckInput & { user_id: string }>(
+  "createDeck",
+  (v) => {
+    const now = new Date();
+    decksCollection.insert({
+      id: v.id,
+      user_id: v.user_id,
+      name: v.name,
+      description: v.description,
+      learning_profile_id: v.learning_profile_id,
+      created_at: now,
+      updated_at: now,
+    });
+  },
+);
 
 const updateDeckAction = offlineAction<DeckInput>("updateDeck", (v) => {
   decksCollection.update(v.id, (d) => {
@@ -69,14 +76,16 @@ export function useDeck(id: string | undefined) {
 }
 
 export function useCreateDeck() {
+  const { user } = useAuth();
   return {
     mutateAsync: async (input: {
       name: string;
       description: string;
       learning_profile_id: string;
     }) => {
+      if (!user) throw new Error("Not signed in.");
       const id = crypto.randomUUID();
-      const tx = createDeckAction({ id, ...input });
+      const tx = createDeckAction({ id, user_id: user.id, ...input });
       toastOnPersistError(tx, "Failed to create deck");
       return id;
     },

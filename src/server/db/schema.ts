@@ -175,6 +175,13 @@ export const cards = pgTable(
     deck_id: uuid("deck_id")
       .notNull()
       .references(() => decks.id, { onDelete: "cascade" }),
+    // Denormalized owner — Electric shapes are single-table, so per-user sync
+    // filters need user_id on every synced table.
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    front: text("front").notNull(),
+    back: text("back").notNull(),
     due: timestamp("due", { withTimezone: true }).notNull().defaultNow(),
     stability: real("stability").notNull().default(0),
     difficulty: real("difficulty").notNull().default(0),
@@ -188,20 +195,11 @@ export const cards = pgTable(
     created_at: createdAt(),
     updated_at: updatedAt(),
   },
-  (t) => [index("cards_deck_id_due_idx").on(t.deck_id, t.due)],
+  (t) => [
+    index("cards_deck_id_due_idx").on(t.deck_id, t.due),
+    index("cards_user_id_idx").on(t.user_id),
+  ],
 );
-
-export const cardContents = pgTable("card_contents", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  card_id: uuid("card_id")
-    .notNull()
-    .unique()
-    .references(() => cards.id, { onDelete: "cascade" }),
-  front: text("front").notNull(),
-  back: text("back").notNull(),
-  created_at: createdAt(),
-  updated_at: updatedAt(),
-});
 
 export const reviewLogs = pgTable(
   "review_logs",
@@ -210,6 +208,10 @@ export const reviewLogs = pgTable(
     card_id: uuid("card_id")
       .notNull()
       .references(() => cards.id, { onDelete: "cascade" }),
+    // Denormalized owner for Electric per-user shape filtering.
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
     rating: integer("rating").notNull(),
     state: cardStateEnum("state").notNull(),
     due: timestamp("due", { withTimezone: true }).notNull(),
@@ -221,13 +223,15 @@ export const reviewLogs = pgTable(
     duration_ms: integer("duration_ms").notNull(),
     created_at: createdAt(),
   },
-  (t) => [index("review_logs_card_id_review_idx").on(t.card_id, t.review)],
+  (t) => [
+    index("review_logs_card_id_review_idx").on(t.card_id, t.review),
+    index("review_logs_user_id_idx").on(t.user_id),
+  ],
 );
 
 export type TUser = typeof user.$inferSelect;
 export type TDeck = typeof decks.$inferSelect;
 export type TCard = typeof cards.$inferSelect;
-export type TCardContent = typeof cardContents.$inferSelect;
 export type TLearningProfile = typeof learningProfiles.$inferSelect;
 export type TReviewLog = typeof reviewLogs.$inferSelect;
 

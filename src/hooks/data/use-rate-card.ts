@@ -5,7 +5,7 @@ import {
   reviewLogsCollection,
   type CardRow,
 } from "@/db/collections";
-import { offlineAction, type RateLogRow } from "@/db/offline";
+import { offlineAction } from "@/db/offline";
 import { toastOnPersistError } from "@/db/toast-on-error";
 import {
   dbRowToFSRSCard,
@@ -40,27 +40,32 @@ type RateInput = {
 };
 
 // Applies the card patch + review log optimistically; the `rateCard`
-// mutationFn rebuilds the server payload from these mutations. The review log
-// carries its full FSRS fields (wider than ReviewLogRow) so a replay after a
-// tab close still has everything `cards.rate` needs.
-const rateCardAction = offlineAction<RateInput>("rateCard", (v) => {
-  cardsCollection.update(v.cardId, (c) => {
-    Object.assign(c, v.cardPatch);
-  });
-  reviewLogsCollection.insert({
-    id: v.reviewLogId,
-    card_id: v.cardId,
-    rating: v.log.rating,
-    state: v.log.state,
-    due: v.log.due,
-    stability: v.log.stability,
-    difficulty: v.log.difficulty,
-    scheduled_days: v.log.scheduled_days,
-    learning_steps: v.log.learning_steps,
-    review: v.log.review,
-    duration_ms: v.durationMs,
-  } as RateLogRow);
-});
+// mutationFn rebuilds the server payload from these mutations, so the log row
+// carries every FSRS field a replay after a tab close needs. The card's
+// user_id rides along on the card row itself.
+const rateCardAction = offlineAction<RateInput & { userId: string }>(
+  "rateCard",
+  (v) => {
+    cardsCollection.update(v.cardId, (c) => {
+      Object.assign(c, v.cardPatch);
+    });
+    reviewLogsCollection.insert({
+      id: v.reviewLogId,
+      card_id: v.cardId,
+      user_id: v.userId,
+      rating: v.log.rating,
+      state: v.log.state,
+      due: v.log.due,
+      stability: v.log.stability,
+      difficulty: v.log.difficulty,
+      scheduled_days: v.log.scheduled_days,
+      learning_steps: v.log.learning_steps,
+      review: v.log.review,
+      duration_ms: v.durationMs,
+      created_at: new Date(),
+    });
+  },
+);
 
 /**
  * Records a review. FSRS scheduling runs here on the client, the new card
@@ -83,6 +88,7 @@ export function useRateCard() {
 
     const tx = rateCardAction({
       cardId: card.id,
+      userId: card.user_id,
       cardPatch,
       log,
       reviewLogId,

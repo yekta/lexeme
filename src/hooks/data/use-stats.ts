@@ -11,8 +11,9 @@ import {
   reviewLogsCollection,
   isRowOptimistic,
   liveStatus,
+  restartCollections,
 } from "@/db/collections";
-import { computeStudyBuckets } from "@/lib/study-buckets";
+import { computeStudyBuckets, filterTodayLogs } from "@/lib/study-buckets";
 
 export type TDeckStatsRow = {
   deckId: string;
@@ -89,16 +90,15 @@ export function useDeckStats() {
     isPending: !isReady && !isError,
     isError,
     error: isError
-      ? (decksCollection.utils.lastError ??
-        cardsCollection.utils.lastError ??
-        reviewLogsCollection.utils.lastError ??
-        learningProfilesCollection.utils.lastError)
+      ? new Error("Syncing failed. Check your connection and retry.")
       : undefined,
     refetch: () => {
-      void decksCollection.utils.refetch();
-      void cardsCollection.utils.refetch();
-      void reviewLogsCollection.utils.refetch();
-      void learningProfilesCollection.utils.refetch();
+      restartCollections([
+        decksCollection,
+        cardsCollection,
+        reviewLogsCollection,
+        learningProfilesCollection,
+      ]);
     },
   };
 }
@@ -106,11 +106,12 @@ export function useDeckStats() {
 /** Today's review count and time spent, derived live from the review logs. */
 export function useTodayStats() {
   const lq = useLiveQuery((q) => q.from({ log: reviewLogsCollection }));
+  const now = useNow();
   const data = useMemo(() => {
-    const logs = lq.data ?? [];
+    const logs = filterTodayLogs(lq.data ?? [], now);
     const count = logs.length;
     const totalMs = logs.reduce((sum, l) => sum + l.duration_ms, 0);
     return { count, totalMs, msPerCard: count > 0 ? totalMs / count : 0 };
-  }, [lq.data]);
+  }, [lq.data, now]);
   return { data, ...liveStatus(lq, reviewLogsCollection) };
 }

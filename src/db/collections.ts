@@ -1,89 +1,119 @@
 import { createCollection } from "@tanstack/react-db";
-import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import type { inferRouterOutputs } from "@trpc/server";
+import { persistedCollectionOptions } from "@tanstack/browser-db-sqlite-persistence";
+import { electricCollectionOptions } from "@tanstack/electric-db-collection";
 
-import type { AppRouter } from "@/server/api/root";
-import { getQueryClient } from "@/trpc/query-client";
-import { trpc } from "@/trpc/vanilla";
+import { persistence } from "@/db/persistence";
+import type {
+  TCard,
+  TDeck,
+  TLearningProfile,
+  TReviewLog,
+} from "@/server/db/schema";
 
-type RouterOutputs = inferRouterOutputs<AppRouter>;
+export type DeckRow = TDeck;
+export type CardRow = TCard;
+export type LearningProfileRow = TLearningProfile;
+export type ReviewLogRow = TReviewLog;
 
-export type DeckRow = RouterOutputs["decks"]["list"][number];
-export type CardRow = RouterOutputs["cards"]["list"][number];
-export type LearningProfileRow =
-  RouterOutputs["learningProfiles"]["list"][number];
-export type ReviewLogRow = RouterOutputs["reviewLogs"]["list"][number];
+/**
+ * Bump to discard everything persisted locally and trigger a fresh sync
+ * (do this whenever a synced table's shape changes incompatibly).
+ */
+const SCHEMA_VERSION = 1;
 
-// Collections sync by calling the server; that only makes sense in the browser.
-// On the server the collections stay idle and components render placeholders
-// until the client takes over.
-const enabled = typeof window !== "undefined";
+/**
+ * Electric streams Postgres values as text; the default parser covers
+ * numbers/bools/arrays but leaves timestamps as strings. FSRS scheduling and
+ * the study queue do real Date math, so parse every timestamptz into a Date.
+ */
+const parser = {
+  timestamptz: (value: string) => new Date(value),
+};
 
-const queryClient = getQueryClient();
+/**
+ * Shape requests go through our auth proxy (src/routes/api/electric/$table),
+ * which pins the table + per-user where clause server-side. The URL is only
+ * read when syncing starts, and that only happens in the browser — the
+ * placeholder origin keeps module evaluation safe during SSR.
+ */
+function shapeUrl(table: string): string {
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost";
+  return new URL(`/api/electric/${table}`, origin).toString();
+}
 
-/** Every deck the user owns. */
+/**
+ * Wrap Electric collection options with SQLite persistence when the browser
+ * supports it (see db/persistence.ts), so synced rows survive reloads and the
+ * stream resumes from disk. Falls back to plain in-memory sync otherwise.
+ * The cast keeps the Electric utils (`awaitTxId`) visible on the collection.
+ */
+function maybePersisted<O extends object>(options: O): O {
+  if (!persistence) return options;
+  return persistedCollectionOptions({
+    ...(options as O & { sync: never; getKey: never }),
+    persistence,
+    schemaVersion: SCHEMA_VERSION,
+  }) as unknown as O;
+}
+
+/**
+ * Every deck the user owns.
+ * Writes go through the durable outbox (see db/offline.ts), not collection
+ * handlers — a handler here would double-write to the server.
+ */
 export const decksCollection = createCollection(
-  queryCollectionOptions({
-    id: "decks",
-    queryKey: ["decks"],
-    queryFn: () => trpc.decks.list.query(),
-    queryClient,
-    enabled,
-    staleTime: Infinity,
-    getKey: (row) => row.id,
-    // Writes go through the durable outbox (see db/offline.ts), not collection
-    // handlers — a handler here would double-write to the server.
-  }),
+  maybePersisted(
+    electricCollectionOptions<DeckRow>({
+      id: "decks",
+      getKey: (row) => row.id,
+      shapeOptions: { url: shapeUrl("decks"), parser },
+    }),
+  ),
 );
 
 /** Every card the user owns, across all decks — FSRS state plus content. */
 export const cardsCollection = createCollection(
-  queryCollectionOptions({
-    id: "cards",
-    queryKey: ["cards"],
-    queryFn: () => trpc.cards.list.query(),
-    queryClient,
-    enabled,
-    staleTime: Infinity,
-    getKey: (row) => row.id,
-    // Writes (create/import/update/rate/delete) go through the durable outbox
-    // (see db/offline.ts), not collection handlers.
-  }),
+  maybePersisted(
+    electricCollectionOptions<CardRow>({
+      id: "cards",
+      getKey: (row) => row.id,
+      shapeOptions: { url: shapeUrl("cards"), parser },
+    }),
+  ),
 );
 
 /** The user's learning (FSRS) profiles. */
 export const learningProfilesCollection = createCollection(
-  queryCollectionOptions({
-    id: "learning_profiles",
-    queryKey: ["learning_profiles"],
-    queryFn: () => trpc.learningProfiles.list.query(),
-    queryClient,
-    enabled,
-    staleTime: Infinity,
-    getKey: (row) => row.id,
-    // Read-only on the client today. Any future writes should go through the
-    // durable outbox (see db/offline.ts), not a collection handler.
-  }),
+  maybePersisted(
+    electricCollectionOptions<LearningProfileRow>({
+      id: "learning_profiles",
+      getKey: (row) => row.id,
+      shapeOptions: { url: shapeUrl("learning_profiles"), parser },
+    }),
+  ),
 );
 
 /**
- * The user's review logs since the start of today. Insert-only, and only ever
- * written through the rate transaction, so no mutation handlers are needed.
+ * The user's full review history. Insert-only, and only ever written through
+ * the rate transaction. Consumers filter to "today" client-side (the shape
+ * has no moving date filter, so it stays stable and resumable).
  */
 export const reviewLogsCollection = createCollection(
-  queryCollectionOptions({
-    id: "review_logs",
-    queryKey: ["review_logs"],
-    queryFn: () => trpc.reviewLogs.list.query(),
-    queryClient,
-    enabled,
-    staleTime: Infinity,
-    getKey: (row) => row.id,
-  }),
+  maybePersisted(
+    electricCollectionOptions<ReviewLogRow>({
+      id: "review_logs",
+      getKey: (row) => row.id,
+      shapeOptions: { url: shapeUrl("review_logs"), parser },
+    }),
+  ),
 );
 
 /** Kick off syncing for every collection (called once after the app mounts). */
 export function preloadCollections() {
+  if (typeof window === "undefined") return;
   void decksCollection.preload();
   void cardsCollection.preload();
   void learningProfilesCollection.preload();
@@ -94,6 +124,7 @@ export function preloadCollections() {
 export function newCardRow(input: {
   id: string;
   deckId: string;
+  userId: string;
   front: string;
   back: string;
 }): CardRow {
@@ -101,6 +132,9 @@ export function newCardRow(input: {
   return {
     id: input.id,
     deck_id: input.deckId,
+    user_id: input.userId,
+    front: input.front,
+    back: input.back,
     due: now,
     stability: 0,
     difficulty: 0,
@@ -113,9 +147,6 @@ export function newCardRow(input: {
     last_review: null,
     created_at: now,
     updated_at: now,
-    front: input.front,
-    back: input.back,
-    content_updated_at: now,
   };
 }
 
@@ -129,10 +160,23 @@ export function isRowOptimistic(row: unknown): boolean {
   return (row as { $synced?: boolean }).$synced === false;
 }
 
-type QueryUtilsLike = {
-  lastError: unknown;
-  refetch: (opts?: { throwOnError?: boolean }) => Promise<unknown>;
+type RestartableCollection = {
+  cleanup: () => Promise<void>;
+  preload: () => Promise<void>;
 };
+
+/**
+ * Tear a collection down and start it again — the Electric equivalent of the
+ * old query refetch, used as the error-recovery path. (A healthy collection
+ * never needs this; the shape stream retries itself.)
+ */
+export function restartCollections(
+  collections: Array<RestartableCollection>,
+): void {
+  for (const collection of collections) {
+    void collection.cleanup().then(() => collection.preload());
+  }
+}
 
 /**
  * Normalise a `useLiveQuery` result + its source collection into the
@@ -141,14 +185,16 @@ type QueryUtilsLike = {
  */
 export function liveStatus(
   lq: { isReady: boolean; isError: boolean },
-  collection: { utils: QueryUtilsLike },
+  collection: RestartableCollection,
 ) {
   return {
     isPending: !lq.isReady && !lq.isError,
     isError: lq.isError,
-    error: lq.isError ? collection.utils.lastError : undefined,
+    error: lq.isError
+      ? new Error("Syncing failed. Check your connection and retry.")
+      : undefined,
     refetch: () => {
-      void collection.utils.refetch();
+      restartCollections([collection]);
     },
   };
 }

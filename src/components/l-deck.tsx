@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { type TDeck } from "@/hooks/data/use-decks";
+import { appLocale } from "@/lib/constants";
 import { motion } from "motion/react";
 import { useState } from "react";
 
@@ -122,21 +123,22 @@ export function LDeck(props: TLDeckProps) {
                 className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-recently-updated:bg-success/15 data-recently-updated:text-success"
               >
                 <p className="max-w-full min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
-                  {totalCards} {totalCards === 1 ? "card" : "cards"}
+                  {totalCards.toLocaleString(appLocale)}{" "}
+                  {totalCards === 1 ? "card" : "cards"}
                 </p>
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1.5 text-state-new group-data-placeholder:text-transparent group-data-placeholder:bg-state-new/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-new group-data-placeholder:opacity-0" />
-                  {newCount} New
+                  {newCount.toLocaleString(appLocale)} New
                 </div>
                 <div className="flex items-center gap-1.5 text-state-learn group-data-placeholder:text-transparent group-data-placeholder:bg-state-learn/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-learn group-data-placeholder:opacity-0" />
-                  {learningCount} Learn
+                  {learningCount.toLocaleString(appLocale)} Learn
                 </div>
                 <div className="flex items-center gap-1.5 text-state-due group-data-placeholder:text-transparent group-data-placeholder:bg-state-due/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                   <span className="w-2 h-2 rounded-full bg-state-due group-data-placeholder:opacity-0" />
-                  {dueCount} Due
+                  {dueCount.toLocaleString(appLocale)} Due
                 </div>
               </div>
             </div>

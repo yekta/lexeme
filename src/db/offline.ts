@@ -52,6 +52,12 @@ type AwaitableCollection = {
   utils: { awaitTxId: (txid: number, timeout?: number) => Promise<boolean> };
 };
 
+// Generous window for the txid to come back over the shape stream. The 5s
+// default is too tight for big writes on slow links (e.g. a 5000-card import
+// in dev): if this resolves before Electric delivers, the optimistic rows are
+// dropped and the data visibly vanishes until the synced rows arrive.
+const AWAIT_TXID_TIMEOUT_MS = 30_000;
+
 // Best-effort sync-back: the server transaction is already committed, so a
 // timeout here (e.g. the shape stream is still catching up) must not fail the
 // outbox entry — the row lands whenever the stream delivers it.
@@ -60,7 +66,9 @@ async function awaitTxIds(
   txids: Array<number>,
 ): Promise<void> {
   await Promise.all(
-    txids.map((txid) => collection.utils.awaitTxId(txid).catch(() => {})),
+    txids.map((txid) =>
+      collection.utils.awaitTxId(txid, AWAIT_TXID_TIMEOUT_MS).catch(() => {}),
+    ),
   );
 }
 
@@ -68,9 +76,7 @@ async function awaitTxIds(
 // committed it but the tab closed before the outbox entry cleared). Treat a
 // NOT_FOUND from such a retry as success so it drains instead of error-looping.
 function isNotFound(error: unknown): boolean {
-  return (
-    error instanceof TRPCClientError && error.data?.code === "NOT_FOUND"
-  );
+  return error instanceof TRPCClientError && error.data?.code === "NOT_FOUND";
 }
 
 const mutationFns = {

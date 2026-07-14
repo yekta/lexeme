@@ -143,7 +143,7 @@ function DuplicateNotice({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "w-full flex flex-col gap-2 rounded-lg border bg-warning/10 border-warning/20 px-2.5 py-2.5",
+        "w-full flex flex-col gap-2 rounded-md border bg-warning/10 border-warning/20 px-2.5 py-1.5",
         className,
       )}
     >

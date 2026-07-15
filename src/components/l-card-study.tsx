@@ -70,25 +70,25 @@ export function LCardStudy(props: TLCardStudyProps) {
     <div
       data-placeholder={isPlaceholder ? "true" : undefined}
       data-is-back={isBack ? "true" : undefined}
-      className="w-full group perspective-distant md:perspective-[1600px] cursor-pointer data-is-back:cursor-default data-placeholder:cursor-default"
+      className="w-full flex-1 min-h-0 group perspective-distant md:perspective-[1600px] cursor-pointer data-is-back:cursor-default data-placeholder:cursor-default"
       onClick={onClick}
     >
       <motion.div
         style={{ rotateY, transformStyle: "preserve-3d" }}
-        className="relative w-full"
+        className="relative w-full h-full"
       >
         {/* ─── Front face ─── */}
         <motion.div
           style={{ backfaceVisibility: "hidden", opacity: frontOpacity }}
           className={cn(
             faceBase,
-            "border border-border bg-background shadow-lg shadow-shadow/shadow-muted overflow-hidden flex flex-col items-center",
+            "absolute inset-0 border border-border bg-background shadow-lg shadow-shadow/shadow-muted overflow-hidden flex flex-col items-center",
           )}
         >
           <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Front
           </p>
-          <div className="flex-1 w-full flex flex-col items-center justify-center relative z-10 py-6 min-h-[calc((100svh-80px)*0.35)]">
+          <div className="faded-scroll-container flex-1 w-full flex flex-col items-center justify-center-safe relative z-10 py-6 min-h-0 overflow-y-auto">
             <p className="max-w-full text-2xl font-medium text-foreground wrap-anywhere text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none px-3">
               {isPlaceholder ? "Front text" : props.front}
             </p>
@@ -125,7 +125,7 @@ export function LCardStudy(props: TLCardStudyProps) {
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative">
               Back
             </p>
-            <div className="w-full flex-1 flex flex-col items-center justify-center py-6 min-h-30 relative">
+            <div className="-mx-4 md:-mx-8 px-4 md:px-8 faded-scroll-container w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] flex-1 flex flex-col items-center justify-center-safe py-6 min-h-0 overflow-y-auto relative">
               <p className="max-w-full text-xl text-foreground wrap-anywhere text-center px-3">
                 {isPlaceholder ? "Back text" : props.back}
               </p>
@@ -171,7 +171,7 @@ function RatingButtons({
   return (
     <div
       className={cn(
-        "grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 pt-4 md:pt-5 transition-opacity duration-150 relative",
+        "grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 pt-2 transition-opacity duration-150 relative",
         visible ? "opacity-100" : "opacity-0 pointer-events-none",
       )}
     >

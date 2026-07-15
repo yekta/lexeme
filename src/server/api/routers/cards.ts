@@ -1,12 +1,17 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { generateBack } from "@/server/ai/generate-back";
 import { requireCard, requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { cards, reviewLogs } from "@/server/db/schema";
 import { generateTxId } from "@/server/db/txid";
 
 const cardState = z.enum(["new", "learning", "review", "relearning"]);
+
+// How many recent cards to feed the model as few-shot context. Enforced
+// server-side so the client can't blow up the prompt.
+const GENERATE_CONTEXT_LIMIT = 10;
 
 // Reads come from Electric shapes (see src/db/collections.ts); this router
 // only carries writes. Every mutation runs in one transaction and returns the
@@ -91,6 +96,39 @@ export const cardsRouter = createTRPCRouter({
         await tx.delete(cards).where(eq(cards.id, input.id));
         return { txid };
       });
+    }),
+
+  /**
+   * Generate a "back" for a new card from its "front", using the deck's most
+   * recent cards as context. Pure compute — no DB write, so no txid. The
+   * Anthropic call and API key stay server-side.
+   */
+  generateBack: protectedProcedure
+    .input(
+      z.object({
+        deckId: z.uuid(),
+        front: z.string().trim().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireDeck({
+        db: ctx.db,
+        deckId: input.deckId,
+        userId: ctx.session.user.id,
+      });
+
+      const recent = await ctx.db
+        .select({ front: cards.front, back: cards.back })
+        .from(cards)
+        .where(eq(cards.deck_id, input.deckId))
+        .orderBy(desc(cards.created_at))
+        .limit(GENERATE_CONTEXT_LIMIT);
+
+      const back = await generateBack({
+        front: input.front,
+        priorCards: recent,
+      });
+      return { back };
     }),
 
   /**

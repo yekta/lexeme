@@ -1,6 +1,7 @@
 "use client";
 
 import BgPattern from "@/components/bg-pattern";
+import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import NewIndicator from "@/components/new-indicator";
 import { useNow } from "@/components/now-provider";
 import OptimisticIndicator from "@/components/optimistic-indicator";
@@ -213,10 +214,10 @@ function EditCardForm({
       <DialogHeader>
         <DialogTitle>Edit Card</DialogTitle>
       </DialogHeader>
-      <div className="space-y-4 py-4">
+      <FormWrapper>
         <form.Field name="front">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>Front (Question)</Label>
               <FormInput
                 id={field.name}
@@ -225,12 +226,12 @@ function EditCardForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="back">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>Back (Answer)</Label>
               <FormInput
                 id={field.name}
@@ -239,10 +240,10 @@ function EditCardForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
-      </div>
+      </FormWrapper>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel

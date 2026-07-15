@@ -1,6 +1,7 @@
 "use client";
 
 import ErrorCard from "@/components/error-card";
+import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { usePersistentForm } from "@/components/form-draft-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,10 +85,10 @@ export function AddCardForm({
           <span className="font-medium text-foreground">{deckName}</span>".
         </DialogDescription>
       </DialogHeader>
-      <div className="w-full flex flex-col gap-4 py-4 min-w-0">
+      <FormWrapper className="min-w-0">
         <form.Field name="front">
           {(field) => (
-            <div className="w-full flex flex-col gap-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>Front (Question)</Label>
               <FormInput
                 id={field.name}
@@ -96,12 +97,12 @@ export function AddCardForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="back">
           {(field) => (
-            <div className="w-full flex flex-col gap-2 min-w-0">
+            <FormFieldWrapper className="min-w-0">
               <div className="w-full flex items-center justify-between gap-4 min-w-0">
                 <Label className="shrink-0" htmlFor={field.name}>
                   Back (Answer)
@@ -112,7 +113,7 @@ export function AddCardForm({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1 gap-1.5"
+                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1.5 gap-1.5"
                       disabled={front.trim() === "" || isPendingGenerateBack}
                       onClick={async () => {
                         const trimmed = front.trim();
@@ -150,10 +151,10 @@ export function AddCardForm({
                 rows={3}
                 className="resize-none"
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
-      </div>
+      </FormWrapper>
       <form.Subscribe
         selector={(s) => ({
           canSubmit: s.canSubmit,

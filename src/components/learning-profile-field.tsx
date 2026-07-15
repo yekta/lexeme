@@ -1,5 +1,6 @@
 "use client";
 
+import { FormFieldWrapper } from "@/components/form";
 import {
   Combobox,
   ComboboxContent,
@@ -48,7 +49,7 @@ export function LearningProfileField({
   }, [fallbackId, isPending, onChange, profileOptions, value]);
 
   return (
-    <div className="w-full flex flex-col gap-2">
+    <FormFieldWrapper>
       <Label>Learning Profile</Label>
       <Combobox
         isPlaceholder={isPending}
@@ -84,6 +85,6 @@ export function LearningProfileField({
       <p className="text-xs text-muted-foreground">
         Controls daily limits and learning parameters.
       </p>
-    </div>
+    </FormFieldWrapper>
   );
 }

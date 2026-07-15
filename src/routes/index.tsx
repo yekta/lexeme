@@ -1,4 +1,5 @@
 import { ClientOnly } from "@/components/client-only";
+import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { usePersistentForm } from "@/components/form-draft-provider";
 import PlusIcon from "@/components/icons/plus-icon";
 import { CreateOrImportDeckButton } from "@/components/import-deck-button";
@@ -271,10 +272,10 @@ function CreateDeckForm({
           Organize your cards into decks by topic or subject.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4">
+      <FormWrapper>
         <form.Field name="name">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>Name</Label>
               <FormInput
                 id={field.name}
@@ -284,12 +285,12 @@ function CreateDeckForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="description">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>
                 Description{" "}
                 <span className="text-muted-foreground font-normal">
@@ -304,7 +305,7 @@ function CreateDeckForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="learning_profile_id">
@@ -318,7 +319,7 @@ function CreateDeckForm({
             />
           )}
         </form.Field>
-      </div>
+      </FormWrapper>
       <DialogFooter>
         <form.Subscribe
           selector={(s) => ({

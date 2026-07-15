@@ -1,5 +1,6 @@
 "use client";
 
+import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,8 +82,8 @@ export function ImportDeckForm({
           Adjust the name, description, or learning profile.
         </DialogDescription>
       </DialogHeader>
-      <div className="w-full flex flex-col gap-5 py-4">
-        <div className="w-full flex flex-col -my-1 gap-0.5">
+      <FormWrapper>
+        <div className="w-full flex flex-col gap-0.5">
           <p className="text-muted-foreground w-full leading-tight">Found:</p>
           <p className="text-base font-medium w-full">
             {cardCount} {cardWord}
@@ -90,7 +91,7 @@ export function ImportDeckForm({
         </div>
         <form.Field name="name">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>Name</Label>
               <FormInput
                 id={field.name}
@@ -100,12 +101,12 @@ export function ImportDeckForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="description">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>
                 Description{" "}
                 <span className="text-muted-foreground font-normal">
@@ -120,7 +121,7 @@ export function ImportDeckForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="learning_profile_id">
@@ -134,7 +135,7 @@ export function ImportDeckForm({
             />
           )}
         </form.Field>
-      </div>
+      </FormWrapper>
       <DialogFooter>
         <form.Subscribe
           selector={(s) => ({

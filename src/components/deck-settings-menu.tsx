@@ -1,5 +1,6 @@
 "use client";
 
+import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -243,10 +244,10 @@ function DeckSettingsForm({
           Update the name, description, or learning profile for this deck.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4">
+      <FormWrapper>
         <form.Field name="name">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>Name</Label>
               <FormInput
                 id={field.name}
@@ -256,12 +257,12 @@ function DeckSettingsForm({
                 onBlur={field.handleBlur}
                 placeholder="Deck Name"
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="description">
           {(field) => (
-            <div className="space-y-2">
+            <FormFieldWrapper>
               <Label htmlFor={field.name}>
                 Description{" "}
                 <span className="text-muted-foreground font-normal">
@@ -276,7 +277,7 @@ function DeckSettingsForm({
                 onBlur={field.handleBlur}
                 placeholder="e.g. Words from chapter 1-5"
               />
-            </div>
+            </FormFieldWrapper>
           )}
         </form.Field>
         <form.Field name="learning_profile_id">
@@ -293,7 +294,7 @@ function DeckSettingsForm({
             />
           )}
         </form.Field>
-      </div>
+      </FormWrapper>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
@@ -358,8 +359,8 @@ function DeleteDeckForm({
           &quot;{deck.name}&quot; and all its cards.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4">
-        <div className="space-y-2">
+      <FormWrapper>
+        <FormFieldWrapper>
           <p className="text-sm text-muted-foreground mb-2">
             Please type{" "}
             <span className="bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-mono font-medium">
@@ -379,8 +380,8 @@ function DeleteDeckForm({
               />
             )}
           </form.Field>
-        </div>
-      </div>
+        </FormFieldWrapper>
+      </FormWrapper>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel

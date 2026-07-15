@@ -1,6 +1,7 @@
 "use client";
 
 import BgPattern from "@/components/bg-pattern";
+import ErrorCard from "@/components/error-card";
 import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import NewIndicator from "@/components/new-indicator";
 import { useNow } from "@/components/now-provider";
@@ -22,9 +23,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormTextarea } from "@/components/ui/textarea";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
+import { api } from "@/trpc/react";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { LoaderIcon, MoreVertical, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -186,6 +189,11 @@ function EditCardForm({
   onDone: () => void;
 }) {
   const mutation = useUpdateCard();
+  const {
+    isPending: isPendingGenerateBack,
+    mutateAsync: mutateGenerateBack,
+    error,
+  } = api.cards.generateBack.useMutation();
   const form = useForm({
     defaultValues: { front, back },
     validators: {
@@ -206,6 +214,7 @@ function EditCardForm({
 
   return (
     <form
+      className="min-w-0"
       onSubmit={(e) => {
         e.preventDefault();
         form.handleSubmit();
@@ -214,7 +223,7 @@ function EditCardForm({
       <DialogHeader>
         <DialogTitle>Edit Card</DialogTitle>
       </DialogHeader>
-      <FormWrapper>
+      <FormWrapper className="min-w-0">
         <form.Field name="front">
           {(field) => (
             <FormFieldWrapper>
@@ -231,19 +240,64 @@ function EditCardForm({
         </form.Field>
         <form.Field name="back">
           {(field) => (
-            <FormFieldWrapper>
-              <Label htmlFor={field.name}>Back (Answer)</Label>
-              <FormInput
+            <FormFieldWrapper className="min-w-0">
+              <div className="w-full flex items-center justify-between gap-4 min-w-0">
+                <Label className="shrink-0" htmlFor={field.name}>
+                  Back (Answer)
+                </Label>
+                <form.Subscribe selector={(s) => s.values.front}>
+                  {(front) => (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1.5 gap-1.5"
+                      disabled={front.trim() === "" || isPendingGenerateBack}
+                      onClick={async () => {
+                        const trimmed = front.trim();
+                        if (trimmed === "") return;
+                        try {
+                          const { back } = await mutateGenerateBack({
+                            deckId,
+                            front: trimmed,
+                          });
+                          field.handleChange(back);
+                        } catch (err) {
+                          console.log(err);
+                        }
+                      }}
+                    >
+                      {isPendingGenerateBack ? (
+                        <LoaderIcon className="size-4 shrink-0 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4 shrink-0" />
+                      )}
+
+                      <span className="truncate">
+                        {isPendingGenerateBack ? "Suggesting" : "Suggest"}
+                      </span>
+                    </Button>
+                  )}
+                </form.Subscribe>
+              </div>
+              <FormTextarea
                 id={field.name}
                 name={field.name}
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
+                rows={3}
+                className="resize-none"
               />
             </FormFieldWrapper>
           )}
         </form.Field>
       </FormWrapper>
+      {error && (
+        <div className="w-[calc(100%+0.5rem)] -mx-1 pb-4">
+          <ErrorCard error={error.message} />
+        </div>
+      )}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel

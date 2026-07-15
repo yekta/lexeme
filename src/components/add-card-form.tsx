@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormTextarea } from "@/components/ui/textarea";
 import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
-import { Sparkles } from "lucide-react";
+import { LoaderIcon, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -111,9 +112,8 @@ export function AddCardForm({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1"
-                      isPending={isPendingGenerateBack}
-                      disabled={front.trim() === ""}
+                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1 gap-1.5"
+                      disabled={front.trim() === "" || isPendingGenerateBack}
                       onClick={async () => {
                         const trimmed = front.trim();
                         if (trimmed === "") return;
@@ -128,18 +128,27 @@ export function AddCardForm({
                         }
                       }}
                     >
-                      <Sparkles className="size-4 shrink-0" />
-                      <span className="truncate">Generate</span>
+                      {isPendingGenerateBack ? (
+                        <LoaderIcon className="size-4 shrink-0 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4 shrink-0" />
+                      )}
+
+                      <span className="truncate">
+                        {isPendingGenerateBack ? "Suggesting" : "Suggest"}
+                      </span>
                     </Button>
                   )}
                 </form.Subscribe>
               </div>
-              <FormInput
+              <FormTextarea
                 id={field.name}
                 name={field.name}
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
+                rows={3}
+                className="resize-none"
               />
             </div>
           )}

@@ -148,7 +148,7 @@ export function AddCardForm({
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                rows={3}
+                rows={4}
                 className="resize-none"
               />
             </FormFieldWrapper>

@@ -27,7 +27,13 @@ import { FormTextarea } from "@/components/ui/textarea";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
 import { api } from "@/trpc/react";
 import { useForm } from "@tanstack/react-form";
-import { LoaderIcon, MoreVertical, Pencil, Sparkles, Trash2 } from "lucide-react";
+import {
+  LoaderIcon,
+  MoreVertical,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -286,7 +292,7 @@ function EditCardForm({
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                rows={3}
+                rows={4}
                 className="resize-none"
               />
             </FormFieldWrapper>

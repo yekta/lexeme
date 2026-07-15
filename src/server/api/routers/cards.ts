@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateBack } from "@/server/ai/generate-back";
@@ -120,7 +120,9 @@ export const cardsRouter = createTRPCRouter({
       const recent = await ctx.db
         .select({ front: cards.front, back: cards.back })
         .from(cards)
-        .where(eq(cards.deck_id, input.deckId))
+        .where(
+          and(eq(cards.deck_id, input.deckId), ne(cards.front, input.front)),
+        )
         .orderBy(desc(cards.created_at))
         .limit(GENERATE_CONTEXT_LIMIT);
 

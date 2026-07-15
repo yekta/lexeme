@@ -88,14 +88,11 @@ export function LCardStudy(props: TLCardStudyProps) {
           <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Front
           </p>
-          <div className="faded-scroll-container flex-1 w-full flex flex-col items-center justify-center-safe relative z-10 py-6 min-h-0 overflow-y-auto">
+          <FaceScrollArea>
             <p className="max-w-full text-2xl font-medium text-foreground wrap-anywhere text-center group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/15 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none px-3">
               {isPlaceholder ? "Front text" : props.front}
             </p>
-            <p className="max-w-full text-xl text-foreground/80 wrap-anywhere text-center opacity-0 px-3">
-              {isPlaceholder ? "Back text" : props.back}
-            </p>
-          </div>
+          </FaceScrollArea>
           {/* Invisible buttons — keep layout identical to back face */}
           <RatingButtons
             visible={false}
@@ -125,14 +122,11 @@ export function LCardStudy(props: TLCardStudyProps) {
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative">
               Back
             </p>
-            <div className="-mx-4 md:-mx-8 px-4 md:px-8 faded-scroll-container w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] flex-1 flex flex-col items-center justify-center-safe py-6 min-h-0 overflow-y-auto relative">
+            <FaceScrollArea>
               <p className="max-w-full text-xl text-foreground wrap-anywhere text-center px-3">
                 {isPlaceholder ? "Back text" : props.back}
               </p>
-              <p className="opacity-0 max-w-full text-2xl font-medium text-transparent wrap-anywhere text-center px-3">
-                {isPlaceholder ? "Front text" : props.front}
-              </p>
-            </div>
+            </FaceScrollArea>
             {/* Invisible placeholder — matches "Click to flip" line height */}
             <p className="text-xs text-center mt-1 mb-0 opacity-0 select-none relative">
               placeholder
@@ -142,6 +136,19 @@ export function LCardStudy(props: TLCardStudyProps) {
           </motion.div>
         )}
       </motion.div>
+    </div>
+  );
+}
+
+/**
+ * Scroll area shared by both faces. Full-bleeds through the face's padding so
+ * the top/bottom fade mask reaches the card edges, then re-applies the padding
+ * inside so content keeps its inset.
+ */
+function FaceScrollArea({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="faded-scroll-container relative z-10 -mx-4 md:-mx-8 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] flex-1 min-h-0 overflow-y-auto flex flex-col items-center justify-center-safe px-4 md:px-8 py-6">
+      {children}
     </div>
   );
 }

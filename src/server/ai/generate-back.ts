@@ -22,9 +22,7 @@ You are given the user's previous cards (front → back pairs) and the front of 
 new card. Infer the user's conventions from the examples — the language(s) \
 involved, whether backs are translations, definitions, or multiple \
 translations, their length, and their tone (formal or friendly) — and produce \
-a back for the new card that matches those conventions. Keep it concise: at \
-most three short paragraphs, and shorter when the user's examples are short. \
-Output only the back content, nothing else.`;
+a back for the new card that matches those conventions. Output only the back content, nothing else.`;
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {

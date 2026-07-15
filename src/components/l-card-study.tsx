@@ -93,16 +93,10 @@ export function LCardStudy(props: TLCardStudyProps) {
               {isPlaceholder ? "Front text" : props.front}
             </p>
           </FaceScrollArea>
-          {/* Invisible buttons — keep layout identical to back face */}
-          <RatingButtons
-            visible={false}
-            {...(isPlaceholder ? placeholderProps : props)}
-          />
-          <p className="text-xs text-muted-foreground text-center relative z-10 select-none group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+          <p className="text-xs mt-5 text-muted-foreground text-center relative z-10 select-none group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
             Click to flip
           </p>
         </motion.div>
-
         {/* ─── Back face ─── */}
         {!isPlaceholder && (
           <motion.div
@@ -127,10 +121,6 @@ export function LCardStudy(props: TLCardStudyProps) {
                 {isPlaceholder ? "Back text" : props.back}
               </p>
             </FaceScrollArea>
-            {/* Invisible placeholder — matches "Click to flip" line height */}
-            <p className="text-xs text-center mt-1 mb-0 opacity-0 select-none relative">
-              placeholder
-            </p>
             {/* Visible rating buttons */}
             <RatingButtons visible={true} {...props} />
           </motion.div>

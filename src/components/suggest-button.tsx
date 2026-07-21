@@ -28,16 +28,14 @@ export function SuggestButton({
       onClick={onClick}
     >
       <div className="size-3.5 shrink-0 -ml-0.5">
-        <div
-          data-pending={isPending || undefined}
-          className="size-full data-pending:animate-spin transform-gpu"
-        >
-          {isPending ? (
-            <LoaderIcon className="size-full" />
-          ) : (
-            <Sparkles className="size-full" />
-          )}
-        </div>
+        {isPending ? (
+          <LoaderIcon
+            data-pending={isPending || undefined}
+            className="size-full data-pending:animate-spin transform-gpu"
+          />
+        ) : (
+          <Sparkles className="size-full" />
+        )}
       </div>
       <span className="truncate">{isPending ? "Suggesting" : "Suggest"}</span>
     </Button>

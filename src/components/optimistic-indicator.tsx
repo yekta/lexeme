@@ -24,7 +24,7 @@ export default function OptimisticIndicator({
       data-optimistic={isOptimistic || undefined}
       data-animate={animate || undefined}
       className={cn(
-        "shrink-0 opacity-0 data-optimistic:opacity-100 scale-50 data-optimistic:scale-100 data-animate:animate-spin transition size-5 text-muted-more-foreground",
+        "shrink-0 opacity-0 data-optimistic:opacity-100 scale-50 data-optimistic:scale-100 data-animate:animate-spin origin-center transform-fill transition size-5 text-muted-more-foreground",
         className,
       )}
     />

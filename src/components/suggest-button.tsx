@@ -29,10 +29,7 @@ export function SuggestButton({
     >
       <div className="size-3.5 shrink-0 -ml-0.5">
         {isPending ? (
-          <LoaderIcon
-            data-pending={isPending || undefined}
-            className="size-full data-pending:animate-spin transform-gpu"
-          />
+          <LoaderIcon className="size-full animate-spin translate-z-0" />
         ) : (
           <Sparkles className="size-full" />
         )}

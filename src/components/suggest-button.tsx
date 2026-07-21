@@ -27,11 +27,13 @@ export function SuggestButton({
       disabled={disabled || isPending}
       onClick={onClick}
     >
-      <div className="size-3.5 shrink-0 -ml-0.5">
+      <div className="relative size-3.5 shrink-0 -ml-0.5">
         {isPending ? (
-          <LoaderIcon className="size-full block animate-spin origin-center transform-fill" />
+          <div className="absolute inset-0 origin-center animate-spin will-change-transform">
+            <LoaderIcon className="block size-full" />
+          </div>
         ) : (
-          <Sparkles className="size-full block" />
+          <Sparkles className="block size-full" />
         )}
       </div>
       <span className="truncate">{isPending ? "Suggesting" : "Suggest"}</span>

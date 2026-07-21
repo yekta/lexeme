@@ -27,7 +27,7 @@ export async function generateBack({
 
   const response = await getClient().responses.parse({
     model: "gpt-5.6-terra",
-    max_output_tokens: 1024 * 4,
+    max_output_tokens: 1024,
     reasoning: { effort: "high" },
     text: { format: zodTextFormat(backSchema, "back") },
     instructions: SYSTEM_PROMPT,

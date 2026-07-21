@@ -33,7 +33,7 @@ export async function generateFront({
 
   const response = await getClient().responses.parse({
     model: "gpt-5.6-terra",
-    max_output_tokens: 1024 * 10,
+    max_output_tokens: 1024,
     reasoning: { effort: "high" },
     text: { format: zodTextFormat(frontSchema, "front") },
     instructions: SYSTEM_PROMPT,

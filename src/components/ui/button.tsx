@@ -138,7 +138,7 @@ function Button({
       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-data-pending/button:opacity-100 pointer-events-none">
         <LoaderIcon
           className={cn(
-            "group-data-pending/button:animate-spin origin-center transform-fill size-5",
+            "group-data-pending/button:animate-spin size-5",
             loaderColorClass,
           )}
         />

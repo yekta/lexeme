@@ -24,16 +24,11 @@ import {
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormTextarea } from "@/components/ui/textarea";
+import { SuggestButton } from "@/components/suggest-button";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
 import { api } from "@/trpc/react";
 import { useForm } from "@tanstack/react-form";
-import {
-  LoaderIcon,
-  MoreVertical,
-  Pencil,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -248,16 +243,13 @@ function EditCardForm({
           {(field) => (
             <FormFieldWrapper className="min-w-0">
               <div className="w-full flex items-center justify-between gap-4 min-w-0">
-                <Label className="shrink-0" htmlFor={field.name}>
+                <Label className="shrink min-w-0 truncate" htmlFor={field.name}>
                   Back (Answer)
                 </Label>
                 <form.Subscribe selector={(s) => s.values.front}>
                   {(front) => (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1.5 gap-1.5"
+                    <SuggestButton
+                      isPending={isPendingGenerateBack}
                       disabled={front.trim() === "" || isPendingGenerateBack}
                       onClick={async () => {
                         const trimmed = front.trim();
@@ -272,17 +264,7 @@ function EditCardForm({
                           console.log(err);
                         }
                       }}
-                    >
-                      {isPendingGenerateBack ? (
-                        <LoaderIcon className="size-4 shrink-0 animate-spin" />
-                      ) : (
-                        <Sparkles className="size-4 shrink-0" />
-                      )}
-
-                      <span className="truncate">
-                        {isPendingGenerateBack ? "Suggesting" : "Suggest"}
-                      </span>
-                    </Button>
+                    />
                   )}
                 </form.Subscribe>
               </div>

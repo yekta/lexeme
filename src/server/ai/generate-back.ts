@@ -1,8 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { env } from "@/env";
+import { getClient } from "@/server/ai/client";
 
 /**
  * Generates the "back" of a flashcard from its "front", using the deck's
@@ -23,12 +22,6 @@ new card. Infer the user's conventions from the examples — the language(s) \
 involved, whether backs are translations, definitions, or multiple \
 translations, their length, and their tone (formal or friendly) — and produce \
 a back for the new card that matches those conventions. Output only the back content, nothing else.`;
-
-let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  client ??= new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  return client;
-}
 
 export async function generateBack({
   front,

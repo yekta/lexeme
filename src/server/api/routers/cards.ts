@@ -1,7 +1,10 @@
+import { TRPCError } from "@trpc/server";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
+import { GENERATE_CARD_EXCLUDE_FRONTS_LIMIT } from "@/lib/constants";
 import { generateBack } from "@/server/ai/generate-back";
+import { generateCard } from "@/server/ai/generate-card";
 import { requireCard, requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { cards, reviewLogs } from "@/server/db/schema";
@@ -9,6 +12,7 @@ import { generateTxId } from "@/server/db/txid";
 
 const cardState = z.enum(["new", "learning", "review", "relearning"]);
 const GENERATE_BACK_CARDS_CONTEXT_LIMIT = 20;
+const GENERATE_CARD_FRONTS_LIMIT = 10_000;
 
 // Reads come from Electric shapes (see src/db/collections.ts); this router
 // only carries writes. Every mutation runs in one transaction and returns the
@@ -128,6 +132,62 @@ export const cardsRouter = createTRPCRouter({
         priorCards: recent,
       });
       return { back };
+    }),
+
+  /**
+   * Suggest a whole new card (front + back) from the deck's existing cards.
+   * Pure compute — no DB write, so no txid. The client hides the button on an
+   * empty deck; the PRECONDITION_FAILED here is just the server-side backstop.
+   */
+  generateCard: protectedProcedure
+    .input(
+      z.object({
+        deckId: z.uuid(),
+        // Fronts already suggested and passed on this dialog session, so
+        // repeated clicks don't return the same card twice.
+        excludeFronts: z
+          .array(z.string().trim().min(1))
+          .max(GENERATE_CARD_EXCLUDE_FRONTS_LIMIT)
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await requireDeck({
+        db: ctx.db,
+        deckId: input.deckId,
+        userId: ctx.session.user.id,
+      });
+
+      // The dedupe list only needs fronts, and at this limit fetching backs
+      // for every row would be waste — so fronts and the small few-shot set
+      // are separate queries.
+      const [existingFronts, recentCards] = await Promise.all([
+        ctx.db
+          .select({ front: cards.front })
+          .from(cards)
+          .where(eq(cards.deck_id, input.deckId))
+          .orderBy(desc(cards.created_at))
+          .limit(GENERATE_CARD_FRONTS_LIMIT),
+        ctx.db
+          .select({ front: cards.front, back: cards.back })
+          .from(cards)
+          .where(eq(cards.deck_id, input.deckId))
+          .orderBy(desc(cards.created_at))
+          .limit(GENERATE_BACK_CARDS_CONTEXT_LIMIT),
+      ]);
+
+      if (existingFronts.length === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Add at least one card before suggesting a new one.",
+        });
+      }
+
+      return generateCard({
+        existingFronts: existingFronts.map((c) => c.front),
+        rejectedFronts: input.excludeFronts,
+        recentCards,
+      });
     }),
 
   /**

@@ -8,10 +8,7 @@ import { cards, reviewLogs } from "@/server/db/schema";
 import { generateTxId } from "@/server/db/txid";
 
 const cardState = z.enum(["new", "learning", "review", "relearning"]);
-
-// How many recent cards to feed the model as few-shot context. Enforced
-// server-side so the client can't blow up the prompt.
-const GENERATE_CONTEXT_LIMIT = 10;
+const GENERATE_BACK_CARDS_CONTEXT_LIMIT = 20;
 
 // Reads come from Electric shapes (see src/db/collections.ts); this router
 // only carries writes. Every mutation runs in one transaction and returns the
@@ -124,7 +121,7 @@ export const cardsRouter = createTRPCRouter({
           and(eq(cards.deck_id, input.deckId), ne(cards.front, input.front)),
         )
         .orderBy(desc(cards.created_at))
-        .limit(GENERATE_CONTEXT_LIMIT);
+        .limit(GENERATE_BACK_CARDS_CONTEXT_LIMIT);
 
       const back = await generateBack({
         front: input.front,

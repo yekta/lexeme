@@ -37,7 +37,7 @@ export async function generateBack({
 
   const response = await getClient().messages.parse({
     model: "claude-opus-4-8",
-    max_tokens: 2048,
+    max_tokens: 1024 * 4,
     thinking: { type: "adaptive" },
     output_config: { format: zodOutputFormat(backSchema), effort: "high" },
     system: SYSTEM_PROMPT,

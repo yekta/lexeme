@@ -44,7 +44,7 @@ export async function generateFront({
 
   const response = await getClient().messages.parse({
     model: "claude-opus-4-8",
-    max_tokens: 2048,
+    max_tokens: 1024 * 10,
     thinking: { type: "adaptive" },
     output_config: { format: zodOutputFormat(frontSchema), effort: "high" },
     system: SYSTEM_PROMPT,

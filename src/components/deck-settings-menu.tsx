@@ -156,7 +156,7 @@ export function DeckSettingsMenu({
             onClick={handleExport}
           >
             {isExporting ? (
-              <LoaderIcon className="size-5 shrink-0 animate-spin" />
+              <LoaderIcon className="size-5 shrink-0 animate-spin origin-center transform-fill" />
             ) : (
               <UploadIcon className="size-5 shrink-0" />
             )}

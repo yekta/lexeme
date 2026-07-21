@@ -89,7 +89,9 @@ export function AddCardForm({
         <form.Field name="front">
           {(field) => (
             <FormFieldWrapper>
-              <Label htmlFor={field.name}>Front (Question)</Label>
+              <Label htmlFor={field.name} className="shrink min-w-0 truncate">
+                Front (Question)
+              </Label>
               <FormInput
                 id={field.name}
                 name={field.name}
@@ -104,16 +106,16 @@ export function AddCardForm({
           {(field) => (
             <FormFieldWrapper className="min-w-0">
               <div className="w-full flex items-center justify-between gap-4 min-w-0">
-                <Label className="shrink-0" htmlFor={field.name}>
+                <Label className="shrink min-w-0 truncate" htmlFor={field.name}>
                   Back (Answer)
                 </Label>
                 <form.Subscribe selector={(s) => s.values.front}>
                   {(front) => (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="shrink min-w-0 px-2 overflow-hidden -mr-1 -my-1.5 gap-1.5"
+                      className="shrink-0 min-w-0 px-2.5 py-1 overflow-hidden -mr-1 -mt-1.5 -mb-1 gap-1.5"
                       disabled={front.trim() === "" || isPendingGenerateBack}
                       onClick={async () => {
                         const trimmed = front.trim();
@@ -129,12 +131,16 @@ export function AddCardForm({
                         }
                       }}
                     >
-                      {isPendingGenerateBack ? (
-                        <LoaderIcon className="size-4 shrink-0 animate-spin" />
-                      ) : (
-                        <Sparkles className="size-4 shrink-0" />
-                      )}
-
+                      <div
+                        data-pending={isPendingGenerateBack || undefined}
+                        className="size-3.5 shrink-0 -ml-0.5 data-pending:animate-spin"
+                      >
+                        {isPendingGenerateBack ? (
+                          <LoaderIcon className="size-full" />
+                        ) : (
+                          <Sparkles className="size-full" />
+                        )}
+                      </div>
                       <span className="truncate">
                         {isPendingGenerateBack ? "Suggesting" : "Suggest"}
                       </span>

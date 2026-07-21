@@ -43,9 +43,9 @@ export async function generateBack({
       : "(no previous cards yet)";
 
   const response = await getClient().messages.parse({
-    model: "claude-sonnet-5",
+    model: "claude-opus-4-8",
     max_tokens: 2048,
-    thinking: { type: "disabled" },
+    thinking: { type: "adaptive" },
     output_config: { format: zodOutputFormat(backSchema), effort: "high" },
     system: SYSTEM_PROMPT,
     messages: [

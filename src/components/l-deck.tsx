@@ -15,6 +15,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { type TDeck } from "@/hooks/data/use-decks";
 import { appLocale } from "@/lib/constants";
 import { motion } from "motion/react";
@@ -26,6 +34,8 @@ export type TDeckStats = {
   learn: number;
   due: number;
   latestCardCreatedAt: number;
+  /** True retention (0..1), or null when the deck has no review answers yet. */
+  retention: number | null;
   /** A card in this deck has local changes the server hasn't confirmed yet. */
   optimistic: boolean;
 };
@@ -52,10 +62,11 @@ export function LDeck(props: TLDeckProps) {
   const description = isPlaceholder
     ? "A short description"
     : props.deck.description;
-  const totalCards = isPlaceholder ? 0 : props.totalCards;
-  const newCount = isPlaceholder ? 0 : props.newCount;
-  const learningCount = isPlaceholder ? 0 : props.learningCount;
-  const dueCount = isPlaceholder ? 0 : props.dueCount;
+  const totalCards = isPlaceholder ? 100 : props.totalCards;
+  const newCount = isPlaceholder ? 5 : props.newCount;
+  const learningCount = isPlaceholder ? 5 : props.learningCount;
+  const dueCount = isPlaceholder ? 5 : props.dueCount;
+  const retention = isPlaceholder ? null : props.stats.retention;
 
   const now = useNow();
   const isNew =
@@ -72,20 +83,12 @@ export function LDeck(props: TLDeckProps) {
 
   return (
     <div
-      className="group relative"
+      className="group relative w-full h-full"
       data-placeholder={isPlaceholder || undefined}
     >
-      {/* Ghost card 2 — bottom of stack */}
-      {(isPlaceholder || totalCards > 2) && (
-        <div className="shadow-md shadow-shadow/shadow absolute -top-2.5 -left-0.5 w-full h-full rounded-xl border border-border bg-card -rotate-1 origin-bottom-left transition-colors" />
-      )}
-      {/* Ghost card 1 */}
-      {(isPlaceholder || totalCards > 1) && (
-        <div className="shadow-md shadow-shadow/shadow absolute -top-1 left-2.5 w-full h-full rounded-xl border border-border bg-card -rotate-1 origin-bottom-left transition-colors" />
-      )}
       {/* Main card */}
-      <motion.div className="relative z-10">
-        <Card className="flex flex-col shadow-md shadow-shadow/shadow relative isolate transition-colors">
+      <motion.div className="relative z-10 h-full">
+        <Card className="h-full flex flex-col shadow-md shadow-shadow/shadow relative isolate transition-colors">
           {!isPlaceholder && (
             <DeckSettingsMenu
               deck={props.deck}
@@ -111,7 +114,7 @@ export function LDeck(props: TLDeckProps) {
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent className="flex-1 flex flex-col justify-end">
             <NewIndicator
               isNew={isNew || isRecentlyUpdated}
               className="rounded-tl-[calc(var(--radius)*1.4-1px)]"
@@ -120,12 +123,60 @@ export function LDeck(props: TLDeckProps) {
             <div className="flex flex-col items-start gap-3 mt-2 relative">
               <div
                 data-recently-updated={isRecentlyUpdated ? "true" : undefined}
-                className="text-sm max-w-full text-muted-foreground bg-transparent flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-recently-updated:bg-success/15 data-recently-updated:text-success"
+                className="text-sm max-w-full text-muted-foreground bg-transparent flex-wrap flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-recently-updated:bg-success/15 data-recently-updated:text-success"
               >
-                <p className="max-w-full min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
+                <p className="shrink wrap-break-word min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
                   {totalCards.toLocaleString(appLocale)}{" "}
                   {totalCards === 1 ? "card" : "cards"}
                 </p>
+                {(isPlaceholder || retention !== null) && (
+                  <p className="px-2 text-muted-more-foreground group-data-placeholder:text-transparent group-data-placeholder:px-1">
+                    |
+                  </p>
+                )}
+                {isPlaceholder ? (
+                  <p className="shrink wrap-break-word min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
+                    80% retention
+                  </p>
+                ) : (
+                  retention !== null && (
+                    <Popover>
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="font-normal py-0 px-1.5 -my-1 -ml-1.5"
+                          />
+                        }
+                      >
+                        <span className="shrink min-w-0 truncate leading-none">
+                          {retention.toLocaleString(appLocale, {
+                            style: "percent",
+                            maximumFractionDigits: 0,
+                          })}{" "}
+                          retention
+                        </span>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="min-w-64">
+                        <PopoverHeader>
+                          <PopoverTitle>
+                            True Retention
+                            <span className="text-muted-foreground">
+                              {" ("}
+                            </span>
+                            30d
+                            <span className="text-muted-foreground">)</span>
+                          </PopoverTitle>
+                          <PopoverDescription>
+                            The share of due-card reviews you answered correctly
+                            in the last 30 days.
+                          </PopoverDescription>
+                        </PopoverHeader>
+                      </PopoverContent>
+                    </Popover>
+                  )
+                )}
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1.5 text-state-new group-data-placeholder:text-transparent group-data-placeholder:bg-state-new/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">

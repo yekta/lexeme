@@ -115,7 +115,7 @@ function DeckPageView({
       className="min-h-screen group flex flex-col w-full"
     >
       <Navbar />
-      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 space-y-5 flex-1 flex flex-col">
+      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 gap-4 flex-1 flex flex-col">
         {state === "not-found" || state === "forbidden" || state === "error" ? (
           <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
             {state === "not-found" ? (
@@ -165,9 +165,9 @@ function DeckPageView({
                 Study Deck
               </LinkButton>
             </div>
-
-            <div className="w-full h-px bg-border rounded-full" />
-
+            <div className="w-full py-1">
+              <div className="w-full h-px bg-border rounded-full" />
+            </div>
             <div className="flex items-center justify-between gap-4">
               <h2 className="px-1 text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 Cards{" "}
@@ -192,7 +192,6 @@ function DeckPageView({
                 </DialogContent>
               </Dialog>
             </div>
-
             {isPlaceholder ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Array.from({ length: 12 }).map((_, i) => (

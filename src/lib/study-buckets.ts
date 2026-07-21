@@ -30,6 +30,42 @@ export function filterTodayLogs(
   return logs.filter((log) => new Date(log.review).getTime() >= dayStart);
 }
 
+const RETENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/**
+ * Anki-style true retention: the pass rate (rating above Again) of answers
+ * given to cards that were in the review state. Learning and relearning
+ * answers are excluded, as are manual reschedules (rating 0). Uses the last
+ * 30 days when the deck has eligible answers in that window, otherwise falls
+ * back to all time; `null` when the deck has no eligible answers at all.
+ */
+export function computeTrueRetention(
+  logs: ReviewLogRow[],
+  deckCardIds: Set<string>,
+  now: number,
+): number | null {
+  const cutoff = now - RETENTION_WINDOW_MS;
+  let recentPassed = 0;
+  let recentTotal = 0;
+  let allPassed = 0;
+  let allTotal = 0;
+  for (const log of logs) {
+    if (log.state !== "review") continue;
+    if (log.rating < 1) continue;
+    if (!deckCardIds.has(log.card_id)) continue;
+    const passed = log.rating > 1;
+    allTotal++;
+    if (passed) allPassed++;
+    if (new Date(log.review).getTime() >= cutoff) {
+      recentTotal++;
+      if (passed) recentPassed++;
+    }
+  }
+  if (recentTotal > 0) return recentPassed / recentTotal;
+  if (allTotal > 0) return allPassed / allTotal;
+  return null;
+}
+
 /**
  * The single source of truth for what is studyable in a deck right now. The
  * deck-list badges (`useDeckStats`) and the study queue (`useStudyCards`) both

@@ -70,9 +70,7 @@ export function CardsVirtualGrid({
 
   return (
     <div ref={parentRef}>
-      <div
-        style={{ height: virtualizer.getTotalSize(), position: "relative" }}
-      >
+      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const rowCards = rows[virtualRow.index];
           return (

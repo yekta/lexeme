@@ -121,14 +121,16 @@ export function LDeck(props: TLDeckProps) {
               classNameInner="rounded-tl-[calc(var(--radius)*1.4-2px)]"
             />
             <div className="flex flex-col items-start gap-3 mt-2 relative">
-              <div
-                data-recently-updated={isRecentlyUpdated ? "true" : undefined}
-                className="text-sm max-w-full text-muted-foreground bg-transparent flex-wrap flex justify-start transition-colors duration-300 rounded px-2 py-0.5 -ml-2 data-recently-updated:bg-success/15 data-recently-updated:text-success"
-              >
-                <p className="shrink wrap-break-word min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
-                  {totalCards.toLocaleString(appLocale)}{" "}
-                  {totalCards === 1 ? "card" : "cards"}
-                </p>
+              <div className="text-sm max-w-full text-muted-foreground bg-transparent flex-wrap flex justify-start items-center">
+                <div
+                  data-recently-updated={isRecentlyUpdated ? "true" : undefined}
+                  className="px-1.25 py-px data-recently-updated:bg-success/15 data-recently-updated:text-success duration-300 transition-colors rounded -mx-1.25"
+                >
+                  <p className="shrink wrap-break-word min-w-0 group-data-placeholder:text-transparent group-data-placeholder:rounded group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:select-none">
+                    {totalCards.toLocaleString(appLocale)}{" "}
+                    {totalCards === 1 ? "card" : "cards"}
+                  </p>
+                </div>
                 {(isPlaceholder || retention !== null) && (
                   <p className="px-2 text-muted-more-foreground group-data-placeholder:text-transparent group-data-placeholder:px-1">
                     |
@@ -146,11 +148,11 @@ export function LDeck(props: TLDeckProps) {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="font-normal py-0 px-1.5 -my-1 -ml-1.5"
+                            className="font-normal py-px px-1.25 -my-px -mx-1.25 rounded"
                           />
                         }
                       >
-                        <span className="shrink min-w-0 truncate leading-none">
+                        <span className="shrink min-w-0 truncate">
                           {retention.toLocaleString(appLocale, {
                             style: "percent",
                             maximumFractionDigits: 0,

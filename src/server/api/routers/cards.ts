@@ -11,8 +11,8 @@ import { cards, reviewLogs } from "@/server/db/schema";
 import { generateTxId } from "@/server/db/txid";
 
 const cardState = z.enum(["new", "learning", "review", "relearning"]);
-const GENERATE_BACK_CARDS_CONTEXT_LIMIT = 20;
-const GENERATE_CARD_FRONTS_LIMIT = 10_000;
+const GENERATE_CARD_BACK_CONTEXT_LIMIT = 20;
+const GENERATE_CARD_FRONT_CONTEXT_LIMIT = 10_000;
 
 export const cardsRouter = createTRPCRouter({
   create: protectedProcedure
@@ -115,7 +115,7 @@ export const cardsRouter = createTRPCRouter({
           and(eq(cards.deck_id, input.deckId), ne(cards.front, input.front)),
         )
         .orderBy(desc(cards.created_at))
-        .limit(GENERATE_BACK_CARDS_CONTEXT_LIMIT);
+        .limit(GENERATE_CARD_BACK_CONTEXT_LIMIT);
 
       if (recentCards.length === 0) {
         throw new TRPCError({
@@ -154,13 +154,13 @@ export const cardsRouter = createTRPCRouter({
           .from(cards)
           .where(eq(cards.deck_id, input.deckId))
           .orderBy(desc(cards.created_at))
-          .limit(GENERATE_CARD_FRONTS_LIMIT),
+          .limit(GENERATE_CARD_FRONT_CONTEXT_LIMIT),
         ctx.db
           .select({ front: cards.front, back: cards.back })
           .from(cards)
           .where(eq(cards.deck_id, input.deckId))
           .orderBy(desc(cards.created_at))
-          .limit(GENERATE_BACK_CARDS_CONTEXT_LIMIT),
+          .limit(GENERATE_CARD_BACK_CONTEXT_LIMIT),
       ]);
 
       if (existingFronts.length === 0) {

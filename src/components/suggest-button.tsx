@@ -27,9 +27,9 @@ export function SuggestButton({
       disabled={disabled || isPending}
       onClick={onClick}
     >
-      <div className="relative size-3.5 shrink-0 -ml-0.5 transform-gpu">
+      <div className="relative size-3.5 shrink-0 -ml-0.5">
         {isPending ? (
-          <div className="absolute inset-0 origin-center animate-spin">
+          <div className="absolute inset-0 origin-center animate-spin will-change-transform">
             <LoaderIcon className="block size-full" />
           </div>
         ) : (

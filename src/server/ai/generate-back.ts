@@ -1,16 +1,7 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 import { getClient } from "@/server/ai/client";
-
-/**
- * Generates the "back" of a flashcard from its "front", using the deck's
- * recent cards as few-shot context so the output matches the user's
- * conventions (language, translation vs. definition, length, tone, format).
- *
- * The API key stays server-side; this module is only ever called from the
- * tRPC router. Structured outputs constrain the response to `{ back }`.
- */
 
 const backSchema = z.object({
   back: z.string(),
@@ -25,23 +16,22 @@ a back for the new card that matches those conventions. Output only the back con
 
 export async function generateBack({
   front,
-  priorCards,
+  recentCards,
 }: {
   front: string;
-  priorCards: { front: string; back: string }[];
+  recentCards: { front: string; back: string }[];
 }): Promise<string> {
-  const examples =
-    priorCards.length > 0
-      ? priorCards.map((c) => `Front: ${c.front}\nBack: ${c.back}`).join("\n\n")
-      : "(no previous cards yet)";
+  const examples = recentCards
+    .map((c) => `Front: ${c.front}\nBack: ${c.back}`)
+    .join("\n\n");
 
-  const response = await getClient().messages.parse({
-    model: "claude-opus-4-8",
-    max_tokens: 1024 * 4,
-    thinking: { type: "adaptive" },
-    output_config: { format: zodOutputFormat(backSchema), effort: "high" },
-    system: SYSTEM_PROMPT,
-    messages: [
+  const response = await getClient().responses.parse({
+    model: "gpt-5.6-terra",
+    max_output_tokens: 1024 * 4,
+    reasoning: { effort: "high" },
+    text: { format: zodTextFormat(backSchema, "back") },
+    instructions: SYSTEM_PROMPT,
+    input: [
       {
         role: "user",
         content: `Previous cards:\n\n${examples}\n\nNew card front: ${front}\n\nGenerate the back for the new card.`,
@@ -49,7 +39,7 @@ export async function generateBack({
     ],
   });
 
-  const back = response.parsed_output?.back?.trim();
+  const back = response.output_parsed?.back?.trim();
   if (!back) {
     throw new Error("Model did not return a usable back side.");
   }

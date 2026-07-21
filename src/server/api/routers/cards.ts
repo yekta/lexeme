@@ -14,9 +14,6 @@ const cardState = z.enum(["new", "learning", "review", "relearning"]);
 const GENERATE_BACK_CARDS_CONTEXT_LIMIT = 20;
 const GENERATE_CARD_FRONTS_LIMIT = 10_000;
 
-// Reads come from Electric shapes (see src/db/collections.ts); this router
-// only carries writes. Every mutation runs in one transaction and returns the
-// Postgres txid so the client can await that transaction on the shape stream.
 export const cardsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -40,8 +37,6 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      // Card ids are client-generated. onConflictDoNothing keeps an outbox
-      // replay idempotent.
       return ctx.db.transaction(async (tx) => {
         const txid = await generateTxId(tx);
         await tx
@@ -99,11 +94,6 @@ export const cardsRouter = createTRPCRouter({
       });
     }),
 
-  /**
-   * Generate a "back" for a new card from its "front", using the deck's most
-   * recent cards as context. Pure compute — no DB write, so no txid. The
-   * Anthropic call and API key stay server-side.
-   */
   generateBack: protectedProcedure
     .input(
       z.object({
@@ -118,7 +108,7 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      const recent = await ctx.db
+      const recentCards = await ctx.db
         .select({ front: cards.front, back: cards.back })
         .from(cards)
         .where(
@@ -127,24 +117,24 @@ export const cardsRouter = createTRPCRouter({
         .orderBy(desc(cards.created_at))
         .limit(GENERATE_BACK_CARDS_CONTEXT_LIMIT);
 
+      if (recentCards.length === 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Add at least one card before generating a back.",
+        });
+      }
+
       const back = await generateBack({
         front: input.front,
-        priorCards: recent,
+        recentCards,
       });
       return { back };
     }),
 
-  /**
-   * Suggest a whole new card (front + back) from the deck's existing cards.
-   * Pure compute — no DB write, so no txid. The client hides the button on an
-   * empty deck; the PRECONDITION_FAILED here is just the server-side backstop.
-   */
   generateCard: protectedProcedure
     .input(
       z.object({
         deckId: z.uuid(),
-        // Fronts already suggested and passed on this dialog session, so
-        // repeated clicks don't return the same card twice.
         excludeFronts: z
           .array(z.string().trim().min(1))
           .max(GENERATE_CARD_EXCLUDE_FRONTS_LIMIT)
@@ -158,9 +148,6 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
 
-      // The dedupe list only needs fronts, and at this limit fetching backs
-      // for every row would be waste — so fronts and the small few-shot set
-      // are separate queries.
       const [existingFronts, recentCards] = await Promise.all([
         ctx.db
           .select({ front: cards.front })
@@ -190,11 +177,6 @@ export const cardsRouter = createTRPCRouter({
       });
     }),
 
-  /**
-   * Persist a review. FSRS scheduling runs on the client (it already owns the
-   * scheduler for the interval previews), so this just writes the resulting
-   * card state and review log it computed. Card ownership is still verified.
-   */
   rate: protectedProcedure
     .input(
       z.object({
@@ -237,9 +219,7 @@ export const cardsRouter = createTRPCRouter({
           .update(cards)
           .set(input.card)
           .where(eq(cards.id, input.cardId));
-        // onConflictDoNothing on the review-log id keeps an outbox replay
-        // idempotent — re-applying the same rating is a no-op. The card update
-        // is naturally idempotent (it sets absolute FSRS values).
+
         await tx
           .insert(reviewLogs)
           .values({

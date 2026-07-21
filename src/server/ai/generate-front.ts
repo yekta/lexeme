@@ -1,18 +1,7 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 import { getClient } from "@/server/ai/client";
-
-/**
- * Suggests the "front" of a new flashcard from all existing fronts in the
- * deck. Fronts alone are enough here — this step only picks what to learn
- * next; the back is generated separately by generate-back with the deck's
- * recent full cards as context. Requires at least one existing front — with
- * an empty deck there is nothing to infer the deck's topic from.
- *
- * The API key stays server-side; this module is only ever called from the
- * tRPC router. Structured outputs constrain the response to `{ front }`.
- */
 
 const frontSchema = z.object({
   front: z.string(),
@@ -42,13 +31,13 @@ export async function generateFront({
       ? `\n\nAlready suggested and passed on this session (do not repeat):\n${rejectedFronts.map((f) => `- ${f}`).join("\n")}`
       : "";
 
-  const response = await getClient().messages.parse({
-    model: "claude-opus-4-8",
-    max_tokens: 1024 * 10,
-    thinking: { type: "adaptive" },
-    output_config: { format: zodOutputFormat(frontSchema), effort: "high" },
-    system: SYSTEM_PROMPT,
-    messages: [
+  const response = await getClient().responses.parse({
+    model: "gpt-5.6-terra",
+    max_output_tokens: 1024 * 10,
+    reasoning: { effort: "high" },
+    text: { format: zodTextFormat(frontSchema, "front") },
+    instructions: SYSTEM_PROMPT,
+    input: [
       {
         role: "user",
         content: `Existing fronts:\n${fronts}${rejected}\n\nSuggest the front of one new card for this deck.`,
@@ -56,7 +45,7 @@ export async function generateFront({
     ],
   });
 
-  const front = response.parsed_output?.front?.trim();
+  const front = response.output_parsed?.front?.trim();
   if (!front) {
     throw new Error("Model did not return a usable front side.");
   }

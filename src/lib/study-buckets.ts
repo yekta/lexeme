@@ -32,13 +32,6 @@ export function filterTodayLogs(
 
 const RETENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-/**
- * Anki-style true retention: the pass rate (rating above Again) of answers
- * given to cards that were in the review state. Learning and relearning
- * answers are excluded, as are manual reschedules (rating 0). Uses the last
- * 30 days when the deck has eligible answers in that window, otherwise falls
- * back to all time; `null` when the deck has no eligible answers at all.
- */
 export function computeTrueRetention(
   logs: ReviewLogRow[],
   deckCardIds: Set<string>,

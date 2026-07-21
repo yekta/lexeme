@@ -148,27 +148,29 @@ export function AddCardForm({
                 <Label className="shrink min-w-0 truncate" htmlFor={field.name}>
                   Back (Answer)
                 </Label>
-                <form.Subscribe selector={(s) => s.values.front}>
-                  {(front) => (
-                    <SuggestButton
-                      isPending={isPendingGenerateBack}
-                      disabled={front.trim() === "" || isPendingSuggest}
-                      onClick={async () => {
-                        const trimmed = front.trim();
-                        if (trimmed === "") return;
-                        try {
-                          const { back } = await mutateGenerateBack({
-                            deckId,
-                            front: trimmed,
-                          });
-                          field.handleChange(back);
-                        } catch (err) {
-                          console.log(err);
-                        }
-                      }}
-                    />
-                  )}
-                </form.Subscribe>
+                {cards.length > 0 && (
+                  <form.Subscribe selector={(s) => s.values.front}>
+                    {(front) => (
+                      <SuggestButton
+                        isPending={isPendingGenerateBack}
+                        disabled={front.trim() === "" || isPendingSuggest}
+                        onClick={async () => {
+                          const trimmed = front.trim();
+                          if (trimmed === "") return;
+                          try {
+                            const { back } = await mutateGenerateBack({
+                              deckId,
+                              front: trimmed,
+                            });
+                            field.handleChange(back);
+                          } catch (err) {
+                            console.log(err);
+                          }
+                        }}
+                      />
+                    )}
+                  </form.Subscribe>
+                )}
               </div>
               <FormTextarea
                 id={field.name}

@@ -163,7 +163,7 @@ export function LDeck(props: TLDeckProps) {
                       <PopoverContent align="start" className="min-w-64">
                         <PopoverHeader>
                           <PopoverTitle>
-                            True Retention
+                            Retention
                             <span className="text-muted-foreground">
                               {" ("}
                             </span>

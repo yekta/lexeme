@@ -10,14 +10,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SuggestButton } from "@/components/suggest-button";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormTextarea } from "@/components/ui/textarea";
 import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
+import { GENERATE_CARD_EXCLUDE_FRONTS_LIMIT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { api } from "@/trpc/react";
-import { LoaderIcon, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -41,8 +42,17 @@ export function AddCardForm({
   const {
     isPending: isPendingGenerateBack,
     mutateAsync: mutateGenerateBack,
-    error,
+    error: errorGenerateBack,
   } = api.cards.generateBack.useMutation();
+  const {
+    isPending: isPendingGenerateCard,
+    mutateAsync: mutateGenerateCard,
+    error: errorGenerateCard,
+  } = api.cards.generateCard.useMutation();
+  // While either suggestion runs, both buttons pause — a back suggestion
+  // racing a full-card suggestion would silently overwrite it.
+  const isPendingSuggest = isPendingGenerateBack || isPendingGenerateCard;
+  const error = errorGenerateBack ?? errorGenerateCard;
   const { data: cards } = useCardsByDeck(deckId);
   // Snapshot the existing fronts once, on mount. The form remounts every time
   // the dialog opens (keyed on open state), so this is always current when
@@ -51,6 +61,11 @@ export function AddCardForm({
   const [existingFronts] = useState(
     () => new Set(cards.map((c) => normalizeFront(c.front))),
   );
+  // Fronts already suggested this dialog session, sent back with each
+  // generateCard call so repeated clicks don't return the same card twice.
+  // The form remounts every time the dialog opens, so the list resets with
+  // it. Capped to match the server's input limit.
+  const suggestedFrontsRef = useRef<string[]>([]);
   const form = usePersistentForm({
     id: "add-card",
     instanceId: deckId,
@@ -89,9 +104,33 @@ export function AddCardForm({
         <form.Field name="front">
           {(field) => (
             <FormFieldWrapper>
-              <Label htmlFor={field.name} className="shrink min-w-0 truncate">
-                Front (Question)
-              </Label>
+              <div className="w-full flex items-center justify-between gap-4 min-w-0">
+                <Label htmlFor={field.name} className="shrink min-w-0 truncate">
+                  Front (Question)
+                </Label>
+                {cards.length > 0 && (
+                  <SuggestButton
+                    isPending={isPendingGenerateCard}
+                    disabled={isPendingSuggest}
+                    onClick={async () => {
+                      try {
+                        const { front, back } = await mutateGenerateCard({
+                          deckId,
+                          excludeFronts: suggestedFrontsRef.current,
+                        });
+                        suggestedFrontsRef.current = [
+                          ...suggestedFrontsRef.current,
+                          front,
+                        ].slice(-GENERATE_CARD_EXCLUDE_FRONTS_LIMIT);
+                        field.handleChange(front);
+                        form.setFieldValue("back", back);
+                      } catch (err) {
+                        console.log(err);
+                      }
+                    }}
+                  />
+                )}
+              </div>
               <FormInput
                 id={field.name}
                 name={field.name}
@@ -111,12 +150,9 @@ export function AddCardForm({
                 </Label>
                 <form.Subscribe selector={(s) => s.values.front}>
                   {(front) => (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0 min-w-0 px-2.5 py-1 overflow-hidden -mr-1 -mt-1.5 -mb-1 gap-1.5"
-                      disabled={front.trim() === "" || isPendingGenerateBack}
+                    <SuggestButton
+                      isPending={isPendingGenerateBack}
+                      disabled={front.trim() === "" || isPendingSuggest}
                       onClick={async () => {
                         const trimmed = front.trim();
                         if (trimmed === "") return;
@@ -130,21 +166,7 @@ export function AddCardForm({
                           console.log(err);
                         }
                       }}
-                    >
-                      <div
-                        data-pending={isPendingGenerateBack || undefined}
-                        className="size-3.5 shrink-0 -ml-0.5 data-pending:animate-spin"
-                      >
-                        {isPendingGenerateBack ? (
-                          <LoaderIcon className="size-full" />
-                        ) : (
-                          <Sparkles className="size-full" />
-                        )}
-                      </div>
-                      <span className="truncate">
-                        {isPendingGenerateBack ? "Suggesting" : "Suggest"}
-                      </span>
-                    </Button>
+                    />
                   )}
                 </form.Subscribe>
               </div>

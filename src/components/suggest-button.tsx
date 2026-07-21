@@ -30,7 +30,7 @@ export function SuggestButton({
       <div className="size-3.5 shrink-0 -ml-0.5">
         <div
           data-pending={isPending || undefined}
-          className="size-full data-pending:animate-spin"
+          className="size-full data-pending:animate-spin transform-gpu"
         >
           {isPending ? (
             <LoaderIcon className="size-full" />

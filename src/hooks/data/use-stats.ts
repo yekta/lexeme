@@ -13,7 +13,11 @@ import {
   liveStatus,
   restartCollections,
 } from "@/db/collections";
-import { computeStudyBuckets, filterTodayLogs } from "@/lib/study-buckets";
+import {
+  computeStudyBuckets,
+  computeTrueRetention,
+  filterTodayLogs,
+} from "@/lib/study-buckets";
 
 export type TDeckStatsRow = {
   deckId: string;
@@ -22,6 +26,8 @@ export type TDeckStatsRow = {
   learn: number;
   due: number;
   latestCardCreatedAt: string | null;
+  /** True retention (0..1), or null when the deck has no review answers yet. */
+  retention: number | null;
   /** A card in this deck has local changes the server hasn't confirmed yet. */
   optimistic: boolean;
 };
@@ -62,6 +68,8 @@ export function useDeckStats() {
         latest = Math.max(latest, new Date(c.created_at).getTime());
       }
 
+      const deckCardIds = new Set(deckCards.map((c) => c.id));
+
       return {
         deckId: deck.id,
         total: deckCards.length,
@@ -69,6 +77,7 @@ export function useDeckStats() {
         learn: buckets.learningCards.length,
         due: buckets.reviewCards.length,
         latestCardCreatedAt: latest > 0 ? new Date(latest).toISOString() : null,
+        retention: computeTrueRetention(logs, deckCardIds, now),
         optimistic: deckCards.some(isRowOptimistic),
       };
     });

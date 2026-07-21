@@ -45,6 +45,7 @@ const EMPTY_STATS: TDeckStats = {
   learn: 0,
   due: 0,
   latestCardCreatedAt: 0,
+  retention: null,
   optimistic: false,
 };
 
@@ -86,6 +87,7 @@ function Home() {
         latestCardCreatedAt: r.latestCardCreatedAt
           ? new Date(r.latestCardCreatedAt).getTime()
           : 0,
+        retention: r.retention,
         optimistic: r.optimistic,
       });
     }
@@ -158,7 +160,7 @@ function HomePageView({
       className="min-h-screen relative group flex flex-col"
     >
       <Navbar />
-      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 flex-1 flex flex-col gap-6">
+      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 flex-1 flex flex-col gap-4">
         {isError ? (
           <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
             <LoadError error={error} onRetry={onRetry} hideGoHome={true} />
@@ -204,7 +206,9 @@ function HomePageView({
               getDeckStats={(id) => statsByDeck?.get(id) ?? EMPTY_STATS}
               onCreateDeck={() => setIsCreateDeckOpen(true)}
             />
-            <div className="w-full h-px rounded-full bg-border" />
+            <div className="w-full py-2">
+              <div className="w-full h-px rounded-full bg-border" />
+            </div>
             <TodayStatsFooter
               isPlaceholder={isPlaceholder}
               stats={todayStats}
@@ -472,7 +476,7 @@ function DecksSection({
 
 function DeckWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {children}
     </div>
   );

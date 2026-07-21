@@ -160,7 +160,7 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                   className="cursor-pointer"
                 >
                   {isLoggingOut ? (
-                    <LoaderIcon className="size-5 shrink-0 animate-spin origin-center transform-fill" />
+                    <LoaderIcon className="size-5 shrink-0 animate-spin" />
                   ) : (
                     <LogOutIcon className="size-5 shrink-0" />
                   )}

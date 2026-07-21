@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 import { env } from "@/env";
 
-let client: Anthropic | null = null;
-export function getClient(): Anthropic {
-  client ??= new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+let client: OpenAI | null = null;
+export function getClient(): OpenAI {
+  client ??= new OpenAI({ apiKey: env.OPENAI_API_KEY });
   return client;
 }

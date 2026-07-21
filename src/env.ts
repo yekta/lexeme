@@ -12,7 +12,7 @@ export const env = createEnv({
     BETTER_AUTH_URL: z.url(),
     GOOGLE_AUTH_CLIENT_ID: z.string().min(1),
     GOOGLE_AUTH_CLIENT_SECRET: z.string().min(1),
-    ANTHROPIC_API_KEY: z.string().min(1),
+    OPENAI_API_KEY: z.string().min(1),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),

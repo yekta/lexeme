@@ -1,4 +1,4 @@
-import { zodTextFormat } from "openai/helpers/zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
 import { getClient } from "@/server/ai/client";
@@ -25,13 +25,13 @@ export async function generateBack({
     .map((c) => `Front: ${c.front}\nBack: ${c.back}`)
     .join("\n\n");
 
-  const response = await getClient().responses.parse({
-    model: "gpt-5.6-terra",
-    max_output_tokens: 1024,
-    reasoning: { effort: "high" },
-    text: { format: zodTextFormat(backSchema, "back") },
-    instructions: SYSTEM_PROMPT,
-    input: [
+  const response = await getClient().messages.parse({
+    model: "claude-opus-5",
+    max_tokens: 4096,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high", format: zodOutputFormat(backSchema) },
+    system: SYSTEM_PROMPT,
+    messages: [
       {
         role: "user",
         content: `Previous cards:\n\n${examples}\n\nNew card front: ${front}\n\nGenerate the back for the new card.`,
@@ -39,7 +39,7 @@ export async function generateBack({
     ],
   });
 
-  const back = response.output_parsed?.back?.trim();
+  const back = response.parsed_output?.back?.trim();
   if (!back) {
     throw new Error("Model did not return a usable back side.");
   }

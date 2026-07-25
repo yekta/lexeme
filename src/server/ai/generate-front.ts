@@ -1,7 +1,7 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { getClient } from "@/server/ai/client";
+import { aiClientConfig, getClient } from "@/server/ai/client";
 
 const frontSchema = z.object({
   front: z.string(),
@@ -32,8 +32,8 @@ export async function generateFront({
       : "";
 
   const response = await getClient().messages.parse({
-    model: "claude-opus-4-8",
-    max_tokens: 4096,
+    model: aiClientConfig.model,
+    max_tokens: aiClientConfig.maxTokens,
     thinking: { type: "adaptive" },
     output_config: { effort: "high", format: zodOutputFormat(frontSchema) },
     system: SYSTEM_PROMPT,

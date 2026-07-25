@@ -2,8 +2,16 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { env } from "@/env";
 
-let client: Anthropic | null = null;
+let aiClient: Anthropic | null = null;
 export function getClient(): Anthropic {
-  client ??= new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-  return client;
+  aiClient ??= new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+  return aiClient;
 }
+
+export const aiClientConfig: {
+  model: Anthropic.Model;
+  maxTokens: number;
+} = {
+  model: "claude-opus-5",
+  maxTokens: 4096,
+};

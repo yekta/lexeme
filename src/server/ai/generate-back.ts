@@ -1,7 +1,7 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { getClient } from "@/server/ai/client";
+import { aiClientConfig, getClient } from "@/server/ai/client";
 
 const backSchema = z.object({
   back: z.string(),
@@ -26,8 +26,8 @@ export async function generateBack({
     .join("\n\n");
 
   const response = await getClient().messages.parse({
-    model: "claude-opus-5",
-    max_tokens: 4096,
+    model: aiClientConfig.model,
+    max_tokens: aiClientConfig.maxTokens,
     thinking: { type: "adaptive" },
     output_config: { effort: "high", format: zodOutputFormat(backSchema) },
     system: SYSTEM_PROMPT,

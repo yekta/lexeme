@@ -1,4 +1,4 @@
-import { zodTextFormat } from "openai/helpers/zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
 import { getClient } from "@/server/ai/client";
@@ -31,13 +31,13 @@ export async function generateFront({
       ? `\n\nAlready suggested and passed on this session (do not repeat):\n${rejectedFronts.map((f) => `- ${f}`).join("\n")}`
       : "";
 
-  const response = await getClient().responses.parse({
-    model: "gpt-5.6-terra",
-    max_output_tokens: 1024,
-    reasoning: { effort: "high" },
-    text: { format: zodTextFormat(frontSchema, "front") },
-    instructions: SYSTEM_PROMPT,
-    input: [
+  const response = await getClient().messages.parse({
+    model: "claude-opus-4-8",
+    max_tokens: 4096,
+    thinking: { type: "adaptive" },
+    output_config: { effort: "high", format: zodOutputFormat(frontSchema) },
+    system: SYSTEM_PROMPT,
+    messages: [
       {
         role: "user",
         content: `Existing fronts:\n${fronts}${rejected}\n\nSuggest the front of one new card for this deck.`,
@@ -45,7 +45,7 @@ export async function generateFront({
     ],
   });
 
-  const front = response.output_parsed?.front?.trim();
+  const front = response.parsed_output?.front?.trim();
   if (!front) {
     throw new Error("Model did not return a usable front side.");
   }

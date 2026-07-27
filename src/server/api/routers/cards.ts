@@ -8,13 +8,17 @@ import { generateCard } from "@/server/ai/generate-card";
 import { requireCard, requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { cards, reviewLogs } from "@/server/db/schema";
-import { generateTxId } from "@/server/db/txid";
 
 const cardState = z.enum(["new", "learning", "review", "relearning"]);
 const GENERATE_CARD_BACK_CONTEXT_LIMIT = 20;
 const GENERATE_CARD_FRONT_CONTEXT_LIMIT = 10_000;
 
 export const cardsRouter = createTRPCRouter({
+  /** Every card the user owns, for the client's query collection. */
+  list: protectedProcedure.query(({ ctx }) =>
+    ctx.db.select().from(cards).where(eq(cards.user_id, ctx.session.user.id)),
+  ),
+
   create: protectedProcedure
     .input(
       z.object({
@@ -38,7 +42,6 @@ export const cardsRouter = createTRPCRouter({
       });
 
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .insert(cards)
           .values(
@@ -51,7 +54,6 @@ export const cardsRouter = createTRPCRouter({
             })),
           )
           .onConflictDoNothing();
-        return { txid };
       });
     }),
 
@@ -70,12 +72,10 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .update(cards)
           .set({ front: input.front, back: input.back })
           .where(eq(cards.id, input.id));
-        return { txid };
       });
     }),
 
@@ -88,9 +88,7 @@ export const cardsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx.delete(cards).where(eq(cards.id, input.id));
-        return { txid };
       });
     }),
 
@@ -214,7 +212,6 @@ export const cardsRouter = createTRPCRouter({
       });
 
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .update(cards)
           .set(input.card)
@@ -237,7 +234,6 @@ export const cardsRouter = createTRPCRouter({
             duration_ms: input.durationMs,
           })
           .onConflictDoNothing();
-        return { txid };
       });
     }),
 });

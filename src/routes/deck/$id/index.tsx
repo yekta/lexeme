@@ -107,7 +107,7 @@ function DeckPageView({
   const [asyncPush] = useAsyncRouterPush();
   const [isAddCardOpen, setIsAddCardOpen] = useState(false);
 
-  const deckName = deck?.name ?? "Loading...";
+  const deckName = isPlaceholder ? "Loading..." : (deck?.name ?? "Loading...");
 
   return (
     <div
@@ -169,7 +169,7 @@ function DeckPageView({
               <div className="w-full h-px bg-border rounded-full" />
             </div>
             <div className="flex items-center justify-between gap-4">
-              <h2 className="px-1 text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+              <h2 className="mx-1 text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
                 Cards{" "}
                 <span className="font-normal text-xl text-muted-foreground group-data-placeholder:text-transparent">
                   ({isPlaceholder ? 5 : cards.length})

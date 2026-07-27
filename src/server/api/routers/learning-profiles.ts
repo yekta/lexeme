@@ -5,17 +5,20 @@ import { z } from "zod";
 import { requireProfile } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { learningProfiles } from "@/server/db/schema";
-import { generateTxId } from "@/server/db/txid";
 
-// Reads come from Electric shapes (see src/db/collections.ts); this router
-// only carries writes. Every mutation runs in one transaction and returns the
-// Postgres txid so the client can await that transaction on the shape stream.
 export const learningProfilesRouter = createTRPCRouter({
+  /** The user's FSRS profiles, for the client's query collection. */
+  list: protectedProcedure.query(({ ctx }) =>
+    ctx.db
+      .select()
+      .from(learningProfiles)
+      .where(eq(learningProfiles.user_id, ctx.session.user.id)),
+  ),
+
   create: protectedProcedure
     .input(z.object({ id: z.uuid(), name: z.string().trim().min(1) }))
     .mutation(async ({ ctx, input }) => {
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .insert(learningProfiles)
           .values({
@@ -25,7 +28,6 @@ export const learningProfilesRouter = createTRPCRouter({
             is_default: false,
           })
           .onConflictDoNothing();
-        return { txid };
       });
     }),
 
@@ -53,12 +55,10 @@ export const learningProfilesRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .update(learningProfiles)
           .set(fields)
           .where(eq(learningProfiles.id, id));
-        return { txid };
       });
     }),
 
@@ -77,11 +77,9 @@ export const learningProfilesRouter = createTRPCRouter({
         });
       }
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .delete(learningProfiles)
           .where(eq(learningProfiles.id, input.id));
-        return { txid };
       });
     }),
 });

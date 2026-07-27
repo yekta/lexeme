@@ -14,7 +14,6 @@ import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as StudyIdIndexRouteImport } from './routes/study/$id/index'
 import { Route as DeckIdIndexRouteImport } from './routes/deck/$id/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api/trpc/$'
-import { Route as ApiElectricTableRouteImport } from './routes/api/electric/$table'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -42,11 +41,6 @@ const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   path: '/api/trpc/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiElectricTableRoute = ApiElectricTableRouteImport.update({
-  id: '/api/electric/$table',
-  path: '/api/electric/$table',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -57,7 +51,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/electric/$table': typeof ApiElectricTableRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
@@ -66,7 +59,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sign-in': typeof SignInIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/electric/$table': typeof ApiElectricTableRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/deck/$id': typeof DeckIdIndexRoute
   '/study/$id': typeof StudyIdIndexRoute
@@ -76,7 +68,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/api/electric/$table': typeof ApiElectricTableRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
@@ -87,7 +78,6 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in/'
     | '/api/auth/$'
-    | '/api/electric/$table'
     | '/api/trpc/$'
     | '/deck/$id/'
     | '/study/$id/'
@@ -96,7 +86,6 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/api/auth/$'
-    | '/api/electric/$table'
     | '/api/trpc/$'
     | '/deck/$id'
     | '/study/$id'
@@ -105,7 +94,6 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in/'
     | '/api/auth/$'
-    | '/api/electric/$table'
     | '/api/trpc/$'
     | '/deck/$id/'
     | '/study/$id/'
@@ -115,7 +103,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SignInIndexRoute: typeof SignInIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
-  ApiElectricTableRoute: typeof ApiElectricTableRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   DeckIdIndexRoute: typeof DeckIdIndexRoute
   StudyIdIndexRoute: typeof StudyIdIndexRoute
@@ -158,13 +145,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTrpcSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/electric/$table': {
-      id: '/api/electric/$table'
-      path: '/api/electric/$table'
-      fullPath: '/api/electric/$table'
-      preLoaderRoute: typeof ApiElectricTableRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -179,7 +159,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SignInIndexRoute: SignInIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
-  ApiElectricTableRoute: ApiElectricTableRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   DeckIdIndexRoute: DeckIdIndexRoute,
   StudyIdIndexRoute: StudyIdIndexRoute,

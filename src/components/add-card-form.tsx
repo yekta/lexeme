@@ -11,15 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SuggestButton } from "@/components/suggest-button";
+import { useCardSuggestion } from "@/components/suggestion-provider";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormTextarea } from "@/components/ui/textarea";
 import { useCardsByDeck, useCreateCard } from "@/hooks/data/use-cards";
-import { GENERATE_CARD_EXCLUDE_FRONTS_LIMIT } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { api } from "@/trpc/react";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 const normalizeFront = (front: string) => front.trim().toLowerCase();
@@ -40,32 +38,20 @@ export function AddCardForm({
 }) {
   const mutation = useCreateCard();
   const {
-    isPending: isPendingGenerateBack,
-    mutateAsync: mutateGenerateBack,
-    error: errorGenerateBack,
-  } = api.cards.generateBack.useMutation();
-  const {
-    isPending: isPendingGenerateCard,
-    mutateAsync: mutateGenerateCard,
-    error: errorGenerateCard,
-  } = api.cards.generateCard.useMutation();
-  // While either suggestion runs, both buttons pause — a back suggestion
-  // racing a full-card suggestion would silently overwrite it.
-  const isPendingSuggest = isPendingGenerateBack || isPendingGenerateCard;
-  const error = errorGenerateBack ?? errorGenerateCard;
+    isPendingCard,
+    isPendingBack,
+    isPendingAny,
+    error,
+    result,
+    suggestCard,
+    suggestBack,
+    takeResult,
+    clear: clearSuggestion,
+  } = useCardSuggestion(`add-card::${deckId}`);
   const { data: cards } = useCardsByDeck(deckId);
-  // Snapshot the existing fronts once, on mount. The form remounts every time
-  // the dialog opens (keyed on open state), so this is always current when
-  // shown — and it never includes the card being added this session, which is
-  // what caused the duplicate notice to flicker as the form closed.
   const [existingFronts] = useState(
     () => new Set(cards.map((c) => normalizeFront(c.front))),
   );
-  // Fronts already suggested this dialog session, sent back with each
-  // generateCard call so repeated clicks don't return the same card twice.
-  // The form remounts every time the dialog opens, so the list resets with
-  // it. Capped to match the server's input limit.
-  const suggestedFrontsRef = useRef<string[]>([]);
   const form = usePersistentForm({
     id: "add-card",
     instanceId: deckId,
@@ -81,9 +67,20 @@ export function AddCardForm({
         front: value.front,
         back: value.back,
       });
+      clearSuggestion();
       onDone();
     },
   });
+
+  useEffect(() => {
+    if (!result) return;
+    const suggestion = takeResult();
+    if (!suggestion) return;
+    if (suggestion.front !== undefined) {
+      form.setFieldValue("front", suggestion.front);
+    }
+    form.setFieldValue("back", suggestion.back);
+  }, [result, takeResult, form]);
 
   return (
     <form
@@ -110,24 +107,9 @@ export function AddCardForm({
                 </Label>
                 {cards.length > 0 && (
                   <SuggestButton
-                    isPending={isPendingGenerateCard}
-                    disabled={isPendingSuggest}
-                    onClick={async () => {
-                      try {
-                        const { front, back } = await mutateGenerateCard({
-                          deckId,
-                          excludeFronts: suggestedFrontsRef.current,
-                        });
-                        suggestedFrontsRef.current = [
-                          ...suggestedFrontsRef.current,
-                          front,
-                        ].slice(-GENERATE_CARD_EXCLUDE_FRONTS_LIMIT);
-                        field.handleChange(front);
-                        form.setFieldValue("back", back);
-                      } catch (err) {
-                        console.log(err);
-                      }
-                    }}
+                    isPending={isPendingCard}
+                    disabled={isPendingAny}
+                    onClick={() => void suggestCard(deckId)}
                   />
                 )}
               </div>
@@ -152,20 +134,12 @@ export function AddCardForm({
                   <form.Subscribe selector={(s) => s.values.front}>
                     {(front) => (
                       <SuggestButton
-                        isPending={isPendingGenerateBack}
-                        disabled={front.trim() === "" || isPendingSuggest}
-                        onClick={async () => {
+                        isPending={isPendingBack}
+                        disabled={front.trim() === "" || isPendingAny}
+                        onClick={() => {
                           const trimmed = front.trim();
                           if (trimmed === "") return;
-                          try {
-                            const { back } = await mutateGenerateBack({
-                              deckId,
-                              front: trimmed,
-                            });
-                            field.handleChange(back);
-                          } catch (err) {
-                            console.log(err);
-                          }
+                          void suggestBack(deckId, trimmed);
                         }}
                       />
                     )}
@@ -200,7 +174,7 @@ export function AddCardForm({
             <>
               {error && (
                 <div className="w-[calc(100%+0.5rem)] -mx-1 pb-4">
-                  <ErrorCard error={error.message} />
+                  <ErrorCard error={error} />
                 </div>
               )}
               {isDuplicate && (

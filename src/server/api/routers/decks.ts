@@ -9,12 +9,13 @@ import {
 import { requireDeck, requireProfile } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { cards, decks } from "@/server/db/schema";
-import { generateTxId } from "@/server/db/txid";
 
-// Reads come from Electric shapes (see src/db/collections.ts); this router
-// only carries writes. Every mutation runs in one transaction and returns the
-// Postgres txid so the client can await that transaction on the shape stream.
 export const decksRouter = createTRPCRouter({
+  /** Full deck list for the client's query collection (src/db/collections.ts). */
+  list: protectedProcedure.query(({ ctx }) =>
+    ctx.db.select().from(decks).where(eq(decks.user_id, ctx.session.user.id)),
+  ),
+
   create: protectedProcedure
     .input(
       z.object({
@@ -36,7 +37,6 @@ export const decksRouter = createTRPCRouter({
       // onConflictDoNothing keeps the durable-outbox replay idempotent: a
       // retry after a prior success is a no-op, not a duplicate-key error.
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .insert(decks)
           .values({
@@ -47,7 +47,6 @@ export const decksRouter = createTRPCRouter({
             learning_profile_id: input.learning_profile_id,
           })
           .onConflictDoNothing();
-        return { txid };
       });
     }),
 
@@ -72,7 +71,6 @@ export const decksRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .update(decks)
           .set({
@@ -81,7 +79,6 @@ export const decksRouter = createTRPCRouter({
             learning_profile_id: input.learning_profile_id,
           })
           .where(eq(decks.id, input.id));
-        return { txid };
       });
     }),
 
@@ -94,9 +91,7 @@ export const decksRouter = createTRPCRouter({
         userId: ctx.session.user.id,
       });
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx.delete(decks).where(eq(decks.id, input.id));
-        return { txid };
       });
     }),
 
@@ -131,7 +126,6 @@ export const decksRouter = createTRPCRouter({
       // onConflictDoNothing on every insert keeps an outbox replay of this
       // import idempotent (a retry after a prior success is a no-op).
       return ctx.db.transaction(async (tx) => {
-        const txid = await generateTxId(tx);
         await tx
           .insert(decks)
           .values({
@@ -156,7 +150,6 @@ export const decksRouter = createTRPCRouter({
             )
             .onConflictDoNothing();
         }
-        return { txid };
       });
     }),
 

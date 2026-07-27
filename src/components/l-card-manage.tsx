@@ -25,11 +25,11 @@ import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormTextarea } from "@/components/ui/textarea";
 import { SuggestButton } from "@/components/suggest-button";
+import { useCardSuggestion } from "@/components/suggestion-provider";
 import { useDeleteCard, useUpdateCard } from "@/hooks/data/use-cards";
-import { api } from "@/trpc/react";
 import { useForm } from "@tanstack/react-form";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 const cardSchema = z.object({
@@ -191,10 +191,13 @@ function EditCardForm({
 }) {
   const mutation = useUpdateCard();
   const {
-    isPending: isPendingGenerateBack,
-    mutateAsync: mutateGenerateBack,
+    isPendingBack,
     error,
-  } = api.cards.generateBack.useMutation();
+    result,
+    suggestBack,
+    takeResult,
+    clear: clearSuggestion,
+  } = useCardSuggestion(`edit-card::${id}`);
   const form = useForm({
     defaultValues: { front, back },
     validators: {
@@ -209,9 +212,17 @@ function EditCardForm({
         front: value.front,
         back: value.back,
       });
+      clearSuggestion();
       onDone();
     },
   });
+
+  useEffect(() => {
+    if (!result) return;
+    const suggestion = takeResult();
+    if (!suggestion) return;
+    form.setFieldValue("back", suggestion.back);
+  }, [result, takeResult, form]);
 
   return (
     <form
@@ -249,20 +260,12 @@ function EditCardForm({
                 <form.Subscribe selector={(s) => s.values.front}>
                   {(front) => (
                     <SuggestButton
-                      isPending={isPendingGenerateBack}
-                      disabled={front.trim() === "" || isPendingGenerateBack}
-                      onClick={async () => {
+                      isPending={isPendingBack}
+                      disabled={front.trim() === "" || isPendingBack}
+                      onClick={() => {
                         const trimmed = front.trim();
                         if (trimmed === "") return;
-                        try {
-                          const { back } = await mutateGenerateBack({
-                            deckId,
-                            front: trimmed,
-                          });
-                          field.handleChange(back);
-                        } catch (err) {
-                          console.log(err);
-                        }
+                        void suggestBack(deckId, trimmed);
                       }}
                     />
                   )}
@@ -283,7 +286,7 @@ function EditCardForm({
       </FormWrapper>
       {error && (
         <div className="w-[calc(100%+0.5rem)] -mx-1 pb-4">
-          <ErrorCard error={error.message} />
+          <ErrorCard error={error} />
         </div>
       )}
       <DialogFooter>

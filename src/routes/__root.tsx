@@ -5,6 +5,7 @@ import { FormDraftProvider } from "@/components/form-draft-provider";
 import { Navbar } from "@/components/navbar";
 import { NowProvider } from "@/components/now-provider";
 import { PageNotFound } from "@/components/page-not-found";
+import { SuggestionProvider } from "@/components/suggestion-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { CollectionsPreloader } from "@/db/collections-preloader";
 import { DEFAULT_THEME } from "@/lib/constants";
@@ -82,7 +83,9 @@ function RootComponent() {
             <CollectionsPreloader />
             <NowProvider>
               <FormDraftProvider>
-                <Outlet />
+                <SuggestionProvider>
+                  <Outlet />
+                </SuggestionProvider>
               </FormDraftProvider>
             </NowProvider>
             <Toaster closeButton position="bottom-right" />

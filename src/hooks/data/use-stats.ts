@@ -112,15 +112,23 @@ export function useDeckStats() {
   };
 }
 
-/** Today's review count and time spent, derived live from the review logs. */
+/** Today's study counts and time spent, derived live from the review logs. */
 export function useTodayStats() {
   const lq = useLiveQuery((q) => q.from({ log: reviewLogsCollection }));
   const now = useNow();
   const data = useMemo(() => {
     const logs = filterTodayLogs(lq.data ?? [], now);
-    const count = logs.length;
+    // A card answered twice today is one card studied but two reviews.
+    const cardCount = new Set(logs.map((l) => l.card_id)).size;
+    const reviewCount = logs.length;
     const totalMs = logs.reduce((sum, l) => sum + l.duration_ms, 0);
-    return { count, totalMs, msPerCard: count > 0 ? totalMs / count : 0 };
+    return {
+      cardCount,
+      reviewCount,
+      totalMs,
+      msPerCard: cardCount > 0 ? totalMs / cardCount : 0,
+      msPerReview: reviewCount > 0 ? totalMs / reviewCount : 0,
+    };
   }, [lq.data, now]);
   return { data, ...liveStatus(lq, reviewLogsCollection) };
 }

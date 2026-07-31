@@ -49,7 +49,13 @@ const EMPTY_STATS: TDeckStats = {
   optimistic: false,
 };
 
-type TTodayStats = { count: number; totalMs: number; msPerCard: number };
+type TTodayStats = {
+  cardCount: number;
+  reviewCount: number;
+  totalMs: number;
+  msPerCard: number;
+  msPerReview: number;
+};
 
 export const Route = createFileRoute("/")({
   component: HomeRoute,
@@ -359,10 +365,10 @@ function TodayStatsFooter({
   isError: boolean;
   className?: string;
 }) {
-  const count = stats?.count ?? 0;
+  const cardCount = stats?.cardCount ?? 0;
   const humanDuration = formatHumanDuration(stats?.totalMs ?? 0);
   const secondsPerCard = formatSecondsPerCard(stats?.msPerCard ?? 0);
-  const cardWord = count === 1 ? "card" : "cards";
+  const cardWord = cardCount === 1 ? "card" : "cards";
 
   const showPlaceholder = isPlaceholder || isPending;
 
@@ -371,13 +377,13 @@ function TodayStatsFooter({
       "Loading today's stats..."
     ) : isError ? (
       "Couldn't load today's stats."
-    ) : count === 0 ? (
+    ) : cardCount === 0 ? (
       "You haven't studied today."
     ) : (
       <>
         {"You've studied "}
         <span className="text-foreground">
-          {count} {cardWord}
+          {cardCount} {cardWord}
         </span>{" "}
         in <span className="text-foreground">{humanDuration}</span> today (
         <span className="text-foreground">{secondsPerCard}s/card</span>)

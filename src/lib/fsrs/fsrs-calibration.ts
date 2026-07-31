@@ -9,7 +9,7 @@ import { replayHistories, type TMemoryState } from "@/lib/fsrs/fsrs-replay";
 import type {
   TTrainRequest,
   TTrainResponse,
-} from "@/workers/fsrs-optimizer.worker";
+} from "@/workers/fsrs-trainer.worker";
 
 export const MIN_REVIEWS_TO_CALIBRATE = 400;
 
@@ -57,7 +57,7 @@ export function trainWeights(request: TTrainRequest): Promise<TTrainResponse> {
     let worker: Worker;
     try {
       worker = new Worker(
-        new URL("@/workers/fsrs-optimizer.worker.ts", import.meta.url),
+        new URL("@/workers/fsrs-trainer.worker.ts", import.meta.url),
         { type: "module" },
       );
     } catch (error) {

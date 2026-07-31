@@ -17,6 +17,7 @@ import {
   DEFAULT_NON_SYSTEM_THEME,
   TTheme,
 } from "@/lib/constants";
+import { proxiedImageUrl } from "@/lib/image";
 import {
   ArrowLeftIcon,
   LoaderIcon,
@@ -135,7 +136,10 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                 }
               >
                 <Avatar className="size-7">
-                  <AvatarImage src={user.image ?? ""} alt={user.email} />
+                  <AvatarImage
+                    src={user.image ? proxiedImageUrl(user.image) : undefined}
+                    alt={user.email}
+                  />
                   <AvatarFallback>
                     {user.email.charAt(0).toUpperCase()}
                   </AvatarFallback>

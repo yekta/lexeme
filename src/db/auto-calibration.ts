@@ -25,7 +25,6 @@ import {
 const IDLE_TIMEOUT_MS = 10_000;
 const FALLBACK_DELAY_MS = 3_000;
 
-/** Silent in production, so it explains itself in dev instead. */
 function debug(...args: unknown[]): void {
   console.info("[calibration]", ...args);
 }

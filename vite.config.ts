@@ -1,5 +1,5 @@
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
@@ -13,6 +13,22 @@ import { nitro } from "nitro/vite";
 const crossOriginIsolation = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
+};
+
+/**
+ * Nitro's dev middleware treats any Sec-Fetch-Dest other than document/empty as
+ * a static asset, so `<img src="/api/...">` 404s before reaching a server route.
+ */
+const devApiFetchDest: PluginOption = {
+  name: "lexeme:dev-api-fetch-dest",
+  enforce: "pre",
+  apply: "serve",
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (req.url?.startsWith("/api/")) delete req.headers["sec-fetch-dest"];
+      next();
+    });
+  },
 };
 
 export default defineConfig({
@@ -30,6 +46,7 @@ export default defineConfig({
     format: "es",
   },
   plugins: [
+    devApiFetchDest,
     tailwindcss(),
     tanstackStart({
       srcDirectory: "src",

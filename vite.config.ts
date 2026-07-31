@@ -55,6 +55,9 @@ export default defineConfig({
     nitro({
       routeRules: {
         "/**": { headers: crossOriginIsolation },
+        // Vercel stops at the first matching route, and the built-in
+        // /assets/** cache-control rule is more specific than /**.
+        "/assets/**": { headers: crossOriginIsolation },
       },
     }),
   ],

@@ -27,7 +27,7 @@ const FALLBACK_DELAY_MS = 3_000;
 
 /** Silent in production, so it explains itself in dev instead. */
 function debug(...args: unknown[]): void {
-  if (import.meta.env.DEV) console.info("[calibration]", ...args);
+  console.info("[calibration]", ...args);
 }
 
 function whenIdle(): Promise<void> {

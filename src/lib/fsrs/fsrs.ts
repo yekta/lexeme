@@ -55,6 +55,20 @@ export const FSRS_DEFAULT_W = Object.freeze([
   FSRS_DEFAULT_DECAY,
 ]);
 
+/**
+ * Whether a profile's weights came from an optimization pass rather than the
+ * shipped defaults. Derived from `w` instead of `last_calibrated_at` because
+ * those answer different questions: the timestamp records when a pass last
+ * *ran* (which reset also stamps, to stop the trigger re-running immediately),
+ * while this records whether the weights are actually fitted.
+ */
+export function isCalibrated(w: readonly number[]): boolean {
+  return (
+    w.length !== FSRS_DEFAULT_W.length ||
+    w.some((value, i) => value !== FSRS_DEFAULT_W[i])
+  );
+}
+
 type TSchedulerParams = Pick<
   TLearningProfile,
   | "request_retention"

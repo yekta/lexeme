@@ -7,7 +7,7 @@ import {
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
 } from "@/lib/constants";
-import { SHORT_INTERVAL_MS } from "@/lib/fsrs";
+import { SHORT_INTERVAL_MS } from "@/lib/fsrs/fsrs";
 
 export type StudyBuckets = {
   newCards: CardRow[];

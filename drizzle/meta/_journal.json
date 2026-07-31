@@ -15,6 +15,13 @@
       "when": 1781276325327,
       "tag": "0001_numerous_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785492834948,
+      "tag": "0002_demonic_vance_astro",
+      "breakpoints": true
     }
   ]
 }

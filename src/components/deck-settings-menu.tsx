@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  CalibrationDot,
+  CalibrationFooterSection,
+  CalibrationMenuItem,
+  ResetCalibrationForm,
+} from "@/components/deck-calibration";
 import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { Button } from "@/components/ui/button";
@@ -15,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemText,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormInput, Input } from "@/components/ui/input";
@@ -81,6 +88,7 @@ export function DeckSettingsMenu({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSettingsFormOpen, setIsSettingsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isResetCalibrationOpen, setIsResetCalibrationOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { openFilePicker, importElements } = useImportCardsFlow({
     deckId: deck.id,
@@ -124,19 +132,20 @@ export function DeckSettingsMenu({
             <Button
               variant="ghost"
               size="icon-lg"
-              className={cn(triggerClassName)}
+              className={cn("relative", triggerClassName)}
             >
               <MoreVertical className="size-5 shrink-0 text-muted-foreground group-data-popup-open/button:rotate-90 transition" />
+              <CalibrationDot profileId={deck.learning_profile_id} />
             </Button>
           }
         ></DropdownMenuTrigger>
-        <DropdownMenuContent align={align} className="min-w-40">
+        <DropdownMenuContent align={align} className="min-w-52">
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={() => setIsSettingsFormOpen(true)}
           >
             <Settings className="size-5 shrink-0" />
-            Settings
+            <DropdownMenuItemText>Settings</DropdownMenuItemText>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
@@ -147,7 +156,7 @@ export function DeckSettingsMenu({
             }}
           >
             <DownloadIcon className="size-5 shrink-0" />
-            Import Cards
+            <DropdownMenuItemText>Import Cards</DropdownMenuItemText>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="cursor-pointer"
@@ -160,16 +169,23 @@ export function DeckSettingsMenu({
             ) : (
               <UploadIcon className="size-5 shrink-0" />
             )}
-            {isExporting ? "Exporting..." : "Export Deck"}
+            <DropdownMenuItemText>
+              {isExporting ? "Exporting..." : "Export Deck"}
+            </DropdownMenuItemText>
           </DropdownMenuItem>
+          <CalibrationMenuItem
+            profileId={deck.learning_profile_id}
+            onReset={() => setIsResetCalibrationOpen(true)}
+          />
           <DropdownMenuItem
             variant="destructive"
             className="cursor-pointer"
             onClick={() => setIsDeleteOpen(true)}
           >
             <Trash2 className="size-5 shrink-0" />
-            Delete Deck
+            <DropdownMenuItemText>Delete Deck</DropdownMenuItemText>
           </DropdownMenuItem>
+          <CalibrationFooterSection profileId={deck.learning_profile_id} />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -178,6 +194,18 @@ export function DeckSettingsMenu({
           <DeckSettingsForm
             deck={deck}
             onDone={() => setIsSettingsFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isResetCalibrationOpen}
+        onOpenChange={setIsResetCalibrationOpen}
+      >
+        <DialogContent>
+          <ResetCalibrationForm
+            profileId={deck.learning_profile_id}
+            onDone={() => setIsResetCalibrationOpen(false)}
           />
         </DialogContent>
       </Dialog>

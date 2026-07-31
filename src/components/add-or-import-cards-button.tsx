@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemText,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useImportCardsFlow } from "@/hooks/use-import-cards-flow";
@@ -71,7 +72,7 @@ export function AddOrImportCardsButton({
               closeOnClick={false}
             >
               <DownloadIcon className="size-5 shrink-0" />
-              Import Cards
+              <DropdownMenuItemText>Import Cards</DropdownMenuItemText>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

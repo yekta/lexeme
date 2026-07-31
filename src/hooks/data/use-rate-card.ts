@@ -13,7 +13,7 @@ import {
   reviewLogToDbRow,
   type FSRS,
   type Grade,
-} from "@/lib/fsrs";
+} from "@/lib/fsrs/fsrs";
 
 export type RateArgs = {
   /** The card being reviewed. */

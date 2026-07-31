@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemText,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
@@ -101,7 +102,7 @@ export function CreateOrImportDeckButton({
               closeOnClick={false}
             >
               <DownloadIcon className="size-5 shrink-0" />
-              Import Deck
+              <DropdownMenuItemText>Import Deck</DropdownMenuItemText>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

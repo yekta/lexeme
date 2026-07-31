@@ -10,7 +10,7 @@ import {
   FSRS_DEFAULT_RELEARNING_STEPS,
   FSRS_DEFAULT_REQUEST_RETENTION,
   FSRS_DEFAULT_W,
-} from "@/lib/fsrs";
+} from "@/lib/fsrs/fsrs";
 import {
   boolean,
   index,
@@ -136,9 +136,10 @@ export const learningProfiles = pgTable(
       .array()
       .notNull()
       .default(FSRS_DEFAULT_RELEARNING_STEPS as string[]),
-    last_calibrated_at: timestamp("last_calibrated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    /** Null until a calibration pass has actually completed. */
+    last_calibrated_at: timestamp("last_calibrated_at", {
+      withTimezone: true,
+    }),
     created_at: createdAt(),
     updated_at: updatedAt(),
   },

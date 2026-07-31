@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemText,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -73,7 +74,7 @@ function ThemeMenuItem() {
   return (
     <DropdownMenuItem closeOnClick={false} onClick={cycleTheme}>
       <Icon className="size-5 shrink-0" />
-      <span>Theme: {label}</span>
+      <DropdownMenuItemText>Theme: {label}</DropdownMenuItemText>
     </DropdownMenuItem>
   );
 }
@@ -140,13 +141,9 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-40">
-                <DropdownMenuItem className="font-normal pointer-events-none">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
+              <DropdownMenuContent align="end" className="min-w-48">
+                <DropdownMenuItem className="font-normal pointer-events-none py-1.25 text-xs text-muted-foreground">
+                  <DropdownMenuItemText>{user.email}</DropdownMenuItemText>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <ThemeMenuItem />

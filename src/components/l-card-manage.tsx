@@ -19,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemText,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormInput } from "@/components/ui/input";
@@ -69,7 +70,7 @@ export function LCardManage(props: TLCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/(--opacity-shadow) overflow-hidden isolate transition-colors"
+      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/shadow overflow-hidden isolate transition-colors"
       data-placeholder={isPlaceholder || undefined}
       style={{
         boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
@@ -97,7 +98,7 @@ export function LCardManage(props: TLCardManageProps) {
                 onClick={() => setEditOpen(true)}
               >
                 <Pencil className="h-4 w-4" />
-                Edit Card
+                <DropdownMenuItemText>Edit Card</DropdownMenuItemText>
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
@@ -105,7 +106,7 @@ export function LCardManage(props: TLCardManageProps) {
                 onClick={() => setDeleteOpen(true)}
               >
                 <Trash2 className="h-4 w-4" />
-                Delete Card
+                <DropdownMenuItemText>Delete Card</DropdownMenuItemText>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

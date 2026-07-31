@@ -30,7 +30,7 @@ import {
   Rating,
   SHORT_INTERVAL_MS,
   type Grade,
-} from "@/lib/fsrs";
+} from "@/lib/fsrs/fsrs";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
 import { createFileRoute } from "@tanstack/react-router";
 import confetti from "canvas-confetti";

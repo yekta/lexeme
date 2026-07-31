@@ -16,6 +16,7 @@ import {
   reviewLogsCollection,
   type CardRow,
   type DeckRow,
+  type LearningProfileRow,
   type RefetchableCollection,
   type ReviewLogRow,
 } from "@/db/collections";
@@ -220,6 +221,35 @@ const mutationFns = {
       },
     });
     await syncBack([cardsCollection, reviewLogsCollection]);
+  },
+
+  // An FSRS optimization pass (or a reset to defaults): the profile's new
+  // weights and every card memory state re-derived under them, committed in one
+  // server transaction so the two can never disagree.
+  calibrateProfile: async ({ transaction }) => {
+    const [profileMut] = mutationsFor(
+      transaction,
+      "learning_profiles",
+    ) as Mutated<LearningProfileRow>[];
+    if (!profileMut) return;
+    const p = profileMut.modified;
+    const cardMuts = mutationsFor(transaction, "cards") as Mutated<CardRow>[];
+    await trpc.learningProfiles.calibrate.mutate({
+      id: p.id,
+      w: p.w,
+      // Always set by the action; the column is only nullable for "never ran".
+      last_calibrated_at: p.last_calibrated_at ?? new Date(),
+      memory_states: cardMuts.map((m) => ({
+        id: m.modified.id,
+        stability: m.modified.stability,
+        difficulty: m.modified.difficulty,
+      })),
+    });
+    await syncBack(
+      cardMuts.length > 0
+        ? [learningProfilesCollection, cardsCollection]
+        : [learningProfilesCollection],
+    );
   },
 } satisfies Record<string, MutationFn>;
 

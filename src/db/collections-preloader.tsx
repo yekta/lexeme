@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { startAutoCalibration } from "@/db/auto-calibration";
 import { preloadCollections } from "@/db/collections";
 import { startOutbox } from "@/db/offline";
 import { startCollectionRefresh } from "@/db/refresh";
@@ -17,6 +18,7 @@ export function CollectionsPreloader() {
     preloadCollections();
     startOutbox();
     startCollectionRefresh();
+    void startAutoCalibration();
   }, []);
   return null;
 }

@@ -16,9 +16,9 @@ import {
 import { calibrate, shouldCalibrate } from "@/lib/fsrs/fsrs-calibration";
 import {
   buildCardHistories,
-  countLongTermReviews,
   countReviews,
-  trainableHistories,
+  countTrainableCards,
+  countTrainingItems,
 } from "@/lib/fsrs/fsrs-history";
 
 /** Leave first paint alone before spending CPU on training. */
@@ -62,8 +62,7 @@ async function calibrateProfile(
   force: boolean,
 ): Promise<void> {
   const histories = buildCardHistories(cardIds, logs);
-  const trainable = trainableHistories(histories);
-  const totalReviews = countLongTermReviews(trainable);
+  const totalReviews = countTrainingItems(histories);
 
   const gate = shouldCalibrate({
     totalReviews,
@@ -79,7 +78,7 @@ async function calibrateProfile(
   if (!gate.ok)
     debug(`profile "${profile.name}": forced past — ${gate.reason}`);
   debug(
-    `profile "${profile.name}": training on ${totalReviews} cross-day reviews (of ${countReviews(histories)} total) across ${trainable.length} of ${histories.length} cards`,
+    `profile "${profile.name}": training on ${totalReviews} items, one per cross-day review (of ${countReviews(histories)} reviews total) across ${countTrainableCards(histories)} of ${histories.length} cards`,
   );
 
   // `ifAvailable` so a second tab skips rather than queueing a duplicate run.
@@ -107,6 +106,7 @@ async function calibrateProfile(
         }
         if (outcome.status === "failed") {
           // No commit — stamping a failed pass would suppress every retry.
+          finalState = "failed";
           debug(`profile "${profile.name}": failed — ${outcome.reason}`);
           return;
         }

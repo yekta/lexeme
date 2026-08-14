@@ -4,7 +4,11 @@ import { useSyncExternalStore } from "react";
 
 /** Last thing calibration did for a profile this session. Calibration runs in a
  * worker, not the outbox, so it isn't visible to TanStack DB's `$synced`. */
-export type TCalibrationState = "idle" | "running" | "insufficient-data";
+export type TCalibrationState =
+  | "idle"
+  | "running"
+  | "insufficient-data"
+  | "failed";
 
 const states = new Map<string, TCalibrationState>();
 const listeners = new Set<() => void>();

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
     "lint": "eslint .",
+    "test": "node --test",
     "lock": "npm install --package-lock-only --os=linux --cpu=x64 --libc=glibc",
     "dgenerate": "drizzle-kit generate",
     "dmigrate": "drizzle-kit migrate",

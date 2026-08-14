@@ -9,6 +9,19 @@ export type TCardHistory = {
   /** Whole days since the previous review; 0 for the first (and for same-day
    * repeats, which FSRS models through its short-term component). */
   deltaTs: number[];
+  /** When each review happened, epoch ms. Parallel to `ratings`. */
+  reviewedAt: number[];
+};
+
+/** The concatenated typed arrays `computeParameters` expects. */
+export type TTrainingSet = {
+  ratings: Uint32Array;
+  deltaTs: Uint32Array;
+  lengths: Uint32Array;
+  /** Which card each item came from, so fsrs-rs can keep one card's prefixes
+   * together in a batch window. Dense indices, not real card ids — fsrs-rs only
+   * ever uses this as a grouping key. */
+  cardIds: BigInt64Array;
 };
 
 const MS_PER_DAY = 86_400_000;
@@ -43,35 +56,31 @@ export function buildCardHistories(
     );
     const ratings: number[] = [];
     const deltaTs: number[] = [];
+    const reviewedAt: number[] = [];
     let previous: number | undefined;
     for (const log of cardLogs) {
-      const reviewedAt = new Date(log.review).getTime();
+      const reviewTime = new Date(log.review).getTime();
       ratings.push(log.rating);
       deltaTs.push(
         previous === undefined
           ? 0
-          : Math.max(0, dayIndex(reviewedAt) - dayIndex(previous)),
+          : Math.max(0, dayIndex(reviewTime) - dayIndex(previous)),
       );
-      previous = reviewedAt;
+      reviewedAt.push(reviewTime);
+      previous = reviewTime;
     }
-    histories.push({ cardId, ratings, deltaTs });
+    histories.push({ cardId, ratings, deltaTs, reviewedAt });
   }
   return histories;
 }
 
-/** fsrs-rs panics on items with no cross-day review, so a card only ever seen
- * within one session can't be trained on (it still gets a memory state). */
-export function trainableHistories(
-  histories: readonly TCardHistory[],
-): TCardHistory[] {
-  return histories.filter((h) => h.deltaTs.some((d) => d > 0));
-}
-
-/** Reviews the optimizer can actually learn from: same-day repeats carry no
- * forgetting signal, so only cross-day ones count toward the floor. */
-export function countLongTermReviews(
-  histories: readonly TCardHistory[],
-): number {
+/**
+ * Reviews the optimizer can actually learn from, which is also exactly the
+ * number of training items `buildTrainingSet` emits: one item predicts one
+ * review, and only a cross-day review carries a forgetting signal. A card's
+ * first review is always `delta_t = 0`, so it never counts.
+ */
+export function countTrainingItems(histories: readonly TCardHistory[]): number {
   let n = 0;
   for (const h of histories) {
     for (const d of h.deltaTs) if (d > 0) n++;
@@ -79,31 +88,66 @@ export function countLongTermReviews(
   return n;
 }
 
+/** Cards contributing at least one training item. Cards only ever seen within
+ * a single day contribute none (they still get a memory state from the
+ * replay). */
+export function countTrainableCards(
+  histories: readonly TCardHistory[],
+): number {
+  return histories.filter((h) => h.deltaTs.some((d) => d > 0)).length;
+}
+
 /** Total number of reviews across the given histories. */
 export function countReviews(histories: readonly TCardHistory[]): number {
   return histories.reduce((n, h) => n + h.ratings.length, 0);
 }
 
-/** Flatten histories into the concatenated typed arrays `computeParameters`
- * expects: all reviews back to back, with per-card lengths to slice them. */
-export function flattenForTraining(histories: readonly TCardHistory[]): {
-  ratings: Uint32Array;
-  deltaTs: Uint32Array;
-  lengths: Uint32Array;
-} {
-  const total = countReviews(histories);
-  const ratings = new Uint32Array(total);
-  const deltaTs = new Uint32Array(total);
-  const lengths = new Uint32Array(histories.length);
-  let offset = 0;
-  for (let i = 0; i < histories.length; i++) {
-    const h = histories[i];
-    lengths[i] = h.ratings.length;
-    for (let j = 0; j < h.ratings.length; j++) {
-      ratings[offset] = h.ratings[j];
-      deltaTs[offset] = h.deltaTs[j];
-      offset++;
+/**
+ * Expand histories into the training set, one item per predictable review.
+ *
+ * An FSRS item is *not* a card — it is a single review to predict, preceded by
+ * every review that came before it on that card. So a card with n cross-day
+ * reviews yields n items, each one review longer than the last. Passing one
+ * item per card instead would hand the optimizer a single label per card and
+ * leave its initial-stability search (which wants items with exactly one
+ * cross-day review) with nothing to fit. This mirrors `reviews_for_fsrs` in
+ * Anki's rslib.
+ *
+ * Items are ordered by the review they predict: fsrs-rs weights items by their
+ * position in the array, from 0.25 at the front to 1.0 at the back, so recent
+ * reviews have to come last to be weighted as recent.
+ */
+export function buildTrainingSet(
+  histories: readonly TCardHistory[],
+): TTrainingSet {
+  const items: Array<{ card: number; end: number; at: number }> = [];
+  for (let card = 0; card < histories.length; card++) {
+    const history = histories[card];
+    // From 1: the first review has nothing before it to predict from.
+    for (let end = 1; end < history.ratings.length; end++) {
+      if (history.deltaTs[end] > 0) {
+        items.push({ card, end, at: history.reviewedAt[end] });
+      }
     }
   }
-  return { ratings, deltaTs, lengths };
+  items.sort((a, b) => a.at - b.at);
+
+  const total = items.reduce((n, item) => n + item.end + 1, 0);
+  const ratings = new Uint32Array(total);
+  const deltaTs = new Uint32Array(total);
+  const lengths = new Uint32Array(items.length);
+  const cardIds = new BigInt64Array(items.length);
+  let offset = 0;
+  for (let i = 0; i < items.length; i++) {
+    const { card, end } = items[i];
+    const history = histories[card];
+    for (let j = 0; j <= end; j++) {
+      ratings[offset] = history.ratings[j];
+      deltaTs[offset] = history.deltaTs[j];
+      offset++;
+    }
+    lengths[i] = end + 1;
+    cardIds[i] = BigInt(card);
+  }
+  return { ratings, deltaTs, lengths, cardIds };
 }

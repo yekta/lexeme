@@ -11,6 +11,8 @@
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Tests run on `node --test`, which needs the extension in the specifier.
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "verbatimModuleSyntax": false,

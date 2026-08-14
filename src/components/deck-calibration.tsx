@@ -40,7 +40,7 @@ import {
 } from "@/lib/fsrs/fsrs-calibration";
 import {
   buildCardHistories,
-  countLongTermReviews,
+  countTrainingItems,
 } from "@/lib/fsrs/fsrs-history";
 import { cn } from "@/lib/utils";
 
@@ -124,7 +124,7 @@ function useLongTermReviewCount(profileId: string | undefined): number {
         cardsCollection.toArray,
       )
     : new Set<string>();
-  return countLongTermReviews(
+  return countTrainingItems(
     buildCardHistories(cardIds, reviewLogsCollection.toArray),
   );
 }
@@ -162,7 +162,9 @@ export function CalibrationFooter({
       ? "Calibrating..."
       : state === "insufficient-data"
         ? "Not enough data for calibration"
-        : calibrationLabel(profile, longTermReviews);
+        : state === "failed"
+          ? "Calibration failed, see the console for details"
+          : calibrationLabel(profile, longTermReviews);
 
   return (
     <div

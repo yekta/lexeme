@@ -1,10 +1,11 @@
 /// <reference lib="webworker" />
-import init, { Fsrs, initThreadPool } from "fsrs-browser";
+import init, { Fsrs, initThreadPool, TrainingConfig } from "fsrs-browser";
 
 export type TTrainRequest = {
   ratings: Uint32Array;
   deltaTs: Uint32Array;
   lengths: Uint32Array;
+  cardIds: BigInt64Array;
   enableShortTerm: boolean;
   numRelearningSteps: number;
 };
@@ -29,6 +30,9 @@ console.error = (...args: unknown[]) => {
  * competes with the UI thread on modest devices. */
 const MAX_THREADS = 4;
 
+/** What Anki trains with; fsrs-rs on its own defaults to 5. */
+const NUM_EPOCHS = 8;
+
 let ready: Promise<void> | undefined;
 
 function ensureReady(): Promise<void> {
@@ -49,14 +53,19 @@ self.onmessage = async (event: MessageEvent<TTrainRequest>) => {
   try {
     await ensureReady();
     const fsrs = new Fsrs();
+    // `computeParameters` takes ownership of the config, so it must not be
+    // freed here — the handle is already dead by the time it returns.
+    const config = new TrainingConfig();
+    config.numEpochs = NUM_EPOCHS;
     const w = fsrs.computeParameters(
       request.ratings,
       request.deltaTs,
       request.lengths,
       undefined,
       request.enableShortTerm,
-      undefined,
+      request.cardIds,
       request.numRelearningSteps,
+      config,
     );
     fsrs.free();
     const response: TTrainResponse = { ok: true, w: Array.from(w) };

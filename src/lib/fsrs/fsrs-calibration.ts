@@ -1,16 +1,13 @@
 import { FSRS_DEFAULT_W } from "@/lib/fsrs/fsrs";
-import {
-  countLongTermReviews,
-  flattenForTraining,
-  trainableHistories,
-  type TCardHistory,
-} from "@/lib/fsrs/fsrs-history";
+import { buildTrainingSet, type TCardHistory } from "@/lib/fsrs/fsrs-history";
 import { replayHistories, type TMemoryState } from "@/lib/fsrs/fsrs-replay";
 import type {
   TTrainRequest,
   TTrainResponse,
 } from "@/workers/fsrs-trainer.worker";
 
+/** Counted in trainable reviews, which is also the FSRS item count — the same
+ * unit Anki's "400 reviews" guidance is stated in. */
 export const MIN_REVIEWS_TO_CALIBRATE = 400;
 
 export const CALIBRATION_INTERVAL_DAYS = 2;
@@ -97,28 +94,22 @@ export async function calibrate({
   enableShortTerm: boolean;
   numRelearningSteps: number;
 }): Promise<TCalibrationOutcome> {
-  // Training uses only cards with a cross-day review; the replay below still
-  // covers every card, so all of them get a refreshed memory state.
-  const trainable = trainableHistories(histories);
-  const longTerm = countLongTermReviews(trainable);
-  if (longTerm < MIN_REVIEWS_TO_CALIBRATE) {
+  // Training only covers reviews it can predict; the replay below still covers
+  // every card, so all of them get a refreshed memory state.
+  const trainingSet = buildTrainingSet(histories);
+  if (trainingSet.lengths.length < MIN_REVIEWS_TO_CALIBRATE) {
     return { status: "insufficient-data" };
   }
 
-  const { ratings, deltaTs, lengths } = flattenForTraining(trainable);
   const result = await trainWeights({
-    ratings,
-    deltaTs,
-    lengths,
+    ...trainingSet,
     enableShortTerm,
     numRelearningSteps,
   });
   if (!result.ok) {
-    // fsrs-rs is the authority on what's trainable — its own verdict outranks
-    // any threshold we guess at from outside.
-    if (result.error.includes("NotEnoughData")) {
-      return { status: "insufficient-data" };
-    }
+    // Anything the optimizer rejects is reported as-is. It gets the same item
+    // count we gated on, so "not enough data" from here is a real anomaly and
+    // shouldn't be dressed up as "keep studying".
     return { status: "failed", reason: result.error };
   }
   const candidateW = result.w;

@@ -26,7 +26,7 @@ export default defineConfig({
   plugins: [
     // File-based routing, same convention as before: a file under src/routes is
     // a route, and this regenerates routeTree.gen.ts. What is gone is the
-    // server half — `createFileRoute(...).server.handlers` was a TanStack Start
+    // server half: `createFileRoute(...).server.handlers` was a TanStack Start
     // feature, and those handlers are Hono routes in apps/server now.
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     viteReact(),

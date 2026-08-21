@@ -14,7 +14,7 @@ import { requireUserId } from "../http.ts";
  *
  * Deck reads and writes are Zero synced queries and shared mutators, answered
  * from the browser's own store. Export stays here because it is a
- * server-rendered artefact rather than a view of the synced rows — it strips
+ * server-rendered artefact rather than a view of the synced rows: it strips
  * ids, FSRS state and the profile reference so a re-import starts fresh and
  * lets the user pick their own profile.
  */

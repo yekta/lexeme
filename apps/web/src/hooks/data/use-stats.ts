@@ -26,7 +26,7 @@ export type TDeckStatsRow = {
 
 /**
  * Per-deck card counts, derived from the synced rows. Counts come from
- * `computeStudyBuckets` — the same function that builds the study queue — so
+ * `computeStudyBuckets`, the same function that builds the study queue, so
  * the badges always equal what the study page offers.
  */
 export function useDeckStats() {

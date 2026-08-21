@@ -13,7 +13,7 @@ import { parseBody, requireUserId } from "../http.ts";
 /**
  * What is left of cards on HTTP: the two model calls.
  *
- * Everything else about a card — creating, editing, rating, deleting — is a
+ * Everything else about a card (creating, editing, rating, deleting) is a
  * shared Zero mutator that runs against the local store first and reaches
  * Postgres when the network allows. These two have no local equivalent: they
  * call a model with an API key that must never reach a browser, and they read

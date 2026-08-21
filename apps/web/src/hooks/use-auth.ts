@@ -15,8 +15,8 @@ import { SIGN_IN_PATHNAME } from "@/lib/constants";
  *
  * - `ok`       the server confirmed it this launch
  * - `checking` the probe is still in flight; the remembered identity stands in
- * - `offline`  the probe failed. Not a verdict — a flaky network, a redeploy, a
- *              laptop that just woke up — so the app stays open and syncing
+ * - `offline`  the probe failed. Not a verdict: a flaky network, a redeploy, a
+ *              laptop that just woke up, so the app stays open and syncing
  *              resumes on its own
  * - `expired`  the server answered, and there is no session. Signing in is the
  *              fix, but the local archive stays readable in the meantime
@@ -26,7 +26,7 @@ export type TAuthStatus = "ok" | "checking" | "offline" | "expired";
 /**
  * Better Auth probes the session once on mount and then leaves `error` set
  * forever. One failed probe is not a verdict, though, and treating it as one
- * strands the app in `offline` until a manual reload — on an app whose whole
+ * strands the app in `offline` until a manual reload: on an app whose whole
  * premise is riding those out. So retry on a backoff, and immediately when the
  * browser says it's back.
  */
@@ -107,7 +107,7 @@ export function useAuth() {
 
   /**
    * Both URLs are absolute on purpose. Better Auth resolves a relative one
-   * against its own base URL, which in production is the API host — so `"/"`
+   * against its own base URL, which in production is the API host, so `"/"`
    * would land the user on api.lexeme.fyi after the round trip instead of back
    * in the app. The server accepts them because `WEB_ORIGIN` is in its trusted
    * origins; it origin-checks `errorCallbackURL` exactly as it does

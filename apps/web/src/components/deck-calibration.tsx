@@ -65,7 +65,7 @@ export function CalibrationDot({ profileId }: { profileId: string }) {
  * The calibration part of the deck settings dropdown: the reset action and the
  * status line.
  *
- * Rendered inside `DropdownMenuContent`, which Base UI unmounts while closed —
+ * Rendered inside `DropdownMenuContent`, which Base UI unmounts while closed,
  * so the profile lookup only runs while the menu is open, rather than once per
  * deck card on the index route.
  */
@@ -106,7 +106,7 @@ export function CalibrationFooterSection({ profileId }: { profileId: string }) {
   );
 }
 
-/** Cross-day reviews on this profile — the only ones FSRS can learn from. */
+/** Cross-day reviews on this profile: the only ones FSRS can learn from. */
 function useLongTermReviewCount(profileId: string | undefined): number {
   const [decks] = useQuery(queries.decks());
   const [cards] = useQuery(queries.cards());
@@ -172,7 +172,7 @@ export function CalibrationFooter({
 
 /**
  * Resets a profile's FSRS weights to the shipped defaults. This is a
- * calibration to a known `w`, so it reuses the same commit path — including
+ * calibration to a known `w`, so it reuses the same commit path, including
  * re-deriving card memory states, which keeps stored state consistent with the
  * weights that produced it.
  */
@@ -192,7 +192,7 @@ export function ResetCalibrationForm({
   const [allCards] = useQuery(queries.cards());
   const [allLogs] = useQuery(queries.reviewLogs());
   const profile = profiles?.find((p) => p.id === profileId);
-  // Every deck on this profile — the blast radius of the reset.
+  // Every deck on this profile: the blast radius of the reset.
   const deckNames = decks
     .filter((d) => d.learning_profile_id === profileId)
     .map((d) => d.name);
@@ -235,7 +235,7 @@ export function ResetCalibrationForm({
           restores the defaults for the &quot;{profile?.name ?? ""}&quot;
           learning profile.
           {others > 0
-            ? ` That affects every deck using it — ${deckNames.join(", ")}.`
+            ? ` That affects every deck using it: ${deckNames.join(", ")}.`
             : ""}
         </DialogDescription>
       </DialogHeader>

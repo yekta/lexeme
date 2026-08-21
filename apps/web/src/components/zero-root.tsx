@@ -19,8 +19,8 @@ import { preloadAccount } from "@/zero/preload";
  * render.
  *
  * With no identity there is no client, and children render without one. Nothing
- * that reads data renders in that state — see `RequireIdentity`, which every
- * data route goes through — because `useQuery` reaches for the client from
+ * that reads data renders in that state: see `RequireIdentity`, which every
+ * data route goes through, because `useQuery` reaches for the client from
  * context even when its query is disabled. The sync banner is inside the
  * provider for the same reason: it reads the connection.
  */

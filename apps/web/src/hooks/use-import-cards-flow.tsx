@@ -20,7 +20,7 @@ export function useImportCardsFlow({
   deckName: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // `parsedCards` deliberately persists through the dialog's close animation —
+  // `parsedCards` deliberately persists through the dialog's close animation:
   // unmounting the form synchronously on submit leaves an empty dialog visible
   // for a frame. Reopening with a new file overwrites it.
   const [parsedCards, setParsedCards] = useState<

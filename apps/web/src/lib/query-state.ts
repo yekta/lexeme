@@ -15,7 +15,7 @@ export type DataState =
 
 /**
  * A settled, non-retryable data condition derived on the client rather than
- * thrown by the server — e.g. a deck that simply isn't in the synced set.
+ * thrown by the server: e.g. a deck that simply isn't in the synced set.
  * `code` mirrors the API's error codes so `apiErrorCode` (and thus
  * `dataStateOf`) classifies it identically.
  */

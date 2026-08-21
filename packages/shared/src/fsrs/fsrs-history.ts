@@ -9,7 +9,7 @@ export type TReviewInput = {
   card_id: string;
   /** FSRS grade, 1..4. */
   rating: number;
-  /** When the answer was given — epoch ms, as Zero carries a `timestamptz`. */
+  /** When the answer was given: epoch ms, as Zero carries a `timestamptz`. */
   review: number;
 };
 
@@ -32,7 +32,7 @@ export type TTrainingSet = {
   deltaTs: Uint32Array;
   lengths: Uint32Array;
   /** Which card each item came from, so fsrs-rs can keep one card's prefixes
-   * together in a batch window. Dense indices, not real card ids — fsrs-rs only
+   * together in a batch window. Dense indices, not real card ids: fsrs-rs only
    * ever uses this as a grouping key. */
   cardIds: BigInt64Array;
 };
@@ -40,7 +40,7 @@ export type TTrainingSet = {
 const MS_PER_DAY = 86_400_000;
 
 /** Local calendar day index. FSRS `delta_t` counts day boundaries crossed, not
- * elapsed 24h periods — 10pm to 9am next morning is 1 day, not 0. */
+ * elapsed 24h periods: 10pm to 9am next morning is 1 day, not 0. */
 function dayIndex(ms: number): number {
   return Math.floor(
     (ms - new Date(ms).getTimezoneOffset() * 60_000) / MS_PER_DAY,
@@ -118,7 +118,7 @@ export function countReviews(histories: readonly TCardHistory[]): number {
 /**
  * Expand histories into the training set, one item per predictable review.
  *
- * An FSRS item is *not* a card — it is a single review to predict, preceded by
+ * An FSRS item is *not* a card: it is a single review to predict, preceded by
  * every review that came before it on that card. So a card with n cross-day
  * reviews yields n items, each one review longer than the last. Passing one
  * item per card instead would hand the optimizer a single label per card and

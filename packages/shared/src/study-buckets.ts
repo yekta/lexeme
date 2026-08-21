@@ -9,7 +9,7 @@ import { SHORT_INTERVAL_MS } from "./fsrs/fsrs.ts";
  * The row shapes this module reads, stated structurally.
  *
  * Bucketing is scheduling arithmetic, not a view of the sync schema, so it
- * names the fields it touches rather than importing `TCardRow` and friends —
+ * names the fields it touches rather than importing `TCardRow` and friends,
  * which would put a dependency on `@lexeme/contracts` underneath the FSRS
  * defaults that `@lexeme/contracts` itself imports. The synced rows satisfy
  * these, and the functions stay generic in the card type so callers get their
@@ -81,7 +81,7 @@ export function computeTrueRetention(
  * The single source of truth for what is studyable in a deck right now. The
  * deck-list badges (`useDeckStats`) and the study queue (`useStudyCards`) both
  * derive from this, so a non-zero badge count always means the study page has
- * exactly those cards — they can never disagree.
+ * exactly those cards: they can never disagree.
  *
  * Bucket rules:
  * - `new`: always ready, capped by the profile's remaining daily new limit.
@@ -98,7 +98,7 @@ export function computeStudyBuckets<TCard extends TCardLike>({
   now,
 }: {
   deckCards: readonly TCard[];
-  /** Review logs from any deck or day — filtered to `deckCards` and today internally. */
+  /** Review logs from any deck or day: filtered to `deckCards` and today internally. */
   logs: readonly TReviewLogLike[];
   profile: TProfileLike | undefined;
   now: number;

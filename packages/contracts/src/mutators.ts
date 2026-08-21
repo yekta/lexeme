@@ -23,7 +23,7 @@ import { zql } from "./schema.ts";
  * Each one runs twice: optimistically on the client against its local store,
  * and authoritatively on the server at `/api/zero/mutate`, where `ctx` comes
  * from the verified session and the writes land in Postgres. Same function
- * both times — which is what collapses the old split between the `onMutate`
+ * both times, which is what collapses the old split between the `onMutate`
  * callbacks in `hooks/data/*` and the tRPC router bodies that mirrored them.
  *
  * Conflict policy is last-writer-wins per mutation: single-user data, no CRDTs.
@@ -43,7 +43,7 @@ import { zql } from "./schema.ts";
 const uuidArg = z.uuid();
 const cardStateArg = z.enum(CARD_STATES);
 
-/** FSRS-6 weight vector: fixed length, all finite — a malformed `w` would
+/** FSRS-6 weight vector: fixed length, all finite. A malformed `w` would
  * corrupt scheduling for every card on the profile. */
 const fsrsWeights = z.array(z.number().finite()).length(FSRS_DEFAULT_W.length);
 
@@ -144,8 +144,8 @@ export const calibrateProfileArgs = z.object({
 // The old tRPC procedures asked Postgres these questions through
 // `server/api/access.ts`. Here the same questions are asked through `tx.run`,
 // which answers from the local store on the client and from Postgres on the
-// server. Only the server's answer is authoritative — the client's local store
-// holds only rows it already owns — but running the check in both places keeps
+// server. Only the server's answer is authoritative: the client's local store
+// holds only rows it already owns, but running the check in both places keeps
 // an unauthorized write from ever being applied optimistically.
 //
 // NOT_FOUND and FORBIDDEN stay distinguishable, as they were in `access.ts`:
@@ -185,7 +185,7 @@ export async function mustOwnProfile(
  * the foreign keys do this themselves in one statement, and zero-cache picks
  * the cascaded deletes out of the WAL like any other change. The client's local
  * store has no foreign keys, so without this a deleted deck would leave its
- * cards (and their review logs) behind until the next sync corrected it —
+ * cards (and their review logs) behind until the next sync corrected it:
  * visible as orphan rows in the deck badges and the study queue.
  */
 async function cascadeDeleteCards(tx: Transaction, cardIds: string[]) {
@@ -200,7 +200,7 @@ async function cascadeDeleteCards(tx: Transaction, cardIds: string[]) {
 /**
  * The mutator definitions, before they are built into a registry.
  *
- * Exported separately so the server can compose them — it swaps one
+ * Exported separately so the server can compose them: it swaps one
  * implementation in (see `server/zero.ts`), and `defineMutators` turns
  * definitions into built mutators, so a registry cannot be spread back into
  * another one.
@@ -250,7 +250,7 @@ export const mutatorDefs = {
 
     /**
      * A deck and all its cards in one mutation, so either the whole import
-     * lands or none of it does — no orphan empty deck if the cards fail.
+     * lands or none of it does, no orphan empty deck if the cards fail.
      */
     import: defineMutator(importDeckArgs, async ({ tx, ctx, args }) => {
       const { user_id } = mustBeSignedIn(ctx);
@@ -380,7 +380,7 @@ export const mutatorDefs = {
      * mutation so the two can never disagree.
      *
      * Scheduling fields (`due`, `state`, `scheduled_days`) are deliberately
-     * untouched — changing weights must never re-date existing cards, matching
+     * untouched: changing weights must never re-date existing cards, matching
      * Anki's default.
      */
     calibrate: defineMutator(calibrateProfileArgs, async ({ tx, ctx, args }) => {
@@ -396,7 +396,7 @@ export const mutatorDefs = {
 
       // Row at a time. Correct everywhere and the right shape for the client's
       // optimistic run, but on the server this is one statement per card and
-      // the batch reaches 10,000 — so `server/zero.ts` overrides this mutator
+      // the batch reaches 10,000, so `server/zero.ts` overrides this mutator
       // with a single bulk UPDATE. Any change to what a calibration writes has
       // to be made in both places; the invariant is that they touch
       // `stability` and `difficulty` and nothing else.
@@ -456,7 +456,7 @@ function newCardRow(input: {
 }
 
 /**
- * The FSRS settings a fresh profile starts with — the same values the
+ * The FSRS settings a fresh profile starts with: the same values the
  * `learning_profiles` column defaults declare, for the same reason as
  * `newCardRow` above.
  */

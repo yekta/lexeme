@@ -18,8 +18,8 @@ import { queryClient } from "@/lib/query-client";
  * The app shell.
  *
  * It used to render `<html>`, `<head>` and `<Scripts>` itself, because TanStack
- * Start rendered the document on the server. The document is `index.html` now —
- * which is also where the title, the icons and the pre-paint theme script went —
+ * Start rendered the document on the server. The document is `index.html` now,
+ * which is also where the title, the icons and the pre-paint theme script went,
  * so this is just the provider tree and an outlet.
  */
 export const Route = createRootRoute({

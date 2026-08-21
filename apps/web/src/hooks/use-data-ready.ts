@@ -12,6 +12,13 @@ export type TDataReady = {
   account: boolean;
   /** Review logs are here too: the numbers derived from them may be shown. */
   logs: boolean;
+  /**
+   * Ready, but only because waiting was pointless: sync is down and this
+   * device has never received a full account. An empty screen in this state
+   * means "we could not fetch your data", not "you have no data", and the two
+   * must never be worded the same way.
+   */
+  stalled: boolean;
 };
 
 /**
@@ -20,7 +27,7 @@ export type TDataReady = {
  * This replaces the per-query `isPending` every screen used to compute from
  * Zero's result details, and it is the fix for two bugs that were really one
  * bug. Creating a deck and landing on it showed a loading skeleton, because the
- * new deck's card query had no rows and had not been confirmed by the server —
+ * new deck's card query had no rows and had not been confirmed by the server,
  * so it read as "still loading" when the honest answer was "this deck is empty,
  * you just made it". An account with no decks at all had the same problem on
  * the home screen, permanently.
@@ -31,7 +38,7 @@ export type TDataReady = {
  *
  * Two moments, in fact, because the preload is deliberately two passes
  * (zero/preload.ts). `logs` trails `account` so the deck list does not wait on
- * the heaviest table in the account — and so the stats footer does not announce
+ * the heaviest table in the account, and so the stats footer does not announce
  * "you haven't studied today" a beat before today's reviews arrive.
  *
  * Each branch below is an answer, not a guess:
@@ -76,5 +83,9 @@ export function useDataReady(): TDataReady {
     });
   }, [account, logsReady, decks.length, logs.length, hint?.logs]);
 
-  return { account, logs: logsReady };
+  // Readiness that came from a dead sync rather than from data. Callers use it
+  // to tell an empty account from an unreachable one.
+  const stalled = !preload.account && paused;
+
+  return { account, logs: logsReady, stalled };
 }

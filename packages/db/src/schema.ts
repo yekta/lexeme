@@ -70,8 +70,8 @@ export const account = pgTable("account", {
    * `https://accounts.google.com`.
    *
    * Better Auth 1.7 looks accounts up by `(issuer, account_id)` rather than
-   * `(provider_id, account_id)`. A provider id is a local nickname — whatever
-   * the app called it in its config — while an issuer is the party that
+   * `(provider_id, account_id)`. A provider id is a local nickname: whatever
+   * the app called it in its config, while an issuer is the party that
    * actually attests to the subject, so two providers configured against the
    * same IdP can no longer be mistaken for one another.
    */
@@ -187,7 +187,7 @@ export const cards = pgTable(
     deck_id: uuid("deck_id")
       .notNull()
       .references(() => decks.id, { onDelete: "cascade" }),
-    // Denormalized owner — every synced query scopes by it, so per-user sync
+    // Denormalized owner: every synced query scopes by it, so per-user sync
     // filters need user_id on every synced table.
     user_id: text("user_id")
       .notNull()

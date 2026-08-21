@@ -65,11 +65,11 @@ async function calibrateProfile(
     now: new Date(),
   });
   if (!gate.ok && !force) {
-    debug(`profile "${profile.name}": skipped — ${gate.reason}`);
+    debug(`profile "${profile.name}": skipped, ${gate.reason}`);
     return;
   }
   if (!gate.ok)
-    debug(`profile "${profile.name}": forced past — ${gate.reason}`);
+    debug(`profile "${profile.name}": forced past, ${gate.reason}`);
   debug(
     `profile "${profile.name}": training on ${totalReviews} items, one per cross-day review (of ${countReviews(histories)} reviews total) across ${countTrainableCards(histories)} of ${histories.length} cards`,
   );
@@ -98,9 +98,9 @@ async function calibrateProfile(
           return;
         }
         if (outcome.status === "failed") {
-          // No commit — stamping a failed pass would suppress every retry.
+          // No commit: stamping a failed pass would suppress every retry.
           finalState = "failed";
-          debug(`profile "${profile.name}": failed — ${outcome.reason}`);
+          debug(`profile "${profile.name}": failed, ${outcome.reason}`);
           return;
         }
         debug(
@@ -128,7 +128,7 @@ async function calibrateProfile(
 }
 
 /**
- * Fired once per app load — on landing, not after studying, when the tab is
+ * Fired once per app load: on landing, not after studying, when the tab is
  * usually about to close. Nothing renders behind it.
  *
  * Reads run against the local store (`zero.run` defaults to answering from
@@ -141,10 +141,10 @@ export async function startAutoCalibration(
   { force = false }: { force?: boolean } = {},
 ): Promise<void> {
   if (typeof window === "undefined") return;
-  // Threaded wasm build — no SharedArrayBuffer means it can't start at all.
+  // Threaded wasm build, no SharedArrayBuffer means it can't start at all.
   if (!crossOriginIsolated) {
     debug(
-      "disabled — the page is not cross-origin isolated, so SharedArrayBuffer is unavailable",
+      "disabled, the page is not cross-origin isolated, so SharedArrayBuffer is unavailable",
     );
     return;
   }
@@ -164,7 +164,7 @@ export async function startAutoCalibration(
     for (const profile of profiles) {
       const cardIds = cardIdsForProfile(profile.id, decks, cards);
       if (cardIds.size === 0) {
-        debug(`profile "${profile.name}": skipped — no cards`);
+        debug(`profile "${profile.name}": skipped, no cards`);
         continue;
       }
       await calibrateProfile(zero, profile, cardIds, logs, force);

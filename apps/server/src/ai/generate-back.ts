@@ -9,9 +9,9 @@ const backSchema = z.object({
 
 const SYSTEM_PROMPT = `You generate the "back" of a flashcard for the app Lexeme. \
 You are given the user's previous cards (front → back pairs) and the front of a \
-new card. Infer the user's conventions from the examples — the language(s) \
+new card. Infer the user's conventions from the examples: the language(s) \
 involved, whether backs are translations, definitions, or multiple \
-translations, their length, and their tone (formal or friendly) — and produce \
+translations, their length, and their tone (formal or friendly), and produce \
 a back for the new card that matches those conventions. Output only the back content, nothing else.`;
 
 export async function generateBack({

@@ -15,13 +15,13 @@ import {
  * `learningProfile.calibrate` writes a memory state per card, and the batch is
  * capped at 10,000. Row at a time is the right shape for the client's
  * optimistic run against its local store, and the wrong one for a single HTTP
- * request holding a Postgres transaction open — which is why the tRPC procedure
+ * request holding a Postgres transaction open, which is why the tRPC procedure
  * this replaces used one bulk statement, and why the server keeps doing so.
  *
  * The `user_id` predicate is the security boundary, exactly as before: ids the
  * caller doesn't own are inert rather than rejected, so a stale client can't
  * fail the whole batch. And as in the shared version, scheduling fields are
- * deliberately untouched — new weights must never re-date existing cards.
+ * deliberately untouched: new weights must never re-date existing cards.
  */
 export const serverMutators = defineMutators({
   ...mutatorDefs,

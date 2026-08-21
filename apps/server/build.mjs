@@ -1,7 +1,7 @@
 import { cp, rm } from "node:fs/promises";
 import { build } from "esbuild";
 
-// Bundle the server — workspace packages included — into one ESM file, so the
+// Bundle the server, workspace packages included, into one ESM file, so the
 // deployed image needs almost no node_modules. The createRequire banner keeps
 // any stray require() from a bundled CJS dependency working under ESM.
 await rm("dist", { recursive: true, force: true });

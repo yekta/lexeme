@@ -158,7 +158,7 @@ export function LCardManage(props: TLCardManageProps) {
         </p>
       </div>
 
-      {/* Divider — ruled line style */}
+      {/* Divider: ruled line style */}
       <div className="w-full h-px bg-border relative z-10" />
 
       {/* Back */}
@@ -339,7 +339,7 @@ function DeleteCardForm({
         <Button
           variant="destructive"
           onClick={() => {
-            // Optimistic — the card disappears immediately; the server catches
+            // Optimistic: the card disappears immediately; the server catches
             // up in the background.
             void mutation.mutateAsync({ id });
             onDone();

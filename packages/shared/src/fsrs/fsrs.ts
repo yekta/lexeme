@@ -71,8 +71,8 @@ export function isCalibrated(w: readonly number[]): boolean {
 
 /**
  * Everything `fsrs()` needs, described structurally rather than as a slice of a
- * database row. Both shapes that carry these fields — the drizzle row on the
- * server and the Zero row in the browser — satisfy it without either being
+ * database row. Both shapes that carry these fields, the drizzle row on the
+ * server and the Zero row in the browser, satisfy it without either being
  * named here, which is what lets the scheduler live below both.
  */
 type TSchedulerParams = {

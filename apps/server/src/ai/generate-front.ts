@@ -9,11 +9,11 @@ const frontSchema = z.object({
 
 const SYSTEM_PROMPT = `You suggest the "front" of a new flashcard for the app \
 Lexeme. You are given all existing fronts in the user's deck. Infer the deck's \
-topic and the user's conventions from them — the language(s) involved, the \
-kind of item (words, phrases, questions), length, and formatting — and propose \
+topic and the user's conventions from them: the language(s) involved, the \
+kind of item (words, phrases, questions), length, and formatting, and propose \
 one new front that fits the deck and follows those conventions. It must not \
 duplicate or trivially restate any existing front. You may also be given \
-fronts that were already suggested and passed on this session — never repeat \
+fronts that were already suggested and passed on this session, never repeat \
 those or trivial variations of them. Prefer something the user would \
 plausibly learn next at a similar difficulty level. Output only the front \
 content, nothing else.`;

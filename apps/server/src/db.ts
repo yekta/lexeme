@@ -14,7 +14,7 @@ export const dbProvider = zeroDrizzle(zeroSchema, db);
 
 // Types `tx.dbTransaction.wrappedTransaction` for the server branches of the
 // shared mutators (see zero.ts). Module augmentation is ambient, so declaring
-// it here is enough — nothing in the browser has to import this file.
+// it here is enough, nothing in the browser has to import this file.
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
     dbProvider: typeof dbProvider;

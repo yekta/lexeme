@@ -16,7 +16,7 @@ import { env } from "./env.ts";
  * Better Auth, built once at startup.
  *
  * It used to be rebuilt per request, because Better Auth captures its adapter
- * on construction and a cached instance would have pinned a Postgres.js pool —
+ * on construction and a cached instance would have pinned a Postgres.js pool,
  * which on Cloudflare Workers meant a later request reusing an earlier
  * request's TCP socket, and workerd refusing it. On an ordinary Node process
  * there is nothing to avoid: one adapter over one pool for the life of the
@@ -85,7 +85,7 @@ export const auth = betterAuth({
    * without this it never sees one and every sync request 401s.
    *
    * They are sibling subdomains and therefore same-site, so the default
-   * `SameSite=Lax` still applies — nothing here needs `SameSite=None`.
+   * `SameSite=Lax` still applies, nothing here needs `SameSite=None`.
    *
    * Unset in dev, where the web dev server proxies `/api` and there is one
    * origin. Note that a Railway-style `*.up.railway.app` host cannot be used

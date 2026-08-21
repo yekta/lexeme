@@ -58,7 +58,7 @@ const deleteDeckSchema = z.object({
     ),
 });
 
-/** The deck fields the settings menu needs — satisfied by both the deck list
+/** The deck fields the settings menu needs, satisfied by both the deck list
  * row (`TDeck`) and the single-deck summary (`TDeckSummary`). */
 export type TDeckSettingsMenuDeck = {
   id: string;

@@ -7,7 +7,7 @@ import type { z } from "zod";
  * Empty in dev, where the Vite server proxies `/api` and everything is one
  * origin, so the session cookie is first-party and nothing needs configuring.
  * In production it is the Railway host (e.g. `https://api.lexeme.fyi`), which
- * is same-site with the app — a sibling subdomain — so the cookie still rides
+ * is same-site with the app, a sibling subdomain, so the cookie still rides
  * along, given `COOKIE_DOMAIN` on the server.
  */
 export const API_BASE: string = import.meta.env.VITE_API_URL ?? "";

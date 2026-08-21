@@ -8,7 +8,7 @@ import { useEffect } from "react";
  *
  * That means both: the server actually answered that there is no session, and
  * this device has no remembered identity. A slow probe, a dead network or an
- * expired session all keep the app open on the local store instead — bouncing
+ * expired session all keep the app open on the local store instead: bouncing
  * an offline device to a sign-in screen it cannot complete is the one outcome
  * a local-first build has no excuse for.
  */

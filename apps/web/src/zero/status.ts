@@ -8,13 +8,13 @@ import { useAccountReady, useReviewLogsReady } from "@/zero/account";
  *
  * The rule that matters: **pending is a property of the account, not of a
  * query.** Zero reports `unknown` until the server confirms a query, which on a
- * device that is offline — or merely slow — never happens, and which is also
+ * device that is offline, or merely slow, never happens, and which is also
  * the state a query the server has genuinely never been asked about sits in.
  * Reading that as "loading" is what put a skeleton over a deck that had just
  * been created and a spinner over an account that had no decks yet, forever.
  *
  * Every screen here draws from one preloaded set, so there is one moment worth
- * waiting for — `useAccountReady` — and after it a query with no rows means
+ * waiting for, `useAccountReady`, and after it a query with no rows means
  * *empty*, which is a screen the app knows how to draw.
  *
  * `error` is separate and does mean something: the query was refused (a bad

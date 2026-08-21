@@ -5,7 +5,7 @@ import { Hono } from "hono";
  *
  * The app is cross-origin isolated (`require-corp`) so the FSRS optimizer can
  * use SharedArrayBuffer, and under that policy a subresource with no CORP
- * header is dropped — which is every image on `googleusercontent.com`. So it
+ * header is dropped, which is every image on `googleusercontent.com`. So it
  * comes through this endpoint, which does carry one.
  *
  * Note `cross-origin`, not `same-origin`: this used to run on the same origin

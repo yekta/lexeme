@@ -63,7 +63,7 @@ export function CardsVirtualGrid({
   });
 
   // When the column count changes (crossing the md breakpoint) the rows are
-  // re-chunked, so any cached row heights are stale — drop them and re-measure.
+  // re-chunked, so any cached row heights are stale: drop them and re-measure.
   useEffect(() => {
     virtualizer.measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps

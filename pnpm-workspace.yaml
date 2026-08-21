@@ -1,5 +1,5 @@
 # apps consume packages; packages export raw .ts, so there is no build step
-# between them — one `tsc` per workspace typechecks the sources it actually uses.
+# between them: one `tsc` per workspace typechecks the sources it actually uses.
 packages:
   - apps/*
   - packages/*
@@ -25,8 +25,8 @@ catalog:
   # runtime: server
   hono: ^4.13.3
   "@hono/node-server": ^2.1.1
-  # Exact, not a caret. Better Auth owns database columns — 1.7.0 added `issuer`
-  # to the `account` model and queries it on every OAuth sign-in — so a version
+  # Exact, not a caret. Better Auth owns database columns: 1.7.0 added `issuer`
+  # to the `account` model and queries it on every OAuth sign-in, so a version
   # bump here is a schema change, and a floating range is a sign-in that breaks
   # in production on an unrelated deploy. It moves when a migration moves with
   # it (packages/db/drizzle/0004).

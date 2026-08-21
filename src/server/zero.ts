@@ -2,8 +2,8 @@ import { defineMutator, defineMutators } from "@rocicorp/zero";
 import { zeroDrizzle } from "@rocicorp/zero/server/adapters/drizzle";
 import { sql } from "drizzle-orm";
 
-import { auth } from "@/server/auth";
-import { db } from "@/server/db";
+import type { Auth } from "@/server/auth";
+import type { Database } from "@/server/db";
 import { cards } from "@/server/db/schema";
 import type { TAuthData } from "@/zero/context";
 import { mustBeSignedIn } from "@/zero/context";
@@ -16,18 +16,19 @@ import { schema } from "@/zero/schema";
 
 /**
  * ZQL-capable database used by `/api/zero/mutate` to run the shared mutators
- * authoritatively inside a Postgres transaction. Wraps the same drizzle client
- * the rest of the server uses, so mutators and tRPC procedures write through
- * one connection pool and one set of type parsers.
+ * authoritatively inside a Postgres transaction. It wraps the request's Drizzle
+ * client, so authentication and the mutation share one TCP connection without
+ * leaking that connection into another Worker invocation.
  */
-export const dbProvider = zeroDrizzle(schema, db);
+export const createDbProvider = (db: Database) => zeroDrizzle(schema, db);
+type DbProvider = ReturnType<typeof createDbProvider>;
 
 // Types `tx.dbTransaction.wrappedTransaction` for the server branches of the
 // shared mutators (see zero/mutators.ts). Module augmentation is ambient, so
 // declaring it here is enough — nothing on the client has to import this file.
 declare module "@rocicorp/zero" {
   interface DefaultTypes {
-    dbProvider: typeof dbProvider;
+    dbProvider: DbProvider;
   }
 }
 
@@ -100,7 +101,10 @@ export const serverMutators = defineMutators({
  * Cookie header means both shells authenticate through one code path, and the
  * native ones need no change on this side when they land.
  */
-export async function getAuthData(req: Request): Promise<TAuthData | undefined> {
+export async function getAuthData(
+  req: Request,
+  auth: Auth,
+): Promise<TAuthData | undefined> {
   const headers = new Headers(req.headers);
   const bearer = headers.get("authorization");
   if (bearer?.startsWith("Bearer ") && !headers.get("cookie")) {

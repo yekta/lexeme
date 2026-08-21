@@ -1,7 +1,8 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+
 import { env } from "@/env";
-import { db } from "@/server/db";
+import type { Database } from "@/server/db";
 import {
   account,
   learningProfiles,
@@ -10,111 +11,101 @@ import {
   verification,
 } from "@/server/db/schema";
 
-function create() {
+/**
+ * Build Better Auth for one request using that request's database client.
+ *
+ * Better Auth captures its adapter when it is constructed, so caching the auth
+ * instance would also retain the Postgres.js pool behind that adapter. Keeping
+ * both objects request-scoped prevents Cloudflare from reusing TCP sockets
+ * across invocations.
+ */
+export function createAuth(db: Database) {
   return betterAuth({
-  baseURL: env.BETTER_AUTH_URL,
-  secret: env.BETTER_AUTH_SECRET,
-  database: drizzleAdapter(db, {
-    provider: "pg",
-    schema: { user, session, account, verification },
-  }),
-  // Map Better Auth's internal camelCase model fields to our snake_case schema.
-  user: {
-    fields: {
-      emailVerified: "email_verified",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
-  session: {
-    fields: {
-      expiresAt: "expires_at",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-      ipAddress: "ip_address",
-      userAgent: "user_agent",
-      userId: "user_id",
-    },
-  },
-  account: {
-    fields: {
-      accountId: "account_id",
-      providerId: "provider_id",
-      userId: "user_id",
-      accessToken: "access_token",
-      refreshToken: "refresh_token",
-      idToken: "id_token",
-      accessTokenExpiresAt: "access_token_expires_at",
-      refreshTokenExpiresAt: "refresh_token_expires_at",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
-  verification: {
-    fields: {
-      expiresAt: "expires_at",
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
-  },
-  /**
-   * Issue the session cookie for the parent domain when one is configured, so
-   * `lexeme.fyi` and `zero.lexeme.fyi` share it. zero-cache forwards that
-   * cookie to `/api/zero/query` and `/api/zero/mutate`, which is how sync
-   * authenticates; without this it never sees one and every sync request 401s.
-   *
-   * The two hosts are sibling subdomains and therefore same-site, so the
-   * default `SameSite=Lax` still applies — nothing here needs `SameSite=None`.
-   */
-  ...(env.COOKIE_DOMAIN
-    ? {
-        advanced: {
-          crossSubDomainCookies: {
-            enabled: true,
-            domain: env.COOKIE_DOMAIN,
-          },
-        },
-      }
-    : {}),
-  emailAndPassword: { enabled: false },
-  socialProviders: {
-    google: {
-      clientId: env.GOOGLE_AUTH_CLIENT_ID,
-      clientSecret: env.GOOGLE_AUTH_CLIENT_SECRET,
-    },
-  },
-  databaseHooks: {
+    baseURL: env.BETTER_AUTH_URL,
+    secret: env.BETTER_AUTH_SECRET,
+    database: drizzleAdapter(db, {
+      provider: "pg",
+      schema: { user, session, account, verification },
+    }),
+    // Map Better Auth's internal camelCase model fields to our snake_case schema.
     user: {
-      create: {
-        after: async (createdUser) => {
-          await db.insert(learningProfiles).values({
-            user_id: createdUser.id,
-            name: "Default",
-            is_default: true,
-          });
+      fields: {
+        emailVerified: "email_verified",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    session: {
+      fields: {
+        expiresAt: "expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+        ipAddress: "ip_address",
+        userAgent: "user_agent",
+        userId: "user_id",
+      },
+    },
+    account: {
+      fields: {
+        accountId: "account_id",
+        providerId: "provider_id",
+        userId: "user_id",
+        accessToken: "access_token",
+        refreshToken: "refresh_token",
+        idToken: "id_token",
+        accessTokenExpiresAt: "access_token_expires_at",
+        refreshTokenExpiresAt: "refresh_token_expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    verification: {
+      fields: {
+        expiresAt: "expires_at",
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+      },
+    },
+    /**
+     * Issue the session cookie for the parent domain when one is configured, so
+     * `lexeme.fyi` and `zero.lexeme.fyi` share it. zero-cache forwards that
+     * cookie to `/api/zero/query` and `/api/zero/mutate`, which is how sync
+     * authenticates; without this it never sees one and every sync request 401s.
+     *
+     * The two hosts are sibling subdomains and therefore same-site, so the
+     * default `SameSite=Lax` still applies — nothing here needs `SameSite=None`.
+     */
+    ...(env.COOKIE_DOMAIN
+      ? {
+          advanced: {
+            crossSubDomainCookies: {
+              enabled: true,
+              domain: env.COOKIE_DOMAIN,
+            },
+          },
+        }
+      : {}),
+    emailAndPassword: { enabled: false },
+    socialProviders: {
+      google: {
+        clientId: env.GOOGLE_AUTH_CLIENT_ID,
+        clientSecret: env.GOOGLE_AUTH_CLIENT_SECRET,
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (createdUser) => {
+            await db.insert(learningProfiles).values({
+              user_id: createdUser.id,
+              name: "Default",
+              is_default: true,
+            });
+          },
         },
       },
     },
-  },
   });
 }
 
-type TAuth = ReturnType<typeof create>;
-
-let cached: TAuth | undefined;
-
-/**
- * Better Auth, constructed on first use rather than at import.
- *
- * `betterAuth()` reads five environment values and builds a database adapter
- * while it runs, so calling it at module scope drags both `env` and `db` into
- * isolate startup — which on Workers is before any binding exists, and during
- * the SPA prerender is before there is any configuration at all.
- */
-export const auth: TAuth = new Proxy({} as TAuth, {
-  get(_target, prop) {
-    cached ??= create();
-    const value = cached[prop as keyof TAuth];
-    return typeof value === "function" ? value.bind(cached) : value;
-  },
-});
+export type Auth = ReturnType<typeof createAuth>;

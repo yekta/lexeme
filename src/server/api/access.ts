@@ -1,10 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 
-import type { db } from "@/server/db";
+import type { Database } from "@/server/db";
 import { decks } from "@/server/db/schema";
 
-type Database = typeof db;
 type DeckRow = typeof decks.$inferSelect;
 
 /**

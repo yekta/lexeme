@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    // shadcn's generated components import `@/lib/utils` and `@/components/ui/*`;
+    // app code follows the same alias so there is one import convention.
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src", "vite.config.ts"]
+}

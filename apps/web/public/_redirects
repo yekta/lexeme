@@ -1,0 +1,8 @@
+# The SPA fallback, and nothing else.
+#
+# Every screen is a real path matched by the router in the browser — /deck/<id>,
+# /study/<id>, /sign-in — so a hard refresh on one has to be served index.html
+# with a 200 rather than a 404. There is no server here to route them: this is a
+# static bundle, and the API is a separate host addressed absolutely
+# (src/lib/api.ts), so there is deliberately no proxy rule to forget.
+/*  /index.html  200

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lexeme</title>
+    <meta name="description" content="Master any subject with spaced repetition." />
+    <meta name="theme-color" content="#f7f0e6" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <!--
+      Applies the stored theme before the first paint.
+
+      next-themes still owns the theme once React is running, but it can only
+      set the class in an effect — which is one painted frame of the light
+      canvas on every dark-mode load. That was survivable while the document
+      came from a server that could render the class into the HTML; it is not
+      now that the document is this file, served identically to everyone.
+
+      Kept in step with next-themes' defaults on purpose: same storage key
+      ("theme"), same attribute (a class on <html>), and "system" (the app's
+      default) means ask the OS. The two colors are --background from
+      styles/globals.css, for the address bar on mobile.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) {
+            document.documentElement.classList.add("dark");
+            document.querySelector('meta[name="theme-color"]').content = "#33302b";
+          }
+        } catch (e) {
+          /* private mode or storage disabled; light is a fine default */
+        }
+      })();
+    </script>
+  </head>
+  <!-- The canvas, the type and the font are all set in styles/globals.css
+       (@layer base), so this stays bare. -->
+  <body class="relative">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    // Workspace packages are consumed as raw sources and their tests run on
+    // bare `node --test`, which resolves the specifier it is handed and nothing
+    // else — so imports inside a package carry the real `.ts` extension, and
+    // every workspace that typechecks those sources has to allow it.
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx"
+  }
+}

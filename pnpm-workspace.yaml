@@ -1,0 +1,47 @@
+# apps consume packages; packages export raw .ts, so there is no build step
+# between them — one `tsc` per workspace typechecks the sources it actually uses.
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  "@rocicorp/zero-sqlite3": true
+  "@tailwindcss/oxide": true
+  esbuild: true
+  protobufjs: true
+
+# One place to pin the versions more than one workspace package depends on
+# (`"dep": "catalog:"`). Anything only one package uses stays in its own
+# package.json.
+catalog:
+  # runtime: client
+  react: 19.2.6
+  react-dom: 19.2.6
+  "@tanstack/react-router": ^1.170.15
+  "@tanstack/react-query": ^5.101.4
+  # runtime: sync. The browser client, the server handlers and zero-cache all
+  # speak one wire protocol, so this is an exact pin rather than a range.
+  "@rocicorp/zero": 1.8.0
+  # runtime: server
+  hono: ^4.13.3
+  "@hono/node-server": ^2.1.1
+  better-auth: ^1.6.25
+  drizzle-orm: ^0.45.2
+  postgres: ^3.4.9
+  "@t3-oss/env-core": ^0.13.11
+  # runtime: shared
+  zod: ^4.4.3
+  ts-fsrs: ^5.4.1
+  # tooling
+  typescript: ^5.9.3
+  tsx: ^4.23.12
+  esbuild: ^0.28.2
+  vite: ^8.1.5
+  "@vitejs/plugin-react": ^6.0.4
+  "@tanstack/router-plugin": ^1.168.34
+  tailwindcss: ^4.3.3
+  "@tailwindcss/vite": ^4.3.3
+  drizzle-kit: ^0.31.10
+  "@types/node": ^22.19.0
+  "@types/react": ^19.2.17
+  "@types/react-dom": ^19.2.3

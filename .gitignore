@@ -1,21 +1,18 @@
 node_modules/
-.next/
+dist/
+.turbo/
 coverage/
 .DS_Store
 *.log
+*.tsbuildinfo
+
+# Secrets. .env.example is the checked-in template.
 .env*
 !.env.example
-.claude
-# Supabase
-.branches
-.temp
-
-# dotenvx
 .env.keys
-.env.local
-.env.*.local
-dist
-.tanstack
-.output
-.wrangler
 
+# Copied out of packages/db by the server build so the bundle can read them at
+# runtime; the originals are the ones under version control.
+apps/server/drizzle/
+
+.claude

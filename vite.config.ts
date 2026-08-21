@@ -70,6 +70,26 @@ export default defineConfig({
     }),
     viteReact(),
     nitro({
+      /**
+       * Cloudflare Workers. `nodeCompat` is what lets better-auth, drizzle,
+       * postgres.js and the Anthropic SDK run: postgres.js ships a `workerd`
+       * build that reaches Postgres over `cloudflare:sockets`, so the server
+       * routes keep talking to Railway with no driver change.
+       *
+       * `deployConfig` is deliberately off. Turning it on makes Nitro write
+       * `.wrangler/deploy/config.json`, and Cloudflare then treats that as the
+       * source of truth and *discards the environment variables set in the
+       * dashboard* — which is where this app's secrets live.
+       */
+      preset: "cloudflare_module",
+      compatibilityDate: "2026-08-01",
+      cloudflare: {
+        nodeCompat: true,
+        // Without this Nitro derives the Worker name from the repo
+        // ("yekta-lexeme") and `wrangler deploy` creates a second Worker beside
+        // the one the dashboard made. Must match the Cloudflare project name.
+        wrangler: { name: "lexeme" },
+      },
       routeRules: {
         "/**": { headers: crossOriginIsolation },
         // Vercel stops at the first matching route, and the built-in

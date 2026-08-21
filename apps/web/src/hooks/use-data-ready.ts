@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { loadAccountHint, saveAccountHint } from "@/lib/account-hint";
 import { SETTLE_BUDGET, useHeld } from "@/lib/settle";
-import { isSyncPaused, useSyncStatus } from "@/lib/sync-status";
+import { isSyncPaused, type TSyncStatus } from "@/lib/sync-status";
 import { usePreloadComplete } from "@/zero/preload";
 
 export type TDataReady = {
@@ -52,11 +52,10 @@ export type TDataReady = {
  *
  * The first four are the normal paths. The last should never fire.
  */
-export function useDataReady(): TDataReady {
+export function useDataReady(sync: TSyncStatus | null): TDataReady {
   const preload = usePreloadComplete();
   const [decks] = useQuery(queries.decks());
   const [logs] = useQuery(queries.reviewLogs());
-  const sync = useSyncStatus(false);
   const paused = isSyncPaused(sync);
 
   // Read once. This is what the device knew before Zero opened its store, and

@@ -4,7 +4,8 @@ import { CloudOffIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { useSyncStatus, type TSyncStatus } from "@/lib/sync-status";
+import { type TSyncStatus } from "@/lib/sync-status";
+import { useSync } from "@/zero/account";
 
 /**
  * What syncing is doing, when it is doing something worth mentioning.
@@ -22,8 +23,7 @@ import { useSyncStatus, type TSyncStatus } from "@/lib/sync-status";
  * always news.
  */
 export function SyncBanner() {
-  const { status: authStatus } = useAuth();
-  const sync = useSyncStatus(authStatus === "expired");
+  const sync = useSync();
 
   if (!sync || sync.name === "synced" || sync.name === "syncing") return null;
   return <Banner sync={sync} />;

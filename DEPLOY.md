@@ -56,13 +56,11 @@ COOKIE_DOMAIN=.lexeme.fyi
 GOOGLE_AUTH_CLIENT_ID=
 GOOGLE_AUTH_CLIENT_SECRET=
 ANTHROPIC_API_KEY=
-MIGRATE_ON_START=true
 ```
 
-`MIGRATE_ON_START` applies pending drizzle migrations at boot — the deploy that
-ships a schema change and the process that needs it are the same deploy. Set it
-to `false` and run `pnpm db:migrate` yourself if you would rather they were
-separate.
+Pending drizzle migrations are applied at boot, before the server listens —
+the deploy that ships a schema change and the process that needs it are the same
+deploy. Nothing to configure, and a restart with nothing pending is a no-op.
 
 In Google Cloud, the authorized redirect URI is
 `https://api.lexeme.fyi/api/auth/callback/google`. It points at the API, not the

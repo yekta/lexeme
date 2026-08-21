@@ -27,12 +27,6 @@ export const env = createEnv({
     PORT: z.coerce.number().int().default(3001),
 
     DATABASE_URL: z.url(),
-    /**
-     * Apply pending drizzle migrations on boot. On by default because the
-     * deploy that ships a schema change and the process that needs it are the
-     * same deploy; turn it off to run them out of band.
-     */
-    MIGRATE_ON_START: z.stringbool().default(true),
 
     BETTER_AUTH_SECRET: z.string().min(32),
     /** Public base URL of this API — where Google sends the OAuth callback. */

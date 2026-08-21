@@ -105,6 +105,14 @@ export default defineConfig({
            * This only protects anything stored as a plain Variable.
            */
           keep_vars: true,
+          /**
+           * Workers Logs, on. Without this the dashboard shows "Disabled" and a
+           * server-side failure is invisible: the app reports Better Auth's
+           * generic `FAILED_TO_GET_SESSION` and the Worker's own metrics read
+           * zero errors, because a caught exception is not an error to
+           * Cloudflare. `npx wrangler tail` needs this too.
+           */
+          observability: { enabled: true },
         },
       },
       routeRules: {

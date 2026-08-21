@@ -1,13 +1,13 @@
 import { useConnectionState } from "@rocicorp/zero/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import { SETTLE_BUDGET } from "@/lib/settle";
+import { SETTLE_BUDGET, useHeld } from "@/lib/settle";
 
 /**
  * One derived answer to "how is syncing going?".
  *
- * Several places want to know — the offline banner, and anything that would
- * otherwise sit waiting for rows that are never coming — and each interpreting
+ * Several places want to know: the offline banner, and anything that would
+ * otherwise sit waiting for rows that are never coming, and each interpreting
  * `useConnectionState()` its own way is how a two-hundred-millisecond blip
  * between reconnects ends up shoving the whole page down by a banner's height.
  *
@@ -29,6 +29,13 @@ export type TSyncStatus =
   | { name: "syncing" }
   /** No usable connection. Everything still works; writes queue. */
   | { name: "offline" }
+  /**
+   * The browser has a network but the sync service never answers. Distinct from
+   * `offline` because the cause is ours, not theirs, and the wording has to
+   * differ: telling someone with working wifi that they are offline sends them
+   * to reboot their router.
+   */
+  | { name: "unreachable" }
   /** Signed in, and sync was still turned away: the server's problem, not the user's. */
   | { name: "refused"; detail: string }
   /** The server says this session is gone. Signing in is the fix. */
@@ -42,7 +49,17 @@ function describeRejection(reason: TAuthRejection): string {
 
 /** Nothing more is coming until something changes, so waiting on sync is pointless. */
 export function isSyncPaused(status: TSyncStatus | null): boolean {
-  return status?.name === "offline" || status?.name === "refused" || status?.name === "expired";
+  return (
+    status?.name === "offline" ||
+    status?.name === "unreachable" ||
+    status?.name === "refused" ||
+    status?.name === "expired"
+  );
+}
+
+/** True when sync is working or still plausibly about to. */
+export function isSyncHealthy(status: TSyncStatus | null): boolean {
+  return status === null || status.name === "synced" || status.name === "syncing";
 }
 
 function subscribeToOnline(onChange: () => void) {
@@ -67,6 +84,14 @@ export function useSyncStatus(sessionExpired: boolean): TSyncStatus | null {
   const conn = useConnectionState();
   const online = useOnline();
 
+  // Zero retries a failed connection forever, and reports each attempt as
+  // `connecting` rather than as a failure, so a sync service that accepts the
+  // TCP connection and then never speaks looks, to this hook, exactly like one
+  // that is about to answer. Left alone it says "syncing" for the rest of the
+  // session and the UI waits on data that is never coming. Past this, a
+  // connection that has not established is a connection that is not going to.
+  const stuckConnecting = useHeld(online && conn.name !== "connected", SETTLE_BUDGET.unreachable);
+
   let current: TSyncStatus;
   if (sessionExpired) current = { name: "expired" };
   else if (conn.name === "needs-auth")
@@ -74,6 +99,7 @@ export function useSyncStatus(sessionExpired: boolean): TSyncStatus | null {
   else if (!online || conn.name === "disconnected" || conn.name === "error")
     current = { name: "offline" };
   else if (conn.name === "connected") current = { name: "synced" };
+  else if (stuckConnecting) current = { name: "unreachable" };
   else current = { name: "syncing" };
 
   return useSettledStatus(current);

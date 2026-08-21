@@ -29,7 +29,7 @@ type DraftStore = {
 const FormDraftContext = createContext<DraftStore | null>(null);
 
 export function FormDraftProvider({ children }: { children: ReactNode }) {
-  // A ref, not state — writing a draft on every keystroke must never re-render
+  // A ref, not state: writing a draft on every keystroke must never re-render
   // the tree. Forms write here while mounted and read once when they remount.
   const store = useRef(new Map<string, unknown>());
 
@@ -62,7 +62,7 @@ function useFormDraftStore() {
  * so a form keeps its values when its dialog is closed and reopened.
  *
  * It takes the exact same options as `useForm` plus two persistence keys, and
- * returns the exact same form API — define `validators`, `listeners`, etc. as
+ * returns the exact same form API: define `validators`, `listeners`, etc. as
  * usual. Give multi-instance forms (e.g. one AddCardForm per deck) an
  * `instanceId` so each keeps its own draft.
  */

@@ -3,7 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api";
 
 /**
- * Codes that describe a settled answer — retrying them just repeats the same
+ * Codes that describe a settled answer: retrying them just repeats the same
  * response, because a missing deck stays missing. Everything else (a dropped
  * connection, a 500, a timeout) is worth another go.
  */
@@ -19,8 +19,8 @@ const NON_RETRYABLE_CODES = new Set([
  * Read the error code off a thrown API error.
  *
  * Also recognises anything carrying a plain string `code`, which is what
- * `DataError` uses so a condition derived on the client — a deck that simply
- * is not in the synced set — classifies the same way a server refusal would.
+ * `DataError` uses, so a condition derived on the client (a deck that simply
+ * is not in the synced set) classifies the same way a server refusal would.
  */
 export function apiErrorCode(error: unknown): string | undefined {
   if (error instanceof ApiError) return error.code;

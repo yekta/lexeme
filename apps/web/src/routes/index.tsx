@@ -1,5 +1,6 @@
 import { RequireIdentity } from "@/components/require-identity";
 import { SettleCover } from "@/components/settle-cover";
+import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { usePersistentForm } from "@/components/form-draft-provider";
 import PlusIcon from "@/components/icons/plus-icon";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSyncStalled } from "@/zero/account";
 import { usePendingIds } from "@/zero/mutate";
 import { usePendingMutations } from "@/zero/mutate";
 import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
@@ -28,6 +30,7 @@ import { useDeckStats, useTodayStats } from "@/hooks/data/use-stats";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates } from "@/lib/query-state";
+import { usePlaceholderPhase } from "@/lib/settle";
 import { cn } from "@/lib/utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { formatDuration, intervalToDuration } from "date-fns";
@@ -64,7 +67,13 @@ export const Route = createFileRoute("/")({
 
 function HomeRoute() {
   return (
-    <RequireIdentity fallback={<SettleCover show loader />}>
+    <RequireIdentity
+      fallback={
+        <SettlingSkeleton>
+          <HomePageView isPlaceholder />
+        </SettlingSkeleton>
+      }
+    >
       <Home />
     </RequireIdentity>
   );
@@ -101,8 +110,9 @@ function Home() {
     dataStateOf(decksQuery),
     dataStateOf(deckStatsQuery),
   );
-  const isPlaceholder =
-    isPendingAuth || state === "pending" || state === "unauthorized";
+  const { isPlaceholder, showCover } = usePlaceholderPhase(
+    isPendingAuth || state === "pending" || state === "unauthorized",
+  );
 
   const hasPendingDeckMutations = usePendingMutations("decks");
   const hasPendingCardMutations = usePendingMutations("cards");
@@ -115,10 +125,10 @@ function Home() {
 
   return (
     <>
-      {/* Keep the real home mounted while Zero resolves, but do not paint its
-          disposable placeholder frame. The screen underneath reaches its final
-          shape behind the cover rather than assembling itself in view. */}
-      <SettleCover show={isPlaceholder} loader />
+      {/* Keep the real home mounted while Zero resolves. The cover hides the
+          first moments so a fast boot paints content and nothing else; past
+          that it lifts and the skeleton below does the talking. */}
+      <SettleCover show={showCover} />
       <HomePageView
         isPlaceholder={isPlaceholder}
         isError={state === "error"}
@@ -433,6 +443,7 @@ function DecksSection({
   onCreateDeck: () => void;
 }) {
   const pending = usePendingIds();
+  const isStalled = useSyncStalled();
   if (isPlaceholder) {
     return (
       <DeckWrapper>
@@ -444,6 +455,29 @@ function DecksSection({
   }
 
   if (decks.length === 0) {
+    /**
+     * Two very different situations look identical from here, and telling a
+     * user with 172 cards that they have none is the worst thing this screen
+     * can do. `stalled` is the difference: the account never reached this
+     * device and sync has stopped trying, so an empty list is our failure to
+     * load rather than a fact about their account.
+     */
+    if (isStalled) {
+      return (
+        <div className="text-center py-20 bg-background rounded-lg border border-dashed">
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            Couldn&apos;t load your decks
+          </h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto text-balance">
+            Your decks are safe but this device can&apos;t load them currently.
+          </p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </div>
+      );
+    }
+
     return (
       <div className="text-center py-20 bg-background rounded-lg border border-dashed">
         <h3 className="text-lg font-medium text-foreground mb-2">

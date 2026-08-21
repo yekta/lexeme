@@ -12,7 +12,7 @@ import { apiPost } from "@/lib/api";
  * The two model calls, as React Query mutations.
  *
  * They are the only things left in this app that are genuinely a network
- * request the user waits on — everything else reads or writes the local store —
+ * request the user waits on: everything else reads or writes the local store,
  * so they are also the only place a retry policy and an in-flight flag are
  * worth having. `@lexeme/contracts` supplies both the request shape the server
  * validates and the response shape parsed here, which is what replaced tRPC's

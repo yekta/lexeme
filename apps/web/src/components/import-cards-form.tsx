@@ -32,7 +32,7 @@ export function ImportCardsForm({
   const { data: existingCards } = useCardsByDeck(deckId);
 
   // Snapshot the existing fronts once, on mount. The form remounts each time the
-  // dialog opens, so this is always current when shown — same approach as
+  // dialog opens, so this is always current when shown: same approach as
   // AddCardForm.
   const [existingFronts] = useState(
     () => new Set(existingCards.map((c) => normalizeFront(c.front))),

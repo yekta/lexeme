@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { queries } from "@lexeme/contracts";
 import { useZeroStatus } from "@/zero/status";
 
-/** The user's learning profiles — default first, then alphabetical. */
+/** The user's learning profiles: default first, then alphabetical. */
 export function useLearningProfiles() {
   const [rows, details] = useQuery(queries.learningProfiles());
   const data = useMemo(

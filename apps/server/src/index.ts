@@ -16,7 +16,7 @@ import { zeroRoutes } from "./routes/zero.ts";
 
 /**
  * Where the drizzle migrations are, resolved from this module rather than from
- * the working directory — the two differ, and so do the two layouts. Running
+ * the working directory: the two differ, and so do the two layouts. Running
  * from source (`tsx watch src/index.ts`) they are still in `@lexeme/db`; in the
  * built bundle they sit beside `dist/`, copied there because they are read at
  * runtime rather than bundled (build.mjs).

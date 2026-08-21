@@ -20,7 +20,7 @@ export type RateArgs = {
 };
 
 export type RateResult = {
-  /** ms until the card is next due — drives same-session requeueing. */
+  /** ms until the card is next due: drives same-session requeueing. */
   intervalMs: number;
   /** The card's new FSRS fields, to merge onto the in-session card. */
   dbFields: ReturnType<typeof fsrsCardToDbRow>;
@@ -28,7 +28,7 @@ export type RateResult = {
 
 /**
  * Records a review. FSRS scheduling runs here, on the client, and the card
- * patch and its review log go to Zero as one mutation — applied to the local
+ * patch and its review log go to Zero as one mutation: applied to the local
  * store immediately and replayed to Postgres whenever the network allows, so a
  * study session works start to finish offline.
  *

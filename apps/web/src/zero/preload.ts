@@ -29,7 +29,7 @@ function subscribe(onChange: () => void) {
  *
  * Two flags rather than one because the preload is two passes, and the screens
  * care about the difference: the deck list needs the first, and the numbers on
- * it — today's counts, retention, the daily-limit deductions — need the second.
+ * it (today's counts, retention, the daily-limit deductions) need the second.
  * Waiting for both would make the deck list wait on the heaviest table in the
  * account; waiting for neither would paint "you haven't studied today" a beat
  * before the reviews land and take it back.
@@ -52,8 +52,8 @@ export function usePreloadComplete(): TPreloadState {
  * it, which is what makes a reload paint from the local store instead of
  * waiting on the network, and what makes the app work with no network at all.
  *
- * Two passes, chained. Zero's `preload` takes a ttl and nothing else — there is
- * no priority flag — so firing everything at once lets zero-cache interleave
+ * Two passes, chained. Zero's `preload` takes a ttl and nothing else: there is
+ * no priority flag, so firing everything at once lets zero-cache interleave
  * the review-log payload into the one the deck list is waiting on. Review logs
  * are by far the heaviest table (one row per answer, forever) and the last
  * thing anything needs: only the retention figure on the deck badges, today's

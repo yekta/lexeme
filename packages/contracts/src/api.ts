@@ -9,7 +9,7 @@ import { GENERATE_CARD_EXCLUDE_FRONTS_LIMIT, deckExportSchema } from "@lexeme/sh
  * router type. It is written out here instead, and it is a much smaller thing
  * to write out than it was: reads and writes are Zero synced queries and shared
  * mutators, so all that is left on HTTP is the handful of calls with no local
- * equivalent — the two model calls, which need an API key that must never reach
+ * equivalent: the two model calls, which need an API key that must never reach
  * a browser, and the export snapshot, which is a server-rendered artefact
  * rather than a view of the synced rows.
  *

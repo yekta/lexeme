@@ -24,7 +24,7 @@ custom domains on all three before setting `COOKIE_DOMAIN`.
 | Build output directory | `apps/web/dist` |
 | Root directory | (repo root) |
 
-Build-time variables — these are baked into the bundle, so nothing secret:
+Build-time variables. These are baked into the bundle, so nothing secret goes here:
 
 ```
 VITE_API_URL=https://api.lexeme.fyi
@@ -58,7 +58,7 @@ GOOGLE_AUTH_CLIENT_SECRET=
 ANTHROPIC_API_KEY=
 ```
 
-Pending drizzle migrations are applied at boot, before the server listens —
+Pending drizzle migrations are applied at boot, before the server listens:
 the deploy that ships a schema change and the process that needs it are the same
 deploy. Nothing to configure, and a restart with nothing pending is a no-op.
 
@@ -92,7 +92,7 @@ Postgres needs `wal_level=logical` for replication.
 
 1. `crossOriginIsolated` is `true` in the console on the app. If it is false the
    `_headers` file is not being served and auto-calibration will never run.
-2. Signing in works end to end, and a reload keeps you signed in — that proves
+2. Signing in works end to end, and a reload keeps you signed in: that proves
    the cookie is visible on both the app and the API.
 3. A write made in one tab appears in another. That proves zero-cache can reach
    `/api/zero/mutate` *with* the cookie; if it cannot, writes stay local
@@ -103,7 +103,7 @@ Postgres needs `wal_level=logical` for replication.
 
 The whole app used to be one TanStack Start deployment on Cloudflare Workers:
 server routes and browser bundle in a single Worker, tRPC between them, Postgres
-over `cloudflare:sockets`. Three things that Worker forced are gone with it — a
+over `cloudflare:sockets`. Three things that Worker forced are gone with it: a
 database client rebuilt per request (workerd binds sockets to the request that
 opened them), a lazily-validated environment (`process.env` is empty at module
 scope there), and `keep_vars`/`deployConfig` workarounds to stop each deploy

@@ -12,7 +12,7 @@ import { serverMutators } from "../zero.ts";
  *
  * `ctx` is derived from the verified session rather than from anything the
  * client claimed, and every shared query and mutator scopes its rows to
- * `ctx.user_id` — so a client cannot widen its own window by asking
+ * `ctx.user_id`, so a client cannot widen its own window by asking
  * differently. A 401 puts the Zero client into its needs-auth state: it keeps
  * working locally and re-syncs once the session is back.
  */

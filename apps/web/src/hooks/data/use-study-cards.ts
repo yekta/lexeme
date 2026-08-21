@@ -16,7 +16,7 @@ export type TStudyQueue = {
 
 /**
  * The cards due for study in a deck, derived from the synced rows via
- * `computeStudyBuckets` — the same function behind the deck-list badges, so the
+ * `computeStudyBuckets`: the same function behind the deck-list badges, so the
  * queue always contains exactly the cards the badges count. Order is
  * deterministic (new, then learning, then review); the study page shuffles it
  * into a session.
@@ -35,7 +35,7 @@ export function useStudyCards(deckId: string | undefined) {
 
   // Gated on the review history, not just the cards: the daily limits are
   // deducted from today's answers (`computeStudyBuckets`), so a queue built
-  // before the logs arrive is not merely a flash — it offers cards the user has
+  // before the logs arrive is not merely a flash: it offers cards the user has
   // already used up their allowance on.
   const status = useReviewStatus(
     logs.length > 0,
@@ -65,7 +65,7 @@ export function useStudyCards(deckId: string | undefined) {
     };
   }, [status.isPending, deckId, now, cards, decks, logs, profiles]);
 
-  // True when any card in the deck has a write the server hasn't confirmed —
+  // True when any card in the deck has a write the server hasn't confirmed:
   // e.g. one just rated this session. Covers the whole deck rather than just
   // `dueCards`, since a rated card leaves the due set.
   const isOptimistic = cards.some((c) => pending.has(c.id));

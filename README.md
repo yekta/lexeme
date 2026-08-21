@@ -29,8 +29,8 @@ client may see and to apply what it writes.
 ## How the data flows
 
 There is no read API and no write API. Every screen reads Zero synced queries
-against a local replica, and every write is a **shared mutator** — the same
-function, run twice: optimistically in the browser against its own store, then
+against a local replica, and every write is a **shared mutator**, the same
+function run twice: optimistically in the browser against its own store, then
 authoritatively on the server inside a Postgres transaction, with a context
 derived from the verified session rather than from anything the client claimed.
 That is also the whole of the authorization model: every query and every mutator
@@ -41,7 +41,7 @@ What is left on HTTP is only what has no local equivalent:
 | Endpoint | Why it is not a mutator |
 | --- | --- |
 | `POST /api/zero/query`, `/api/zero/mutate` | zero-cache calls these; they *are* the sync |
-| `GET /api/decks/:id/export` | a different artefact from the synced rows — no ids, no FSRS state |
+| `GET /api/decks/:id/export` | a different artefact from the synced rows, no ids, no FSRS state |
 | `POST /api/cards/generate-back`, `/generate-card` | an API key that must never reach a browser |
 | `GET /api/avatar` | cross-origin isolation drops Google's avatars; this re-serves them with a CORP header |
 | `GET,POST /api/auth/*` | Better Auth |
@@ -57,7 +57,7 @@ pnpm dev:zero-cache       # in a second terminal
 ```
 
 The web dev server proxies `/api` to the API, so everything is one origin and
-the session cookie is first-party — no CORS or cookie-domain setup to develop.
+the session cookie is first-party, no CORS or cookie-domain setup to develop.
 
 ```sh
 pnpm typecheck   # every workspace

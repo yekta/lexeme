@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Constants that only mean something in a browser. Everything the server also
- * needs — the daily study limits, the formatting locale, the suggestion cap —
+ * needs (the daily study limits, the formatting locale, the suggestion cap)
  * lives in `@lexeme/shared`, where both ends read one copy.
  */
 

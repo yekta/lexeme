@@ -7,7 +7,7 @@ import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-n
  *
  * Two jobs, and they are the same job: it is what sends a genuinely signed-out
  * visitor to the sign-in page, and it is what guarantees no `useQuery` runs
- * outside a `ZeroRoot` — the provider only mounts when there is a user, and
+ * outside a `ZeroRoot`: the provider only mounts when there is a user, and
  * `useQuery` reaches for the client from context even when disabled.
  *
  * "Has an identity" is deliberately weaker than "has a live session": an

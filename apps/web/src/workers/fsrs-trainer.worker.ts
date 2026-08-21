@@ -54,7 +54,7 @@ self.onmessage = async (event: MessageEvent<TTrainRequest>) => {
     await ensureReady();
     const fsrs = new Fsrs();
     // `computeParameters` takes ownership of the config, so it must not be
-    // freed here — the handle is already dead by the time it returns.
+    // freed here: the handle is already dead by the time it returns.
     const config = new TrainingConfig();
     config.numEpochs = NUM_EPOCHS;
     const w = fsrs.computeParameters(

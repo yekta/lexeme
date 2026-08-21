@@ -8,8 +8,8 @@ import { toastErrorOnOptimisticOperation } from "@/components/mutation-error-toa
  * Running a mutation, and knowing which rows are still in flight.
  *
  * Two things live here because they are the same moment. Zero hands back a
- * `MutatorResult` whose `client` and `server` promises both **resolve** — a
- * failure arrives as `{type: "error"}`, never as a rejection — so a bare
+ * `MutatorResult` whose `client` and `server` promises both **resolve**: a
+ * failure arrives as `{type: "error"}`, never as a rejection, so a bare
  * `await zero.mutate(...)` inside a try/catch reads like error handling and is
  * not: the catch never runs, the optimistic write is rolled back, and a form
  * that closes on success closes on failure too, silently, taking what was typed
@@ -20,7 +20,7 @@ import { toastErrorOnOptimisticOperation } from "@/components/mutation-error-toa
  * flag on every row, which is what the spinner on a card or a deck used to
  * read; Zero has no equivalent, so a mutation registers the row ids it touches
  * and clears them when the server settles. Same per-row fidelity, tracked one
- * level up — and it covers deletes, which `$synced` never could, because an
+ * level up, and it covers deletes, which `$synced` never could, because an
  * optimistically deleted row is simply gone.
  */
 
@@ -125,7 +125,7 @@ function track(
   // The authoritative run can still refuse what the optimistic one accepted: a
   // server on an older build, a row that moved underneath it, a session that
   // expired mid-flight. Zero rolls the write back when that happens, and by
-  // then the screen that issued it has usually moved on — so a toast is the
+  // then the screen that issued it has usually moved on, so a toast is the
   // only place left to say so.
   void result.server
     .then((settled) => {
@@ -145,7 +145,7 @@ export function commit(result: MutatorResult, options: TCommitOptions): void {
 }
 
 /**
- * `commit`, awaited, for callers that need to know before moving on — a form
+ * `commit`, awaited, for callers that need to know before moving on: a form
  * that should stay open and keep what was typed if the write is refused.
  * Rejects on failure so an ordinary try/catch means what it reads as.
  */

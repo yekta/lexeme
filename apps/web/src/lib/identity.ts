@@ -7,7 +7,7 @@ import { useMemo, useSyncExternalStore } from "react";
  * after that the archive is on the device, and needing a round trip to a
  * session endpoint before anything can render would put the network back on the
  * critical path it was just taken off. So the identity is cached here, and a
- * failed session probe is read as "offline", not as "signed out" — the app
+ * failed session probe is read as "offline", not as "signed out": the app
  * opens from the local store either way and syncing catches up later.
  *
  * Only an explicit sign-out clears this (along with the local Zero store), so a
@@ -64,7 +64,7 @@ function subscribeToIdentity(onStoreChange: () => void): () => void {
  *
  * It used to report `null` on that first render and the real value immediately
  * after, because the document was server-rendered and localStorage does not
- * exist there — so reporting it straight away meant a provider tree that
+ * exist there, so reporting it straight away meant a provider tree that
  * changed shape during hydration, which React answers by throwing away the
  * server's document. There is no hydration now, so the honest answer is
  * available at once, and that is one fewer frame between opening the app and

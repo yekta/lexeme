@@ -2,6 +2,8 @@ import { AddCardForm } from "@/components/add-card-form";
 import { AddOrImportCardsButton } from "@/components/add-or-import-cards-button";
 import { CardsVirtualGrid } from "@/components/cards-virtual-grid";
 import { RequireIdentity } from "@/components/require-identity";
+import { SettleCover } from "@/components/settle-cover";
+import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { DeckNotFound } from "@/components/deck-not-found";
 import { DeckSettingsMenu } from "@/components/deck-settings-menu";
 import {
@@ -29,6 +31,7 @@ import { useDeck, type TDeck } from "@/hooks/data/use-decks";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
+import { usePlaceholderPhase } from "@/lib/settle";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
@@ -39,7 +42,13 @@ export const Route = createFileRoute("/deck/$id/")({
 
 function DeckRoute() {
   return (
-    <RequireIdentity fallback={<DeckPageSkeleton />}>
+    <RequireIdentity
+      fallback={
+        <SettlingSkeleton>
+          <DeckPageSkeleton />
+        </SettlingSkeleton>
+      }
+    >
       <DeckPage />
     </RequireIdentity>
   );
@@ -53,8 +62,9 @@ function DeckPage() {
   const cardsQuery = useCardsByDeck(id);
 
   const state = mergeStates(dataStateOf(deckQuery), dataStateOf(cardsQuery));
-  const isPlaceholder =
-    isPendingAuth || state === "pending" || state === "unauthorized";
+  const { isPlaceholder, showCover } = usePlaceholderPhase(
+    isPendingAuth || state === "pending" || state === "unauthorized",
+  );
 
   const hasPendingCards = usePendingMutations("cards");
   const hasPendingDecks = usePendingMutations("decks");
@@ -66,19 +76,25 @@ function DeckPage() {
     cardsQuery.data.some((c) => pending.has(c.id));
 
   return (
-    <DeckPageView
-      isPlaceholder={isPlaceholder}
-      state={state}
-      deck={deckQuery.data}
-      cards={cardsQuery.data}
-      deckId={id}
-      isOptimistic={isOptimistic}
-      error={deckQuery.error ?? cardsQuery.error}
-      onRetry={() => {
-        deckQuery.refetch();
-        cardsQuery.refetch();
-      }}
-    />
+    <>
+      {/* Same settle boundary the home screen uses. Without it this page
+          painted its skeleton on every visit, including the ones where the
+          deck was already on the device and the wait was a single frame. */}
+      <SettleCover show={showCover} />
+      <DeckPageView
+        isPlaceholder={isPlaceholder}
+        state={state}
+        deck={deckQuery.data}
+        cards={cardsQuery.data}
+        deckId={id}
+        isOptimistic={isOptimistic}
+        error={deckQuery.error ?? cardsQuery.error}
+        onRetry={() => {
+          deckQuery.refetch();
+          cardsQuery.refetch();
+        }}
+      />
+    </>
   );
 }
 

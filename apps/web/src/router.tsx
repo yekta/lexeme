@@ -8,7 +8,7 @@ import { routeTree } from "./routeTree.gen";
  * No route has a loader: every screen reads the local Zero store, which answers
  * without a round trip, so there is nothing for a route to wait on before it
  * renders and no pending state for the router to show. Navigation is therefore
- * synchronous — which is why creating a deck and landing on it is a single
+ * synchronous, which is why creating a deck and landing on it is a single
  * frame rather than a spinner.
  */
 export function getRouter() {

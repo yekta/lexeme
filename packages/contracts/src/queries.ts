@@ -6,7 +6,7 @@ import { zql } from "./schema.ts";
 /**
  * The synced queries. The same definitions run on the client (against the local
  * store) and on the server (`/api/zero/query`), where `ctx` comes from the
- * verified session — so the `user_id` filters below ARE the access control.
+ * verified session, so the `user_id` filters below ARE the access control.
  *
  * Every one is whole-table-per-user, because that is what the app already
  * assumes: the deck badges, the study queue and the retention numbers are all

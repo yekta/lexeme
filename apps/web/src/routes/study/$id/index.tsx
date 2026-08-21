@@ -1,4 +1,6 @@
 import { RequireIdentity } from "@/components/require-identity";
+import { SettleCover } from "@/components/settle-cover";
+import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { DeckNotFound } from "@/components/deck-not-found";
 import {
   EmptyList,
@@ -32,6 +34,7 @@ import {
   type Grade,
 } from "@lexeme/shared";
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
+import { usePlaceholderPhase } from "@/lib/settle";
 import { createFileRoute } from "@tanstack/react-router";
 import confetti from "canvas-confetti";
 import { CheckCircle2 } from "lucide-react";
@@ -56,15 +59,21 @@ export const Route = createFileRoute("/study/$id/")({
 
 function StudyRoute() {
   return (
-    <RequireIdentity fallback={<StudyPageSkeleton />}>
+    <RequireIdentity
+      fallback={
+        <SettlingSkeleton>
+          <StudyPageSkeleton />
+        </SettlingSkeleton>
+      }
+    >
       <StudyPage />
     </RequireIdentity>
   );
 }
 
 /**
- * Fisher–Yates shuffle driven by a seeded PRNG (mulberry32). Deterministic —
- * the same set of cards always yields the same order — so it's safe to run
+ * Fisher-Yates shuffle driven by a seeded PRNG (mulberry32). Deterministic:
+ * the same set of cards always yields the same order, so it's safe to run
  * during render without reshuffling on every re-render.
  */
 function seededShuffle<T>(items: readonly T[], seed: string): T[] {
@@ -234,34 +243,42 @@ function StudyPage() {
   }, [isFinished]);
 
   const hasNoCards = !isPending && !!studyData && totalCards === 0;
-  const isPlaceholder =
+  // A study screen is unresolved for longer than the others: it waits on the
+  // deck, the profile, the review history and then on a queue built from all
+  // three. Every one of those is a chance to paint a card frame that is about
+  // to be replaced, which is what the cover below is for.
+  const { isPlaceholder, showCover } = usePlaceholderPhase(
     !isUnavailable &&
-    (isPending ||
-      !deckData ||
-      (!currentCard && !isFinished && !hasNoDueCards && !hasNoCards));
+      (isPending ||
+        !deckData ||
+        (!currentCard && !isFinished && !hasNoDueCards && !hasNoCards)),
+  );
 
   return (
-    <StudyPageView
-      isPlaceholder={isPlaceholder}
-      state={state}
-      deckName={deckData?.name ?? "Loading..."}
-      deckId={id}
-      error={deckQuery.error ?? studyQuery.error ?? profilesQuery.error}
-      onRetry={() => {
-        deckQuery.refetch();
-        studyQuery.refetch();
-        profilesQuery.refetch();
-      }}
-      totalCards={totalCards}
-      hasNoDueCards={hasNoDueCards}
-      isFinished={isFinished}
-      currentCard={currentCard}
-      previewLabels={previewLabels}
-      onRate={handleRate}
-      reviewedCount={reviewedCount}
-      queueLength={queue.length}
-      isOptimistic={isOptimistic}
-    />
+    <>
+      <SettleCover show={showCover} />
+      <StudyPageView
+        isPlaceholder={isPlaceholder}
+        state={state}
+        deckName={deckData?.name ?? "Loading..."}
+        deckId={id}
+        error={deckQuery.error ?? studyQuery.error ?? profilesQuery.error}
+        onRetry={() => {
+          deckQuery.refetch();
+          studyQuery.refetch();
+          profilesQuery.refetch();
+        }}
+        totalCards={totalCards}
+        hasNoDueCards={hasNoDueCards}
+        isFinished={isFinished}
+        currentCard={currentCard}
+        previewLabels={previewLabels}
+        onRate={handleRate}
+        reviewedCount={reviewedCount}
+        queueLength={queue.length}
+        isOptimistic={isOptimistic}
+      />
+    </>
   );
 }
 

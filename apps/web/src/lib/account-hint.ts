@@ -4,11 +4,11 @@
  * Zero has no "the local store has finished opening" event, and its per-query
  * `details` answer a different question than the screens are asking: `unknown`
  * means *the server has not confirmed this query*, which on a device that is
- * offline — or merely slow — never happens. Treating that as "loading" is what
+ * offline, or merely slow, never happens. Treating that as "loading" is what
  * put a skeleton over an archive sitting on disk.
  *
- * So the one question the UI actually needs answered on boot — *should this
- * device expect rows?* — is answered by the device itself. Two counts,
+ * So the device itself answers the one question the UI actually needs on
+ * boot: *should I expect rows?* Two counts,
  * rewritten whenever a screen settles. They are wrong only in the direction of
  * waiting a beat longer (an account emptied on another device) or opening
  * straight into the empty state (a first deck created elsewhere), and they heal

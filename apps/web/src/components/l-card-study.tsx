@@ -40,7 +40,7 @@ export function LCardStudy(props: TLCardStudyProps) {
   const rotateY = useMotionValue(0);
   const frontOpacity = useTransform(rotateY, (v) => (Math.abs(v) < 90 ? 1 : 0));
   const backOpacity = useTransform(rotateY, (v) => (Math.abs(v) >= 90 ? 1 : 0));
-  const baseAngle = useRef(0); // 0 or 180 — updated on flip commit
+  const baseAngle = useRef(0); // 0 or 180: updated on flip commit
 
   const commitFlip = (targetAngle: number) => {
     baseAngle.current = targetAngle;
@@ -56,7 +56,7 @@ export function LCardStudy(props: TLCardStudyProps) {
     if (isPlaceholder) return;
     // Don't interfere with button clicks
     if ((e.target as HTMLElement).closest("button")) return;
-    // Back face is locked — must use buttons to rate
+    // Back face is locked: must use buttons to rate
     if (baseAngle.current !== 0) return;
     commitFlip(180);
   };

@@ -12,7 +12,7 @@ export type ImportDeckArgs = {
 
 /**
  * Import a deck and its cards as one mutation, so the destination page renders
- * complete on first paint and the server commits both together — no orphan
+ * complete on first paint and the server commits both together, no orphan
  * empty deck if the cards fail. Zero replays it if the tab closes before the
  * server has confirmed.
  */

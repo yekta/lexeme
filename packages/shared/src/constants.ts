@@ -3,7 +3,7 @@ export const appLocale = "en-US";
 
 /**
  * Max already-suggested fronts the client sends back with a generate-card call,
- * and the ceiling the server validates that list against — one number so the
+ * and the ceiling the server validates that list against: one number so the
  * two can never disagree about what a valid request is.
  */
 export const GENERATE_CARD_EXCLUDE_FRONTS_LIMIT = 50;

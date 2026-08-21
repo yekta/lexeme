@@ -10,7 +10,7 @@ import type {
   TTrainResponse,
 } from "@/workers/fsrs-trainer.worker";
 
-/** Counted in trainable reviews, which is also the FSRS item count — the same
+/** Counted in trainable reviews, which is also the FSRS item count: the same
  * unit Anki's "400 reviews" guidance is stated in. */
 export const MIN_REVIEWS_TO_CALIBRATE = 400;
 

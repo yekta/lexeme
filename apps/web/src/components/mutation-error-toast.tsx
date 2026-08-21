@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
  *
  * Sticky and dismissed by hand, because by the time it appears the change has
  * already been rolled back on screen and whatever the user was looking at has
- * usually moved on — a notice that fades after four seconds is one they can
+ * usually moved on: a notice that fades after four seconds is one they can
  * miss entirely and never learn their edit is gone.
  */
 export function toastErrorOnOptimisticOperation({

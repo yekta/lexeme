@@ -20,7 +20,7 @@ export const deckExportSchema = z.object({
 
 export type DeckExport = z.infer<typeof deckExportSchema>;
 
-/** Filename slug for a deck export — lowercase, alnum + hyphen, length-capped. */
+/** Filename slug for a deck export: lowercase, alnum + hyphen, length-capped. */
 export function deckExportFilename(name: string): string {
   const slug = name
     .toLowerCase()

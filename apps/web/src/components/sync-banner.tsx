@@ -12,7 +12,7 @@ import { useSyncStatus, type TSyncStatus } from "@/lib/sync-status";
  * Nothing here is an error state. The archive is on the device, so being
  * offline costs nothing: decks open, cards are added, a study session runs start
  * to finish, and every write queues until the network comes back. The banner
- * exists so that is *visible* — without it the app works perfectly and gives no
+ * exists so that is *visible*: without it the app works perfectly and gives no
  * account of itself, which reads as "did that save?".
  *
  * It is in the document flow rather than floating over the page, so it can
@@ -29,9 +29,28 @@ export function SyncBanner() {
   return <Banner sync={sync} />;
 }
 
-function Banner({ sync }: { sync: Extract<TSyncStatus, { name: "offline" | "refused" | "expired" }> }) {
+function Banner({
+  sync,
+}: {
+  sync: Extract<TSyncStatus, { name: "offline" | "unreachable" | "refused" | "expired" }>;
+}) {
   const zero = useZero();
   const { signInWithGoogle } = useAuth();
+
+  // The browser has a network and the sync service still will not answer. Say
+  // that, rather than "you're offline": the user's connection is fine, and
+  // sending them to check their wifi wastes their time on our outage.
+  if (sync.name === "unreachable") {
+    return (
+      <BannerShell tone="warning">
+        <TriangleAlertIcon className="size-4 shrink-0" />
+        <span>Your decks are safe but this device can&apos;t load them currently.</span>
+        <Button size="xs" variant="outline" onClick={() => void zero.connection.connect()}>
+          Retry
+        </Button>
+      </BannerShell>
+    );
+  }
 
   // Offline is the ordinary case and the quiet one: it is not a problem, it is
   // a fact about the network, and the only thing worth saying is that nothing
@@ -40,10 +59,7 @@ function Banner({ sync }: { sync: Extract<TSyncStatus, { name: "offline" | "refu
     return (
       <BannerShell tone="muted">
         <CloudOffIcon className="size-4 shrink-0" />
-        <span>
-          You&apos;re offline. Keep going — your changes are saved on this device and
-          will sync when you&apos;re back.
-        </span>
+        <span>You&apos;re offline. Changes are saved locally and will sync when online.</span>
       </BannerShell>
     );
   }
@@ -54,10 +70,7 @@ function Banner({ sync }: { sync: Extract<TSyncStatus, { name: "offline" | "refu
     return (
       <BannerShell tone="warning">
         <TriangleAlertIcon className="size-4 shrink-0" />
-        <span>
-          You&apos;re signed out, so syncing is paused. Your decks are safe on this
-          device.
-        </span>
+        <span>You&apos;re signed out. Sync is paused but your decks are safe on this device.</span>
         <Button size="xs" variant="outline" onClick={() => void signInWithGoogle()}>
           Sign in
         </Button>
@@ -71,10 +84,7 @@ function Banner({ sync }: { sync: Extract<TSyncStatus, { name: "offline" | "refu
   return (
     <BannerShell tone="warning">
       <TriangleAlertIcon className="size-4 shrink-0" />
-      <span>
-        Syncing was refused: {sync.detail}. Your decks are safe on this device and
-        changes stay local until it&apos;s accepted.
-      </span>
+      <span>Sync was refused: {sync.detail}. Changes stay local until it&apos;s accepted.</span>
       <Button size="xs" variant="outline" onClick={() => void zero.connection.connect()}>
         Retry
       </Button>

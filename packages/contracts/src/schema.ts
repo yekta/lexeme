@@ -53,7 +53,7 @@ const learningProfiles = table("learning_profiles")
     enable_fuzz: boolean(),
     enable_short_term: boolean(),
     /**
-     * `text[]` upstream — FSRS step strings like "1m"/"10m". Not to be confused
+     * `text[]` upstream: FSRS step strings like "1m"/"10m". Not to be confused
      * with `cards.learning_steps`/`review_logs.learning_steps`, which are plain
      * integers: same column name, different type, different meaning.
      */

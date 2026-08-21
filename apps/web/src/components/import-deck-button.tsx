@@ -1,0 +1,129 @@
+import PlusIcon from "@/components/icons/plus-icon";
+import { ImportDeckForm } from "@/components/import-deck-form";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuItemText,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toastErrorOnOptimisticOperation } from "@/components/mutation-error-toast";
+import { deckExportSchema, type DeckExport } from "@lexeme/shared";
+import { ChevronDown, DownloadIcon } from "lucide-react";
+import { useRef, useState } from "react";
+
+/**
+ * Split button for the home page header: primary action creates a deck, the
+ * attached chevron opens a menu with "Import Deck" which triggers a hidden file
+ * picker. On a valid JSON file the import dialog opens with the parsed payload.
+ */
+export function CreateOrImportDeckButton({
+  isPlaceholder = false,
+  onCreate,
+  onImported,
+}: {
+  isPlaceholder?: boolean;
+  onCreate: () => void;
+  onImported: (id: string) => Promise<void> | void;
+}) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [parsed, setParsed] = useState<DeckExport | null>(null);
+
+  async function handleFile(file: File) {
+    let payload: unknown;
+    try {
+      const text = await file.text();
+      payload = JSON.parse(text);
+    } catch {
+      toastErrorOnOptimisticOperation({
+        message: "Invalid deck file",
+        description: "The selected file is not valid JSON.",
+      });
+      return;
+    }
+    const result = deckExportSchema.safeParse(payload);
+    if (!result.success) {
+      toastErrorOnOptimisticOperation({
+        message: "Invalid deck file",
+        description: "This file isn't a valid Lexeme deck export.",
+      });
+      return;
+    }
+    setParsed(result.data);
+  }
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          setIsDropdownOpen(false);
+          const file = e.target.files?.[0];
+          // Reset value so picking the same file twice still fires onChange.
+          e.target.value = "";
+          if (file) void handleFile(file);
+        }}
+      />
+      <div className="flex">
+        <Button
+          isPlaceholder={isPlaceholder}
+          onClick={onCreate}
+          className="rounded-r-none px-3.5"
+        >
+          <PlusIcon className="size-5 -ml-1.25 shrink-0" />
+          <span className="shrink min-w-0 overflow-hidden text-ellipsis">
+            Create
+          </span>
+        </Button>
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                isPlaceholder={isPlaceholder}
+                aria-label="More create options"
+                className="rounded-l-none border-l-transparent px-1.75"
+              />
+            }
+          >
+            <ChevronDown className="size-5 shrink-0 group-data-popup-open/button:rotate-180 transition" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-40">
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              closeOnClick={false}
+            >
+              <DownloadIcon className="size-5 shrink-0" />
+              <DropdownMenuItemText>Import Deck</DropdownMenuItemText>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <Dialog
+        open={parsed !== null}
+        onOpenChange={(open) => {
+          if (!open) setParsed(null);
+        }}
+      >
+        <DialogContent>
+          {parsed && (
+            <ImportDeckForm
+              parsed={parsed}
+              onAfterSubmit={async (id) => {
+                setParsed(null);
+                await onImported(id);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

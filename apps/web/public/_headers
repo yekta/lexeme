@@ -1,0 +1,26 @@
+# Cross-origin isolation, for every document this site serves.
+#
+# The FSRS optimizer is a threaded wasm build, so it needs SharedArrayBuffer,
+# which browsers only grant to a cross-origin isolated document. `require-corp`
+# is the mode Safari supports.
+#
+# This file is now load-bearing rather than a belt to some braces. The app used
+# to be rendered by a Cloudflare Worker whose route rules set these headers; it
+# is a static bundle on Pages now, so this is the only place they come from. If
+# it stops being read, auto-calibration silently declines to start and says so
+# only in a console line (see src/zero/auto-calibration.ts).
+#
+# Worth checking after a deploy: `crossOriginIsolated` in the console must be
+# true.
+#
+# The cost of `require-corp` is that cross-origin subresources without a CORP
+# header stop loading, which is why the Google avatar goes through the API's
+# /api/avatar rather than straight into an <img> — and why that endpoint answers
+# `cross-origin` rather than `same-origin`, now that it is not our origin.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# Hashed filenames, so they can never go stale.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

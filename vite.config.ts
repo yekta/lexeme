@@ -51,22 +51,22 @@ export default defineConfig({
     tanstackStart({
       srcDirectory: "src",
       /**
-       * Ship the app as a prerendered shell served for every route, rather than
-       * server-rendering each request.
+       * SPA mode is deliberately OFF on Cloudflare.
        *
-       * Nothing is lost: every screen is already `ClientOnly` (the data layer
-       * reads from Zero's local store, which does not exist on the server), so
-       * SSR was paying a round trip to deliver a skeleton. Now the document is
-       * static and the first paint never waits on the network — which is the
-       * whole point of holding the account on the device.
+       * It produces a prerendered `_shell.html` served for every route, which
+       * is the nicer shape — but the prerender needs a running server to fetch
+       * `/` from, and on the `cloudflare_module` preset Nitro provides that by
+       * spawning `npx wrangler dev`. That process watches its assets directory,
+       * so writing the shell into it triggers a reload and wrangler then sits
+       * there watching forever. The build renders the page, succeeds, and never
+       * exits — a hung deploy with a green log.
        *
-       * The server does not go away: `/api/auth`, `/api/trpc`, `/api/zero/*`
-       * and `/api/avatar` are still Nitro routes.
+       * The cost of leaving it off is small: every route is already
+       * `ClientOnly`, so the Worker renders the same empty skeleton it would
+       * have prerendered, at the edge, in single-digit milliseconds. What makes
+       * the app feel instant is that the data comes from Zero's local store
+       * rather than the network, and that is unaffected.
        */
-      spa: {
-        enabled: true,
-        prerender: { enabled: true },
-      },
     }),
     viteReact(),
     nitro({

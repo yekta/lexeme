@@ -3,7 +3,10 @@ import postgres from "postgres";
 
 import { env } from "@/env";
 import * as schema from "./schema";
-import { withRequestResource } from "./resource";
+import {
+  withRequestResource,
+  withRequestResourceResponse,
+} from "./resource";
 
 /**
  * Create the database resources for one server request.
@@ -38,4 +41,11 @@ export async function withDatabase<T>(
   run: (db: Database) => Promise<T>,
 ): Promise<T> {
   return withRequestResource(createDatabase, ({ db }) => run(db));
+}
+
+/** Keep Postgres alive through a streamed Fetch response (not just its setup). */
+export async function withDatabaseResponse(
+  run: (db: Database) => Promise<Response>,
+): Promise<Response> {
+  return withRequestResourceResponse(createDatabase, ({ db }) => run(db));
 }

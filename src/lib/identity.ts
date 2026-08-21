@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useSyncExternalStore } from "react";
+
 /**
  * Who this device is signed in as, remembered across launches.
  *
@@ -21,6 +23,7 @@
  */
 
 const KEY = "lexeme:identity";
+const CHANGE_EVENT = "lexeme:identity-change";
 
 export type TIdentity = {
   id: string;
@@ -28,26 +31,59 @@ export type TIdentity = {
   image: string | null;
 };
 
-export function loadIdentity(): TIdentity | null {
+function readIdentitySource(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
+    return localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+function parseIdentity(raw: string | null): TIdentity | null {
+  if (!raw) return null;
+  try {
     const parsed = JSON.parse(raw) as Partial<TIdentity>;
     if (typeof parsed.id !== "string" || typeof parsed.email !== "string") {
       return null;
     }
     return { id: parsed.id, email: parsed.email, image: parsed.image ?? null };
   } catch {
-    // Unparseable, or storage blocked in a private window. No identity is a
-    // perfectly good answer: the sign-in screen is the fallback.
     return null;
   }
+}
+
+function subscribeToIdentity(onStoreChange: () => void): () => void {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(CHANGE_EVENT, onStoreChange);
+  };
+}
+
+/**
+ * The remembered identity, with a hydration-stable server snapshot.
+ *
+ * SSR cannot see localStorage, so the first client render must also report no
+ * remembered identity. React checks the real browser snapshot immediately
+ * after hydration and then mounts the user's Zero client behind the settle
+ * cover. Reading localStorage from a useState initializer changes the provider
+ * tree during hydration and makes React discard the server document.
+ */
+export function useStoredIdentity(): TIdentity | null {
+  const raw = useSyncExternalStore(
+    subscribeToIdentity,
+    readIdentitySource,
+    () => null,
+  );
+  return useMemo(() => parseIdentity(raw), [raw]);
 }
 
 export function saveIdentity(identity: TIdentity): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(identity));
+    window.dispatchEvent(new Event(CHANGE_EVENT));
   } catch {
     // Private mode or quota. The app still works for this session; it just
     // won't open straight into the archive next time.
@@ -57,6 +93,7 @@ export function saveIdentity(identity: TIdentity): void {
 export function clearIdentity(): void {
   try {
     localStorage.removeItem(KEY);
+    window.dispatchEvent(new Event(CHANGE_EVENT));
   } catch {
     // Nothing to clear if storage is unavailable.
   }

@@ -19,13 +19,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { cardIdsForProfile } from "@/db/auto-calibration";
-import {
-  cardsCollection,
-  decksCollection,
-  reviewLogsCollection,
-  type LearningProfileRow,
-} from "@/db/collections";
+import { useQuery } from "@rocicorp/zero/react";
+
+import { cardIdsForProfile } from "@/zero/auto-calibration";
+import { queries } from "@/zero/queries";
+import type { TLearningProfileRow } from "@/zero/schema";
 import { useCalibrateProfile } from "@/hooks/data/use-calibrate-profile";
 import { useDecks } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
@@ -117,20 +115,17 @@ export function CalibrationFooterSection({ profileId }: { profileId: string }) {
 
 /** Cross-day reviews on this profile — the only ones FSRS can learn from. */
 function useLongTermReviewCount(profileId: string | undefined): number {
+  const [decks] = useQuery(queries.decks());
+  const [cards] = useQuery(queries.cards());
+  const [logs] = useQuery(queries.reviewLogs());
   const cardIds = profileId
-    ? cardIdsForProfile(
-        profileId,
-        decksCollection.toArray,
-        cardsCollection.toArray,
-      )
+    ? cardIdsForProfile(profileId, decks, cards)
     : new Set<string>();
-  return countTrainingItems(
-    buildCardHistories(cardIds, reviewLogsCollection.toArray),
-  );
+  return countTrainingItems(buildCardHistories(cardIds, logs));
 }
 
 function calibrationLabel(
-  profile: LearningProfileRow,
+  profile: TLearningProfileRow,
   longTermReviews: number,
 ): string {
   if (profile.last_calibrated_at) {
@@ -149,7 +144,7 @@ export function CalibrationFooter({
   profile,
   className,
 }: {
-  profile: LearningProfileRow | undefined;
+  profile: TLearningProfileRow | undefined;
   className?: string;
 }) {
   const state = useCalibrationState(profile?.id);
@@ -198,6 +193,11 @@ export function ResetCalibrationForm({
   const mutation = useCalibrateProfile();
   const { data: profiles } = useLearningProfiles();
   const { data: decks } = useDecks();
+  // The reset re-derives every card state on this profile, so it needs the
+  // whole account rather than just this deck. All three are already preloaded,
+  // so these read from the local store.
+  const [allCards] = useQuery(queries.cards());
+  const [allLogs] = useQuery(queries.reviewLogs());
   const profile = profiles?.find((p) => p.id === profileId);
   // Every deck on this profile — the blast radius of the reset.
   const deckNames = decks
@@ -212,21 +212,14 @@ export function ResetCalibrationForm({
     },
     onSubmit: async () => {
       if (!profile) return;
-      const cardIds = cardIdsForProfile(
-        profileId,
-        decksCollection.toArray,
-        cardsCollection.toArray,
-      );
-      const histories = buildCardHistories(
-        cardIds,
-        reviewLogsCollection.toArray,
-      );
+      const cardIds = cardIdsForProfile(profileId, decks, allCards);
+      const histories = buildCardHistories(cardIds, allLogs);
       await mutation.mutateAsync({
         profileId,
         w: [...FSRS_DEFAULT_W],
         // Stamped so auto-calibration doesn't immediately re-derive the very
         // parameters this reset just discarded.
-        lastCalibratedAt: new Date(),
+        lastCalibratedAt: Date.now(),
         memoryStates: memoryStatesFor(histories, FSRS_DEFAULT_W),
       });
       await onDone();

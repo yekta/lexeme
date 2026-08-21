@@ -1,12 +1,7 @@
 "use client";
 
-import {
-  cardsCollection,
-  reviewLogsCollection,
-  type CardRow,
-} from "@/db/collections";
-import { offlineAction } from "@/db/offline";
-import { toastOnPersistError } from "@/db/toast-on-error";
+import { useZero } from "@rocicorp/zero/react";
+
 import {
   dbRowToFSRSCard,
   fsrsCardToDbRow,
@@ -14,10 +9,13 @@ import {
   type FSRS,
   type Grade,
 } from "@/lib/fsrs/fsrs";
+import { commit } from "@/zero/mutate";
+import { mutators } from "@/zero/mutators";
+import type { TCardRow } from "@/zero/schema";
 
 export type RateArgs = {
   /** The card being reviewed. */
-  card: CardRow;
+  card: TCardRow;
   /** The deck's FSRS scheduler (built from its learning profile). */
   scheduler: FSRS;
   rating: Grade;
@@ -31,49 +29,21 @@ export type RateResult = {
   dbFields: ReturnType<typeof fsrsCardToDbRow>;
 };
 
-type RateInput = {
-  cardId: string;
-  cardPatch: ReturnType<typeof fsrsCardToDbRow>;
-  log: ReturnType<typeof reviewLogToDbRow>;
-  reviewLogId: string;
-  durationMs: number;
-};
-
-// Applies the card patch + review log optimistically; the `rateCard`
-// mutationFn rebuilds the server payload from these mutations, so the log row
-// carries every FSRS field a replay after a tab close needs. The card's
-// user_id rides along on the card row itself.
-const rateCardAction = offlineAction<RateInput & { userId: string }>(
-  "rateCard",
-  (v) => {
-    cardsCollection.update(v.cardId, (c) => {
-      Object.assign(c, v.cardPatch);
-    });
-    reviewLogsCollection.insert({
-      id: v.reviewLogId,
-      card_id: v.cardId,
-      user_id: v.userId,
-      rating: v.log.rating,
-      state: v.log.state,
-      due: v.log.due,
-      stability: v.log.stability,
-      difficulty: v.log.difficulty,
-      scheduled_days: v.log.scheduled_days,
-      learning_steps: v.log.learning_steps,
-      review: v.log.review,
-      duration_ms: v.durationMs,
-      created_at: new Date(),
-    });
-  },
-);
-
 /**
- * Records a review. FSRS scheduling runs here on the client, the new card
- * state and review log are applied optimistically across both collections in
- * one durable transaction, and the server persists them in the background. The
- * result is returned synchronously so the study session can advance immediately.
+ * Records a review. FSRS scheduling runs here, on the client, and the card
+ * patch and its review log go to Zero as one mutation — applied to the local
+ * store immediately and replayed to Postgres whenever the network allows, so a
+ * study session works start to finish offline.
+ *
+ * Every timestamp is computed here and passed explicitly, so the optimistic run
+ * and the authoritative one cannot disagree about when the review happened.
+ *
+ * The result is returned synchronously so the session can advance without
+ * waiting for anything.
  */
 export function useRateCard() {
+  const zero = useZero();
+
   const rate = ({
     card,
     scheduler,
@@ -86,16 +56,27 @@ export function useRateCard() {
     const log = reviewLogToDbRow(result.log, card.id, durationMs);
     const reviewLogId = crypto.randomUUID();
 
-    const tx = rateCardAction({
-      cardId: card.id,
-      userId: card.user_id,
-      cardPatch,
-      log,
-      reviewLogId,
-      durationMs,
-    });
-
-    toastOnPersistError(tx, "Failed to save rating");
+    commit(
+      zero.mutate(
+        mutators.card.rate({
+          card_id: card.id,
+          review_log_id: reviewLogId,
+          duration_ms: durationMs,
+          card: cardPatch,
+          log: {
+            rating: log.rating,
+            state: log.state,
+            due: log.due,
+            stability: log.stability,
+            difficulty: log.difficulty,
+            scheduled_days: log.scheduled_days,
+            learning_steps: log.learning_steps,
+            review: log.review,
+          },
+        }),
+      ),
+      { kind: "cards", rows: [card.id], message: "Failed to save rating" },
+    );
 
     return {
       intervalMs: result.card.due.getTime() - now.getTime(),

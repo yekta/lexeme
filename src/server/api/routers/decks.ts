@@ -6,153 +6,19 @@ import {
   DECK_EXPORT_VERSION,
   type DeckExport,
 } from "@/lib/deck-export";
-import { requireDeck, requireProfile } from "@/server/api/access";
+import { requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { cards, decks } from "@/server/db/schema";
+import { cards } from "@/server/db/schema";
 
+/**
+ * What is left on tRPC: the export snapshot.
+ *
+ * Deck reads and writes are Zero synced queries and shared mutators now. Export
+ * stays here because it is a server-rendered artefact rather than a view of the
+ * synced rows — it strips ids, FSRS state and the profile reference so a
+ * re-import starts fresh.
+ */
 export const decksRouter = createTRPCRouter({
-  /** Full deck list for the client's query collection (src/db/collections.ts). */
-  list: protectedProcedure.query(({ ctx }) =>
-    ctx.db.select().from(decks).where(eq(decks.user_id, ctx.session.user.id)),
-  ),
-
-  create: protectedProcedure
-    .input(
-      z.object({
-        id: z.uuid(),
-        name: z.string().trim().min(1),
-        description: z.string().trim(),
-        learning_profile_id: z.uuid(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await requireProfile({
-        db: ctx.db,
-        userId: ctx.session.user.id,
-        profileId: input.learning_profile_id,
-      });
-
-      // The id is generated on the client so it can be used immediately for
-      // the optimistic row and navigation; we just persist it here.
-      // onConflictDoNothing keeps the durable-outbox replay idempotent: a
-      // retry after a prior success is a no-op, not a duplicate-key error.
-      return ctx.db.transaction(async (tx) => {
-        await tx
-          .insert(decks)
-          .values({
-            id: input.id,
-            user_id: ctx.session.user.id,
-            name: input.name,
-            description: input.description,
-            learning_profile_id: input.learning_profile_id,
-          })
-          .onConflictDoNothing();
-      });
-    }),
-
-  update: protectedProcedure
-    .input(
-      z.object({
-        id: z.uuid(),
-        name: z.string().trim().min(1),
-        description: z.string().trim(),
-        learning_profile_id: z.uuid(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await requireDeck({
-        db: ctx.db,
-        deckId: input.id,
-        userId: ctx.session.user.id,
-      });
-      await requireProfile({
-        db: ctx.db,
-        profileId: input.learning_profile_id,
-        userId: ctx.session.user.id,
-      });
-      return ctx.db.transaction(async (tx) => {
-        await tx
-          .update(decks)
-          .set({
-            name: input.name,
-            description: input.description,
-            learning_profile_id: input.learning_profile_id,
-          })
-          .where(eq(decks.id, input.id));
-      });
-    }),
-
-  delete: protectedProcedure
-    .input(z.object({ id: z.uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      await requireDeck({
-        db: ctx.db,
-        deckId: input.id,
-        userId: ctx.session.user.id,
-      });
-      return ctx.db.transaction(async (tx) => {
-        await tx.delete(decks).where(eq(decks.id, input.id));
-      });
-    }),
-
-  /**
-   * Create a deck and all its cards atomically. Used by the import flow so
-   * either the whole deck lands or nothing does — no orphan empty decks if
-   * the card insert fails halfway.
-   */
-  import: protectedProcedure
-    .input(
-      z.object({
-        id: z.uuid(),
-        name: z.string().trim().min(1),
-        description: z.string().trim(),
-        learning_profile_id: z.uuid(),
-        cards: z.array(
-          z.object({
-            id: z.uuid(),
-            front: z.string().trim().min(1),
-            back: z.string().trim().min(1),
-          }),
-        ),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await requireProfile({
-        db: ctx.db,
-        userId: ctx.session.user.id,
-        profileId: input.learning_profile_id,
-      });
-
-      // onConflictDoNothing on every insert keeps an outbox replay of this
-      // import idempotent (a retry after a prior success is a no-op).
-      return ctx.db.transaction(async (tx) => {
-        await tx
-          .insert(decks)
-          .values({
-            id: input.id,
-            user_id: ctx.session.user.id,
-            name: input.name,
-            description: input.description,
-            learning_profile_id: input.learning_profile_id,
-          })
-          .onConflictDoNothing();
-        if (input.cards.length > 0) {
-          await tx
-            .insert(cards)
-            .values(
-              input.cards.map((c) => ({
-                id: c.id,
-                deck_id: input.id,
-                user_id: ctx.session.user.id,
-                front: c.front,
-                back: c.back,
-              })),
-            )
-            .onConflictDoNothing();
-        }
-      });
-    }),
-
   /**
    * Snapshot a deck and its cards as a portable payload. Strips ids, FSRS
    * state, and learning-profile reference so a re-import starts fresh and

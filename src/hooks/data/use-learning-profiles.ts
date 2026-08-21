@@ -1,22 +1,23 @@
 "use client";
 
-import { useLiveQuery } from "@tanstack/react-db";
+import { useQuery } from "@rocicorp/zero/react";
 import { useMemo } from "react";
 
-import { learningProfilesCollection, liveStatus } from "@/db/collections";
+import { queries } from "@/zero/queries";
+import { zeroStatus } from "@/zero/status";
 
 /** The user's learning profiles — default first, then alphabetical. */
 export function useLearningProfiles() {
-  const lq = useLiveQuery((q) => q.from({ profile: learningProfilesCollection }));
+  const [rows, details] = useQuery(queries.learningProfiles());
   const data = useMemo(
     () =>
-      [...(lq.data ?? [])].sort((a, b) => {
+      [...rows].sort((a, b) => {
         if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
         return a.name.localeCompare(b.name);
       }),
-    [lq.data],
+    [rows],
   );
-  return { data, ...liveStatus(lq, learningProfilesCollection) };
+  return { data, ...zeroStatus(data.length > 0, details) };
 }
 
 export function useDefaultLearningProfile() {

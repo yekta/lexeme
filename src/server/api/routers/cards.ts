@@ -5,93 +5,23 @@ import { z } from "zod";
 import { GENERATE_CARD_EXCLUDE_FRONTS_LIMIT } from "@/lib/constants";
 import { generateBack } from "@/server/ai/generate-back";
 import { generateCard } from "@/server/ai/generate-card";
-import { requireCard, requireDeck } from "@/server/api/access";
+import { requireDeck } from "@/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { cards, reviewLogs } from "@/server/db/schema";
+import { cards } from "@/server/db/schema";
 
-const cardState = z.enum(["new", "learning", "review", "relearning"]);
 const GENERATE_CARD_BACK_CONTEXT_LIMIT = 20;
 const GENERATE_CARD_FRONT_CONTEXT_LIMIT = 10_000;
 
+/**
+ * What is left on tRPC: the two AI generators.
+ *
+ * Reads and writes moved to Zero (src/zero/) — they are synced queries and
+ * shared mutators now, so the client answers them from its local store instead
+ * of over the wire. These two stay because they have no local equivalent: they
+ * call a model with an API key that must never reach a browser, and they read
+ * deck context the client already has only to keep the prompt server-side.
+ */
 export const cardsRouter = createTRPCRouter({
-  /** Every card the user owns, for the client's query collection. */
-  list: protectedProcedure.query(({ ctx }) =>
-    ctx.db.select().from(cards).where(eq(cards.user_id, ctx.session.user.id)),
-  ),
-
-  create: protectedProcedure
-    .input(
-      z.object({
-        deckId: z.uuid(),
-        cards: z
-          .array(
-            z.object({
-              id: z.uuid(),
-              front: z.string().trim().min(1),
-              back: z.string().trim().min(1),
-            }),
-          )
-          .min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await requireDeck({
-        db: ctx.db,
-        deckId: input.deckId,
-        userId: ctx.session.user.id,
-      });
-
-      return ctx.db.transaction(async (tx) => {
-        await tx
-          .insert(cards)
-          .values(
-            input.cards.map((c) => ({
-              id: c.id,
-              deck_id: input.deckId,
-              user_id: ctx.session.user.id,
-              front: c.front,
-              back: c.back,
-            })),
-          )
-          .onConflictDoNothing();
-      });
-    }),
-
-  update: protectedProcedure
-    .input(
-      z.object({
-        id: z.uuid(),
-        front: z.string().trim().min(1),
-        back: z.string().trim().min(1),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await requireCard({
-        db: ctx.db,
-        cardId: input.id,
-        userId: ctx.session.user.id,
-      });
-      return ctx.db.transaction(async (tx) => {
-        await tx
-          .update(cards)
-          .set({ front: input.front, back: input.back })
-          .where(eq(cards.id, input.id));
-      });
-    }),
-
-  delete: protectedProcedure
-    .input(z.object({ id: z.uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      await requireCard({
-        db: ctx.db,
-        cardId: input.id,
-        userId: ctx.session.user.id,
-      });
-      return ctx.db.transaction(async (tx) => {
-        await tx.delete(cards).where(eq(cards.id, input.id));
-      });
-    }),
-
   generateBack: protectedProcedure
     .input(
       z.object({
@@ -172,68 +102,6 @@ export const cardsRouter = createTRPCRouter({
         existingFronts: existingFronts.map((c) => c.front),
         rejectedFronts: input.excludeFronts,
         recentCards,
-      });
-    }),
-
-  rate: protectedProcedure
-    .input(
-      z.object({
-        cardId: z.uuid(),
-        reviewLogId: z.uuid(),
-        durationMs: z.number().int().min(0),
-        card: z.object({
-          due: z.date(),
-          stability: z.number(),
-          difficulty: z.number(),
-          scheduled_days: z.number().int(),
-          reps: z.number().int(),
-          lapses: z.number().int(),
-          state: cardState,
-          learning_steps: z.number().int(),
-          last_review: z.date().nullable(),
-        }),
-        log: z.object({
-          rating: z.number().int(),
-          state: cardState,
-          due: z.date(),
-          stability: z.number(),
-          difficulty: z.number(),
-          scheduled_days: z.number().int(),
-          learning_steps: z.number().int(),
-          review: z.date(),
-        }),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      await requireCard({
-        db: ctx.db,
-        cardId: input.cardId,
-        userId: ctx.session.user.id,
-      });
-
-      return ctx.db.transaction(async (tx) => {
-        await tx
-          .update(cards)
-          .set(input.card)
-          .where(eq(cards.id, input.cardId));
-
-        await tx
-          .insert(reviewLogs)
-          .values({
-            id: input.reviewLogId,
-            card_id: input.cardId,
-            user_id: ctx.session.user.id,
-            rating: input.log.rating,
-            state: input.log.state,
-            due: input.log.due,
-            stability: input.log.stability,
-            difficulty: input.log.difficulty,
-            scheduled_days: input.log.scheduled_days,
-            learning_steps: input.log.learning_steps,
-            review: input.log.review,
-            duration_ms: input.durationMs,
-          })
-          .onConflictDoNothing();
       });
     }),
 });

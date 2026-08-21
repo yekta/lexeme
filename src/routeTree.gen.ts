@@ -14,6 +14,8 @@ import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as ApiAvatarRouteImport } from './routes/api/avatar'
 import { Route as StudyIdIndexRouteImport } from './routes/study/$id/index'
 import { Route as DeckIdIndexRouteImport } from './routes/deck/$id/index'
+import { Route as ApiZeroQueryRouteImport } from './routes/api/zero/query'
+import { Route as ApiZeroMutateRouteImport } from './routes/api/zero/mutate'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api/trpc/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
@@ -42,6 +44,16 @@ const DeckIdIndexRoute = DeckIdIndexRouteImport.update({
   path: '/deck/$id/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiZeroQueryRoute = ApiZeroQueryRouteImport.update({
+  id: '/api/zero/query',
+  path: '/api/zero/query',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiZeroMutateRoute = ApiZeroMutateRouteImport.update({
+  id: '/api/zero/mutate',
+  path: '/api/zero/mutate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   id: '/api/trpc/$',
   path: '/api/trpc/$',
@@ -59,6 +71,8 @@ export interface FileRoutesByFullPath {
   '/sign-in/': typeof SignInIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/api/zero/mutate': typeof ApiZeroMutateRoute
+  '/api/zero/query': typeof ApiZeroQueryRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
 }
@@ -68,6 +82,8 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/api/zero/mutate': typeof ApiZeroMutateRoute
+  '/api/zero/query': typeof ApiZeroQueryRoute
   '/deck/$id': typeof DeckIdIndexRoute
   '/study/$id': typeof StudyIdIndexRoute
 }
@@ -78,6 +94,8 @@ export interface FileRoutesById {
   '/sign-in/': typeof SignInIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/api/zero/mutate': typeof ApiZeroMutateRoute
+  '/api/zero/query': typeof ApiZeroQueryRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
 }
@@ -89,6 +107,8 @@ export interface FileRouteTypes {
     | '/sign-in/'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/api/zero/mutate'
+    | '/api/zero/query'
     | '/deck/$id/'
     | '/study/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +118,8 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/api/zero/mutate'
+    | '/api/zero/query'
     | '/deck/$id'
     | '/study/$id'
   id:
@@ -107,6 +129,8 @@ export interface FileRouteTypes {
     | '/sign-in/'
     | '/api/auth/$'
     | '/api/trpc/$'
+    | '/api/zero/mutate'
+    | '/api/zero/query'
     | '/deck/$id/'
     | '/study/$id/'
   fileRoutesById: FileRoutesById
@@ -117,6 +141,8 @@ export interface RootRouteChildren {
   SignInIndexRoute: typeof SignInIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
+  ApiZeroMutateRoute: typeof ApiZeroMutateRoute
+  ApiZeroQueryRoute: typeof ApiZeroQueryRoute
   DeckIdIndexRoute: typeof DeckIdIndexRoute
   StudyIdIndexRoute: typeof StudyIdIndexRoute
 }
@@ -158,6 +184,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeckIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/zero/query': {
+      id: '/api/zero/query'
+      path: '/api/zero/query'
+      fullPath: '/api/zero/query'
+      preLoaderRoute: typeof ApiZeroQueryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/zero/mutate': {
+      id: '/api/zero/mutate'
+      path: '/api/zero/mutate'
+      fullPath: '/api/zero/mutate'
+      preLoaderRoute: typeof ApiZeroMutateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/trpc/$': {
       id: '/api/trpc/$'
       path: '/api/trpc/$'
@@ -181,6 +221,8 @@ const rootRouteChildren: RootRouteChildren = {
   SignInIndexRoute: SignInIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
+  ApiZeroMutateRoute: ApiZeroMutateRoute,
+  ApiZeroQueryRoute: ApiZeroQueryRoute,
   DeckIdIndexRoute: DeckIdIndexRoute,
   StudyIdIndexRoute: StudyIdIndexRoute,
 }

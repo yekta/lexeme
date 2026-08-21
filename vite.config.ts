@@ -50,6 +50,23 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart({
       srcDirectory: "src",
+      /**
+       * Ship the app as a prerendered shell served for every route, rather than
+       * server-rendering each request.
+       *
+       * Nothing is lost: every screen is already `ClientOnly` (the data layer
+       * reads from Zero's local store, which does not exist on the server), so
+       * SSR was paying a round trip to deliver a skeleton. Now the document is
+       * static and the first paint never waits on the network — which is the
+       * whole point of holding the account on the device.
+       *
+       * The server does not go away: `/api/auth`, `/api/trpc`, `/api/zero/*`
+       * and `/api/avatar` are still Nitro routes.
+       */
+      spa: {
+        enabled: true,
+        prerender: { enabled: true },
+      },
     }),
     viteReact(),
     nitro({

@@ -1,4 +1,5 @@
 import { ClientOnly } from "@/components/client-only";
+import { RequireIdentity } from "@/components/require-identity";
 import { DeckNotFound } from "@/components/deck-not-found";
 import {
   EmptyList,
@@ -16,7 +17,7 @@ import { Navbar } from "@/components/navbar";
 import { NoAccess } from "@/components/no-access";
 import OptimisticIndicator from "@/components/optimistic-indicator";
 import { LinkButton } from "@/components/ui/button";
-import { isRowOptimistic } from "@/db/collections";
+import { usePendingIds } from "@/zero/mutate";
 import { useDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useRateCard } from "@/hooks/data/use-rate-card";
@@ -57,7 +58,9 @@ export const Route = createFileRoute("/study/$id/")({
 function StudyRoute() {
   return (
     <ClientOnly fallback={<StudyPageSkeleton />}>
-      <StudyPage />
+      <RequireIdentity fallback={<StudyPageSkeleton />}>
+        <StudyPage />
+      </RequireIdentity>
     </ClientOnly>
   );
 }
@@ -136,8 +139,9 @@ function StudyPage() {
     isPendingAuth || state === "pending" || state === "unauthorized";
   const totalCards = studyData?.totalCards || 0;
 
+  const pending = usePendingIds();
   const isOptimistic =
-    (deckData ? isRowOptimistic(deckData) : false) || studyQuery.isOptimistic;
+    (deckData ? pending.has(deckData.id) : false) || studyQuery.isOptimistic;
 
   const initialQueue = useMemo<TQueueItem[]>(() => {
     const cards = studyData?.dueCards ?? [];

@@ -1,7 +1,7 @@
 "use client";
 
 import { LCardManage } from "@/components/l-card-manage";
-import { isRowOptimistic } from "@/db/collections";
+import { usePendingIds } from "@/zero/mutate";
 import { type TCard } from "@/hooks/data/use-cards";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
@@ -23,6 +23,9 @@ export function CardsVirtualGrid({
 }) {
   const isMobile = useIsMobile();
   const columns = isMobile ? 1 : 2;
+  // Read once for the whole grid and test membership per card, rather than
+  // subscribing from every tile.
+  const pending = usePendingIds();
 
   // Chunk the flat card list into rows of `columns` cards each. Each virtual
   // item is one row, so rows in the same row stay height-matched exactly like
@@ -98,7 +101,7 @@ export function CardsVirtualGrid({
                     back={card.back}
                     createdAt={card.created_at}
                     updatedAt={card.updated_at}
-                    isOptimistic={isRowOptimistic(card)}
+                    isOptimistic={pending.has(card.id)}
                   />
                 ))}
               </div>

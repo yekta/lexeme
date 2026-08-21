@@ -1,4 +1,5 @@
 import { ClientOnly } from "@/components/client-only";
+import { RequireIdentity } from "@/components/require-identity";
 import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { usePersistentForm } from "@/components/form-draft-provider";
 import PlusIcon from "@/components/icons/plus-icon";
@@ -19,8 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isRowOptimistic } from "@/db/collections";
-import { usePendingMutations } from "@/db/pending-mutations";
+import { usePendingIds } from "@/zero/mutate";
+import { usePendingMutations } from "@/zero/mutate";
 import { useCreateDeck, useDecks, type TDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useDeckStats, useTodayStats } from "@/hooks/data/use-stats";
@@ -64,7 +65,9 @@ export const Route = createFileRoute("/")({
 function HomeRoute() {
   return (
     <ClientOnly fallback={<HomeSkeleton />}>
-      <Home />
+      <RequireIdentity fallback={<HomeSkeleton />}>
+        <Home />
+      </RequireIdentity>
     </ClientOnly>
   );
 }
@@ -109,10 +112,11 @@ function Home() {
 
   const hasPendingDeckMutations = usePendingMutations("decks");
   const hasPendingCardMutations = usePendingMutations("cards");
+  const pending = usePendingIds();
   const isOptimistic =
     hasPendingDeckMutations ||
     hasPendingCardMutations ||
-    decks.some(isRowOptimistic) ||
+    decks.some((d) => pending.has(d.id)) ||
     deckStatsRows.some((r) => r.optimistic);
 
   return (
@@ -428,6 +432,7 @@ function DecksSection({
   getDeckStats: (deckId: string) => TDeckStats;
   onCreateDeck: () => void;
 }) {
+  const pending = usePendingIds();
   if (isPlaceholder) {
     return (
       <DeckWrapper>
@@ -472,7 +477,7 @@ function DecksSection({
             dueCount={stats.due}
             studyHref={`/study/${deck.id}`}
             manageHref={`/deck/${deck.id}`}
-            isOptimistic={isRowOptimistic(deck) || stats.optimistic}
+            isOptimistic={pending.has(deck.id) || stats.optimistic}
           />
         );
       })}

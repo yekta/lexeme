@@ -1,132 +1,104 @@
 "use client";
 
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useQuery, useZero } from "@rocicorp/zero/react";
 import { useMemo } from "react";
 
-import {
-  cardsCollection,
-  liveStatus,
-  newCardRow,
-  type CardRow,
-} from "@/db/collections";
-import { offlineAction } from "@/db/offline";
-import { trackPending } from "@/db/pending-mutations";
-import { toastOnPersistError } from "@/db/toast-on-error";
-import { useAuth } from "@/hooks/use-auth";
+import { commit } from "@/zero/mutate";
+import { mutators } from "@/zero/mutators";
+import { queries } from "@/zero/queries";
+import type { TCardRow } from "@/zero/schema";
+import { zeroStatus } from "@/zero/status";
 
-export type TCard = CardRow;
-
-const insertCardsAction = offlineAction<CardRow[]>("insertCards", (rows) => {
-  cardsCollection.insert(rows);
-});
-
-const updateCardAction = offlineAction<{ id: string; front: string; back: string }>(
-  "updateCard",
-  (v) => {
-    cardsCollection.update(v.id, (c) => {
-      c.front = v.front;
-      c.back = v.back;
-    });
-  },
-);
-
-const deleteCardAction = offlineAction<{ id: string }>("deleteCard", (v) => {
-  cardsCollection.delete(v.id);
-});
+export type TCard = TCardRow;
 
 /** Cards in a deck, newest first. */
 export function useCardsByDeck(deckId: string | undefined) {
-  const lq = useLiveQuery(
-    (q) =>
-      q
-        .from({ card: cardsCollection })
-        .where(({ card }) => eq(card.deck_id, deckId ?? "")),
-    [deckId],
+  const [rows, details] = useQuery(
+    deckId ? queries.cardsByDeck({ deck_id: deckId }) : false,
   );
   const data = useMemo(
-    () =>
-      [...(lq.data ?? [])].sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      ),
-    [lq.data],
+    () => [...(rows ?? [])].sort((a, b) => b.created_at - a.created_at),
+    [rows],
   );
-  return { data, ...liveStatus(lq, cardsCollection) };
+  return { data, ...zeroStatus(data.length > 0, details) };
 }
 
 export function useCreateCard() {
-  const { user } = useAuth();
+  const zero = useZero();
   return {
     mutateAsync: async (input: {
       deckId: string;
       front: string;
       back: string;
     }) => {
-      if (!user) throw new Error("Not signed in.");
       const id = crypto.randomUUID();
-      const tx = insertCardsAction([
-        newCardRow({
-          id,
-          deckId: input.deckId,
-          userId: user.id,
-          front: input.front,
-          back: input.back,
-        }),
-      ]);
-      toastOnPersistError(tx, "Failed to create card");
+      commit(
+        zero.mutate(
+          mutators.card.insert({
+            deck_id: input.deckId,
+            cards: [{ id, front: input.front, back: input.back }],
+          }),
+        ),
+        { kind: "cards", rows: [id], message: "Failed to create card" },
+      );
       return id;
     },
   };
 }
 
 /**
- * Bulk-insert cards into a deck. The `insertCards` mutationFn groups by deck
- * and dispatches a single `cards.create` per deck, so this stays one server
- * round-trip regardless of card count.
+ * Bulk-insert cards into a deck. One mutation regardless of card count, so a
+ * paste of five hundred cards is a single optimistic write and a single trip to
+ * the server.
  */
 export function useImportCards() {
-  const { user } = useAuth();
+  const zero = useZero();
   return {
     mutate: (input: {
       deckId: string;
       cards: { front: string; back: string }[];
     }) => {
-      if (!user) throw new Error("Not signed in.");
-      const rows = input.cards.map((c) =>
-        newCardRow({
-          id: crypto.randomUUID(),
-          deckId: input.deckId,
-          userId: user.id,
-          front: c.front,
-          back: c.back,
-        }),
+      const cards = input.cards.map((c) => ({
+        id: crypto.randomUUID(),
+        front: c.front,
+        back: c.back,
+      }));
+      commit(
+        zero.mutate(
+          mutators.card.insert({ deck_id: input.deckId, cards }),
+        ),
+        {
+          kind: "cards",
+          rows: cards.map((c) => c.id),
+          message: "Failed to import cards",
+        },
       );
-      const tx = insertCardsAction(rows);
-      toastOnPersistError(tx, "Failed to import cards");
     },
   };
 }
 
 export function useUpdateCard() {
+  const zero = useZero();
   return {
-    mutateAsync: async (input: {
-      id: string;
-      deckId: string;
-      front: string;
-      back: string;
-    }) => {
-      const tx = updateCardAction(input);
-      toastOnPersistError(tx, "Failed to update card");
+    mutateAsync: async (input: { id: string; front: string; back: string }) => {
+      commit(zero.mutate(mutators.card.update(input)), {
+        kind: "cards",
+        rows: [input.id],
+        message: "Failed to update card",
+      });
     },
   };
 }
 
 export function useDeleteCard() {
+  const zero = useZero();
   return {
-    mutateAsync: async (input: { id: string; deckId: string }) => {
-      const tx = deleteCardAction(input);
-      trackPending("cards", tx);
-      toastOnPersistError(tx, "Failed to delete card");
+    mutateAsync: async (input: { id: string }) => {
+      commit(zero.mutate(mutators.card.delete({ id: input.id })), {
+        kind: "cards",
+        rows: [input.id],
+        message: "Failed to delete card",
+      });
     },
   };
 }

@@ -7,7 +7,7 @@ import { NowProvider } from "@/components/now-provider";
 import { PageNotFound } from "@/components/page-not-found";
 import { SuggestionProvider } from "@/components/suggestion-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { CollectionsPreloader } from "@/db/collections-preloader";
+import { ZeroRoot } from "@/components/zero-root";
 import { DEFAULT_THEME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { TRPCReactProvider } from "@/trpc/react";
@@ -80,14 +80,18 @@ function RootComponent() {
           enableSystem
         >
           <TRPCReactProvider>
-            <CollectionsPreloader />
-            <NowProvider>
-              <FormDraftProvider>
-                <SuggestionProvider>
-                  <Outlet />
-                </SuggestionProvider>
-              </FormDraftProvider>
-            </NowProvider>
+            {/* Zero owns reads, writes and the local replica. It mounts only
+                once this device has an identity; `RequireIdentity` is what
+                keeps data screens from rendering before then. */}
+            <ZeroRoot>
+              <NowProvider>
+                <FormDraftProvider>
+                  <SuggestionProvider>
+                    <Outlet />
+                  </SuggestionProvider>
+                </FormDraftProvider>
+              </NowProvider>
+            </ZeroRoot>
             <Toaster closeButton position="bottom-right" />
           </TRPCReactProvider>
         </ThemeProvider>

@@ -1,4 +1,4 @@
-import type { ReviewLogRow } from "@/db/collections";
+import type { TReviewLogRow } from "@/zero/schema";
 
 /** One card's review history, in the flat form both the optimizer and the
  * replay consume. */
@@ -37,9 +37,9 @@ function dayIndex(ms: number): number {
 /** Per-card histories for `cardIds`. Cards with no logs are omitted. */
 export function buildCardHistories(
   cardIds: ReadonlySet<string>,
-  logs: readonly ReviewLogRow[],
+  logs: readonly TReviewLogRow[],
 ): TCardHistory[] {
-  const byCard = new Map<string, ReviewLogRow[]>();
+  const byCard = new Map<string, TReviewLogRow[]>();
   for (const log of logs) {
     if (!cardIds.has(log.card_id)) continue;
     // Outside 1..4 isn't a gradeable answer; it would poison the fit.

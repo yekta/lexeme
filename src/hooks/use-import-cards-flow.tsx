@@ -2,7 +2,7 @@
 
 import { ImportCardsForm } from "@/components/import-cards-form";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
+import { toastErrorOnOptimisticOperation } from "@/components/mutation-error-toast";
 import { cardsImportSchema } from "@/lib/cards-import";
 import { useRef, useState } from "react";
 

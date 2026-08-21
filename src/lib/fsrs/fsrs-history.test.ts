@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ReviewLogRow } from "@/db/collections";
+import type { TReviewLogRow } from "@/zero/schema";
 import {
   buildCardHistories,
   buildTrainingSet,
@@ -171,7 +171,7 @@ test("keeps every item's card id aligned with its reviews", () => {
 
 test("counts day boundaries crossed, not elapsed hours", () => {
   const log = (id: string, rating: number, review: Date) =>
-    ({ id, card_id: "a", rating, review }) as unknown as ReviewLogRow;
+    ({ id, card_id: "a", rating, review }) as unknown as TReviewLogRow;
 
   const [built] = buildCardHistories(
     new Set(["a"]),
@@ -190,7 +190,7 @@ test("counts day boundaries crossed, not elapsed hours", () => {
 
 test("orders a card's reviews by time before deriving deltas", () => {
   const log = (id: string, review: Date) =>
-    ({ id, card_id: "a", rating: 3, review }) as unknown as ReviewLogRow;
+    ({ id, card_id: "a", rating: 3, review }) as unknown as TReviewLogRow;
 
   const [built] = buildCardHistories(
     new Set(["a"]),

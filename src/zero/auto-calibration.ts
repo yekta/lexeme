@@ -1,14 +1,7 @@
 "use client";
 
-import { calibrateProfileAction } from "@/db/calibrate-profile";
-import {
-  cardsCollection,
-  decksCollection,
-  learningProfilesCollection,
-  reviewLogsCollection,
-  type LearningProfileRow,
-  type ReviewLogRow,
-} from "@/db/collections";
+import type { Zero } from "@rocicorp/zero";
+
 import {
   setCalibrationState,
   type TCalibrationState,
@@ -20,6 +13,13 @@ import {
   countTrainableCards,
   countTrainingItems,
 } from "@/lib/fsrs/fsrs-history";
+import { mutators } from "@/zero/mutators";
+import { queries } from "@/zero/queries";
+import type {
+  TLearningProfileRow,
+  TReviewLogRow,
+  TSchema,
+} from "@/zero/schema";
 
 /** Leave first paint alone before spending CPU on training. */
 const IDLE_TIMEOUT_MS = 10_000;
@@ -42,8 +42,8 @@ function whenIdle(): Promise<void> {
 /** Cards belonging to the decks on this profile. */
 export function cardIdsForProfile(
   profileId: string,
-  decks: Array<{ id: string; learning_profile_id: string }>,
-  cards: Array<{ id: string; deck_id: string }>,
+  decks: ReadonlyArray<{ id: string; learning_profile_id: string }>,
+  cards: ReadonlyArray<{ id: string; deck_id: string }>,
 ): Set<string> {
   const deckIds = new Set(
     decks.filter((d) => d.learning_profile_id === profileId).map((d) => d.id),
@@ -56,9 +56,10 @@ export function cardIdsForProfile(
 }
 
 async function calibrateProfile(
-  profile: LearningProfileRow,
+  zero: Zero<TSchema>,
+  profile: TLearningProfileRow,
   cardIds: Set<string>,
-  logs: ReviewLogRow[],
+  logs: ReadonlyArray<TReviewLogRow>,
   force: boolean,
 ): Promise<void> {
   const histories = buildCardHistories(cardIds, logs);
@@ -118,13 +119,15 @@ async function calibrateProfile(
           }`,
         );
         // `unchanged` still stamps: the evidence was weighed and rejected.
-        calibrateProfileAction({
-          profileId: profile.id,
-          w: outcome.status === "improved" ? outcome.w : profile.w,
-          lastCalibratedAt: new Date(),
-          memoryStates:
-            outcome.status === "improved" ? outcome.memoryStates : [],
-        });
+        void zero.mutate(
+          mutators.learningProfile.calibrate({
+            id: profile.id,
+            w: outcome.status === "improved" ? outcome.w : [...profile.w],
+            last_calibrated_at: Date.now(),
+            memory_states:
+              outcome.status === "improved" ? outcome.memoryStates : [],
+          }),
+        );
       } finally {
         setCalibrationState(profile.id, finalState);
       }
@@ -132,11 +135,19 @@ async function calibrateProfile(
   );
 }
 
-/** Fired once per app load — on landing, not after studying, when the tab is
- * usually about to close. Nothing renders behind it. */
-export async function startAutoCalibration({
-  force = false,
-}: { force?: boolean } = {}): Promise<void> {
+/**
+ * Fired once per app load — on landing, not after studying, when the tab is
+ * usually about to close. Nothing renders behind it.
+ *
+ * Reads run against the local store (`zero.run` defaults to answering from
+ * whatever has synced rather than waiting for the server), so a pass works
+ * offline on the history this device already holds, and the mutation it writes
+ * queues like any other.
+ */
+export async function startAutoCalibration(
+  zero: Zero<TSchema>,
+  { force = false }: { force?: boolean } = {},
+): Promise<void> {
   if (typeof window === "undefined") return;
   // Threaded wasm build — no SharedArrayBuffer means it can't start at all.
   if (!crossOriginIsolated) {
@@ -149,10 +160,10 @@ export async function startAutoCalibration({
   try {
     if (!force) await whenIdle();
     const [profiles, decks, cards, logs] = await Promise.all([
-      learningProfilesCollection.toArrayWhenReady(),
-      decksCollection.toArrayWhenReady(),
-      cardsCollection.toArrayWhenReady(),
-      reviewLogsCollection.toArrayWhenReady(),
+      zero.run(queries.learningProfiles()),
+      zero.run(queries.decks()),
+      zero.run(queries.cards()),
+      zero.run(queries.reviewLogs()),
     ]);
 
     debug(
@@ -164,16 +175,10 @@ export async function startAutoCalibration({
         debug(`profile "${profile.name}": skipped — no cards`);
         continue;
       }
-      await calibrateProfile(profile, cardIds, logs, force);
+      await calibrateProfile(zero, profile, cardIds, logs, force);
     }
   } catch (error) {
     // Best-effort: a failed pass just leaves the existing parameters in place.
     debug("aborted", error);
   }
-}
-
-/** Dev escape hatch: run a pass now, ignoring the gates. */
-if (import.meta.env.DEV && typeof window !== "undefined") {
-  (window as unknown as { calibrateNow: () => Promise<void> }).calibrateNow =
-    () => startAutoCalibration({ force: true });
 }

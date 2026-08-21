@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FormInput, Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
+import { toastErrorOnOptimisticOperation } from "@/components/mutation-error-toast";
 import { useDeleteDeck, useUpdateDeck } from "@/hooks/data/use-decks";
 import { useLearningProfiles } from "@/hooks/data/use-learning-profiles";
 import { useImportCardsFlow } from "@/hooks/use-import-cards-flow";

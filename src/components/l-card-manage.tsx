@@ -46,8 +46,8 @@ type TLCardManageProps =
       deckId: string;
       front: string;
       back: string;
-      createdAt: string | Date;
-      updatedAt: string | Date;
+      createdAt: string | number | Date;
+      updatedAt: string | number | Date;
       isOptimistic: boolean;
     };
 
@@ -209,7 +209,6 @@ function EditCardForm({
     onSubmit: async ({ value }) => {
       await mutation.mutateAsync({
         id,
-        deckId,
         front: value.front,
         back: value.back,
       });
@@ -344,7 +343,7 @@ function DeleteCardForm({
           onClick={() => {
             // Optimistic — the card disappears immediately; the server catches
             // up in the background.
-            void mutation.mutateAsync({ id, deckId });
+            void mutation.mutateAsync({ id });
             onDone();
           }}
         >

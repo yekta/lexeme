@@ -2,6 +2,7 @@ import { AddCardForm } from "@/components/add-card-form";
 import { AddOrImportCardsButton } from "@/components/add-or-import-cards-button";
 import { CardsVirtualGrid } from "@/components/cards-virtual-grid";
 import { ClientOnly } from "@/components/client-only";
+import { RequireIdentity } from "@/components/require-identity";
 import { DeckNotFound } from "@/components/deck-not-found";
 import { DeckSettingsMenu } from "@/components/deck-settings-menu";
 import {
@@ -22,8 +23,8 @@ import { NoAccess } from "@/components/no-access";
 import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button, LinkButton } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { isRowOptimistic } from "@/db/collections";
-import { usePendingMutations } from "@/db/pending-mutations";
+import { usePendingIds } from "@/zero/mutate";
+import { usePendingMutations } from "@/zero/mutate";
 import { useCardsByDeck, type TCard } from "@/hooks/data/use-cards";
 import { useDeck, type TDeck } from "@/hooks/data/use-decks";
 import { useAsyncRouterPush } from "@/hooks/use-async-router-push";
@@ -40,7 +41,9 @@ export const Route = createFileRoute("/deck/$id/")({
 function DeckRoute() {
   return (
     <ClientOnly fallback={<DeckPageSkeleton />}>
-      <DeckPage />
+      <RequireIdentity fallback={<DeckPageSkeleton />}>
+        <DeckPage />
+      </RequireIdentity>
     </ClientOnly>
   );
 }
@@ -58,11 +61,12 @@ function DeckPage() {
 
   const hasPendingCards = usePendingMutations("cards");
   const hasPendingDecks = usePendingMutations("decks");
+  const pending = usePendingIds();
   const isOptimistic =
     hasPendingCards ||
     hasPendingDecks ||
-    (deckQuery.data ? isRowOptimistic(deckQuery.data) : false) ||
-    cardsQuery.data.some(isRowOptimistic);
+    (deckQuery.data ? pending.has(deckQuery.data.id) : false) ||
+    cardsQuery.data.some((c) => pending.has(c.id));
 
   return (
     <DeckPageView

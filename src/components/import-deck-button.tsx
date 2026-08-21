@@ -11,7 +11,7 @@ import {
   DropdownMenuItemText,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toastErrorOnOptimisticOperation } from "@/db/toast-on-error";
+import { toastErrorOnOptimisticOperation } from "@/components/mutation-error-toast";
 import { deckExportSchema, type DeckExport } from "@/lib/deck-export";
 import { ChevronDown, DownloadIcon } from "lucide-react";
 import { useRef, useState } from "react";

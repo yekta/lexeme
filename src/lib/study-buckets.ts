@@ -1,8 +1,8 @@
 import type {
-  CardRow,
-  LearningProfileRow,
-  ReviewLogRow,
-} from "@/db/collections";
+  TCardRow,
+  TLearningProfileRow,
+  TReviewLogRow,
+} from "@/zero/schema";
 import {
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
@@ -10,9 +10,9 @@ import {
 import { SHORT_INTERVAL_MS } from "@/lib/fsrs/fsrs";
 
 export type StudyBuckets = {
-  newCards: CardRow[];
-  learningCards: CardRow[];
-  reviewCards: CardRow[];
+  newCards: TCardRow[];
+  learningCards: TCardRow[];
+  reviewCards: TCardRow[];
 };
 
 /**
@@ -21,9 +21,9 @@ export type StudyBuckets = {
  * stats only care about today's entries.
  */
 export function filterTodayLogs(
-  logs: ReviewLogRow[],
+  logs: TReviewLogRow[],
   now: number,
-): ReviewLogRow[] {
+): TReviewLogRow[] {
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const dayStart = startOfToday.getTime();
@@ -33,7 +33,7 @@ export function filterTodayLogs(
 const RETENTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export function computeTrueRetention(
-  logs: ReviewLogRow[],
+  logs: TReviewLogRow[],
   deckCardIds: Set<string>,
   now: number,
 ): number | null {
@@ -79,10 +79,10 @@ export function computeStudyBuckets({
   profile,
   now,
 }: {
-  deckCards: CardRow[];
+  deckCards: TCardRow[];
   /** Review logs from any deck or day — filtered to `deckCards` and today internally. */
-  logs: ReviewLogRow[];
-  profile: LearningProfileRow | undefined;
+  logs: TReviewLogRow[];
+  profile: TLearningProfileRow | undefined;
   now: number;
 }): StudyBuckets {
   const newPerDay = profile?.new_cards_per_day ?? DEFAULT_NEW_CARDS_PER_DAY;
@@ -106,9 +106,9 @@ export function computeStudyBuckets({
   const dayEnd = endOfToday.getTime();
   const learnAheadCutoff = now + SHORT_INTERVAL_MS;
 
-  const newCards: CardRow[] = [];
-  const learningCards: CardRow[] = [];
-  const reviewCards: CardRow[] = [];
+  const newCards: TCardRow[] = [];
+  const learningCards: TCardRow[] = [];
+  const reviewCards: TCardRow[] = [];
   for (const c of deckCards) {
     if (c.state === "new") {
       newCards.push(c);

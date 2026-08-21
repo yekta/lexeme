@@ -56,6 +56,25 @@ export const auth = betterAuth({
       updatedAt: "updated_at",
     },
   },
+  /**
+   * Issue the session cookie for the parent domain when one is configured, so
+   * `lexeme.fyi` and `zero.lexeme.fyi` share it. zero-cache forwards that
+   * cookie to `/api/zero/query` and `/api/zero/mutate`, which is how sync
+   * authenticates; without this it never sees one and every sync request 401s.
+   *
+   * The two hosts are sibling subdomains and therefore same-site, so the
+   * default `SameSite=Lax` still applies — nothing here needs `SameSite=None`.
+   */
+  ...(env.COOKIE_DOMAIN
+    ? {
+        advanced: {
+          crossSubDomainCookies: {
+            enabled: true,
+            domain: env.COOKIE_DOMAIN,
+          },
+        },
+      }
+    : {}),
   emailAndPassword: { enabled: false },
   socialProviders: {
     google: {

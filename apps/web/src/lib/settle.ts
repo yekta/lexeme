@@ -44,6 +44,25 @@ export const SETTLE_BUDGET = {
    * service that is simply down.
    */
   unreachable: 10_000,
+  /**
+   * How long sync must be struggling before the app asks the network whether it
+   * is still there. Long enough that an ordinary start, which spends a moment
+   * in `connecting` before its first connection lands, never sends the request:
+   * the only cost of a real outage noticing a second late is a second.
+   */
+  probeDelay: 1_000,
+  /**
+   * How long that request may take before its silence is the answer. A network
+   * that is gone fails in milliseconds, so this is the ceiling for one that
+   * accepts the request and then never speaks.
+   */
+  probeTimeout: 3_000,
+  /**
+   * How often to ask again while sync is still down. The verdict can change
+   * without the connection recovering: wifi comes back, our sync host stays
+   * down, and "you're offline" has to stop being the answer.
+   */
+  probeInterval: 15_000,
 } as const;
 
 /** True once `active` has held continuously for `ms`. Good news can be instant; bad news waits. */

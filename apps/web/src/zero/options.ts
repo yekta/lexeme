@@ -45,5 +45,15 @@ export function lexemeZeroOptions(config: TLexemeZeroConfig) {
     auth: config.auth,
     cacheURL: config.cacheURL,
     kvStore: config.kvStore,
+    // Zero learns a connection is dead only by missing a pong, and budgets
+    // 2 x this for the verdict. The 5s default therefore spends ten seconds
+    // telling someone who just walked out of wifi range that they are synced,
+    // because a link that goes quiet without closing the socket (a captive
+    // portal, a phone leaving the building) gives off no other signal at all.
+    // Six seconds is the trade: short enough to notice, long enough that a slow
+    // mobile round trip is not read as a death and made to reconnect for
+    // nothing. The socket usually closes outright, in which case none of this
+    // is on the path and the banner is up in about a second.
+    pingTimeoutMs: 3_000,
   } satisfies ZeroOptions<TSchema>;
 }

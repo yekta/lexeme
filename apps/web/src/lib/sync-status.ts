@@ -1,6 +1,7 @@
 import { useConnectionState } from "@rocicorp/zero/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { useReachable } from "@/lib/reachability";
 import { SETTLE_BUDGET, useHeld } from "@/lib/settle";
 
 /**
@@ -27,13 +28,18 @@ type TAuthRejection = Extract<
 export type TSyncStatus =
   | { name: "synced" }
   | { name: "syncing" }
-  /** No usable connection. Everything still works; writes queue. */
+  /**
+   * This device cannot reach the network. Everything still works; writes queue.
+   *
+   * Established either by the browser saying so or, when it declines to, by
+   * `useReachable` failing to fetch anything at all.
+   */
   | { name: "offline" }
   /**
-   * The browser has a network but the sync service never answers. Distinct from
-   * `offline` because the cause is ours, not theirs, and the wording has to
-   * differ: telling someone with working wifi that they are offline sends them
-   * to reboot their router.
+   * The network is there and the sync service still never answers. Distinct
+   * from `offline` because the cause is ours, not theirs, and the wording has
+   * to differ: telling someone with working wifi that they are offline sends
+   * them to reboot their router.
    */
   | { name: "unreachable" }
   /** Signed in, and sync was still turned away: the server's problem, not the user's. */
@@ -89,6 +95,15 @@ export function useSyncStatus(sessionExpired: boolean): TSyncStatus | null {
   const conn = useConnectionState();
   const online = useOnline();
 
+  // Zero going quiet says nothing about the network on its own: it is one
+  // service, and it failing looks identical whether the wifi died or only our
+  // sync host did. Asking the network directly is what separates the two, and
+  // it is asked only once Zero has been unhappy for a beat, so an ordinary
+  // start sends nothing. `needs-auth` is excluded because the server answered,
+  // which settles the question without anyone asking it.
+  const struggling = online && conn.name !== "connected" && conn.name !== "needs-auth";
+  const reachable = useReachable(useHeld(struggling, SETTLE_BUDGET.probeDelay));
+
   // Zero retries a failed connection forever, and reports each attempt as
   // `connecting` rather than as a failure, so a sync service that accepts the
   // TCP connection and then never speaks looks, to this hook, exactly like one
@@ -101,10 +116,15 @@ export function useSyncStatus(sessionExpired: boolean): TSyncStatus | null {
   if (sessionExpired) current = { name: "expired" };
   else if (conn.name === "needs-auth")
     current = { name: "refused", detail: describeRejection(conn.reason) };
-  else if (!online || conn.name === "disconnected" || conn.name === "error")
-    current = { name: "offline" };
+  // Nothing this device asks for arrives. There is no outage of ours left to
+  // describe, and no wording to get right beyond saying so.
+  else if (!online || reachable === false) current = { name: "offline" };
   else if (conn.name === "connected") current = { name: "synced" };
-  else if (stuckConnecting) current = { name: "unreachable" };
+  else if (stuckConnecting || conn.name === "disconnected" || conn.name === "error")
+    // Something answered and Zero still did not, so this outage is ours to own
+    // and comes with a retry. Before there is a verdict to go on, the older and
+    // coarser reading stands.
+    current = reachable === true ? { name: "unreachable" } : { name: "offline" };
   else current = { name: "syncing" };
 
   // `navigator.onLine` going false is not a guess we should sit on for a beat:

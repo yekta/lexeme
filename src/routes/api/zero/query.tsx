@@ -2,6 +2,8 @@ import { mustGetQuery } from "@rocicorp/zero";
 import { handleQueryRequest } from "@rocicorp/zero/server";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { createAuth } from "@/server/auth";
+import { withDatabase } from "@/server/db";
 import { getAuthData } from "@/server/zero";
 import { queries } from "@/zero/queries";
 import { schema } from "@/zero/schema";
@@ -15,23 +17,24 @@ import { schema } from "@/zero/schema";
  * verified session — so a client cannot widen its own window by asking
  * differently.
  */
-const handler = async ({ request }: { request: Request }) => {
-  const authData = await getAuthData(request);
-  if (!authData) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
-  }
+const handler = ({ request }: { request: Request }) =>
+  withDatabase(async (db) => {
+    const authData = await getAuthData(request, createAuth(db));
+    if (!authData) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
 
-  const result = await handleQueryRequest({
-    handler: (name, args) => {
-      const query = mustGetQuery(queries, name);
-      return query.fn({ args, ctx: authData });
-    },
-    schema,
-    request,
-    userID: authData.user_id,
+    const result = await handleQueryRequest({
+      handler: (name, args) => {
+        const query = mustGetQuery(queries, name);
+        return query.fn({ args, ctx: authData });
+      },
+      schema,
+      request,
+      userID: authData.user_id,
+    });
+    return Response.json(result);
   });
-  return Response.json(result);
-};
 
 export const Route = createFileRoute("/api/zero/query")({
   server: { handlers: { POST: handler } },

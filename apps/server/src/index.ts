@@ -30,10 +30,13 @@ function migrationsFolder(): string {
   throw new Error("No drizzle migrations folder found; run the server build first.");
 }
 
-if (env.MIGRATE_ON_START) {
-  await migrate(db, { migrationsFolder: migrationsFolder() });
-  console.info("[api] migrations applied");
-}
+// Unconditional, and before the server listens. The deploy that ships a schema
+// change and the process that needs it are the same deploy, so there is no
+// version of this worth making configurable: a flag would only ever be a way to
+// boot code against a database that cannot serve it. drizzle records what it has
+// applied, so a restart with nothing pending is a no-op.
+await migrate(db, { migrationsFolder: migrationsFolder() });
+console.info("[api] migrations applied");
 
 const app = new Hono();
 

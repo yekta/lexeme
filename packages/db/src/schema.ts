@@ -65,6 +65,17 @@ export const account = pgTable("account", {
   id: text("id").primaryKey(),
   account_id: text("account_id").notNull(),
   provider_id: text("provider_id").notNull(),
+  /**
+   * The identity provider that vouched for this account, e.g.
+   * `https://accounts.google.com`.
+   *
+   * Better Auth 1.7 looks accounts up by `(issuer, account_id)` rather than
+   * `(provider_id, account_id)`. A provider id is a local nickname — whatever
+   * the app called it in its config — while an issuer is the party that
+   * actually attests to the subject, so two providers configured against the
+   * same IdP can no longer be mistaken for one another.
+   */
+  issuer: text("issuer").notNull(),
   user_id: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),

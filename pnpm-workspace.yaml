@@ -25,7 +25,12 @@ catalog:
   # runtime: server
   hono: ^4.13.3
   "@hono/node-server": ^2.1.1
-  better-auth: ^1.6.25
+  # Exact, not a caret. Better Auth owns database columns — 1.7.0 added `issuer`
+  # to the `account` model and queries it on every OAuth sign-in — so a version
+  # bump here is a schema change, and a floating range is a sign-in that breaks
+  # in production on an unrelated deploy. It moves when a migration moves with
+  # it (packages/db/drizzle/0004).
+  better-auth: 1.7.1
   drizzle-orm: ^0.45.2
   postgres: ^3.4.9
   "@t3-oss/env-core": ^0.13.11

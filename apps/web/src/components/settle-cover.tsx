@@ -11,6 +11,14 @@ const FADE_MS = 200;
  * later. The cover itself never fades in on boot: that would expose the exact
  * half-built frame it exists to hide.
  *
+ * It sits above the navbar on purpose. The navbar is `sticky z-50` and every
+ * route renders this cover as its first child, so at an equal z-index the
+ * navbar won the tie on tree order and painted straight through the cover.
+ * That was invisible on the screens whose navbar holds nothing but the logo,
+ * and a real flash on the study screen, whose navbar holds a deck-title
+ * skeleton and a card-counter skeleton. Anything that must outrank this cover
+ * belongs above `z-60`.
+ *
  * It is short-lived by design. `usePlaceholderPhase` lifts it after
  * `SETTLE_BUDGET.skeletonGrace`, at which point the screen's own skeleton takes
  * over. It used to be able to sit there for as long as the wait lasted, with a
@@ -43,7 +51,7 @@ export function SettleCover({ show, fadeIn = false }: { show: boolean; fadeIn?: 
     <div
       data-settle-cover={show ? "up" : "lifting"}
       aria-hidden
-      className={`fixed inset-0 z-50 bg-background transition-opacity duration-150 ease-out ${
+      className={`fixed inset-0 z-60 bg-background transition-opacity duration-150 ease-out ${
         opaque ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     />

@@ -1,0 +1,20 @@
+# Cross-origin isolation, and it is load-bearing.
+#
+# The FSRS optimizer is a threaded wasm build, so it needs SharedArrayBuffer,
+# which browsers only grant to a cross-origin isolated document. `require-corp`
+# is the mode Safari supports.
+#
+# This file exists because the Nitro `routeRules` that set the same headers
+# cannot reach the document on Cloudflare: in SPA mode the page is the
+# prerendered `_shell.html`, a *static asset*, and Workers Static Assets serves
+# assets before the Worker runs. Without these headers the app still loads and
+# nothing errors — `crossOriginIsolated` is simply false, and auto-calibration
+# quietly declines to start (see zero/auto-calibration.ts). Check it in the
+# console after a deploy: `crossOriginIsolated` must be true.
+#
+# The cost is that cross-origin subresources without CORP headers stop loading,
+# which is why the Google avatar goes through /api/avatar rather than straight
+# into an <img>.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

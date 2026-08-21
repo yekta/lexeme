@@ -59,7 +59,7 @@ function Banner({
     return (
       <BannerShell tone="muted">
         <CloudOffIcon className="size-4 shrink-0" />
-        <span>You&apos;re offline. Changes are saved locally and will sync when online.</span>
+        <span>You&apos;re offline. Changes are saved locally.</span>
       </BannerShell>
     );
   }

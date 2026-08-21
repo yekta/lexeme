@@ -2,12 +2,12 @@ import { env } from "@/env";
 import { appRouter } from "@/server/api/root";
 import { createTRPCContext } from "@/server/api/trpc";
 import { createAuth } from "@/server/auth";
-import { withDatabase } from "@/server/db";
+import { withDatabaseResponse } from "@/server/db";
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
 const handler = ({ request }: { request: Request }) =>
-  withDatabase((db) => {
+  withDatabaseResponse((db) => {
     const auth = createAuth(db);
     return fetchRequestHandler({
       endpoint: "/api/trpc",

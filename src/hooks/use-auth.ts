@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   clearIdentity,
-  loadIdentity,
   saveIdentity,
+  useStoredIdentity,
   type TIdentity,
 } from "@/lib/identity";
 import { signIn, signOut, useSession } from "@/lib/auth-client";
@@ -69,7 +69,7 @@ function useSessionRecovery(error: unknown, refetch: () => void): void {
  */
 export function useAuth() {
   const { data: session, isPending, error, refetch } = useSession();
-  const [stored, setStored] = useState<TIdentity | null>(() => loadIdentity());
+  const stored = useStoredIdentity();
 
   useSessionRecovery(error, refetch);
 
@@ -81,7 +81,6 @@ export function useAuth() {
       image: session.user.image ?? null,
     };
     saveIdentity(identity);
-    setStored(identity);
   }, [session?.user]);
 
   let user: TIdentity | null;

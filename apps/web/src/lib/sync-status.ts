@@ -80,6 +80,11 @@ export function useOnline(): boolean {
   );
 }
 
+/** By value, not identity: `refused` carries a string and every render rebuilds it. */
+function statusKey(status: TSyncStatus): string {
+  return status.name === "refused" ? `refused:${status.detail}` : status.name;
+}
+
 export function useSyncStatus(sessionExpired: boolean): TSyncStatus | null {
   const conn = useConnectionState();
   const online = useOnline();
@@ -102,31 +107,55 @@ export function useSyncStatus(sessionExpired: boolean): TSyncStatus | null {
   else if (stuckConnecting) current = { name: "unreachable" };
   else current = { name: "syncing" };
 
-  return useSettledStatus(current);
+  // `navigator.onLine` going false is not a guess we should sit on for a beat:
+  // the browser is stating a fact, and the user who just turned off their wifi
+  // is watching for the app to notice.
+  return useSettledStatus(current, !online);
 }
 
 /**
- * Reports `synced` immediately and everything else only once it has held for
- * `SETTLE_BUDGET.statusHold`. Before the first verdict, reports nothing at all.
+ * Reports `synced` immediately, anything the browser states as fact
+ * immediately, and every other verdict once it has held for
+ * `SETTLE_BUDGET.statusHold`. Before the first verdict, reports nothing.
+ *
+ * The hold is measured from the moment the truth stopped matching what is on
+ * screen, not from the last time the truth changed. That distinction is the
+ * whole point: Zero cycles `connecting` and `disconnected` several times a
+ * second while it retries, and a timer restarted on every one of those never
+ * fires. The banner then freezes on whatever it last managed to report, which
+ * is how turning off wifi left it insisting the sync service was unreachable.
  */
-function useSettledStatus(current: TSyncStatus): TSyncStatus | null {
+function useSettledStatus(current: TSyncStatus, immediate: boolean): TSyncStatus | null {
   const [reported, setReported] = useState<TSyncStatus | null>(
     current.name === "synced" ? current : null,
   );
-  // Compared by value, not identity: `refused` carries a string, and every
-  // render hands back a fresh object for the same state.
-  const key = current.name === "refused" ? `refused:${current.detail}` : current.name;
   const latest = useRef(current);
   latest.current = current;
+  /** When `current` first disagreed with `reported`. Survives key changes. */
+  const disagreedAt = useRef<number | null>(null);
+
+  const key = statusKey(current);
+  const reportedKey = reported ? statusKey(reported) : null;
+  const settleNow = immediate || current.name === "synced";
 
   useEffect(() => {
-    if (latest.current.name === "synced") {
+    if (key === reportedKey) {
+      disagreedAt.current = null;
+      return;
+    }
+    if (settleNow) {
+      disagreedAt.current = null;
       setReported(latest.current);
       return;
     }
-    const timer = setTimeout(() => setReported(latest.current), SETTLE_BUDGET.statusHold);
+    disagreedAt.current ??= Date.now();
+    const wait = Math.max(0, disagreedAt.current + SETTLE_BUDGET.statusHold - Date.now());
+    const timer = setTimeout(() => {
+      disagreedAt.current = null;
+      setReported(latest.current);
+    }, wait);
     return () => clearTimeout(timer);
-  }, [key]);
+  }, [key, reportedKey, settleNow]);
 
   return reported;
 }

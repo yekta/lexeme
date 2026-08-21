@@ -85,10 +85,27 @@ export default defineConfig({
       compatibilityDate: "2026-08-01",
       cloudflare: {
         nodeCompat: true,
-        // Without this Nitro derives the Worker name from the repo
-        // ("yekta-lexeme") and `wrangler deploy` creates a second Worker beside
-        // the one the dashboard made. Must match the Cloudflare project name.
-        wrangler: { name: "lexeme" },
+        wrangler: {
+          // Without this Nitro derives the Worker name from the repo
+          // ("yekta-lexeme") and `wrangler deploy` creates a second Worker
+          // beside the one the dashboard made. Must match the project name.
+          name: "lexeme",
+          /**
+           * Keep the environment variables configured in the dashboard.
+           *
+           * Wrangler treats its config as the source of truth, "like a
+           * terraform file" — so a deploy whose config has no `vars` block
+           * *deletes* every plain variable set in the dashboard. Nitro
+           * generates exactly such a config, so every deploy was silently
+           * wiping the app's configuration and the Worker came back up with an
+           * empty `process.env`: `/api/auth/get-session` 500s on the first
+           * request because env validation finds nothing.
+           *
+           * Secrets are unaffected either way — Wrangler never deletes those.
+           * This only protects anything stored as a plain Variable.
+           */
+          keep_vars: true,
+        },
       },
       routeRules: {
         "/**": { headers: crossOriginIsolation },

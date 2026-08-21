@@ -1,20 +1,26 @@
-# Cross-origin isolation, and it is load-bearing.
+# Cross-origin isolation for anything Cloudflare serves as a static asset,
+# without the Worker running.
 #
 # The FSRS optimizer is a threaded wasm build, so it needs SharedArrayBuffer,
 # which browsers only grant to a cross-origin isolated document. `require-corp`
 # is the mode Safari supports.
 #
-# This file exists because the Nitro `routeRules` that set the same headers
-# cannot reach the document on Cloudflare: in SPA mode the page is the
-# prerendered `_shell.html`, a *static asset*, and Workers Static Assets serves
-# assets before the Worker runs. Without these headers the app still loads and
-# nothing errors — `crossOriginIsolated` is simply false, and auto-calibration
-# quietly declines to start (see zero/auto-calibration.ts). Check it in the
-# console after a deploy: `crossOriginIsolated` must be true.
+# The document itself does NOT depend on this file: the Worker renders it, so
+# Nitro's `routeRules` set both headers there (verified — a request to `/` comes
+# back with `cross-origin-opener-policy: same-origin` and
+# `cross-origin-embedder-policy: require-corp`). This file existed because SPA
+# mode made the page a prerendered static asset that bypassed the Worker
+# entirely; SPA mode is off now (see the note in vite.config.ts), so this is the
+# belt to that braces — it keeps the guarantee if a page is ever served straight
+# from the assets handler.
 #
-# The cost is that cross-origin subresources without CORP headers stop loading,
-# which is why the Google avatar goes through /api/avatar rather than straight
-# into an <img>.
+# Worth checking after a deploy either way: `crossOriginIsolated` in the console
+# must be true, or auto-calibration silently declines to start and says so only
+# in a console line (see zero/auto-calibration.ts).
+#
+# The cost of `require-corp` is that cross-origin subresources without CORP
+# headers stop loading, which is why the Google avatar goes through /api/avatar
+# rather than straight into an <img>.
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp

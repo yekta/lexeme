@@ -3,7 +3,14 @@ import { usePendingIds } from "@/zero/mutate";
 import { type TCard } from "@/hooks/data/use-cards";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 // Estimated height (px) of a single card row before it is measured. Real
 // heights are measured dynamically via measureElement; this only affects the
@@ -38,21 +45,35 @@ export function CardsVirtualGrid({
 
   // The window virtualizer measures scroll against the whole document, so it
   // needs to know how far the grid sits from the top of the page (navbar +
-  // header above it). Recompute on resize since that header height and the
-  // column count both shift with the breakpoint.
+  // header above it). A stale reading offsets every row by the difference.
   const parentRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
 
-  useLayoutEffect(() => {
-    const measure = () => {
-      const el = parentRef.current;
-      if (!el) return;
-      setScrollMargin(el.getBoundingClientRect().top + window.scrollY);
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+  const measureScrollMargin = useCallback(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    // Rounded because this runs after every commit, including the ones a scroll
+    // causes: `rect.top + scrollY` is a constant while scrolling only up to
+    // subpixel noise, and storing that noise would re-render the grid on every
+    // frame for a fraction of a pixel.
+    setScrollMargin(Math.round(el.getBoundingClientRect().top + window.scrollY));
   }, []);
+
+  // After every commit, because a render is the ordinary reason the header
+  // above the grid changes height.
+  useLayoutEffect(measureScrollMargin);
+
+  // And for the reflows React never renders: the viewport resizing, or the
+  // document growing under us when the sync banner arrives or a webfont lands.
+  useLayoutEffect(() => {
+    window.addEventListener("resize", measureScrollMargin);
+    const observer = new ResizeObserver(measureScrollMargin);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", measureScrollMargin);
+      observer.disconnect();
+    };
+  }, [measureScrollMargin]);
 
   const virtualizer = useWindowVirtualizer({
     count: rows.length,
@@ -64,10 +85,20 @@ export function CardsVirtualGrid({
 
   // When the column count changes (crossing the md breakpoint) the rows are
   // re-chunked, so any cached row heights are stale: drop them and re-measure.
+  //
+  // Deliberately not on mount. `measure()` clears every cached height, and
+  // nothing re-measures a row that is already on screen: the ref that measures
+  // one only runs when the element mounts, and the observer behind it only
+  // fires when the element's own size changes. Running it on mount therefore
+  // threw away the heights the first rows had just been measured at and re-laid
+  // the grid out on the 180px estimate, one frame after it was painted
+  // correctly. That was the shift.
+  const measuredColumns = useRef(columns);
   useEffect(() => {
+    if (measuredColumns.current === columns) return;
+    measuredColumns.current = columns;
     virtualizer.measure();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columns]);
+  }, [columns, virtualizer]);
 
   return (
     <div ref={parentRef}>

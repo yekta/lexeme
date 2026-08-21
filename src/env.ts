@@ -1,7 +1,8 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
-export const env = createEnv({
+function buildEnv() {
+  return createEnv({
   server: {
     DATABASE_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
@@ -29,4 +30,25 @@ export const env = createEnv({
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  });
+}
+
+type TEnv = ReturnType<typeof buildEnv>;
+
+let cached: TEnv | undefined;
+
+/**
+ * Validated server env, resolved on first access rather than at import.
+ *
+ * Lazy because this runs on Cloudflare Workers, where `process.env` is
+ * populated from the Worker's bindings when a request arrives — there is
+ * nothing to read at module scope, so validating there fails on a correctly
+ * configured deployment. It also keeps the SPA prerender working: rendering the
+ * shell touches no server config, so it must not need a DATABASE_URL to exist.
+ */
+export const env: TEnv = new Proxy({} as TEnv, {
+  get(_target, prop) {
+    cached ??= buildEnv();
+    return cached[prop as keyof TEnv];
+  },
 });

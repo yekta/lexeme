@@ -10,7 +10,8 @@ import {
   verification,
 } from "@/server/db/schema";
 
-export const auth = betterAuth({
+function create() {
+  return betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
@@ -94,5 +95,26 @@ export const auth = betterAuth({
         },
       },
     },
+  },
+  });
+}
+
+type TAuth = ReturnType<typeof create>;
+
+let cached: TAuth | undefined;
+
+/**
+ * Better Auth, constructed on first use rather than at import.
+ *
+ * `betterAuth()` reads five environment values and builds a database adapter
+ * while it runs, so calling it at module scope drags both `env` and `db` into
+ * isolate startup — which on Workers is before any binding exists, and during
+ * the SPA prerender is before there is any configuration at all.
+ */
+export const auth: TAuth = new Proxy({} as TAuth, {
+  get(_target, prop) {
+    cached ??= create();
+    const value = cached[prop as keyof TAuth];
+    return typeof value === "function" ? value.bind(cached) : value;
   },
 });

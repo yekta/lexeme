@@ -1,5 +1,6 @@
 import { ClientOnly } from "@/components/client-only";
 import { RequireIdentity } from "@/components/require-identity";
+import { SettleCover } from "@/components/settle-cover";
 import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { usePersistentForm } from "@/components/form-draft-provider";
 import PlusIcon from "@/components/icons/plus-icon";
@@ -64,16 +65,12 @@ export const Route = createFileRoute("/")({
 
 function HomeRoute() {
   return (
-    <ClientOnly fallback={<HomeSkeleton />}>
-      <RequireIdentity fallback={<HomeSkeleton />}>
+    <ClientOnly fallback={<SettleCover show loader />}>
+      <RequireIdentity fallback={<SettleCover show loader />}>
         <Home />
       </RequireIdentity>
     </ClientOnly>
   );
-}
-
-function HomeSkeleton() {
-  return <HomePageView isPlaceholder />;
 }
 
 function Home() {
@@ -120,21 +117,27 @@ function Home() {
     deckStatsRows.some((r) => r.optimistic);
 
   return (
-    <HomePageView
-      isPlaceholder={isPlaceholder}
-      isError={state === "error"}
-      error={decksQuery.error ?? deckStatsQuery.error}
-      decks={decks}
-      statsByDeck={statsByDeck}
-      isOptimistic={isOptimistic}
-      todayStats={todayQuery.data}
-      todayStatsPending={todayQuery.isPending}
-      todayStatsError={todayQuery.isError}
-      onRetry={() => {
-        decksQuery.refetch();
-        deckStatsQuery.refetch();
-      }}
-    />
+    <>
+      {/* Keep the real home mounted while Zero resolves, but do not paint its
+          disposable placeholder frame. This is the same settle-cover boundary
+          Ragbag uses around its mounted archive shell. */}
+      <SettleCover show={isPlaceholder} loader />
+      <HomePageView
+        isPlaceholder={isPlaceholder}
+        isError={state === "error"}
+        error={decksQuery.error ?? deckStatsQuery.error}
+        decks={decks}
+        statsByDeck={statsByDeck}
+        isOptimistic={isOptimistic}
+        todayStats={todayQuery.data}
+        todayStatsPending={todayQuery.isPending}
+        todayStatsError={todayQuery.isError}
+        onRetry={() => {
+          decksQuery.refetch();
+          deckStatsQuery.refetch();
+        }}
+      />
+    </>
   );
 }
 

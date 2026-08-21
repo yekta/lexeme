@@ -29,6 +29,13 @@
       "when": 1787291224077,
       "tag": "0003_zero_data_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787309515044,
+      "tag": "0004_account_issuer",
+      "breakpoints": true
     }
   ]
 }

@@ -40,7 +40,7 @@ export function RevokeButton({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="ghost-destructive"
         size="icon"
         aria-label="Revoke"
         className="shrink-0 text-muted-foreground"

@@ -8,6 +8,7 @@ import { RevokeButton } from "@/components/access/revoke-button";
 import { RoleBadge } from "@/components/access/role-picker";
 import {
   CredentialRow,
+  CredentialRowPlaceholder,
   SettingsPage,
   SettingsSection,
 } from "@/components/access/settings-page";
@@ -34,10 +35,7 @@ function ConnectedAppsPage() {
   const mcpUrl = `${publicApiOrigin()}/mcp`;
 
   return (
-    <SettingsPage
-      title="Connected Apps"
-      description="Apps you've signed in to with your Lexeme account, such as MCP clients."
-    >
+    <SettingsPage title="Connected Apps">
       <SettingsSection
         title="MCP server"
         description="Add this URL to an MCP client. You'll sign in to Lexeme and choose what the app can do."
@@ -52,12 +50,7 @@ function ConnectedAppsPage() {
             <span className="text-foreground">ChatGPT:</span> Settings, Apps &amp; Connectors, with
             developer mode on.
           </li>
-          <li>
-            <span className="text-foreground">Claude Code:</span> run the command below, then{" "}
-            <code className="font-mono text-xs">/mcp</code> to sign in.
-          </li>
         </ul>
-        <CopyField layout="snippet" value={`claude mcp add --transport http lexeme ${mcpUrl}`} />
       </SettingsSection>
 
       <SettingsSection title="Your apps">
@@ -81,7 +74,12 @@ function ConnectedAppList({
   const revoke = useRevokeConnectedApp();
 
   if (isPending) {
-    return <div className="h-16 rounded-xl border bg-card animate-pulse" />;
+    return (
+      <CredentialRowPlaceholder
+        badges={<RoleBadge role="editor" />}
+        meta="Last used 5 minutes ago · Connected Nov 17, 2026"
+      />
+    );
   }
 
   if (!apps || apps.length === 0) {

@@ -224,7 +224,7 @@ function CreateApiKeyFlow({ onDone }: { onDone: () => void }) {
                 key={option.label}
                 type="button"
                 size="sm"
-                variant={option.days === expiryDays ? "secondary" : "ghost"}
+                variant="ghost"
                 className={cn(option.days === expiryDays && "ring-1 ring-foreground/30")}
                 onClick={() => setExpiryDays(option.days)}
               >

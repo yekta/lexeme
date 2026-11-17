@@ -43,10 +43,10 @@ export function RevokeButton({
         variant="ghost-destructive"
         size="icon"
         aria-label="Revoke"
-        className="shrink-0 text-muted-foreground"
+        className="shrink-0 rounded-[calc(var(--radius-lg)-3px)] text-muted-foreground"
         onClick={() => setIsOpen(true)}
       >
-        <Trash2Icon className="size-4" />
+        <Trash2Icon className="size-4.5" />
       </Button>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent>

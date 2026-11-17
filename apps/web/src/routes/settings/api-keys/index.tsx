@@ -10,6 +10,7 @@ import { RevokeButton } from "@/components/access/revoke-button";
 import { RoleBadge, RolePicker } from "@/components/access/role-picker";
 import {
   CredentialRow,
+  CredentialRowPlaceholder,
   SettingsPage,
   SettingsSection,
 } from "@/components/access/settings-page";
@@ -52,8 +53,6 @@ const EXPIRY_OPTIONS = [
   { label: "Never", days: null },
 ] as const;
 
-const DEFAULT_EXPIRY_DAYS = 90;
-
 function ApiKeysPage() {
   useRedirectToSignInIfNecessary();
   const keysQuery = useApiKeys();
@@ -62,7 +61,6 @@ function ApiKeysPage() {
   return (
     <SettingsPage
       title="API Keys"
-      description="Let scripts and apps use your account through the Lexeme API or MCP."
       action={
         <Button className="shrink-0" onClick={() => setIsCreateOpen(true)}>
           <PlusIcon className="size-5 -ml-1.5 shrink-0" />
@@ -94,7 +92,11 @@ function ApiKeyList({ keys, isPending }: { keys: TApiKey[] | undefined; isPendin
     return (
       <div className="flex flex-col gap-2">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="h-16 rounded-xl border bg-card animate-pulse" />
+          <CredentialRowPlaceholder
+            key={i}
+            badges={<ApiKeyBadges tokenPrefix="lx_xxxx" role="admin" />}
+            meta="Never expires · Last used 5 minutes ago · Created Nov 17, 2026"
+          />
         ))}
       </div>
     );
@@ -124,14 +126,7 @@ function ApiKeyList({ keys, isPending }: { keys: TApiKey[] | undefined; isPendin
         <CredentialRow
           key={key.id}
           title={key.name}
-          badges={
-            <>
-              <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono">
-                {key.token_prefix}...
-              </code>
-              <RoleBadge role={key.role} />
-            </>
-          }
+          badges={<ApiKeyBadges tokenPrefix={key.token_prefix} role={key.role} />}
           meta={<ApiKeyMeta apiKey={key} />}
           action={
             <RevokeButton
@@ -143,6 +138,15 @@ function ApiKeyList({ keys, isPending }: { keys: TApiKey[] | undefined; isPendin
         />
       ))}
     </div>
+  );
+}
+
+function ApiKeyBadges({ tokenPrefix, role }: { tokenPrefix: string; role: TAccessRole }) {
+  return (
+    <>
+      <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-mono">{tokenPrefix}...</code>
+      <RoleBadge role={role} />
+    </>
   );
 }
 
@@ -175,7 +179,7 @@ function CreateApiKeyFlow({ onDone }: { onDone: () => void }) {
   const create = useCreateApiKey();
   const [name, setName] = useState("");
   const [role, setRole] = useState<TAccessRole>(DEFAULT_ACCESS_ROLE);
-  const [expiryDays, setExpiryDays] = useState<number | null>(DEFAULT_EXPIRY_DAYS);
+  const [expiryDays, setExpiryDays] = useState<number | null>(null);
 
   if (create.data) {
     return <ApiKeyCreated name={create.data.key.name} token={create.data.token} onDone={onDone} />;
@@ -201,7 +205,7 @@ function CreateApiKeyFlow({ onDone }: { onDone: () => void }) {
           <Label htmlFor="api-key-name">Name</Label>
           <FormInput
             id="api-key-name"
-            placeholder="e.g. Claude Code"
+            placeholder="e.g. My App"
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoComplete="off"
@@ -282,13 +286,6 @@ function UsageSection() {
       <CopyField
         layout="snippet"
         value={`curl ${origin}/api/v1/decks \\\n  -H "Authorization: Bearer lx_your_key"`}
-      />
-      <p className="text-sm text-muted-foreground">
-        Or connect an MCP client with it, for example Claude Code:
-      </p>
-      <CopyField
-        layout="snippet"
-        value={`claude mcp add --transport http lexeme ${origin}/mcp \\\n  --header "Authorization: Bearer lx_your_key"`}
       />
     </SettingsSection>
   );

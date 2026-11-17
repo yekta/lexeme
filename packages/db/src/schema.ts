@@ -1,4 +1,5 @@
 import {
+  ACCESS_ROLES,
   CARD_STATES,
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
@@ -19,12 +20,14 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
 // The tuple lives in @lexeme/shared: the Zero schema clients sync and the FSRS
 // state mapping spell out the same four values, and all three have to agree.
 export const cardStateEnum = pgEnum("card_state", CARD_STATES);
+export const accessRoleEnum = pgEnum("access_role", ACCESS_ROLES);
 
 const updatedAt = () =>
   timestamp("updated_at", { withTimezone: true })
@@ -239,6 +242,88 @@ export const reviewLogs = pgTable(
     index("review_logs_card_id_review_idx").on(t.card_id, t.review),
     index("review_logs_user_id_idx").on(t.user_id),
   ],
+);
+
+// API keys and connected apps. Server-only: never added to the zero_data
+// publication, so token hashes stay out of client replicas.
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    role: accessRoleEnum("role").notNull(),
+    token_prefix: text("token_prefix").notNull(),
+    token_hash: text("token_hash").notNull().unique(),
+    expires_at: timestamp("expires_at", { withTimezone: true }),
+    last_used_at: timestamp("last_used_at", { withTimezone: true }),
+    created_at: createdAt(),
+  },
+  (t) => [uniqueIndex("api_keys_user_id_name_idx").on(t.user_id, t.name)],
+);
+
+export const oauthClients = pgTable("oauth_clients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  redirect_uris: text("redirect_uris").array().notNull(),
+  created_at: createdAt(),
+});
+
+export const oauthAuthorizationCodes = pgTable("oauth_authorization_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code_hash: text("code_hash").notNull().unique(),
+  client_id: uuid("client_id")
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: "cascade" }),
+  user_id: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  role: accessRoleEnum("role").notNull(),
+  redirect_uri: text("redirect_uri").notNull(),
+  code_challenge: text("code_challenge").notNull(),
+  resource: text("resource").notNull(),
+  expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+  created_at: createdAt(),
+});
+
+/** One app's access to one account. Revoking deletes it and its tokens. */
+export const oauthGrants = pgTable(
+  "oauth_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    client_id: uuid("client_id")
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: "cascade" }),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: accessRoleEnum("role").notNull(),
+    resource: text("resource").notNull(),
+    last_used_at: timestamp("last_used_at", { withTimezone: true }),
+    created_at: createdAt(),
+  },
+  (t) => [index("oauth_grants_user_id_idx").on(t.user_id)],
+);
+
+export const oauthTokenKindEnum = pgEnum("oauth_token_kind", ["access", "refresh"]);
+
+export const oauthTokens = pgTable(
+  "oauth_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    grant_id: uuid("grant_id")
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: "cascade" }),
+    kind: oauthTokenKindEnum("kind").notNull(),
+    token_hash: text("token_hash").notNull().unique(),
+    expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Set when a refresh token is exchanged; presenting it again revokes the grant. */
+    used_at: timestamp("used_at", { withTimezone: true }),
+    created_at: createdAt(),
+  },
+  (t) => [index("oauth_tokens_grant_id_idx").on(t.grant_id)],
 );
 
 export type TUser = typeof user.$inferSelect;

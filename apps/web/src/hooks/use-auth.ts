@@ -113,10 +113,10 @@ export function useAuth() {
    * origins; it origin-checks `errorCallbackURL` exactly as it does
    * `callbackURL`.
    */
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = useCallback(async (returnToPath = "/") => {
     await signIn.social({
       provider: "google",
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: `${window.location.origin}${returnToPath}`,
       errorCallbackURL: `${window.location.origin}${SIGN_IN_PATHNAME}`,
     });
   }, []);

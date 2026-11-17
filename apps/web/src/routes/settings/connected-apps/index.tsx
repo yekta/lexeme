@@ -84,7 +84,7 @@ function ConnectedAppList({
 
   if (!apps || apps.length === 0) {
     return (
-      <EmptyList className="border border-dashed">
+      <EmptyList hasBorder>
         <EmptyListHeader>
           <EmptyListIcon>
             <BlocksIcon />

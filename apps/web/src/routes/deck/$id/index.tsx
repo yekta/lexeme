@@ -216,7 +216,7 @@ function DeckPageView({
                 ))}
               </div>
             ) : cards.length === 0 ? (
-              <EmptyList className="border border-dashed">
+              <EmptyList hasBorder>
                 <EmptyListHeader>
                   <EmptyListIcon>
                     <CardsIcon />

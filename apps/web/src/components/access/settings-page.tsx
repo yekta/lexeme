@@ -114,8 +114,8 @@ export function CredentialRowPlaceholder({
       badges={badges}
       meta={meta}
       action={
-        <Button variant="ghost-destructive" size="icon" isPlaceholder aria-hidden className="shrink-0">
-          <Trash2Icon className="size-4" />
+        <Button variant="ghost-destructive" size="icon" isPlaceholder aria-hidden className="shrink-0 rounded-[calc(var(--radius-lg)-3px)]">
+          <Trash2Icon className="size-4.5" />
         </Button>
       }
     />

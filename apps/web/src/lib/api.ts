@@ -101,3 +101,15 @@ export function apiPost<TSchema extends z.ZodType>(
 ): Promise<z.infer<TSchema>> {
   return request(path, schema, { method: "POST", body: JSON.stringify(body) });
 }
+
+export function apiDelete<TSchema extends z.ZodType>(
+  path: string,
+  schema: TSchema,
+): Promise<z.infer<TSchema>> {
+  return request(path, schema, { method: "DELETE" });
+}
+
+/** Where the API is reachable from outside this app: MCP clients and scripts. */
+export function publicApiOrigin(): string {
+  return API_BASE || window.location.origin;
+}

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { GENERATE_CARD_EXCLUDE_FRONTS_LIMIT, deckExportSchema } from "@lexeme/shared";
+import {
+  ACCESS_ROLES,
+  DEFAULT_ACCESS_ROLE,
+  GENERATE_CARD_EXCLUDE_FRONTS_LIMIT,
+  deckExportSchema,
+} from "@lexeme/shared";
 
 /**
  * The HTTP surface, declared once for both ends.
@@ -100,3 +105,83 @@ export const generateCardResponse = z.object({
 
 export type TGenerateCardRequest = z.infer<typeof generateCardRequest>;
 export type TGenerateCardResponse = z.infer<typeof generateCardResponse>;
+
+// --- /api/api-keys (session only) ---
+
+export const accessRoleSchema = z.enum(ACCESS_ROLES);
+
+export const apiKeySchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  role: accessRoleSchema,
+  token_prefix: z.string(),
+  expires_at: z.iso.datetime({ offset: true }).nullable(),
+  last_used_at: z.iso.datetime({ offset: true }).nullable(),
+  created_at: z.iso.datetime({ offset: true }),
+});
+
+export const listApiKeysResponse = z.object({ keys: z.array(apiKeySchema) });
+
+export const createApiKeyRequest = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  role: accessRoleSchema.default(DEFAULT_ACCESS_ROLE),
+  expires_at: z.iso.datetime({ offset: true }).nullable(),
+});
+
+/** `token` is the only time the full key leaves the server. */
+export const createApiKeyResponse = z.object({
+  key: apiKeySchema,
+  token: z.string(),
+});
+
+export type TApiKey = z.infer<typeof apiKeySchema>;
+export type TCreateApiKeyRequest = z.input<typeof createApiKeyRequest>;
+
+// --- /api/connected-apps (session only) ---
+
+export const connectedAppSchema = z.object({
+  id: z.uuid(),
+  client_name: z.string(),
+  role: accessRoleSchema,
+  last_used_at: z.iso.datetime({ offset: true }).nullable(),
+  created_at: z.iso.datetime({ offset: true }),
+});
+
+export const listConnectedAppsResponse = z.object({
+  apps: z.array(connectedAppSchema),
+});
+
+export type TConnectedApp = z.infer<typeof connectedAppSchema>;
+
+// --- /api/oauth/consent (session only) ---
+
+/** The authorize request's query, forwarded to the consent page unchanged. */
+export const oauthAuthorizeParams = z.object({
+  response_type: z.string(),
+  client_id: z.string(),
+  redirect_uri: z.string(),
+  code_challenge: z.string(),
+  code_challenge_method: z.string(),
+  state: z.string().optional(),
+  scope: z.string().optional(),
+  resource: z.string().optional(),
+});
+
+export const oauthConsentResponse = z.object({
+  client_name: z.string(),
+  redirect_host: z.string(),
+});
+
+export const oauthApproveRequest = z.object({
+  params: oauthAuthorizeParams,
+  role: accessRoleSchema,
+});
+
+export const oauthDenyRequest = z.object({ params: oauthAuthorizeParams });
+
+export const oauthRedirectResponse = z.object({ redirect_url: z.string() });
+
+export type TOAuthAuthorizeParams = z.infer<typeof oauthAuthorizeParams>;
+
+/** An empty body, for calls that only answer success. */
+export const okResponse = z.object({ ok: z.literal(true) });

@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as DeckIdIndexRouteImport } from './routes/deck/$id/index'
+import { Route as OauthConsentIndexRouteImport } from './routes/oauth/consent/index'
+import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-keys/index'
+import { Route as SettingsConnectedAppsIndexRouteImport } from './routes/settings/connected-apps/index'
 import { Route as StudyIdIndexRouteImport } from './routes/study/$id/index'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +32,22 @@ const DeckIdIndexRoute = DeckIdIndexRouteImport.update({
   path: '/deck/$id/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthConsentIndexRoute = OauthConsentIndexRouteImport.update({
+  id: '/oauth/consent/',
+  path: '/oauth/consent/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsApiKeysIndexRoute = SettingsApiKeysIndexRouteImport.update({
+  id: '/settings/api-keys/',
+  path: '/settings/api-keys/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsConnectedAppsIndexRoute =
+  SettingsConnectedAppsIndexRouteImport.update({
+    id: '/settings/connected-apps/',
+    path: '/settings/connected-apps/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const StudyIdIndexRoute = StudyIdIndexRouteImport.update({
   id: '/study/$id/',
   path: '/study/$id/',
@@ -39,12 +58,18 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/deck/$id/': typeof DeckIdIndexRoute
+  '/oauth/consent/': typeof OauthConsentIndexRoute
+  '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
+  '/settings/connected-apps/': typeof SettingsConnectedAppsIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sign-in': typeof SignInIndexRoute
   '/deck/$id': typeof DeckIdIndexRoute
+  '/oauth/consent': typeof OauthConsentIndexRoute
+  '/settings/api-keys': typeof SettingsApiKeysIndexRoute
+  '/settings/connected-apps': typeof SettingsConnectedAppsIndexRoute
   '/study/$id': typeof StudyIdIndexRoute
 }
 export interface FileRoutesById {
@@ -52,20 +77,48 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/deck/$id/': typeof DeckIdIndexRoute
+  '/oauth/consent/': typeof OauthConsentIndexRoute
+  '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
+  '/settings/connected-apps/': typeof SettingsConnectedAppsIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sign-in/' | '/deck/$id/' | '/study/$id/'
+  fullPaths:
+    | '/'
+    | '/sign-in/'
+    | '/deck/$id/'
+    | '/oauth/consent/'
+    | '/settings/api-keys/'
+    | '/settings/connected-apps/'
+    | '/study/$id/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sign-in' | '/deck/$id' | '/study/$id'
-  id: '__root__' | '/' | '/sign-in/' | '/deck/$id/' | '/study/$id/'
+  to:
+    | '/'
+    | '/sign-in'
+    | '/deck/$id'
+    | '/oauth/consent'
+    | '/settings/api-keys'
+    | '/settings/connected-apps'
+    | '/study/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/sign-in/'
+    | '/deck/$id/'
+    | '/oauth/consent/'
+    | '/settings/api-keys/'
+    | '/settings/connected-apps/'
+    | '/study/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SignInIndexRoute: typeof SignInIndexRoute
   DeckIdIndexRoute: typeof DeckIdIndexRoute
+  OauthConsentIndexRoute: typeof OauthConsentIndexRoute
+  SettingsApiKeysIndexRoute: typeof SettingsApiKeysIndexRoute
+  SettingsConnectedAppsIndexRoute: typeof SettingsConnectedAppsIndexRoute
   StudyIdIndexRoute: typeof StudyIdIndexRoute
 }
 
@@ -92,6 +145,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeckIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/consent/': {
+      id: '/oauth/consent/'
+      path: '/oauth/consent'
+      fullPath: '/oauth/consent/'
+      preLoaderRoute: typeof OauthConsentIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/api-keys/': {
+      id: '/settings/api-keys/'
+      path: '/settings/api-keys'
+      fullPath: '/settings/api-keys/'
+      preLoaderRoute: typeof SettingsApiKeysIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/connected-apps/': {
+      id: '/settings/connected-apps/'
+      path: '/settings/connected-apps'
+      fullPath: '/settings/connected-apps/'
+      preLoaderRoute: typeof SettingsConnectedAppsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/study/$id/': {
       id: '/study/$id/'
       path: '/study/$id'
@@ -106,6 +180,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SignInIndexRoute: SignInIndexRoute,
   DeckIdIndexRoute: DeckIdIndexRoute,
+  OauthConsentIndexRoute: OauthConsentIndexRoute,
+  SettingsApiKeysIndexRoute: SettingsApiKeysIndexRoute,
+  SettingsConnectedAppsIndexRoute: SettingsConnectedAppsIndexRoute,
   StudyIdIndexRoute: StudyIdIndexRoute,
 }
 export const routeTree = rootRouteImport

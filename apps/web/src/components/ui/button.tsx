@@ -6,7 +6,7 @@ import { LoaderIcon } from "lucide-react";
 import React from "react";
 
 const buttonVariants = cva(
-  "group/button max-w-full relative overflow-hidden text-ellipsis min-w-0 relative inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 data-placeholder:pointer-events-none data-placeholder:opacity-100 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "group/button max-w-full relative overflow-hidden text-ellipsis min-w-0 relative inline-flex items-center justify-center rounded-lg border border-transparent bg-clip-padding font-medium whitespace-nowrap outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 data-placeholder:pointer-events-none data-placeholder:opacity-100 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -18,6 +18,8 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground shadow-md shadow-shadow/shadow-muted-more",
         ghost:
           "hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
+        "ghost-destructive":
+          "hover:bg-destructive/15 hover:text-destructive active:bg-destructive/15 active:text-destructive aria-expanded:bg-destructive/15 aria-expanded:text-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
         destructive:
           "bg-destructive text-background border-destructive hover:bg-destructive/80 active:bg-destructive/80 focus-visible:border-destructive focus-visible:ring-destructive/25 shadow-md shadow-shadow/shadow-muted-more",
         warning:
@@ -52,6 +54,7 @@ const loaderColorClassMap: Record<TVariant, string> = {
   outline: "text-foreground",
   secondary: "text-secondary-foreground",
   ghost: "text-foreground",
+  "ghost-destructive": "text-destructive",
   destructive: "text-background",
   warning: "text-background",
   link: "text-primary",
@@ -62,6 +65,7 @@ const placeholderTextClassMap: Record<TVariant, string> = {
   outline: "group-data-placeholder/button:bg-foreground/20",
   secondary: "group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "group-data-placeholder/button:bg-foreground/20",
+  "ghost-destructive": "group-data-placeholder/button:bg-foreground/20",
   destructive: "group-data-placeholder/button:bg-background/20",
   warning: "group-data-placeholder/button:bg-background/20",
   link: "group-data-placeholder/button:bg-primary/20",
@@ -73,6 +77,7 @@ const placeholderDescendantTextClassMap: Record<TVariant, string> = {
   secondary:
     "[&_span]:group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "[&_span]:group-data-placeholder/button:bg-foreground/20",
+  "ghost-destructive": "[&_span]:group-data-placeholder/button:bg-foreground/20",
   destructive: "[&_span]:group-data-placeholder/button:bg-background/20",
   warning: "[&_span]:group-data-placeholder/button:bg-background/20",
   link: "[&_span]:group-data-placeholder/button:bg-primary/20",
@@ -83,6 +88,7 @@ const placeholderIconClassMap: Record<TVariant, string> = {
   outline: "[&_svg]:group-data-placeholder/button:bg-foreground/20",
   secondary: "[&_svg]:group-data-placeholder/button:bg-secondary-foreground/20",
   ghost: "[&_svg]:group-data-placeholder/button:bg-foreground/20",
+  "ghost-destructive": "[&_svg]:group-data-placeholder/button:bg-foreground/20",
   destructive: "[&_svg]:group-data-placeholder/button:bg-background/20",
   warning: "[&_svg]:group-data-placeholder/button:bg-background/20",
   link: "[&_svg]:group-data-placeholder/button:bg-primary/20",
@@ -126,7 +132,7 @@ function Button({
       data-placeholder={isPlaceholder ? "true" : undefined}
       className={cn(
         buttonVariants({ variant, size, className }),
-        "data-pending:text-transparent data-pending:transition-none",
+        "data-pending:text-transparent",
         placeholderIconClass,
         placeholderIconSkeletonClass,
         placeholderDescendantTextClass,

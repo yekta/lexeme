@@ -9,9 +9,15 @@ import { auth } from "./auth.ts";
 import { db } from "./db.ts";
 import { env } from "./env.ts";
 import { toErrorResponse } from "./errors.ts";
+import { apiKeyRoutes } from "./routes/api-keys.ts";
 import { avatarRoutes } from "./routes/avatar.ts";
 import { cardRoutes } from "./routes/cards.ts";
+import { connectedAppRoutes } from "./routes/connected-apps.ts";
 import { deckRoutes } from "./routes/decks.ts";
+import { mcpRoutes } from "./routes/mcp.ts";
+import { oauthRoutes } from "./routes/oauth.ts";
+import { oauthConsentRoutes } from "./routes/oauth-consent.ts";
+import { v1Routes } from "./routes/v1.ts";
 import { zeroRoutes } from "./routes/zero.ts";
 
 /**
@@ -40,13 +46,20 @@ console.info("[api] migrations applied");
 
 const app = new Hono();
 
+const appCors = cors({ origin: env.WEB_ORIGIN, credentials: true });
+// API keys are bearer tokens, never cookies, so any origin may call v1.
+const publicCors = cors({ origin: "*" });
+
 /**
  * Dev goes through the web dev server's proxy, so it is same-origin and this
  * does nothing. In production the app is on Cloudflare Pages and this is on
  * Railway: different origins, so every call needs an allow-list entry, and
  * `credentials` is what lets the session cookie ride along.
  */
-app.use("/api/*", cors({ origin: env.WEB_ORIGIN, credentials: true }));
+app.use("/api/*", async (c, next) => {
+  if (c.req.path.startsWith("/api/v1")) return publicCors(c, next);
+  return appCors(c, next);
+});
 
 /**
  * One place where a thrown error becomes a response, so no handler has to
@@ -67,6 +80,12 @@ app.route("/api/zero", zeroRoutes);
 app.route("/api/decks", deckRoutes);
 app.route("/api/cards", cardRoutes);
 app.route("/api/avatar", avatarRoutes);
+app.route("/api/api-keys", apiKeyRoutes);
+app.route("/api/connected-apps", connectedAppRoutes);
+app.route("/api/oauth/consent", oauthConsentRoutes);
+app.route("/api/v1", v1Routes);
+app.route("/mcp", mcpRoutes);
+app.route("/", oauthRoutes);
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.info(`[api] listening on :${info.port} (${env.NODE_ENV}), web origin ${env.WEB_ORIGIN}`);

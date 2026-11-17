@@ -3,6 +3,16 @@ import { SettleCover } from "@/components/settle-cover";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { FormFieldWrapper, FormWrapper } from "@/components/form";
 import { usePersistentForm } from "@/components/form-draft-provider";
+import {
+  EmptyList,
+  EmptyListContent,
+  EmptyListDescription,
+  EmptyListFooter,
+  EmptyListHeader,
+  EmptyListIcon,
+  EmptyListTitle,
+} from "@/components/empty-list";
+import CardsIcon from "@/components/icons/cards";
 import PlusIcon from "@/components/icons/plus-icon";
 import { CreateOrImportDeckButton } from "@/components/import-deck-button";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
@@ -34,6 +44,7 @@ import { usePlaceholderPhase } from "@/lib/settle";
 import { cn } from "@/lib/utils";
 import { createFileRoute } from "@tanstack/react-router";
 import { formatDuration, intervalToDuration } from "date-fns";
+import { CloudOffIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -464,35 +475,52 @@ function DecksSection({
      */
     if (isStalled) {
       return (
-        <div className="text-center py-20 bg-background rounded-lg border border-dashed">
-          <h3 className="text-lg font-medium text-foreground mb-2">
-            Couldn&apos;t load your decks
-          </h3>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto text-balance">
-            Your decks are safe but this device can&apos;t load them currently.
-          </p>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Try again
-          </Button>
-        </div>
+        <EmptyList hasBorder className="py-20 bg-background">
+          <EmptyListHeader>
+            <EmptyListIcon>
+              <CloudOffIcon />
+            </EmptyListIcon>
+            <EmptyListContent>
+              <EmptyListTitle className="text-lg">
+                Couldn&apos;t load your decks
+              </EmptyListTitle>
+              <EmptyListDescription className="text-balance">
+                Your decks are safe but this device can&apos;t load them
+                currently.
+              </EmptyListDescription>
+            </EmptyListContent>
+          </EmptyListHeader>
+          <EmptyListFooter>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
+          </EmptyListFooter>
+        </EmptyList>
       );
     }
 
     return (
-      <div className="text-center py-20 bg-background rounded-lg border border-dashed">
-        <h3 className="text-lg font-medium text-foreground mb-2">
-          No decks yet
-        </h3>
-        <p className="text-muted-foreground mb-6">
-          Create your first deck to start adding cards.
-        </p>
-        <Button onClick={onCreateDeck}>
-          <PlusIcon className="size-5 -ml-1.5 shrink-0" />
-          <span className="shrink min-w-0 overflow-hidden text-ellipsis">
-            Create Deck
-          </span>
-        </Button>
-      </div>
+      <EmptyList hasBorder className="py-20 bg-background">
+        <EmptyListHeader>
+          <EmptyListIcon>
+            <CardsIcon />
+          </EmptyListIcon>
+          <EmptyListContent>
+            <EmptyListTitle className="text-lg">No decks yet</EmptyListTitle>
+            <EmptyListDescription>
+              Create your first deck to start adding cards.
+            </EmptyListDescription>
+          </EmptyListContent>
+        </EmptyListHeader>
+        <EmptyListFooter>
+          <Button onClick={onCreateDeck}>
+            <PlusIcon className="size-5 -ml-1.5 shrink-0" />
+            <span className="shrink min-w-0 overflow-hidden text-ellipsis">
+              Create Deck
+            </span>
+          </Button>
+        </EmptyListFooter>
+      </EmptyList>
     );
   }
 

@@ -104,7 +104,7 @@ function ApiKeyList({ keys, isPending }: { keys: TApiKey[] | undefined; isPendin
 
   if (!keys || keys.length === 0) {
     return (
-      <EmptyList className="border border-dashed">
+      <EmptyList hasBorder>
         <EmptyListHeader>
           <EmptyListIcon>
             <KeyRoundIcon />

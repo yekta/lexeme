@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 function EmptyList({
   className,
+  hasBorder,
   ...props
 }: React.ComponentProps<"div"> & { hasBorder?: boolean }) {
   return (
@@ -11,6 +12,7 @@ function EmptyList({
       data-slot="empty-list"
       className={cn(
         "w-full text-center flex flex-col items-center gap-5 rounded-xl py-10",
+        hasBorder && "border border-dashed px-8",
         className,
       )}
       {...props}

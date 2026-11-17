@@ -22,6 +22,17 @@ const crossOriginIsolation = {
 /** Where the API lives in dev. Must match the health check in `pnpm dev`. */
 const devApiTarget = "http://localhost:3001";
 
+/**
+ * MCP clients find the OAuth server from `/.well-known` at the API's root, and
+ * `BETTER_AUTH_URL` is this dev server, so those paths go through too.
+ * `/oauth/consent` is not among them: it is a page in this app.
+ */
+const devProxy = Object.fromEntries(
+  ["/api", "/mcp", "/.well-known", "/oauth/authorize", "/oauth/token", "/oauth/register"].map(
+    (path) => [path, devApiTarget],
+  ),
+);
+
 export default defineConfig({
   plugins: [
     // File-based routing, same convention as before: a file under src/routes is
@@ -44,7 +55,7 @@ export default defineConfig({
     headers: crossOriginIsolation,
     // The API is fronted by the dev server so the session cookie stays
     // first-party and no CORS or COOKIE_DOMAIN setup is needed to develop.
-    proxy: { "/api": devApiTarget },
+    proxy: devProxy,
   },
   // `server.proxy` does not apply to preview, so repeat it; otherwise the
   // production bundle cannot reach auth and the preview is unusable for the
@@ -52,6 +63,6 @@ export default defineConfig({
   preview: {
     port: 4173,
     headers: crossOriginIsolation,
-    proxy: { "/api": devApiTarget },
+    proxy: devProxy,
   },
 });

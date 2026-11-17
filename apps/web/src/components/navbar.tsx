@@ -14,12 +14,15 @@ import { AvailableThemesEnum, DEFAULT_NON_SYSTEM_THEME, TTheme } from "@/lib/con
 import { proxiedImageUrl } from "@/lib/image";
 import {
   ArrowLeftIcon,
+  BlocksIcon,
+  KeyRoundIcon,
   LoaderIcon,
   LogOutIcon,
   MonitorSmartphoneIcon,
   MoonIcon,
   SunIcon,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
 import { useState } from "react";
 
@@ -129,6 +132,15 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
               <DropdownMenuContent align="end" className="min-w-48">
                 <DropdownMenuItem className="font-normal pointer-events-none py-1.25 text-xs text-muted-foreground">
                   <DropdownMenuItemText>{user.email}</DropdownMenuItemText>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link to="/settings/api-keys" />}>
+                  <KeyRoundIcon className="size-5 shrink-0" />
+                  <DropdownMenuItemText>API Keys</DropdownMenuItemText>
+                </DropdownMenuItem>
+                <DropdownMenuItem render={<Link to="/settings/connected-apps" />}>
+                  <BlocksIcon className="size-5 shrink-0" />
+                  <DropdownMenuItemText>Connected Apps</DropdownMenuItemText>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <ThemeMenuItem />

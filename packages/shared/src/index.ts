@@ -1,3 +1,4 @@
+export * from "./access-role.ts";
 export * from "./card-state.ts";
 export * from "./constants.ts";
 export * from "./deck-export.ts";

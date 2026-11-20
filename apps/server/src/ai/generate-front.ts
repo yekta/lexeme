@@ -1,7 +1,6 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { aiClientConfig, getClient } from "./client.ts";
+import { generateStructured } from "./client.ts";
 
 const frontSchema = z.object({
   front: z.string(),
@@ -31,21 +30,13 @@ export async function generateFront({
       ? `\n\nAlready suggested and passed on this session (do not repeat):\n${rejectedFronts.map((f) => `- ${f}`).join("\n")}`
       : "";
 
-  const response = await getClient().messages.parse({
-    model: aiClientConfig.model,
-    max_tokens: aiClientConfig.maxTokens,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "high", format: zodOutputFormat(frontSchema) },
+  const output = await generateStructured({
     system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Existing fronts:\n${fronts}${rejected}\n\nSuggest the front of one new card for this deck.`,
-      },
-    ],
+    prompt: `Existing fronts:\n${fronts}${rejected}\n\nSuggest the front of one new card for this deck.`,
+    schema: frontSchema,
   });
 
-  const front = response.parsed_output?.front?.trim();
+  const front = output.front.trim();
   if (!front) {
     throw new Error("Model did not return a usable front side.");
   }

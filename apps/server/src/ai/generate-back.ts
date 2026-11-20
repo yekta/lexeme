@@ -1,7 +1,6 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
-import { aiClientConfig, getClient } from "./client.ts";
+import { generateStructured } from "./client.ts";
 
 const backSchema = z.object({
   back: z.string(),
@@ -25,21 +24,13 @@ export async function generateBack({
     .map((c) => `Front: ${c.front}\nBack: ${c.back}`)
     .join("\n\n");
 
-  const response = await getClient().messages.parse({
-    model: aiClientConfig.model,
-    max_tokens: aiClientConfig.maxTokens,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "high", format: zodOutputFormat(backSchema) },
+  const output = await generateStructured({
     system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Previous cards:\n\n${examples}\n\nNew card front: ${front}\n\nGenerate the back for the new card.`,
-      },
-    ],
+    prompt: `Previous cards:\n\n${examples}\n\nNew card front: ${front}\n\nGenerate the back for the new card.`,
+    schema: backSchema,
   });
 
-  const back = response.parsed_output?.back?.trim();
+  const back = output.back.trim();
   if (!back) {
     throw new Error("Model did not return a usable back side.");
   }

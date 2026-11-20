@@ -13,7 +13,7 @@ const INSTRUCTIONS = `Lexeme is a spaced repetition app. Cards live in decks; ea
 
 Call whoami first: it tells you the role of this connection. A viewer can only read, an editor can also create, change, import and review, and an admin can also delete. Tools above the role are not offered.
 
-Ids come from list-decks, list-cards and list-learning-profiles. Before adding cards, search the deck with list-cards to avoid duplicates. Keep cards short and atomic: one fact per card.
+Ids come from list-decks, list-cards and list-learning-profiles. Before adding cards, search the deck with list-cards to avoid duplicates. Keep cards short and atomic: one fact per card. generate-card and generate-back write cards in the style of the deck's existing ones but save nothing; add the ones the user keeps with add-cards.
 
 To quiz the user, call get-study-queue, show one card's front, wait for their answer, show the back, then record how it went with review-card. Rate honestly: again when they forgot, hard when it was a struggle, good when they recalled it, easy when it was effortless.
 

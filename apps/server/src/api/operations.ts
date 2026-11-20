@@ -3,6 +3,7 @@ import { cards, decks, learningProfiles, reviewLogs, user } from "@lexeme/db";
 import {
   DECK_EXPORT_KIND,
   DECK_EXPORT_VERSION,
+  GENERATE_CARD_EXCLUDE_FRONTS_LIMIT,
   Rating,
   computeStudyBuckets,
   createUserScheduler,
@@ -16,6 +17,7 @@ import {
 import { and, asc, desc, eq, gte, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
+import { generateBackForDeck, generateCardForDeck } from "../ai/generate-card.ts";
 import type { TCaller } from "../caller.ts";
 import { db } from "../db.ts";
 import { ApiError } from "../errors.ts";
@@ -400,6 +402,45 @@ export const operations: TOperation[] = [
         back: input.back ?? card.back,
       });
       return { card: presentCard(await mustFindCard(caller.userId, card.id)) };
+    },
+  }),
+
+  defineOperation({
+    name: "generate-card",
+    title: "Generate card",
+    description:
+      "Suggest one new card that fits a deck and follows the style of its existing cards. Nothing is saved: add it with add-cards if the user keeps it. The deck needs at least one card.",
+    role: "editor",
+    method: "POST",
+    path: "/decks/:deck_id/generate-card",
+    input: z.object({
+      deck_id: deckId,
+      exclude_fronts: z
+        .array(z.string().trim().min(1))
+        .max(GENERATE_CARD_EXCLUDE_FRONTS_LIMIT)
+        .default([])
+        .describe("Fronts already suggested and turned down, so they are not suggested again."),
+    }),
+    run: async (caller, input) => {
+      await mustFindDeck(caller.userId, input.deck_id);
+      return {
+        card: await generateCardForDeck({ deckId: input.deck_id, excludeFronts: input.exclude_fronts }),
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "generate-back",
+    title: "Generate back",
+    description:
+      "Write the back for a front, following the style of the deck's existing cards. Nothing is saved. The deck needs at least one other card.",
+    role: "editor",
+    method: "POST",
+    path: "/decks/:deck_id/generate-back",
+    input: z.object({ deck_id: deckId, front: cardContent.shape.front }),
+    run: async (caller, input) => {
+      await mustFindDeck(caller.userId, input.deck_id);
+      return { back: await generateBackForDeck({ deckId: input.deck_id, front: input.front }) };
     },
   }),
 

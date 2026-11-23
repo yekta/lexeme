@@ -18,6 +18,7 @@ import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
 import { useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
@@ -149,10 +150,12 @@ function isReadingNow(book: TBook) {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground truncate">{label}</span>
-      <span className="text-xl font-semibold tabular-nums truncate">{value}</span>
-    </div>
+    <Card size="sm" className="min-w-0">
+      <CardHeader>
+        <CardDescription className="truncate">{label}</CardDescription>
+        <span className="text-xl font-semibold tabular-nums truncate">{value}</span>
+      </CardHeader>
+    </Card>
   );
 }
 
@@ -188,31 +191,29 @@ function DailyBars({ days }: { days: TReadingDay[] }) {
 
 function BookRow({ book }: { book: TBook }) {
   const percent = Math.round((book.progress ?? 0) * 100);
+  const finished = book.status === "finished";
+  const status = finished
+    ? `Finished${book.finished_at ? ` ${format(book.finished_at, "d MMM yyyy")}` : ""}`
+    : book.last_read_at
+      ? `Read ${formatDistanceToNowStrict(book.last_read_at, { addSuffix: true })}`
+      : null;
   return (
-    <Link
-      to="/reading/$id"
-      params={{ id: book.id }}
-      className="min-w-0 rounded-xl border bg-card p-4 flex flex-col gap-2 hover:border-foreground/30 transition-colors"
-    >
-      <div className="flex flex-col gap-0.5 min-w-0">
-        <span className="font-medium truncate">{book.title}</span>
-        {book.authors && <span className="text-sm text-muted-foreground truncate">{book.authors}</span>}
-      </div>
-      {book.status === "finished" ? (
-        <span className="text-xs text-muted-foreground">
-          Finished{book.finished_at ? ` ${format(book.finished_at, "d MMM yyyy")}` : ""}
-        </span>
-      ) : (
-        <div className="flex items-center gap-3">
-          <Progress value={percent} className="flex-1" />
-          <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">{percent}%</span>
-        </div>
-      )}
-      {book.status !== "finished" && book.last_read_at && (
-        <span className="text-xs text-muted-foreground">
-          Read {formatDistanceToNowStrict(book.last_read_at, { addSuffix: true })}
-        </span>
-      )}
+    <Link to="/reading/$id" params={{ id: book.id }} className="min-w-0 rounded-xl">
+      <Card className="h-full hover:border-foreground/30 transition-colors">
+        <CardHeader>
+          <CardTitle className="truncate">{book.title}</CardTitle>
+          {book.authors && <CardDescription className="truncate">{book.authors}</CardDescription>}
+        </CardHeader>
+        <CardContent className="flex-1 flex flex-col justify-end gap-2">
+          {!finished && (
+            <div className="flex items-center gap-3">
+              <Progress value={percent} className="flex-1" />
+              <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">{percent}%</span>
+            </div>
+          )}
+          {status && <span className="text-sm text-muted-foreground truncate">{status}</span>}
+        </CardContent>
+      </Card>
     </Link>
   );
 }

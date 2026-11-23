@@ -9,6 +9,7 @@ import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
+import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
 import { useReading } from "@/hooks/data/use-reading";
@@ -136,9 +137,11 @@ function BookPage() {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground truncate">{label}</span>
-      <span className="font-semibold tabular-nums truncate">{value}</span>
-    </div>
+    <Card size="sm" className="min-w-0">
+      <CardHeader>
+        <CardDescription className="truncate">{label}</CardDescription>
+        <span className="text-lg font-semibold tabular-nums truncate">{value}</span>
+      </CardHeader>
+    </Card>
   );
 }

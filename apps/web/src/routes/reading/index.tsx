@@ -131,10 +131,15 @@ function ReadingPage() {
                   {finished.slice(0, RECENT_FINISHED).map((book) => (
                     <BookCard key={book.id} book={book} />
                   ))}
+                  {finished.length > RECENT_FINISHED && (
+                    <SeeAllRow
+                      href="/reading/finished"
+                      more={finished.length - RECENT_FINISHED}
+                      standalone
+                      className="col-span-full"
+                    />
+                  )}
                 </div>
-                {finished.length > RECENT_FINISHED && (
-                  <SeeAllRow href="/reading/finished" more={finished.length - RECENT_FINISHED} standalone />
-                )}
               </section>
             )}
           </>

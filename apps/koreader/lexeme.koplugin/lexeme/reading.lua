@@ -95,7 +95,9 @@ function Reading.books()
                 local listed = Books.forPath(file)
                 aliases[file:match("([^/]+)%.[^.]+$")] = key
                 local title = text(props.title) or listed.title
-                local finished = summary.status == "complete"
+                local progress = settings:readSetting("percent_finished")
+                -- A book read to the end counts as read even if nobody marked it.
+                local finished = summary.status == "complete" or (progress or 0) >= 1
                 table.insert(books, {
                     id = Reading.stableId("book:" .. key),
                     key = key,
@@ -106,8 +108,8 @@ function Reading.books()
                     description = text(props.description),
                     rating = tonumber(summary.rating) and summary.rating >= 1 and math.floor(summary.rating) or nil,
                     review = text(summary.note),
-                    progress = settings:readSetting("percent_finished"),
-                    status = status(summary.status),
+                    progress = progress,
+                    status = finished and "finished" or status(summary.status),
                     pages = settings:readSetting("doc_pages"),
                     last_read_at = (entry.time or 0) * 1000,
                     finished_at = finished and (parseDatetime(summary.modified) or (entry.time or 0) * 1000) or nil,
@@ -117,6 +119,31 @@ function Reading.books()
         end
     end
     return books, highlights, aliases
+end
+
+--[[
+Books deleted from the device: history entries whose file is gone but whose
+settings still know the book's key. Books still present under another path are
+left alone. Returns { key, file } pairs.
+]]
+function Reading.removedBooks(present)
+    local removed = {}
+    for _, entry in ipairs(ReadHistory.hist) do
+        local file = entry.file
+        if file and lfs.attributes(file, "mode") ~= "file" then
+            local key = DocSettings:open(file):readSetting("partial_md5_checksum")
+            if key and not present[key] then table.insert(removed, { key = key, file = file }) end
+        end
+    end
+    return removed
+end
+
+-- Drops what's left of deleted books once Lexeme has been told, so they're sent once.
+function Reading.forget(removed)
+    for _, book in ipairs(removed) do
+        DocSettings:open(book.file):purge()
+        ReadHistory:removeItemByPath(book.file)
+    end
 end
 
 local function query(path, sql)
@@ -215,7 +242,12 @@ function Reading.snapshot(since)
         key_by_title[book.title] = book.key
     end
     local recent = math.max(0, since - 6 * 3600)
+    local removed = Reading.removedBooks(keys)
+    local removed_keys = {}
+    for _, book in ipairs(removed) do table.insert(removed_keys, book.key) end
     return {
+        removed = removed,
+        removed_book_keys = removed_keys,
         books = books,
         page_reads = Reading.pageReads(recent, keys),
         highlights = highlights,

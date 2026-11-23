@@ -55,9 +55,16 @@ function BookPage() {
                 <h1 className="text-2xl font-semibold text-balance wrap-break-word">{book.title}</h1>
                 {book.authors && <p className="text-muted-foreground">{book.authors}</p>}
               </div>
-              <Progress value={percent} />
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Fact label="Progress" value={`${percent}%`} />
+                <Card className="min-w-0 py-3">
+                  <CardHeader>
+                    <CardDescription>Progress</CardDescription>
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg font-semibold tabular-nums">{percent}%</span>
+                      <Progress value={percent} className="flex-1" />
+                    </div>
+                  </CardHeader>
+                </Card>
                 <Fact label="Time read" value={formatReadingTime(totalSeconds)} />
                 <Fact label="Days read" value={String(days.length)} />
                 <Fact
@@ -94,14 +101,14 @@ function BookPage() {
                   {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
                     <HighlightItem key={highlight.id} highlight={highlight} />
                   ))}
+                  {highlights.length > RECENT_HIGHLIGHTS && (
+                    <SeeAllRow
+                      href={`/reading/${id}/highlights`}
+                      more={highlights.length - RECENT_HIGHLIGHTS}
+                      standalone
+                    />
+                  )}
                 </div>
-                {highlights.length > RECENT_HIGHLIGHTS && (
-                  <SeeAllRow
-                    href={`/reading/${id}/highlights`}
-                    more={highlights.length - RECENT_HIGHLIGHTS}
-                    standalone
-                  />
-                )}
               </section>
             )}
 

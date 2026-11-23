@@ -62,7 +62,7 @@ local function amazonBooks()
         if not books[cde] or opened then
             local path = convertedPath(title)
             local key = path and Reading.bookKey(path) or "kindle:" .. cde
-            local finished = tonumber(row[6]) == 2
+            local finished = tonumber(row[6]) == 2 or (percent or 0) >= 100
             local last_read = (tonumber(row[5]) or 0) * 1000
             books[cde] = {
                 id = Reading.stableId("book:" .. key),

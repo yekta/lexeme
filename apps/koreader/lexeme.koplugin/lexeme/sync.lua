@@ -13,9 +13,9 @@ local Reading = require("lexeme/reading")
 local Sync = {}
 
 -- Bumped when a sync starts sending something new, so the next one sends it all.
-local SYNC_VERSION = 3
+local SYNC_VERSION = 4
 
-local CHUNK = { books = 200, page_reads = 2000, highlights = 500, lookups = 500 }
+local CHUNK = { books = 200, page_reads = 2000, highlights = 500, lookups = 500, removed_book_keys = 500 }
 
 function Sync.isConnected()
     return Api.token() ~= nil
@@ -40,7 +40,7 @@ sent as a JSON object, which the server refuses.
 ]]
 function Sync.queueReading(snapshot)
     local queued = false
-    for _, kind in ipairs({ "books", "page_reads", "highlights", "lookups" }) do
+    for _, kind in ipairs({ "books", "page_reads", "highlights", "lookups", "removed_book_keys" }) do
         local rows = snapshot[kind] or {}
         for first = 1, #rows, CHUNK[kind] do
             local body = { [kind] = {} }
@@ -65,7 +65,14 @@ local function changedSince(snapshot, since)
     for _, highlight in ipairs(snapshot.highlights) do
         if changed[highlight.book_key] then table.insert(highlights, highlight) end
     end
-    return { books = books, page_reads = snapshot.page_reads, highlights = highlights, lookups = snapshot.lookups }
+    return {
+        books = books,
+        page_reads = snapshot.page_reads,
+        highlights = highlights,
+        lookups = snapshot.lookups,
+        removed = snapshot.removed,
+        removed_book_keys = snapshot.removed_book_keys,
+    }
 end
 
 local running = false
@@ -85,7 +92,9 @@ function Sync.run(on_done)
         if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
         local since = G_reader_settings:readSetting("lexeme_sync_version") == SYNC_VERSION
             and Sync.lastSyncedAt() or 0
-        Sync.queueReading(changedSince(Reading.snapshot(since), since))
+        local snapshot = changedSince(Reading.snapshot(since), since)
+        Sync.queueReading(snapshot)
+        Reading.forget(snapshot.removed)
         local _, failure = Outbox.flush()
         if failure then error(failure, 0) end
         local _, delivery_failure = require("lexeme/delivery").run()

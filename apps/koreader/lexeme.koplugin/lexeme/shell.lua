@@ -115,8 +115,15 @@ function Shell:toggleRead(book)
 end
 
 function Shell:deleteBook(book)
+    local settings = require("docsettings"):open(book.path)
+    local key = settings:readSetting("partial_md5_checksum")
+    if key then
+        local Sync = require("lexeme/sync")
+        Sync.queueReading{ removed_book_keys = { key } }
+        Sync.soon()
+    end
     -- Settings can be beside the book or in KOReader's folder; purge clears every copy.
-    require("docsettings"):open(book.path):purge()
+    settings:purge()
     os.remove(book.path)
     require("readhistory"):removeItemByPath(book.path)
     self:reload()

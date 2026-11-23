@@ -88,7 +88,7 @@ function SendPage() {
           onDrop={onDrop}
           className={cn(
             "rounded-xl border-2 border-dashed px-6 py-10 flex flex-col items-center gap-2 text-center",
-            dragging ? "border-primary bg-accent" : "hover:bg-accent/50",
+            dragging ? "border-primary bg-accent" : "hover:bg-accent/50 active:bg-accent/50",
           )}
         >
           {send.isPending ? (

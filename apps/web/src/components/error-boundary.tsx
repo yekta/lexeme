@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<TProps, TState> {
           </h1>
           <p className="text-muted-foreground mb-4 max-w-md">{errorMessage}</p>
           <button
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 active:bg-primary/90"
             onClick={() => this.setState({ hasError: false, error: null })}
           >
             Try again

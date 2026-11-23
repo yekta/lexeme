@@ -87,11 +87,11 @@ function ChartFrame({
             className="group relative flex-1 h-full flex items-end enabled:cursor-pointer"
           >
             <div
-              className={cn("w-full rounded-t-[4px] bg-primary group-enabled:group-hover:opacity-80", bar.seconds === 0 && "bg-transparent")}
+              className={cn("w-full rounded-t-[4px] bg-primary group-enabled:group-hover:opacity-80 group-enabled:group-active:opacity-80", bar.seconds === 0 && "bg-transparent")}
               style={{ height: `${(bar.seconds / max) * 100}%` }}
             />
             {bar.seconds > 0 && (
-              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md z-10">
+              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block group-active:block whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md z-10">
                 {bar.tip}
               </div>
             )}

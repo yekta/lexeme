@@ -47,7 +47,7 @@ export function BookCard({ book }: { book: TBook }) {
   const finished = book.status === "finished";
   return (
     <Link to="/reading/$id" params={{ id: book.id }} className="group/book min-w-0 flex flex-col gap-2.5">
-      <BookCover book={book} className="transition-transform group-hover/book:-translate-y-1" />
+      <BookCover book={book} className="transition-transform group-hover/book:-translate-y-1 group-active/book:-translate-y-1" />
       {finished ? (
         <span className="text-xs text-muted-foreground truncate">
           {book.finished_at ? format(book.finished_at, "d MMM yyyy") : "Finished"}

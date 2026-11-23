@@ -29,6 +29,8 @@ G_reader_settings:saveSetting("document_metadata_folder", "dir")
 -- Lay a book out fully on every change; KOReader's partial relayouts reload the book
 -- later, when it's idle, and can land back on an older page.
 G_reader_settings:saveSetting("cre_partial_rerendering", false)
+-- Vocabulary Builder keeps the sentence each looked-up word was read in, which Lexeme shows.
+G_reader_settings:saveSetting("vocabulary_builder", { enabled = true, with_context = true })
 
 local Lexeme = WidgetContainer:extend{
     name = "lexeme",

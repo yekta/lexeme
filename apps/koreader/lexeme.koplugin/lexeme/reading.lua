@@ -191,41 +191,59 @@ function Reading.pageReads(since, known_keys)
     return reads
 end
 
+-- The sentence a word was read in, from the text Vocabulary Builder kept around it.
 local function contextOf(before, word, after)
-    local text = ((before or "") .. " " .. word .. " " .. (after or "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
+    local text = require("lexeme/words").sentence(before, word, after):gsub("%s+", " ")
     return text ~= word and text or nil
 end
 
 --[[
-Words looked up in KOReader since `since`: the dictionary's lookup history and
-Vocabulary Builder (which keeps the sentence around each word). Books are
-matched by title, as both only know a book by its title.
+Words looked up in KOReader since `since`. The dictionary's lookup history has
+every look-up; Vocabulary Builder keeps one row per word with the sentence it
+was read in, which goes on the look-up it came from. A word only in Vocabulary
+Builder is sent as its own look-up. Books are matched by title, the only thing
+either knows them by.
 ]]
 function Reading.lookups(since, key_by_title)
-    local lookups = {}
+    local vocabulary = {}
     for _, row in ipairs(query(DataStorage:getSettingsDir() .. "/vocabulary_builder.sqlite3", string.format([[
         SELECT v.word, t.name, v.create_time, v.prev_context, v.next_context
         FROM vocabulary v LEFT JOIN title t ON t.id = v.title_id
         WHERE v.create_time >= %d;]], math.floor(since)))) do
-        table.insert(lookups, {
-            id = Reading.stableId("koreader-vocabulary:" .. row[1]),
-            book_key = row[2] and key_by_title[row[2]] or nil,
-            word = row[1],
+        vocabulary[row[1]] = {
+            title = row[2],
+            at = tonumber(row[3]) or 0,
             context = contextOf(row[4], row[1], row[5]),
-            looked_up_at = (tonumber(row[3]) or 0) * 1000,
-        })
+        }
     end
+
+    local lookups = {}
     local ok, history = pcall(function()
         return require("luadata"):open(DataStorage:getSettingsDir() .. "/lookup_history.lua", "LookupHistory")
             :readSetting("lookup_history")
     end)
     for _, entry in ipairs(ok and history or {}) do
         if entry.word and (entry.time or 0) >= since then
+            local saved = vocabulary[entry.word]
+            local same = saved and math.abs(saved.at - entry.time) <= 60
+            if same then saved.matched = true end
             table.insert(lookups, {
                 id = Reading.stableId("koreader-lookup:" .. entry.word .. ":" .. tostring(entry.time)),
                 book_key = entry.book_title and key_by_title[entry.book_title] or nil,
                 word = entry.word,
-                looked_up_at = (entry.time or 0) * 1000,
+                context = same and saved.context or nil,
+                looked_up_at = entry.time * 1000,
+            })
+        end
+    end
+    for word, saved in pairs(vocabulary) do
+        if not saved.matched then
+            table.insert(lookups, {
+                id = Reading.stableId("koreader-vocabulary:" .. word),
+                book_key = saved.title and key_by_title[saved.title] or nil,
+                word = word,
+                context = saved.context,
+                looked_up_at = saved.at * 1000,
             })
         end
     end

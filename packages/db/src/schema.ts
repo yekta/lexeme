@@ -244,6 +244,119 @@ export const reviewLogs = pgTable(
   ],
 );
 
+// Reading data sent by paired e-readers. Synced to the app, so every table
+// carries its owner. Ids are minted on the device so a resent outbox entry
+// updates the row it already created instead of adding another.
+
+/** A book as one device knows it; `key` is that device's identity for the file. */
+export const books = pgTable(
+  "books",
+  {
+    id: uuid("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    title: text("title").notNull(),
+    authors: text("authors"),
+    /** 0..1 */
+    progress: real("progress"),
+    /** "reading" | "finished" | "abandoned" */
+    status: text("status").notNull(),
+    pages: integer("pages"),
+    last_read_at: timestamp("last_read_at", { withTimezone: true }),
+    finished_at: timestamp("finished_at", { withTimezone: true }),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => [uniqueIndex("books_user_id_key_idx").on(t.user_id, t.key)],
+);
+
+/** Time spent in one book on one calendar day, in the device's time zone. */
+export const readingDays = pgTable(
+  "reading_days",
+  {
+    id: uuid("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    book_id: uuid("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    /** YYYY-MM-DD */
+    day: text("day").notNull(),
+    seconds: integer("seconds").notNull(),
+    pages: integer("pages").notNull(),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("reading_days_book_id_day_idx").on(t.book_id, t.day),
+    index("reading_days_user_id_idx").on(t.user_id),
+  ],
+);
+
+export const highlights = pgTable(
+  "highlights",
+  {
+    id: uuid("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    book_id: uuid("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    note: text("note"),
+    chapter: text("chapter"),
+    page: text("page"),
+    highlighted_at: timestamp("highlighted_at", { withTimezone: true }).notNull(),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => [index("highlights_user_id_idx").on(t.user_id)],
+);
+
+/** A word looked up or added while reading; `card_id` is set once it became a card. */
+export const lookups = pgTable(
+  "lookups",
+  {
+    id: uuid("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    book_id: uuid("book_id").references(() => books.id, { onDelete: "set null" }),
+    word: text("word").notNull(),
+    context: text("context"),
+    card_id: uuid("card_id").references(() => cards.id, { onDelete: "set null" }),
+    looked_up_at: timestamp("looked_up_at", { withTimezone: true }).notNull(),
+    created_at: createdAt(),
+  },
+  (t) => [index("lookups_user_id_idx").on(t.user_id)],
+);
+
+/**
+ * Books sent from Lexeme to the user's e-readers. The file is in object storage
+ * under `storage_key`; a device downloads it and marks it delivered.
+ */
+export const sentBooks = pgTable(
+  "sent_books",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    file_name: text("file_name").notNull(),
+    content_type: text("content_type").notNull(),
+    size_bytes: integer("size_bytes").notNull(),
+    storage_key: text("storage_key").notNull(),
+    delivered_at: timestamp("delivered_at", { withTimezone: true }),
+    created_at: createdAt(),
+  },
+  (t) => [index("sent_books_user_id_idx").on(t.user_id)],
+);
+
 // API keys and connected apps. Server-only: never added to the zero_data
 // publication, so token hashes stay out of client replicas.
 export const apiKeys = pgTable(
@@ -326,9 +439,28 @@ export const oauthTokens = pgTable(
   (t) => [index("oauth_tokens_grant_id_idx").on(t.grant_id)],
 );
 
+/**
+ * A device asking to be paired. The device shows `user_code` (as text and a QR
+ * code), someone signed in approves it on the web, and the device's next poll
+ * with its secret turns the approval into an API key. Server-only.
+ */
+export const devicePairings = pgTable("device_pairings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  user_code: text("user_code").notNull().unique(),
+  poll_token_hash: text("poll_token_hash").notNull().unique(),
+  device_name: text("device_name").notNull(),
+  user_id: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+  api_key_id: uuid("api_key_id").references(() => apiKeys.id, { onDelete: "set null" }),
+  expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+  approved_at: timestamp("approved_at", { withTimezone: true }),
+  claimed_at: timestamp("claimed_at", { withTimezone: true }),
+  created_at: createdAt(),
+});
+
 export type TUser = typeof user.$inferSelect;
 export type TDeck = typeof decks.$inferSelect;
 export type TCard = typeof cards.$inferSelect;
 export type TLearningProfile = typeof learningProfiles.$inferSelect;
 export type TReviewLog = typeof reviewLogs.$inferSelect;
+export type TSentBook = typeof sentBooks.$inferSelect;
 

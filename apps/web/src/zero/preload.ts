@@ -80,6 +80,11 @@ export function preloadAccount(zero: Zero<TSchema>): void {
     const logs = zero.preload(queries.reviewLogs(), { ttl: "forever" });
     void logs.complete.then(() => {
       preloaded.setState((s) => ({ ...s, logs: true }));
+      // Reading data from paired e-readers: only its own screens read it.
+      zero.preload(queries.books(), { ttl: "forever" });
+      zero.preload(queries.readingDays(), { ttl: "forever" });
+      zero.preload(queries.highlights(), { ttl: "forever" });
+      zero.preload(queries.lookups(), { ttl: "forever" });
     });
   });
 }

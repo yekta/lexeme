@@ -1,0 +1,12 @@
+/* KOReader's defaults, then the two places the Kindle differs: paragraphs
+   indent 1em unless the book says otherwise, and the book's own body margins
+   don't add to the reader's. */
+@import url("../../data/epub.css");
+
+p {
+  text-indent: 1em;
+}
+
+body {
+  margin: 0 !important;
+}

@@ -3,6 +3,7 @@ import type { Transaction } from "@rocicorp/zero";
 import { z } from "zod";
 
 import {
+  BOOK_STATUSES,
   CARD_STATES,
   DEFAULT_MAX_REVIEWS_PER_DAY,
   DEFAULT_NEW_CARDS_PER_DAY,
@@ -137,6 +138,71 @@ export const calibrateProfileArgs = z.object({
       }),
     )
     .max(10_000),
+});
+
+// Reading data from a paired e-reader. Books are identified by the device's
+// key for the file; everything else names its book by that key too, so one
+// request can introduce a book and the rows that belong to it.
+const bookKey = z.string().trim().min(1).max(500);
+const optionalText = z.string().trim().max(20_000).nullish();
+const epochMs = z.number().int().min(0);
+
+export const syncReadingArgs = z.object({
+  books: z
+    .array(
+      z.object({
+        id: uuidArg,
+        key: bookKey,
+        title: z.string().trim().min(1).max(1000),
+        authors: z.string().trim().max(1000).nullish(),
+        progress: z.number().min(0).max(1).nullish(),
+        status: z.enum(BOOK_STATUSES),
+        pages: z.number().int().min(0).nullish(),
+        last_read_at: epochMs.nullish(),
+        finished_at: epochMs.nullish(),
+      }),
+    )
+    .max(2000)
+    .default([]),
+  days: z
+    .array(
+      z.object({
+        id: uuidArg,
+        book_key: bookKey,
+        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        seconds: z.number().int().min(0),
+        pages: z.number().int().min(0),
+      }),
+    )
+    .max(10_000)
+    .default([]),
+  highlights: z
+    .array(
+      z.object({
+        id: uuidArg,
+        book_key: bookKey,
+        text: z.string().trim().min(1).max(20_000),
+        note: optionalText,
+        chapter: z.string().trim().max(1000).nullish(),
+        page: z.string().trim().max(50).nullish(),
+        highlighted_at: epochMs,
+      }),
+    )
+    .max(5000)
+    .default([]),
+  lookups: z
+    .array(
+      z.object({
+        id: uuidArg,
+        book_key: bookKey.nullish(),
+        word: z.string().trim().min(1).max(200),
+        context: optionalText,
+        card_id: uuidArg.nullish(),
+        looked_up_at: epochMs,
+      }),
+    )
+    .max(5000)
+    .default([]),
 });
 
 // --- access ---
@@ -333,6 +399,119 @@ export const mutatorDefs = {
         duration_ms: args.duration_ms,
         created_at: Date.now(),
       });
+    }),
+  },
+
+  reading: {
+    /**
+     * Upserts what a device reports. Safe to repeat: books match on the
+     * device's key, reading days on (book, day), and highlights and lookups on
+     * the ids the device minted, so a resent outbox entry changes nothing.
+     */
+    sync: defineMutator(syncReadingArgs, async ({ tx, ctx, args }) => {
+      const { user_id } = mustBeSignedIn(ctx);
+      const now = Date.now();
+      const bookIds = new Map<string, string>();
+
+      async function findBookId(key: string) {
+        const known = bookIds.get(key);
+        if (known) return known;
+        const book = await tx.run(zql.books.where("user_id", user_id).where("key", key).one());
+        if (book) bookIds.set(key, book.id);
+        return book?.id;
+      }
+
+      async function bookId(key: string) {
+        const id = await findBookId(key);
+        if (!id) throw new Error(`No book with key ${key}. Send the book first.`);
+        return id;
+      }
+
+      function mustBeMineOrNew(row: { user_id: string } | undefined) {
+        if (row && row.user_id !== user_id) throw new Error("That id belongs to someone else.");
+      }
+
+      for (const book of args.books) {
+        const existing = await tx.run(zql.books.where("user_id", user_id).where("key", book.key).one());
+        const fields = {
+          title: book.title,
+          authors: book.authors ?? undefined,
+          progress: book.progress ?? undefined,
+          status: book.status,
+          pages: book.pages ?? undefined,
+          last_read_at: book.last_read_at ?? undefined,
+          finished_at: book.finished_at ?? undefined,
+          updated_at: now,
+        };
+        if (existing) {
+          await tx.mutate.books.update({ id: existing.id, ...fields });
+          bookIds.set(book.key, existing.id);
+        } else {
+          mustBeMineOrNew(await tx.run(zql.books.where("id", book.id).one()));
+          await tx.mutate.books.insert({ id: book.id, user_id, key: book.key, created_at: now, ...fields });
+          bookIds.set(book.key, book.id);
+        }
+      }
+
+      for (const day of args.days) {
+        const book_id = await bookId(day.book_key);
+        const existing = await tx.run(
+          zql.reading_days.where("book_id", book_id).where("day", day.day).one(),
+        );
+        if (existing) {
+          await tx.mutate.reading_days.update({
+            id: existing.id,
+            seconds: day.seconds,
+            pages: day.pages,
+            updated_at: now,
+          });
+        } else {
+          await tx.mutate.reading_days.insert({
+            id: day.id,
+            user_id,
+            book_id,
+            day: day.day,
+            seconds: day.seconds,
+            pages: day.pages,
+            created_at: now,
+            updated_at: now,
+          });
+        }
+      }
+
+      for (const highlight of args.highlights) {
+        const book_id = await bookId(highlight.book_key);
+        mustBeMineOrNew(await tx.run(zql.highlights.where("id", highlight.id).one()));
+        await tx.mutate.highlights.upsert({
+          id: highlight.id,
+          user_id,
+          book_id,
+          text: highlight.text,
+          note: highlight.note ?? undefined,
+          chapter: highlight.chapter ?? undefined,
+          page: highlight.page ?? undefined,
+          highlighted_at: highlight.highlighted_at,
+          created_at: now,
+          updated_at: now,
+        });
+      }
+
+      for (const lookup of args.lookups) {
+        const existing = await tx.run(zql.lookups.where("id", lookup.id).one());
+        mustBeMineOrNew(existing);
+        if (lookup.card_id) await mustOwnCard(tx, user_id, lookup.card_id);
+        await tx.mutate.lookups.upsert({
+          id: lookup.id,
+          user_id,
+          // A word can arrive before its book does; it is kept without one.
+          book_id: lookup.book_key ? await findBookId(lookup.book_key) : undefined,
+          word: lookup.word,
+          context: lookup.context ?? undefined,
+          card_id: lookup.card_id ?? existing?.card_id ?? undefined,
+          looked_up_at: lookup.looked_up_at,
+          created_at: existing?.created_at ?? now,
+        });
+      }
     }),
   },
 

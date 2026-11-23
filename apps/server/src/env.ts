@@ -55,6 +55,16 @@ export const env = createEnv({
      * everything is one origin.
      */
     COOKIE_DOMAIN: z.string().optional(),
+
+    /**
+     * Object storage for books sent to e-readers: any S3-compatible bucket.
+     * Without them sending books is turned off and everything else works.
+     */
+    S3_ENDPOINT: z.url().optional(),
+    S3_REGION: z.string().default("us-east-1"),
+    S3_BUCKET: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

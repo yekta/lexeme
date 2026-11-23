@@ -53,4 +53,24 @@ export const queries = defineQueries({
   reviewLogs: defineQuery(({ ctx }) =>
     zql.review_logs.where("user_id", ctx.user_id),
   ),
+
+  /** Books the user's paired e-readers have reported. */
+  books: defineQuery(({ ctx }) => zql.books.where("user_id", ctx.user_id)),
+
+  /** Reading time per book per day: the stats and the reading calendar. */
+  readingDays: defineQuery(({ ctx }) =>
+    zql.reading_days.where("user_id", ctx.user_id),
+  ),
+
+  highlights: defineQuery(({ ctx }) =>
+    zql.highlights.where("user_id", ctx.user_id),
+  ),
+
+  /** Words looked up or added while reading. */
+  lookups: defineQuery(({ ctx }) => zql.lookups.where("user_id", ctx.user_id)),
+
+  /** Books sent to the user's e-readers, newest first. */
+  sentBooks: defineQuery(({ ctx }) =>
+    zql.sent_books.where("user_id", ctx.user_id).orderBy("created_at", "desc"),
+  ),
 });

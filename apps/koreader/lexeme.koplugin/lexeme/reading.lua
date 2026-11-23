@@ -1,8 +1,9 @@
 --[[
-What KOReader knows about the reading on this device, shaped for the server's
-sync-reading: books from the history, time per day from the statistics
-plugin's database, and highlights from each book's annotations. Ids are derived
-from stable keys, so the same data always produces the same ids.
+Everything KOReader records about the reading on this device, shaped for the
+server's sync-reading: books from the history and their settings, every page
+visit from the statistics database, highlights, notes and bookmarks from each
+book, and words from the dictionary's history and Vocabulary Builder. Ids are
+derived from stable keys, so the same record always produces the same id.
 ]]
 local DataStorage = require("datastorage")
 local DocSettings = require("docsettings")
@@ -54,12 +55,17 @@ end
 local function highlightsOf(key, settings)
     local result = {}
     for _, item in ipairs(settings:readSetting("annotations") or {}) do
-        if item.drawer and item.text and item.text ~= "" then
+        -- An annotation without a drawer is a bookmark; its text is where it points.
+        local kind = item.drawer and "highlight" or "bookmark"
+        local text = item.text and item.text ~= "" and item.text
+            or (kind == "bookmark" and ("Page " .. tostring(item.pageno or "?")))
+        if text then
             local position = type(item.pos0) == "table" and (item.pos0.page or "") or tostring(item.pos0 or item.page)
             table.insert(result, {
-                id = Reading.stableId("highlight:" .. key .. ":" .. position .. ":" .. item.text),
+                id = Reading.stableId(kind .. ":" .. key .. ":" .. position .. ":" .. text),
                 book_key = key,
-                text = item.text,
+                kind = kind,
+                text = text,
                 note = item.note,
                 chapter = item.chapter,
                 page = item.pageno and tostring(item.pageno) or nil,
@@ -84,11 +90,17 @@ function Reading.books()
                 local summary = settings:readSetting("summary") or {}
                 local title = props.title and props.title ~= "" and props.title or file:match("([^/]+)%.[^.]+$")
                 local finished = summary.status == "complete"
+                local function text(value) return type(value) == "string" and value ~= "" and value or nil end
                 table.insert(books, {
                     id = Reading.stableId("book:" .. key),
                     key = key,
                     title = title,
-                    authors = props.authors,
+                    authors = text(props.authors),
+                    series = text(props.series),
+                    language = text(props.language),
+                    description = text(props.description),
+                    rating = tonumber(summary.rating) and summary.rating >= 1 and math.floor(summary.rating) or nil,
+                    review = text(summary.note),
                     progress = settings:readSetting("percent_finished"),
                     status = status(summary.status),
                     pages = settings:readSetting("doc_pages"),
@@ -102,106 +114,108 @@ function Reading.books()
     return books, highlights
 end
 
---[[
-Reading time per book per local day, from the statistics plugin's database,
-for days on or after `since` (epoch seconds). Only books in `known_keys` are
-included, since the server needs the book before its days.
-]]
-function Reading.days(since, known_keys)
-    local path = DataStorage:getSettingsDir() .. "/statistics.sqlite3"
+local function query(path, sql)
     if lfs.attributes(path, "mode") ~= "file" then return {} end
     local SQ3 = require("lua-ljsqlite3/init")
     local conn = SQ3.open(path)
-    local ok, rows = pcall(conn.exec, conn, string.format([[
-        SELECT b.md5, strftime('%%Y-%%m-%%d', p.start_time, 'unixepoch', 'localtime') AS day,
-               sum(p.duration), count(DISTINCT p.page)
-        FROM page_stat_data p JOIN book b ON b.id = p.id_book
-        WHERE p.start_time >= %d AND b.md5 IS NOT NULL
-        GROUP BY b.md5, day;]], math.floor(since)))
+    local ok, columns = pcall(conn.exec, conn, sql)
     conn:close()
-    local days = {}
-    if not ok or not rows then return days end
-    for i = 1, #rows[1] do
-        local key = rows[1][i]
+    local rows = {}
+    if not ok or not columns then return rows end
+    for i = 1, #columns[1] do
+        local row = {}
+        for c = 1, #columns do row[c] = columns[c][i] end
+        table.insert(rows, row)
+    end
+    return rows
+end
+
+--[[
+Every page visit the statistics plugin recorded since `since` (epoch seconds),
+for books in `known_keys`: which page, when, for how long, and the book's page
+count at the time.
+]]
+function Reading.pageReads(since, known_keys)
+    local reads = {}
+    for _, row in ipairs(query(DataStorage:getSettingsDir() .. "/statistics.sqlite3", string.format([[
+        SELECT b.md5, p.page, p.start_time, p.duration, p.total_pages
+        FROM page_stat_data p JOIN book b ON b.id = p.id_book
+        WHERE p.start_time >= %d AND b.md5 IS NOT NULL;]], math.floor(since)))) do
+        local key, page, start = row[1], tonumber(row[2]) or 0, tonumber(row[3]) or 0
         if known_keys[key] then
-            table.insert(days, {
-                id = Reading.stableId("day:" .. key .. ":" .. rows[2][i]),
+            table.insert(reads, {
+                id = Reading.stableId("page:" .. key .. ":" .. page .. ":" .. start),
                 book_key = key,
-                day = rows[2][i],
-                seconds = tonumber(rows[3][i]) or 0,
-                pages = tonumber(rows[4][i]) or 0,
+                page = page,
+                total_pages = tonumber(row[5]) or 0,
+                started_at = start * 1000,
+                seconds = tonumber(row[4]) or 0,
             })
         end
     end
-    return days
+    return reads
 end
 
--- A pause longer than this between page turns ends a reading session.
-local SESSION_GAP = 10 * 60
+local function contextOf(before, word, after)
+    local text = ((before or "") .. " " .. word .. " " .. (after or "")):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
+    return text ~= word and text or nil
+end
 
 --[[
-Reading sessions per book from the statistics database's page turns, for those
-starting on or after `since` (epoch seconds), only for books in `known_keys`.
-A session's id comes from its book and start, so one still going is updated.
+Words looked up in KOReader since `since`: the dictionary's lookup history and
+Vocabulary Builder (which keeps the sentence around each word). Books are
+matched by title, as both only know a book by its title.
 ]]
-function Reading.sessions(since, known_keys)
-    local path = DataStorage:getSettingsDir() .. "/statistics.sqlite3"
-    if lfs.attributes(path, "mode") ~= "file" then return {} end
-    local SQ3 = require("lua-ljsqlite3/init")
-    local conn = SQ3.open(path)
-    local ok, rows = pcall(conn.exec, conn, string.format([[
-        SELECT b.md5, p.start_time, p.duration, p.page
-        FROM page_stat_data p JOIN book b ON b.id = p.id_book
-        WHERE p.start_time >= %d AND b.md5 IS NOT NULL
-        ORDER BY b.md5, p.start_time;]], math.floor(since)))
-    conn:close()
-    local sessions = {}
-    if not ok or not rows then return sessions end
-    local current
-    local function finish()
-        if not current then return end
-        local pages = 0
-        for _ in pairs(current.page_set) do pages = pages + 1 end
-        table.insert(sessions, {
-            id = Reading.stableId("session:" .. current.key .. ":" .. current.start),
-            book_key = current.key,
-            started_at = current.start * 1000,
-            ended_at = current.finish * 1000,
-            seconds = current.seconds,
-            pages = pages,
+function Reading.lookups(since, key_by_title)
+    local lookups = {}
+    for _, row in ipairs(query(DataStorage:getSettingsDir() .. "/vocabulary_builder.sqlite3", string.format([[
+        SELECT v.word, t.name, v.create_time, v.prev_context, v.next_context
+        FROM vocabulary v LEFT JOIN title t ON t.id = v.title_id
+        WHERE v.create_time >= %d;]], math.floor(since)))) do
+        table.insert(lookups, {
+            id = Reading.stableId("koreader-vocabulary:" .. row[1]),
+            book_key = row[2] and key_by_title[row[2]] or nil,
+            word = row[1],
+            context = contextOf(row[4], row[1], row[5]),
+            looked_up_at = (tonumber(row[3]) or 0) * 1000,
         })
-        current = nil
     end
-    for i = 1, #rows[1] do
-        local key, start = rows[1][i], tonumber(rows[2][i])
-        local duration, page = tonumber(rows[3][i]) or 0, rows[4][i]
-        if known_keys[key] and start then
-            if not current or current.key ~= key or start - current.finish > SESSION_GAP then
-                finish()
-                current = { key = key, start = start, finish = start, seconds = 0, page_set = {} }
-            end
-            current.finish = math.max(current.finish, start + duration)
-            current.seconds = current.seconds + duration
-            current.page_set[page] = true
+    local ok, history = pcall(function()
+        return require("luadata"):open(DataStorage:getSettingsDir() .. "/lookup_history.lua", "LookupHistory")
+            :readSetting("lookup_history")
+    end)
+    for _, entry in ipairs(ok and history or {}) do
+        if entry.word and (entry.time or 0) >= since then
+            table.insert(lookups, {
+                id = Reading.stableId("koreader-lookup:" .. entry.word .. ":" .. tostring(entry.time)),
+                book_key = entry.book_title and key_by_title[entry.book_title] or nil,
+                word = entry.word,
+                looked_up_at = (entry.time or 0) * 1000,
+            })
         end
     end
-    finish()
-    return sessions
+    return lookups
 end
 
 --[[
-Everything to send since the last sync, as sync-reading bodies of at most
-`chunk` rows each. Books always go first so their days and highlights resolve.
+Everything to send since the last sync. Books always go first so the rest
+resolves. A page still open at the last sync keeps counting, so the last few
+hours are always resent.
 ]]
 function Reading.snapshot(since)
     local books, highlights = Reading.books()
-    local keys = {}
-    for _, book in ipairs(books) do keys[book.key] = true end
-    -- A day already sent keeps changing until it's over, so the last one is always resent.
-    local days = Reading.days(math.max(0, since - 24 * 3600), keys)
-    -- A session can still be going at the last sync; going back a few hours resends it whole.
-    local sessions = Reading.sessions(math.max(0, since - 6 * 3600), keys)
-    return { books = books, days = days, sessions = sessions, highlights = highlights, lookups = {} }
+    local keys, key_by_title = {}, {}
+    for _, book in ipairs(books) do
+        keys[book.key] = true
+        key_by_title[book.title] = book.key
+    end
+    local recent = math.max(0, since - 6 * 3600)
+    return {
+        books = books,
+        page_reads = Reading.pageReads(recent, keys),
+        highlights = highlights,
+        lookups = Reading.lookups(recent, key_by_title),
+    }
 end
 
 return Reading

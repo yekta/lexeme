@@ -43,7 +43,7 @@ function BookPage() {
     [reading.highlights, id],
   );
   const sessions = useMemo(
-    () => reading.sessions.filter((s) => s.book_id === id).sort((a, b) => b.started_at - a.started_at),
+    () => reading.sessions.filter((s) => s.book_id === id),
     [reading.sessions, id],
   );
   const words = useMemo(
@@ -93,7 +93,7 @@ function BookPage() {
                 <h2 className="font-semibold">Sessions</h2>
                 <div className="rounded-xl border divide-y">
                   {sessions.map((session) => (
-                    <SessionRow key={session.id} session={session} />
+                    <SessionRow key={session.started_at} session={session} />
                   ))}
                 </div>
               </section>

@@ -1,5 +1,22 @@
-/** Reading time as e-readers report it: seconds per book per local calendar day. */
+/** One visit to a page, as KOReader records it: when it started and how long it stayed open. */
+export type TPageRead = { book_id: string; page: number; started_at: number; seconds: number };
+
+/** Reading time on one local calendar day. */
 export type TReadingDay = { day: string; seconds: number };
+
+export type TBookDay = TReadingDay & { book_id: string; pages: number };
+
+/** A pause between page turns longer than this ends a reading session. */
+export const SESSION_GAP_SECONDS = 10 * 60;
+
+/** One sitting with a book: first page turn to last, with time spent and pages seen. */
+export type TReadingSession = {
+  book_id: string;
+  started_at: number;
+  ended_at: number;
+  seconds: number;
+  pages: number;
+};
 
 /** YYYY-MM-DD for a local date. */
 export function dayKey(date: Date): string {
@@ -7,6 +24,47 @@ export function dayKey(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+/** Time and distinct pages per book per local day. */
+export function bookDays(reads: readonly TPageRead[]): TBookDay[] {
+  const byKey = new Map<string, TBookDay & { pageSet: Set<number> }>();
+  for (const read of reads) {
+    const day = dayKey(new Date(read.started_at));
+    const key = `${read.book_id}|${day}`;
+    let entry = byKey.get(key);
+    if (!entry) {
+      entry = { book_id: read.book_id, day, seconds: 0, pages: 0, pageSet: new Set() };
+      byKey.set(key, entry);
+    }
+    entry.seconds += read.seconds;
+    entry.pageSet.add(read.page);
+  }
+  return [...byKey.values()].map(({ pageSet, ...day }) => ({ ...day, pages: pageSet.size }));
+}
+
+/** Page reads grouped into sittings per book, newest first. */
+export function readingSessions(reads: readonly TPageRead[], gapSeconds = SESSION_GAP_SECONDS): TReadingSession[] {
+  const sorted = [...reads].sort((a, b) => a.book_id.localeCompare(b.book_id) || a.started_at - b.started_at);
+  const sessions: TReadingSession[] = [];
+  let current: (TReadingSession & { pageSet: Set<number> }) | undefined;
+  const finish = () => {
+    if (!current) return;
+    const { pageSet, ...session } = current;
+    sessions.push({ ...session, pages: pageSet.size });
+  };
+  for (const read of sorted) {
+    const end = read.started_at + read.seconds * 1000;
+    if (!current || current.book_id !== read.book_id || read.started_at - current.ended_at > gapSeconds * 1000) {
+      finish();
+      current = { book_id: read.book_id, started_at: read.started_at, ended_at: end, seconds: 0, pages: 0, pageSet: new Set() };
+    }
+    current.ended_at = Math.max(current.ended_at, end);
+    current.seconds += read.seconds;
+    current.pageSet.add(read.page);
+  }
+  finish();
+  return sessions.sort((a, b) => b.started_at - a.started_at);
 }
 
 /** Seconds read per day, across all books. */

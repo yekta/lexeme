@@ -85,6 +85,27 @@
       "when": 1795452060472,
       "tag": "0011_reading_sessions_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795452915005,
+      "tag": "0012_drop_reading_summaries",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795452915553,
+      "tag": "0013_page_reads",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795452925543,
+      "tag": "0014_page_reads_publication",
+      "breakpoints": true
     }
   ]
 }

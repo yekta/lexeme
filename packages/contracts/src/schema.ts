@@ -132,6 +132,12 @@ const books = table("books")
     progress: number().optional(),
     status: enumeration<TBookStatus>(),
     pages: number().optional(),
+    series: string().optional(),
+    language: string().optional(),
+    description: string().optional(),
+    /** 1..5 */
+    rating: number().optional(),
+    review: string().optional(),
     last_read_at: number().optional(),
     finished_at: number().optional(),
     created_at: number(),
@@ -139,29 +145,16 @@ const books = table("books")
   })
   .primaryKey("id");
 
-const readingDays = table("reading_days")
+/** Every visit to a page, as the device recorded it. */
+const pageReads = table("page_reads")
   .columns({
     id: string(),
     user_id: string(),
     book_id: string(),
-    /** YYYY-MM-DD, in the device's time zone. */
-    day: string(),
-    seconds: number(),
-    pages: number(),
-    created_at: number(),
-    updated_at: number(),
-  })
-  .primaryKey("id");
-
-const readingSessions = table("reading_sessions")
-  .columns({
-    id: string(),
-    user_id: string(),
-    book_id: string(),
+    page: number(),
+    total_pages: number(),
     started_at: number(),
-    ended_at: number(),
     seconds: number(),
-    pages: number(),
     created_at: number(),
     updated_at: number(),
   })
@@ -172,6 +165,7 @@ const highlights = table("highlights")
     id: string(),
     user_id: string(),
     book_id: string(),
+    kind: enumeration<"highlight" | "bookmark">(),
     text: string(),
     note: string().optional(),
     chapter: string().optional(),
@@ -243,7 +237,7 @@ const learningProfileRelationships = relationships(
 );
 
 const bookRelationships = relationships(books, ({ many }) => ({
-  reading_days: many({ sourceField: ["id"], destField: ["book_id"], destSchema: readingDays }),
+  page_reads: many({ sourceField: ["id"], destField: ["book_id"], destSchema: pageReads }),
   highlights: many({ sourceField: ["id"], destField: ["book_id"], destSchema: highlights }),
   lookups: many({ sourceField: ["id"], destField: ["book_id"], destSchema: lookups }),
 }));
@@ -255,8 +249,7 @@ export const schema = createSchema({
     cards,
     reviewLogs,
     books,
-    readingDays,
-    readingSessions,
+    pageReads,
     highlights,
     lookups,
     sentBooks,
@@ -285,8 +278,7 @@ export type TCardRow = Row<TSchema["tables"]["cards"]>;
 export type TLearningProfileRow = Row<TSchema["tables"]["learning_profiles"]>;
 export type TReviewLogRow = Row<TSchema["tables"]["review_logs"]>;
 export type TBookRow = Row<TSchema["tables"]["books"]>;
-export type TReadingDayRow = Row<TSchema["tables"]["reading_days"]>;
-export type TReadingSessionRow = Row<TSchema["tables"]["reading_sessions"]>;
+export type TPageReadRow = Row<TSchema["tables"]["page_reads"]>;
 export type THighlightRow = Row<TSchema["tables"]["highlights"]>;
 export type TLookupRow = Row<TSchema["tables"]["lookups"]>;
 export type TSentBookRow = Row<TSchema["tables"]["sent_books"]>;

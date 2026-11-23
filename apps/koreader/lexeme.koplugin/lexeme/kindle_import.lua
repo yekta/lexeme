@@ -188,7 +188,7 @@ function Import.queue()
             table.insert(book_rows, book)
         end
     end
-    require("lexeme/sync").queueReading{ books = book_rows, days = {}, highlights = highlights, lookups = words }
+    require("lexeme/sync").queueReading{ books = book_rows, highlights = highlights, lookups = words }
     G_reader_settings:saveSetting("lexeme_kindle_imported_at", os.time())
     return { books = #book_rows, highlights = #highlights, lookups = #words }
 end

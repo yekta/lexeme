@@ -57,15 +57,8 @@ export const queries = defineQueries({
   /** Books the user's paired e-readers have reported. */
   books: defineQuery(({ ctx }) => zql.books.where("user_id", ctx.user_id)),
 
-  /** Reading time per book per day: the stats and the reading calendar. */
-  readingDays: defineQuery(({ ctx }) =>
-    zql.reading_days.where("user_id", ctx.user_id),
-  ),
-
-  /** Each sitting with a book, for the session lists. */
-  readingSessions: defineQuery(({ ctx }) =>
-    zql.reading_sessions.where("user_id", ctx.user_id),
-  ),
+  /** Every page visit; reading time per day and sessions are worked out from these. */
+  pageReads: defineQuery(({ ctx }) => zql.page_reads.where("user_id", ctx.user_id)),
 
   highlights: defineQuery(({ ctx }) =>
     zql.highlights.where("user_id", ctx.user_id),

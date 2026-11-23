@@ -158,42 +158,36 @@ export const syncReadingArgs = z.object({
         progress: z.number().min(0).max(1).nullish(),
         status: z.enum(BOOK_STATUSES),
         pages: z.number().int().min(0).nullish(),
+        series: z.string().trim().max(1000).nullish(),
+        language: z.string().trim().max(50).nullish(),
+        description: z.string().trim().max(20_000).nullish(),
+        rating: z.number().int().min(1).max(5).nullish(),
+        review: optionalText,
         last_read_at: epochMs.nullish(),
         finished_at: epochMs.nullish(),
       }),
     )
     .max(2000)
     .default([]),
-  days: z
+  page_reads: z
     .array(
       z.object({
         id: uuidArg,
         book_key: bookKey,
-        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        seconds: z.number().int().min(0),
-        pages: z.number().int().min(0),
-      }),
-    )
-    .max(10_000)
-    .default([]),
-  sessions: z
-    .array(
-      z.object({
-        id: uuidArg,
-        book_key: bookKey,
+        page: z.number().int().min(0),
+        total_pages: z.number().int().min(0),
         started_at: epochMs,
-        ended_at: epochMs,
         seconds: z.number().int().min(0),
-        pages: z.number().int().min(0),
       }),
     )
-    .max(5000)
+    .max(20_000)
     .default([]),
   highlights: z
     .array(
       z.object({
         id: uuidArg,
         book_key: bookKey,
+        kind: z.enum(["highlight", "bookmark"]).default("highlight"),
         text: z.string().trim().min(1).max(20_000),
         note: optionalText,
         chapter: z.string().trim().max(1000).nullish(),
@@ -452,6 +446,11 @@ export const mutatorDefs = {
           progress: book.progress ?? undefined,
           status: book.status,
           pages: book.pages ?? undefined,
+          series: book.series ?? undefined,
+          language: book.language ?? undefined,
+          description: book.description ?? undefined,
+          rating: book.rating ?? undefined,
+          review: book.review ?? undefined,
           last_read_at: book.last_read_at ?? undefined,
           finished_at: book.finished_at ?? undefined,
           updated_at: now,
@@ -466,44 +465,18 @@ export const mutatorDefs = {
         }
       }
 
-      for (const day of args.days) {
-        const book_id = await bookId(day.book_key);
-        const existing = await tx.run(
-          zql.reading_days.where("book_id", book_id).where("day", day.day).one(),
-        );
-        if (existing) {
-          await tx.mutate.reading_days.update({
-            id: existing.id,
-            seconds: day.seconds,
-            pages: day.pages,
-            updated_at: now,
-          });
-        } else {
-          await tx.mutate.reading_days.insert({
-            id: day.id,
-            user_id,
-            book_id,
-            day: day.day,
-            seconds: day.seconds,
-            pages: day.pages,
-            created_at: now,
-            updated_at: now,
-          });
-        }
-      }
-
-      for (const session of args.sessions) {
-        const book_id = await bookId(session.book_key);
-        const existing = await tx.run(zql.reading_sessions.where("id", session.id).one());
+      for (const read of args.page_reads) {
+        const book_id = await bookId(read.book_key);
+        const existing = await tx.run(zql.page_reads.where("id", read.id).one());
         mustBeMineOrNew(existing);
-        await tx.mutate.reading_sessions.upsert({
-          id: session.id,
+        await tx.mutate.page_reads.upsert({
+          id: read.id,
           user_id,
           book_id,
-          started_at: session.started_at,
-          ended_at: session.ended_at,
-          seconds: session.seconds,
-          pages: session.pages,
+          page: read.page,
+          total_pages: read.total_pages,
+          started_at: read.started_at,
+          seconds: read.seconds,
           created_at: existing?.created_at ?? now,
           updated_at: now,
         });
@@ -516,6 +489,7 @@ export const mutatorDefs = {
           id: highlight.id,
           user_id,
           book_id,
+          kind: highlight.kind,
           text: highlight.text,
           note: highlight.note ?? undefined,
           chapter: highlight.chapter ?? undefined,

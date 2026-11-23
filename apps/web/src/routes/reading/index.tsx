@@ -56,7 +56,7 @@ function ReadingPage() {
     [reading.lookups],
   );
   const recentSessions = useMemo(
-    () => [...reading.sessions].sort((a, b) => b.started_at - a.started_at).slice(0, 10),
+    () => reading.sessions.slice(0, 10),
     [reading.sessions],
   );
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
@@ -88,7 +88,11 @@ function ReadingPage() {
                 <h2 className="font-semibold">Recent sessions</h2>
                 <div className="rounded-xl border divide-y">
                   {recentSessions.map((session) => (
-                    <SessionRow key={session.id} session={session} bookTitle={titles.get(session.book_id)} />
+                    <SessionRow
+                      key={`${session.book_id}-${session.started_at}`}
+                      session={session}
+                      bookTitle={titles.get(session.book_id)}
+                    />
                   ))}
                 </div>
               </section>

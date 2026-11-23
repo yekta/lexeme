@@ -264,6 +264,12 @@ export const books = pgTable(
     /** "reading" | "finished" | "abandoned" */
     status: text("status").notNull(),
     pages: integer("pages"),
+    series: text("series"),
+    language: text("language"),
+    description: text("description"),
+    /** 1..5, as rated on the device. */
+    rating: integer("rating"),
+    review: text("review"),
     last_read_at: timestamp("last_read_at", { withTimezone: true }),
     finished_at: timestamp("finished_at", { withTimezone: true }),
     created_at: createdAt(),
@@ -272,9 +278,12 @@ export const books = pgTable(
   (t) => [uniqueIndex("books_user_id_key_idx").on(t.user_id, t.key)],
 );
 
-/** Time spent in one book on one calendar day, in the device's time zone. */
-export const readingDays = pgTable(
-  "reading_days",
+/**
+ * Every visit to a page, as the device records it: when it started and how
+ * long it stayed open. Reading time per day and reading sessions come from these.
+ */
+export const pageReads = pgTable(
+  "page_reads",
   {
     id: uuid("id").primaryKey(),
     user_id: text("user_id")
@@ -283,41 +292,17 @@ export const readingDays = pgTable(
     book_id: uuid("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
-    /** YYYY-MM-DD */
-    day: text("day").notNull(),
-    seconds: integer("seconds").notNull(),
-    pages: integer("pages").notNull(),
-    created_at: createdAt(),
-    updated_at: updatedAt(),
-  },
-  (t) => [
-    uniqueIndex("reading_days_book_id_day_idx").on(t.book_id, t.day),
-    index("reading_days_user_id_idx").on(t.user_id),
-  ],
-);
-
-/** One sitting with a book: from the first page turn to the last, with no long pause between. */
-export const readingSessions = pgTable(
-  "reading_sessions",
-  {
-    id: uuid("id").primaryKey(),
-    user_id: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    book_id: uuid("book_id")
-      .notNull()
-      .references(() => books.id, { onDelete: "cascade" }),
+    page: integer("page").notNull(),
+    /** The book's page count when the page was read; it changes with the layout. */
+    total_pages: integer("total_pages").notNull(),
     started_at: timestamp("started_at", { withTimezone: true }).notNull(),
-    ended_at: timestamp("ended_at", { withTimezone: true }).notNull(),
-    /** Time actually spent on pages, which leaves out short pauses. */
     seconds: integer("seconds").notNull(),
-    pages: integer("pages").notNull(),
     created_at: createdAt(),
     updated_at: updatedAt(),
   },
   (t) => [
-    index("reading_sessions_user_id_idx").on(t.user_id),
-    index("reading_sessions_book_id_idx").on(t.book_id),
+    index("page_reads_user_id_idx").on(t.user_id),
+    index("page_reads_book_id_idx").on(t.book_id),
   ],
 );
 
@@ -331,6 +316,8 @@ export const highlights = pgTable(
     book_id: uuid("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
+    /** "highlight" | "bookmark" */
+    kind: text("kind").notNull().default("highlight"),
     text: text("text").notNull(),
     note: text("note"),
     chapter: text("chapter"),

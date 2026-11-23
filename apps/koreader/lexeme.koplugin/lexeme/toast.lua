@@ -26,8 +26,9 @@ function Toast:init()
 end
 
 function Toast:render(bb, x, y, w, h)
-    D.roundRect(bb, x, y, w, h, D.BLACK, D.s(48))
-    D.text(bb, x + D.s(48), y + D.s(60), self.face, self.text, D.WHITE)
+    D.roundRect(bb, x, y, w, h, D.WHITE, D.s(48))
+    D.border(bb, x, y, w, h, D.s(3), D.BLACK, D.s(48))
+    D.text(bb, x + D.s(48), y + D.s(60), self.face, self.text, D.BLACK)
 end
 
 function Toast.show(text)

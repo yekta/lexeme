@@ -51,6 +51,10 @@ Layout.MARGINS = { 82, 164, 246 }
 Layout.TOP_MARGIN = 66
 Layout.BOTTOM_MARGIN = 70
 -- crengine won't draw a font bigger than this, so bigger sizes are scaled up in CSS.
+-- Measured against Amazon's reader on the same page. A higher contrast matches its
+-- edges but adds ink; thinning the text to make up for it narrows the letters, so
+-- lines break somewhere else than on the Kindle.
+local FONT_HINTING, FONT_GAMMA = 1, 22
 local MAX_ENGINE_SIZE = 72
 
 local DEFAULTS = {
@@ -272,6 +276,11 @@ function Layout.applyBeforeRender(ui)
     G_reader_settings:saveSetting("copt_line_spacing", 100)
     applyWordSpacing(ui)
     Layout.applyMargins(ui)
+    -- Edges as sharp as the Kindle's at its weight: native hinting, contrast a step under 1.45.
+    document.configurable.font_hinting = FONT_HINTING
+    document:setFontHinting(FONT_HINTING)
+    document.configurable.font_gamma = FONT_GAMMA
+    document:setGammaIndex(FONT_GAMMA)
 end
 
 -- Kindle's built-in themes. A theme with a font or boldness only matches when those match too.

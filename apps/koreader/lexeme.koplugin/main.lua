@@ -48,6 +48,10 @@ function Lexeme:init()
     UIManager:nextTick(function() UIManager:show(self.shell, "flashui") end)
 end
 
+function Lexeme:onPreRenderDocument()
+    Reader.beforeRender(self.ui)
+end
+
 function Lexeme:onReaderReady()
     Reader.onReaderReady(self.ui)
     require("lexeme/loading").close()

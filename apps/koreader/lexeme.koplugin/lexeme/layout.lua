@@ -243,31 +243,35 @@ end
 
 -- Reading settings follow the reader, not the book, as on a Kindle: a book
 -- opened with other settings is brought in line with the current ones.
-function Layout.applyAll(ui)
-    local document = ui.document
-    if not ui.styletweak.lexeme_css then
-        local original = ui.styletweak.getCssText
-        ui.styletweak.getCssText = function(tweaks)
-            local css = original(tweaks)
-            local ours = Layout.css(ui)
-            return css and css ~= "" and css .. "\n" .. ours or ours
-        end
-        ui.styletweak.lexeme_css = true
+-- Our stylesheet rides along with KOReader's style tweaks, so every relayout includes it.
+local function installCss(ui)
+    if ui.styletweak.lexeme_css then return end
+    local original = ui.styletweak.getCssText
+    ui.styletweak.getCssText = function(tweaks)
+        local css = original(tweaks)
+        local ours = Layout.css(ui)
+        return css and css ~= "" and css .. "\n" .. ours or ours
     end
+    ui.styletweak.lexeme_css = true
+end
+
+-- Runs before the first layout: laying the book out twice shifts the saved position.
+function Layout.applyBeforeRender(ui)
+    local document = ui.document
+    installCss(ui)
     document._document:setIntProperty("crengine.style.floating.punctuation.enabled", 0)
-    local config = document.configurable
-    if stylesheet and ui.typeset.css ~= stylesheet then ui.typeset:setStyleSheet(stylesheet) end
+    if stylesheet then ui.typeset.css = stylesheet end
+    document:setStyleSheet(ui.typeset.css, ui.styletweak:getCssText())
     local font = Layout.get("lexeme_font")
-    if ui.font.font_face ~= font then ui.font:onSetFont(font) end
-    -- Everything is set on the document first and laid out once, by the stylesheet below.
+    ui.font.font_face = font
+    document:setFontFace(font)
     applySize(ui)
     applyBold(ui)
-    config.line_spacing = 100
+    document.configurable.line_spacing = 100
     document:setInterlineSpacePercent(100)
     G_reader_settings:saveSetting("copt_line_spacing", 100)
     applyWordSpacing(ui)
     Layout.applyMargins(ui)
-    applyCss(ui)
 end
 
 -- Kindle's built-in themes. A theme with a font or boldness only matches when those match too.

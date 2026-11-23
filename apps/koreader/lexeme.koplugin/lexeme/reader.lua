@@ -75,6 +75,10 @@ function Reader.install(ui)
     end
 end
 
+function Reader.beforeRender(ui)
+    if ui.rolling then Layout.applyBeforeRender(ui) end
+end
+
 function Reader.onReaderReady(ui)
     if not ui.rolling then return end
     -- Each book also remembers this setting; turn it off for books opened before.
@@ -82,16 +86,6 @@ function Reader.onReaderReady(ui)
     UIManager:nextTick(function()
         if ui.document then ui.document:enablePartialRerendering(false) end
     end)
-    -- A book imported from the Kindle comes with only a percentage; it's applied
-    -- once the book is laid out the Kindle's way, or the relayout loses it.
-    local imported = not ui.doc_settings:has("last_xpointer") and ui.doc_settings:readSetting("last_percent")
-    Layout.applyAll(ui)
-    if imported then
-        ui.doc_settings:delSetting("last_percent")
-        -- After every other ReaderReady handler, KOReader's own position restore included.
-        UIManager:nextTick(function() ui.rolling:onGotoPercent(imported * 100) end)
-    end
-    UIManager:setDirty(ui.dialog, "full")
 end
 
 return Reader

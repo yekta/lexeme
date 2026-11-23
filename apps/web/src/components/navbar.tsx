@@ -1,3 +1,4 @@
+import { BackButton } from "@/components/back-button";
 import Logo from "@/components/icons/logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button, LinkButton } from "@/components/ui/button";
@@ -13,7 +14,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { AvailableThemesEnum, DEFAULT_NON_SYSTEM_THEME, TTheme } from "@/lib/constants";
 import { proxiedImageUrl } from "@/lib/image";
 import {
-  ArrowLeftIcon,
   BlocksIcon,
   BookOpenIcon,
   BookUpIcon,
@@ -91,13 +91,7 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
           {(backHref || title) && (
             <div className="flex items-center gap-2 border-l pl-4 min-w-0 flex-1">
               {backHref && (
-                <LinkButton
-                  variant="ghost"
-                  href={backHref}
-                  className="shrink-0 size-9"
-                >
-                  <ArrowLeftIcon className="size-5 shrink-0" />
-                </LinkButton>
+                <BackButton fallbackHref={backHref} />
               )}
               {title && (
                 <h1 className="text-lg font-semibold truncate min-w-0">

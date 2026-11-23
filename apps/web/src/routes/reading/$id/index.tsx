@@ -131,7 +131,7 @@ const RECENT_WORDS = 6;
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <Card size="sm" className="min-w-0">
+    <Card className="min-w-0 py-3">
       <CardHeader>
         <CardDescription className="truncate">{label}</CardDescription>
         <span className="text-lg font-semibold tabular-nums truncate">{value}</span>

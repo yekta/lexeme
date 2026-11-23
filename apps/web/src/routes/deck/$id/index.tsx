@@ -1,4 +1,5 @@
 import { AddCardForm } from "@/components/add-card-form";
+import { BackButton } from "@/components/back-button";
 import { AddOrImportCardsButton } from "@/components/add-or-import-cards-button";
 import { CardsVirtualGrid } from "@/components/cards-virtual-grid";
 import { RequireIdentity } from "@/components/require-identity";
@@ -33,7 +34,6 @@ import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-n
 import { dataStateOf, mergeStates, type DataState } from "@/lib/query-state";
 import { usePlaceholderPhase } from "@/lib/settle";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/deck/$id/")({
@@ -147,13 +147,7 @@ function DeckPageView({
           <>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <LinkButton
-                  variant="ghost"
-                  href="/"
-                  className="shrink-0 -ml-2 size-9"
-                >
-                  <ArrowLeft className="size-5 shrink-0" />
-                </LinkButton>
+                <BackButton fallbackHref="/" className="-ml-2" />
                 <h1
                   data-placeholder={isPlaceholder ? "true" : undefined}
                   className="text-xl truncate items-center font-semibold data-placeholder:animate-pulse data-placeholder:bg-foreground/20 data-placeholder:rounded data-placeholder:text-transparent"

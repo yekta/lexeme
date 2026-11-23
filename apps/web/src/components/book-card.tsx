@@ -15,20 +15,20 @@ export function BookCard({ book }: { book: TBook }) {
       : null;
   return (
     <Link to="/reading/$id" params={{ id: book.id }} className="min-w-0 rounded-xl">
-      <Card className="h-full hover:border-foreground/30 transition-colors">
+      <Card className="h-full gap-3 py-3 hover:border-foreground/30 transition-colors">
         <CardHeader>
           <CardTitle className="truncate">{book.title}</CardTitle>
           {book.authors && <CardDescription className="truncate">{book.authors}</CardDescription>}
+          {status && <CardDescription className="truncate">{status}</CardDescription>}
         </CardHeader>
-        <CardContent className="flex-1 flex flex-col justify-end gap-2">
-          {!finished && (
+        {!finished && (
+          <CardContent className="flex-1 flex flex-col justify-end">
             <div className="flex items-center gap-3">
               <Progress value={percent} className="flex-1" />
               <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">{percent}%</span>
             </div>
-          )}
-          {status && <span className="text-sm text-muted-foreground truncate">{status}</span>}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
     </Link>
   );

@@ -159,7 +159,7 @@ function isReadingNow(book: TBook) {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <Card size="sm" className="min-w-0">
+    <Card className="min-w-0 py-3">
       <CardHeader>
         <CardDescription className="truncate">{label}</CardDescription>
         <span className="text-xl font-semibold tabular-nums truncate">{value}</span>

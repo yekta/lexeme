@@ -168,8 +168,8 @@ function ReadingPage() {
 }
 
 const READING_NOW_DAYS = 90;
-const RECENT_SESSIONS = 10;
-const RECENT_WORDS = 6;
+const RECENT_SESSIONS = 3;
+const RECENT_WORDS = 3;
 const RECENT_HIGHLIGHTS = 3;
 const RECENT_FINISHED = 12;
 

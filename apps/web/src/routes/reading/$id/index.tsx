@@ -157,6 +157,6 @@ function plainText(html: string) {
   return text.replace(/\n{3,}/g, "\n\n").trim() || null;
 }
 
-const RECENT_SESSIONS = 10;
-const RECENT_HIGHLIGHTS = 6;
-const RECENT_WORDS = 6;
+const RECENT_SESSIONS = 3;
+const RECENT_HIGHLIGHTS = 3;
+const RECENT_WORDS = 3;

@@ -97,7 +97,7 @@ function SendPage() {
           )}
           <span className="font-medium">{send.isPending ? "Sending…" : "Drop books here, or choose files"}</span>
           <span className="text-sm text-muted-foreground">
-            EPUB, PDF, MOBI, AZW3, FB2, TXT, CBZ or DjVu, up to 100 MB. Your Kindle downloads them when it syncs.
+            Your Kindle downloads them the next time it syncs.
           </span>
         </button>
         <input
@@ -120,10 +120,11 @@ function SendPage() {
               <EmptyListIcon>
                 <BookUpIcon />
               </EmptyListIcon>
-              <EmptyListTitle>Nothing sent yet</EmptyListTitle>
-              <EmptyListDescription>Books you send show up here until your Kindle has them.</EmptyListDescription>
+              <EmptyListContent>
+                <EmptyListTitle>Nothing sent yet</EmptyListTitle>
+                <EmptyListDescription>Books you send show up here until your Kindle has them.</EmptyListDescription>
+              </EmptyListContent>
             </EmptyListHeader>
-            <EmptyListContent />
           </EmptyList>
         ) : (
           <section className="flex flex-col gap-3">

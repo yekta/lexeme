@@ -203,13 +203,14 @@ function NoBooks() {
         <EmptyListIcon>
           <BookOpenIcon />
         </EmptyListIcon>
-        <EmptyListTitle>Nothing read yet</EmptyListTitle>
-        <EmptyListDescription>
-          Connect your Kindle under Settings → Integrations → Lexeme. Your books, reading time, highlights and the words
-          you add will show up here.
-        </EmptyListDescription>
+        <EmptyListContent>
+          <EmptyListTitle>Nothing read yet</EmptyListTitle>
+          <EmptyListDescription>
+            Connect your Kindle under Settings → Integrations → Lexeme. Your books, reading time, highlights and the
+            words you add will show up here.
+          </EmptyListDescription>
+        </EmptyListContent>
       </EmptyListHeader>
-      <EmptyListContent />
     </EmptyList>
   );
 }

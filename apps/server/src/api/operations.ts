@@ -517,7 +517,7 @@ export const operations: TOperation[] = [
 
       await runMutator(caller.userId, serverMutators.reading.sync, {
         books: [],
-        days: [],
+        page_reads: [],
         highlights: [],
         lookups: [
           {
@@ -538,7 +538,7 @@ export const operations: TOperation[] = [
     name: "sync-reading",
     title: "Sync reading data",
     description:
-      "Send books, reading time per day, highlights and looked-up words from an e-reader. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
+      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
     role: "editor",
     method: "POST",
     path: "/reading",
@@ -547,7 +547,7 @@ export const operations: TOperation[] = [
       await runMutator(caller.userId, serverMutators.reading.sync, input);
       return {
         books: input.books.length,
-        days: input.days.length,
+        page_reads: input.page_reads.length,
         highlights: input.highlights.length,
         lookups: input.lookups.length,
       };

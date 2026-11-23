@@ -1,0 +1,73 @@
+#!/bin/sh
+# Dev mode for working on the plugin with someone's real Kindle: `on` snapshots
+# everything reading leaves behind (statistics, look-ups, highlights, positions,
+# history, the sync outbox) and pauses syncing; `off` puts the snapshot back, so
+# nothing done in between counts, and syncing resumes. `status` says which.
+# KINDLE_HOST is an ssh host, `kindle` by default.
+set -e
+HOST="${KINDLE_HOST:-kindle}"
+case "$1" in on | off | status) ;; *) echo "usage: dev-mode.sh on|off|status" >&2; exit 1 ;; esac
+
+ssh "$HOST" "MODE=$1 sh -s" <<'EOF'
+set -e
+KO=/mnt/us/koreader
+SNAP=/mnt/us/lexeme-dev/snapshot
+
+stop_koreader() {
+  pid=$(pidof reader.lua | tr " " "\n" | sort -n | head -1)
+  if [ -n "$pid" ]; then kill "$pid"; fi
+  for _ in $(seq 1 30); do
+    pidof reader.lua >/dev/null || ps | grep -q "[k]oreader.sh" || break
+    sleep 1
+  done
+}
+
+start_koreader() {
+  nohup /var/local/kmc/bin/kpm launch koreader --asap >/dev/null 2>&1 &
+}
+
+set_flag() {
+  cd "$KO" && ./luajit -e "
+    require('setupkoenv')
+    local settings = require('luasettings'):open('settings.reader.lua')
+    if $1 then settings:saveSetting('lexeme_dev_mode', true) else settings:delSetting('lexeme_dev_mode') end
+    settings:flush()" >/dev/null 2>&1
+}
+
+# Everything reading writes, relative to /.
+tracked() {
+  cd /
+  for f in mnt/us/koreader/settings/statistics.sqlite3 mnt/us/koreader/settings/vocabulary_builder.sqlite3 \
+    mnt/us/koreader/settings/lookup_history.lua mnt/us/koreader/settings/lexeme_outbox.lua \
+    mnt/us/koreader/history.lua mnt/us/koreader/settings.reader.lua mnt/us/koreader/docsettings; do
+    [ -e "$f" ] && echo "$f"
+  done
+  find mnt/us/documents -name "*.sdr" -type d
+}
+
+case "$MODE" in
+  status)
+    if [ -d "$SNAP" ]; then echo "Dev mode is on (snapshot from $(date -r "$SNAP/data.tar"))"; else echo "Dev mode is off"; fi
+    ;;
+  on)
+    if [ -d "$SNAP" ]; then echo "Dev mode is already on"; exit 0; fi
+    stop_koreader
+    mkdir -p "$SNAP"
+    tracked > "$SNAP/files"
+    (cd / && tar -cf "$SNAP/data.tar" -T "$SNAP/files")
+    set_flag true
+    start_koreader
+    echo "Dev mode on: syncing paused, reading data saved"
+    ;;
+  off)
+    if [ ! -d "$SNAP" ]; then echo "Dev mode is already off"; exit 0; fi
+    stop_koreader
+    (cd / && tracked | while read -r f; do rm -rf "/$f"; done)
+    (cd / && tar -xf "$SNAP/data.tar")
+    rm -rf "$SNAP"
+    set_flag false
+    start_koreader
+    echo "Dev mode off: reading data restored, syncing resumed"
+    ;;
+esac
+EOF

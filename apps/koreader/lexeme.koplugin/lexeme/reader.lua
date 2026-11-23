@@ -89,6 +89,10 @@ function Reader.beforeRender(ui)
 end
 
 function Reader.onReaderReady(ui)
+    -- KOReader's gesture shortcuts (a bookmark on the top-right corner, page flipping on
+    -- the top-left, the light on the bottom-left, 10-page jumps...) aren't the Kindle's;
+    -- without them a tap falls through to the reader, so the whole top bar opens the toolbar.
+    if ui.gestures then ui.gestures.gestures = {} end
     if not ui.rolling then return end
     -- Each book also remembers this setting; turn it off for books opened before.
     ui.rolling.partial_rerendering = false

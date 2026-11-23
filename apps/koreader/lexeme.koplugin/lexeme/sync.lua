@@ -86,6 +86,7 @@ function Sync.run(on_done)
     on_done = on_done or function() end
     if running then return on_done(false, "A sync is already running.") end
     if not Sync.isConnected() then return on_done(false, "Connect to Lexeme first.") end
+    if G_reader_settings:isTrue("lexeme_dev_mode") then return on_done(false, "Syncing is paused in dev mode.") end
     if not NetworkMgr:isOnline() then return on_done(false, "No internet connection.") end
     running = true
     local ok, err = pcall(function()
@@ -115,7 +116,7 @@ local scheduled = false
 
 -- Syncs a few seconds from now, quietly; repeated calls in the meantime are folded into one.
 function Sync.soon()
-    if scheduled or not Sync.isConnected() then return end
+    if scheduled or not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
     scheduled = true
     require("ui/uimanager"):scheduleIn(3, function()
         scheduled = false

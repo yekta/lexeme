@@ -43,7 +43,11 @@ end
 
 -- Paints the status line across the top of a view and returns its height.
 function Status.paint(view, bb, x, y, w, on_handle)
-    D.text(bb, x + D.s(32), y + D.s(59), D.face("regular", 28), Status.clock())
+    local clock_w = D.text(bb, x + D.s(32), y + D.s(59), D.face("regular", 28), Status.clock())
+    -- Dev mode (scripts/dev-mode.sh) pauses syncing; it says so, so it isn't left on.
+    if G_reader_settings:isTrue("lexeme_dev_mode") then
+        D.text(bb, x + D.s(32) + clock_w + D.s(20), y + D.s(59), D.face("bold", 28), "Dev")
+    end
 
     local hw, hh = D.s(130), D.s(22)
     local hx = x + math.floor((w - hw) / 2)

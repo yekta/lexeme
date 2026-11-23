@@ -11,6 +11,11 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
 - `pnpm run deploy` (`scripts/deploy.sh`) copies the plugin, checks every file
   compiles, and restarts KOReader. Wait about 25 seconds after a restart
   before tapping; earlier touches are dropped.
+- `scripts/dev-mode.sh on` before testing on a Kindle someone reads on: it
+  snapshots what reading leaves behind (statistics, look-ups, highlights,
+  positions, history, the sync outbox) and pauses syncing, with "Dev" shown by
+  the clock. `scripts/dev-mode.sh off` restores the snapshot and resumes
+  syncing; `status` says which is on.
 - `python3 scripts/kindle.py shot out.png` saves a framebuffer screenshot.
 - `python3 scripts/kindle.py tap X Y` / `hold X Y` / `swipe X1 Y1 X2 Y2`
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a

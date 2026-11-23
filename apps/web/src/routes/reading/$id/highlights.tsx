@@ -22,7 +22,6 @@ function HighlightsPage() {
       title="Highlights"
       count={reading.highlights.length}
       backHref={`/reading/${id}`}
-      narrow
       isError={reading.isError}
       error={reading.error}
       onRetry={reading.refetch}

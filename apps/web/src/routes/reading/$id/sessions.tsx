@@ -22,7 +22,6 @@ function SessionsPage() {
       title="Sessions"
       count={reading.sessions.length}
       backHref={`/reading/${id}`}
-      narrow
       isError={reading.isError}
       error={reading.error}
       onRetry={reading.refetch}

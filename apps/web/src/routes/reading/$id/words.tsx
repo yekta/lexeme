@@ -22,7 +22,6 @@ function BookWordsPage() {
       title="Words"
       count={reading.words.length}
       backHref={`/reading/${id}`}
-      narrow
       isError={reading.isError}
       error={reading.error}
       onRetry={reading.refetch}

@@ -54,11 +54,9 @@ function BookPage() {
                 <h1 className="text-2xl font-semibold text-balance wrap-break-word">{book.title}</h1>
                 {book.authors && <p className="text-muted-foreground">{book.authors}</p>}
               </div>
-              <div className="flex items-center gap-3">
-                <Progress value={percent} className="flex-1" />
-                <span className="text-sm text-muted-foreground tabular-nums">{percent}%</span>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
+              <Progress value={percent} />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Fact label="Progress" value={`${percent}%`} />
                 <Fact label="Time read" value={formatReadingTime(totalSeconds)} />
                 <Fact label="Days read" value={String(days.length)} />
                 <Fact

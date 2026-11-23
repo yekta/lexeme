@@ -1,5 +1,6 @@
 import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
+import { ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
 import { format } from "date-fns";
 
 import { BookCover } from "@/components/book-card";
@@ -8,6 +9,7 @@ import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
+import { SectionEmpty } from "@/components/section-empty";
 import { SeeAllRow } from "@/components/see-all-row";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
@@ -51,9 +53,9 @@ function BookPage() {
           <>
             <BookHeader book={book} totalSeconds={totalSeconds} daysRead={days.length} />
 
-            {sessions.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Sessions" count={sessions.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Sessions" count={sessions.length} />
+              {sessions.length > 0 ? (
                 <div className="rounded-xl border divide-y overflow-hidden">
                   {sessions.slice(0, RECENT_SESSIONS).map((session) => (
                     <SessionRow key={session.started_at} session={session} />
@@ -62,12 +64,14 @@ function BookPage() {
                     <SeeAllRow href={`/reading/${id}/sessions`} more={sessions.length - RECENT_SESSIONS} />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<ClockIcon />} title="No sessions yet" description="Time you spend reading on your Kindle shows up here." />
+              )}
+            </section>
 
-            {highlights.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Highlights" count={highlights.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Highlights" count={highlights.length} />
+              {highlights.length > 0 ? (
                 <div className="flex flex-col gap-3">
                   {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
                     <HighlightItem key={highlight.id} highlight={highlight} />
@@ -80,12 +84,14 @@ function BookPage() {
                     />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<HighlighterIcon />} title="No highlights yet" description="Passages you highlight on your Kindle show up here, with your notes." />
+              )}
+            </section>
 
-            {words.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Words" count={words.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Words" count={words.length} />
+              {words.length > 0 ? (
                 <div className="rounded-xl border divide-y overflow-hidden">
                   {words.slice(0, RECENT_WORDS).map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} />
@@ -94,8 +100,10 @@ function BookPage() {
                     <SeeAllRow href={`/reading/${id}/words`} more={words.length - RECENT_WORDS} />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<LanguagesIcon />} title="No words yet" description="Words you look up while reading show up here." />
+              )}
+            </section>
           </>
         )}
       </main>

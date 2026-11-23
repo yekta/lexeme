@@ -1,6 +1,6 @@
 import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpenIcon } from "lucide-react";
+import { BookCheckIcon, BookOpenIcon, ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
 import { useMemo } from "react";
 
 import { BOOK_GRID, BookCard, finishedBooks } from "@/components/book-card";
@@ -18,6 +18,7 @@ import { ReadingChart } from "@/components/reading-chart";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
+import { SectionEmpty } from "@/components/section-empty";
 import { SeeAllRow } from "@/components/see-all-row";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
@@ -85,20 +86,22 @@ function ReadingPage() {
               <ReadingChart days={summary.lastDays} pageReads={reading.pageReads} />
             </section>
 
-            {current.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Reading" count={current.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Reading" count={current.length} />
+              {current.length > 0 ? (
                 <div className={BOOK_GRID}>
                   {current.map((book) => (
                     <BookCard key={book.id} book={book} />
                   ))}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<BookOpenIcon />} title="Nothing in progress" description="Books you're reading on your Kindle show up here." />
+              )}
+            </section>
 
-            {recentWords.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Words" count={reading.lookups.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Words" count={reading.lookups.length} />
+              {recentWords.length > 0 ? (
                 <div className="rounded-xl border divide-y overflow-hidden">
                   {recentWords.map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined} />
@@ -107,12 +110,14 @@ function ReadingPage() {
                     <SeeAllRow href="/reading/words" more={reading.lookups.length - RECENT_WORDS} />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<LanguagesIcon />} title="No words yet" description="Words you look up while reading show up here." />
+              )}
+            </section>
 
-            {highlights.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Highlights" count={highlights.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Highlights" count={highlights.length} />
+              {highlights.length > 0 ? (
                 <div className="flex flex-col gap-3">
                   {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
                     <HighlightItem key={highlight.id} highlight={highlight} bookTitle={titles.get(highlight.book_id)} />
@@ -121,12 +126,14 @@ function ReadingPage() {
                     <SeeAllRow href="/reading/highlights" more={highlights.length - RECENT_HIGHLIGHTS} standalone />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<HighlighterIcon />} title="No highlights yet" description="Passages you highlight on your Kindle show up here, with your notes." />
+              )}
+            </section>
 
-            {recentSessions.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Sessions" count={reading.sessions.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Sessions" count={reading.sessions.length} />
+              {recentSessions.length > 0 ? (
                 <div className="rounded-xl border divide-y overflow-hidden">
                   {recentSessions.map((session) => (
                     <SessionRow
@@ -139,12 +146,14 @@ function ReadingPage() {
                     <SeeAllRow href="/reading/sessions" more={reading.sessions.length - RECENT_SESSIONS} />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<ClockIcon />} title="No sessions yet" description="Time you spend reading on your Kindle shows up here." />
+              )}
+            </section>
 
-            {finished.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Finished" count={finished.length} />
+            <section className="flex flex-col gap-3">
+              <SectionTitle title="Finished" count={finished.length} />
+              {finished.length > 0 ? (
                 <div className={BOOK_GRID}>
                   {finished.slice(0, RECENT_FINISHED).map((book) => (
                     <BookCard key={book.id} book={book} />
@@ -158,8 +167,10 @@ function ReadingPage() {
                     />
                   )}
                 </div>
-              </section>
-            )}
+              ) : (
+                <SectionEmpty icon={<BookCheckIcon />} title="Nothing finished yet" description="Books you finish on your Kindle show up here." />
+              )}
+            </section>
           </>
         )}
       </main>

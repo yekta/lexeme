@@ -18,7 +18,7 @@ function WordInContext({ word, context }: { word: string; context?: string | nul
 
 export function WordRow({ lookup, bookTitle }: { lookup: TLookup; bookTitle?: string }) {
   return (
-    <div className="px-4 py-3 flex flex-col gap-1">
+    <div className="px-4 py-3 flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <span className="font-medium">{lookup.word}</span>
         {lookup.card_id && (
@@ -28,12 +28,16 @@ export function WordRow({ lookup, bookTitle }: { lookup: TLookup; bookTitle?: st
           {formatDistanceToNowStrict(lookup.looked_up_at, { addSuffix: true })}
         </span>
       </div>
-      {lookup.context && (
-        <p className="text-sm text-muted-foreground">
-          <WordInContext word={lookup.word} context={lookup.context} />
-        </p>
+      {(lookup.context || bookTitle) && (
+        <div className="flex flex-col gap-1">
+          {lookup.context && (
+            <p className="text-sm text-muted-foreground">
+              <WordInContext word={lookup.word} context={lookup.context} />
+            </p>
+          )}
+          {bookTitle && <span className="text-xs text-muted-foreground truncate">{bookTitle}</span>}
+        </div>
       )}
-      {bookTitle && <span className="text-xs text-muted-foreground truncate">{bookTitle}</span>}
     </div>
   );
 }

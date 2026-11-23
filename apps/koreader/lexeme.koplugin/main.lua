@@ -26,6 +26,9 @@ end
 -- Each book's progress lives in KOReader's own folder: a .sdr folder beside the
 -- book is claimed (and emptied) by Amazon's indexer when the book is a PDF.
 G_reader_settings:saveSetting("document_metadata_folder", "dir")
+-- Lay a book out fully on every change; KOReader's partial relayouts reload the book
+-- later, when it's idle, and can land back on an older page.
+G_reader_settings:saveSetting("cre_partial_rerendering", false)
 
 local Lexeme = WidgetContainer:extend{
     name = "lexeme",

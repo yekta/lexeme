@@ -77,6 +77,11 @@ end
 
 function Reader.onReaderReady(ui)
     if not ui.rolling then return end
+    -- Each book also remembers this setting; turn it off for books opened before.
+    ui.rolling.partial_rerendering = false
+    UIManager:nextTick(function()
+        if ui.document then ui.document:enablePartialRerendering(false) end
+    end)
     -- A book imported from the Kindle comes with only a percentage; it's applied
     -- once the book is laid out the Kindle's way, or the relayout loses it.
     local imported = not ui.doc_settings:has("last_xpointer") and ui.doc_settings:readSetting("last_percent")

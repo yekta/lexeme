@@ -11,17 +11,14 @@ function Words.pending()
     return words
 end
 
--- Queues the word; false when the same word from the same book is already waiting.
+-- Queues the word as a card; false when the same word is already waiting.
 function Words.add(entry)
     for _, waiting in ipairs(Words.pending()) do
-        if waiting.word:lower() == entry.word:lower() and waiting.book_key == entry.book_key then return false end
+        if waiting.word:lower() == entry.word:lower() then return false end
     end
     local body = {
-        id = Outbox.uuid(),
         word = entry.word,
         context = entry.context,
-        book_key = entry.book_key,
-        looked_up_at = os.time() * 1000,
         deck_id = G_reader_settings:readSetting("lexeme_deck_id"),
     }
     Outbox.push("word", body)
@@ -70,7 +67,7 @@ function Words.sentence(before, word, after)
     return trim((prefix ~= "" and prefix .. " " or "") .. word .. (glued and "" or " ") .. suffix)
 end
 
--- The selection's word with the sentence around it and where it came from.
+-- The selection's word with the sentence around it.
 function Words.fromSelection(ui)
     local selected = ui.highlight.selected_text
     if not selected or not selected.text then return end
@@ -79,7 +76,6 @@ function Words.fromSelection(ui)
     if before or after then
         entry.context = Words.sentence(before, selected.text, after)
     end
-    entry.book_key = require("lexeme/reading").bookKey(ui.document.file, ui.doc_settings)
     return entry
 end
 

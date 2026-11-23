@@ -24,7 +24,7 @@ import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { WordRow } from "@/components/word-row";
-import { useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
+import { useCardWords, useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
 
 export const Route = createFileRoute("/reading/")({
   component: ReadingRoute,
@@ -46,6 +46,7 @@ function ReadingRoute() {
 
 function ReadingPage() {
   const reading = useReading();
+  const cardWords = useCardWords();
   const summary = useReadingSummary(reading.books, reading.days);
   const booksByRecent = useMemo(
     () => [...reading.books].sort((a, b) => (b.last_read_at ?? 0) - (a.last_read_at ?? 0)),
@@ -104,7 +105,12 @@ function ReadingPage() {
               {recentWords.length > 0 ? (
                 <div className="rounded-xl border divide-y overflow-hidden">
                   {recentWords.map((lookup) => (
-                    <WordRow key={lookup.id} lookup={lookup} bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined} />
+                    <WordRow
+                      key={lookup.id}
+                      lookup={lookup}
+                      isCard={cardWords.has(lookup.word.trim().toLowerCase())}
+                      bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined}
+                    />
                   ))}
                   {reading.lookups.length > RECENT_WORDS && (
                     <SeeAllRow href="/reading/words" more={reading.lookups.length - RECENT_WORDS} />

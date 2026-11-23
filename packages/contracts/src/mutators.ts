@@ -147,9 +147,6 @@ const bookKey = z.string().trim().min(1).max(500);
 const optionalText = z.string().trim().max(20_000).nullish();
 const epochMs = z.number().int().min(0);
 
-/** Look-ups of the same word this close together are the same look-up. */
-const SAME_LOOKUP_MS = 10 * 60 * 1000;
-
 export const syncReadingArgs = z.object({
   books: z
     .array(
@@ -207,7 +204,6 @@ export const syncReadingArgs = z.object({
         book_key: bookKey.nullish(),
         word: z.string().trim().min(1).max(200),
         context: optionalText,
-        card_id: uuidArg.nullish(),
         looked_up_at: epochMs,
       }),
     )
@@ -508,33 +504,15 @@ export const mutatorDefs = {
       for (const lookup of args.lookups) {
         const existing = await tx.run(zql.lookups.where("id", lookup.id).one());
         mustBeMineOrNew(existing);
-        if (lookup.card_id) await mustOwnCard(tx, user_id, lookup.card_id);
         // A word can arrive before its book does; it is kept without one.
         const book_id = lookup.book_key ? await findBookId(lookup.book_key) : undefined;
-
-        // One look-up can arrive twice: as the device recorded it, and as the word added
-        // to Lexeme from it. The one with the card is kept.
-        const twins = (await tx.run(zql.lookups.where("user_id", user_id).where("word", lookup.word))).filter(
-          (other) =>
-            other.id !== lookup.id &&
-            (!other.book_id || !book_id || other.book_id === book_id) &&
-            Math.abs(other.looked_up_at - lookup.looked_up_at) <= SAME_LOOKUP_MS,
-        );
-        if (!lookup.card_id && twins.some((twin) => twin.card_id)) {
-          if (existing) await tx.mutate.lookups.delete({ id: lookup.id });
-          continue;
-        }
-        if (lookup.card_id) {
-          for (const twin of twins) if (!twin.card_id) await tx.mutate.lookups.delete({ id: twin.id });
-        }
 
         await tx.mutate.lookups.upsert({
           id: lookup.id,
           user_id,
-          book_id,
+          book_id: book_id ?? existing?.book_id ?? undefined,
           word: lookup.word,
-          context: lookup.context ?? undefined,
-          card_id: lookup.card_id ?? existing?.card_id ?? undefined,
+          context: lookup.context ?? existing?.context ?? undefined,
           looked_up_at: lookup.looked_up_at,
           created_at: existing?.created_at ?? now,
         });

@@ -60,6 +60,12 @@ export function useReadingSummary(books: readonly TBookRow[], days: readonly TRe
   }, [books, days]);
 }
 
+/** The words that are cards already, lowercased, for marking looked-up words. */
+export function useCardWords() {
+  const [cards] = useQuery(queries.cards());
+  return useMemo(() => new Set(cards.map((card) => card.front.trim().toLowerCase())), [cards]);
+}
+
 /** One book and everything recorded about it, newest first. */
 export function useBookReading(id: string) {
   const reading = useReading();

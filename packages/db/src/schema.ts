@@ -329,7 +329,7 @@ export const highlights = pgTable(
   (t) => [index("highlights_user_id_idx").on(t.user_id)],
 );
 
-/** A word looked up or added while reading; `card_id` is set once it became a card. */
+/** A word looked up while reading. */
 export const lookups = pgTable(
   "lookups",
   {
@@ -340,7 +340,6 @@ export const lookups = pgTable(
     book_id: uuid("book_id").references(() => books.id, { onDelete: "set null" }),
     word: text("word").notNull(),
     context: text("context"),
-    card_id: uuid("card_id").references(() => cards.id, { onDelete: "set null" }),
     looked_up_at: timestamp("looked_up_at", { withTimezone: true }).notNull(),
     created_at: createdAt(),
   },

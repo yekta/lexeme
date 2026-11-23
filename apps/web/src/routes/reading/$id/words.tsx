@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ReadingListPage, ReadingRoute } from "@/components/reading-list-page";
 import { DividedVirtualList } from "@/components/window-virtual-grid";
 import { WordRow } from "@/components/word-row";
-import { useBookReading } from "@/hooks/data/use-reading";
+import { useBookReading, useCardWords } from "@/hooks/data/use-reading";
 
 export const Route = createFileRoute("/reading/$id/words")({
   component: () => (
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/reading/$id/words")({
 function BookWordsPage() {
   const { id } = Route.useParams();
   const reading = useBookReading(id);
+  const cardWords = useCardWords();
   return (
     <ReadingListPage
       navTitle={reading.book?.title ?? "Book"}
@@ -30,7 +31,7 @@ function BookWordsPage() {
         items={reading.words}
         estimateRowHeight={90}
         getKey={(lookup) => lookup.id}
-        renderItem={(lookup) => <WordRow lookup={lookup} />}
+        renderItem={(lookup) => <WordRow lookup={lookup} isCard={cardWords.has(lookup.word.trim().toLowerCase())} />}
       />
     </ReadingListPage>
   );

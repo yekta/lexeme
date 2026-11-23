@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ReadingListPage, ReadingRoute } from "@/components/reading-list-page";
 import { DividedVirtualList } from "@/components/window-virtual-grid";
 import { WordRow } from "@/components/word-row";
-import { useReading } from "@/hooks/data/use-reading";
+import { useCardWords, useReading } from "@/hooks/data/use-reading";
 
 export const Route = createFileRoute("/reading/words")({
   component: () => (
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/reading/words")({
 
 function WordsPage() {
   const reading = useReading();
+  const cardWords = useCardWords();
   const words = useMemo(
     () => [...reading.lookups].sort((a, b) => b.looked_up_at - a.looked_up_at),
     [reading.lookups],
@@ -37,7 +38,11 @@ function WordsPage() {
         estimateRowHeight={110}
         getKey={(lookup) => lookup.id}
         renderItem={(lookup) => (
-          <WordRow lookup={lookup} bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined} />
+          <WordRow
+            lookup={lookup}
+            isCard={cardWords.has(lookup.word.trim().toLowerCase())}
+            bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined}
+          />
         )}
       />
     </ReadingListPage>

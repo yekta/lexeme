@@ -183,8 +183,6 @@ const lookups = table("lookups")
     book_id: string().optional(),
     word: string(),
     context: string().optional(),
-    /** Set once the word became a card. */
-    card_id: string().optional(),
     looked_up_at: number(),
     created_at: number(),
   })

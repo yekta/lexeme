@@ -470,28 +470,16 @@ export const operations: TOperation[] = [
     name: "add-word",
     title: "Add word",
     description:
-      "Add a word met while reading as a card. The back is written for the sense the word has in `context`, in the deck's style. A word already in the deck isn't added again. Without a deck, the word goes to a deck named \"Kindle\", created if needed.",
+      "Add a word met while reading as a card. The back is written for the sense the word has in `context`, in the deck's style. A word already in the deck isn't added again, so retrying is safe. Without a deck, the word goes to a deck named \"Kindle\", created if needed.",
     role: "editor",
     method: "POST",
     path: "/words",
     input: z.object({
-      id: z.uuid().describe("Minted by the caller, so a retried request adds the word once."),
       deck_id: deckId.optional(),
       word: z.string().trim().min(1).max(200),
       context: z.string().trim().max(5000).optional().describe("The sentence the word was read in."),
-      book_key: z.string().trim().min(1).max(500).optional().describe("A book sent with sync-reading."),
-      looked_up_at: z.number().int().min(0).optional().describe("Epoch milliseconds."),
     }),
     run: async (caller, input) => {
-      const [done] = await db
-        .select({ card_id: lookups.card_id })
-        .from(lookups)
-        .where(and(eq(lookups.id, input.id), eq(lookups.user_id, caller.userId)))
-        .limit(1);
-      if (done?.card_id) {
-        return { card: presentCard(await mustFindCard(caller.userId, done.card_id)), created: false };
-      }
-
       const deck = input.deck_id ? await mustFindDeck(caller.userId, input.deck_id) : await deviceDeck(caller.userId);
       let [card] = await db
         .select()
@@ -515,22 +503,6 @@ export const operations: TOperation[] = [
         card = await mustFindCard(caller.userId, id);
       }
 
-      await runMutator(caller.userId, serverMutators.reading.sync, {
-        books: [],
-        page_reads: [],
-        highlights: [],
-        removed_book_keys: [],
-        lookups: [
-          {
-            id: input.id,
-            book_key: input.book_key,
-            word: input.word,
-            context: input.context,
-            card_id: card.id,
-            looked_up_at: input.looked_up_at ?? Date.now(),
-          },
-        ],
-      });
       return { card: presentCard(card), deck: presentDeck(deck), created };
     },
   }),

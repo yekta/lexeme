@@ -30,7 +30,7 @@ export function useReading() {
   // Days and sessions are worked out here from every page visit the devices recorded.
   const days = useMemo(() => bookDays(pageReads), [pageReads]);
   const sessions = useMemo(() => readingSessions(pageReads), [pageReads]);
-  return { books, days, sessions, highlights, lookups, ...status };
+  return { books, pageReads, days, sessions, highlights, lookups, ...status };
 }
 
 export type TReadingSummary = {

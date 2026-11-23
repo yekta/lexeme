@@ -1,6 +1,5 @@
-import { formatReadingTime, type TReadingDay } from "@lexeme/shared";
+import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { format, parseISO } from "date-fns";
 import { BookOpenIcon } from "lucide-react";
 import { useMemo } from "react";
 
@@ -14,6 +13,7 @@ import {
   EmptyListTitle,
 } from "@/components/empty-list";
 import { LoadError } from "@/components/load-error";
+import { ReadingChart } from "@/components/reading-chart";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
@@ -23,7 +23,6 @@ import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { WordRow } from "@/components/word-row";
 import { useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/reading/")({
   component: ReadingRoute,
@@ -78,7 +77,7 @@ function ReadingPage() {
 
             <section className="flex flex-col gap-3">
               <SectionTitle title="Reading Time" />
-              <DailyBars days={summary.lastDays} />
+              <ReadingChart days={summary.lastDays} pageReads={reading.pageReads} />
             </section>
 
             {recentSessions.length > 0 && (
@@ -171,37 +170,6 @@ function StatTile({ label, value }: { label: string; value: string }) {
     </Card>
   );
 }
-
-/** One bar per day; the tallest day sets the scale. */
-function DailyBars({ days }: { days: TReadingDay[] }) {
-  const max = Math.max(...days.map((d) => d.seconds), 1);
-  const peak = days.reduce((best, d) => (d.seconds > best.seconds ? d : best), days[0]);
-  return (
-    <div className="rounded-xl border bg-card p-4 flex flex-col gap-2">
-      <div className="flex items-start justify-between text-xs text-muted-foreground">
-        <span>{peak && peak.seconds > 0 ? `Most: ${formatReadingTime(peak.seconds)}` : "No reading yet"}</span>
-      </div>
-      <div className="h-36 flex items-end gap-0.5 border-b border-border" role="img" aria-label="Minutes read per day">
-        {days.map((day) => (
-          <div key={day.day} className="group relative flex-1 h-full flex items-end">
-            <div
-              className={cn("w-full rounded-t-[4px] bg-primary", day.seconds === 0 && "bg-transparent")}
-              style={{ height: `${(day.seconds / max) * 100}%` }}
-            />
-            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md z-10">
-              {format(parseISO(day.day), "EEE d MMM")}: {formatReadingTime(day.seconds)}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{format(parseISO(days[0].day), "d MMM")}</span>
-        <span>Today</span>
-      </div>
-    </div>
-  );
-}
-
 
 function NoBooks() {
   return (

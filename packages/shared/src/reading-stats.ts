@@ -101,6 +101,25 @@ export function lastDays(totals: Map<string, number>, today: Date, count: number
   return result;
 }
 
+/**
+ * Seconds read in each of the 24 local hours of `day` (YYYY-MM-DD), across all
+ * books. A page left open over the turn of an hour counts toward both hours.
+ */
+export function secondsByHour(reads: readonly TPageRead[], day: string): number[] {
+  const hours = Array.from({ length: 24 }, () => 0);
+  const [y, m, d] = day.split("-").map(Number);
+  for (let hour = 0; hour < 24; hour += 1) {
+    const from = new Date(y, m - 1, d, hour).getTime();
+    const to = new Date(y, m - 1, d, hour + 1).getTime();
+    for (const read of reads) {
+      const end = read.started_at + read.seconds * 1000;
+      const overlap = Math.min(end, to) - Math.max(read.started_at, from);
+      if (overlap > 0) hours[hour] += overlap / 1000;
+    }
+  }
+  return hours;
+}
+
 /** "1 h 20 min", "45 min", "0 min". */
 export function formatReadingTime(seconds: number): string {
   const minutes = Math.round(seconds / 60);

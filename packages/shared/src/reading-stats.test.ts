@@ -9,6 +9,7 @@ import {
   readingSessions,
   readingStreak,
   secondsByDay,
+  secondsByHour,
   type TPageRead,
 } from "./reading-stats.ts";
 
@@ -95,4 +96,19 @@ test("a pause longer than ten minutes starts a new session", () => {
 test("sessions never mix books", () => {
   const sessions = readingSessions([read(1, 9, 0, 60), read(1, 9, 1, 60, "b")]);
   assert.equal(sessions.length, 2);
+});
+
+test("hours split a page left open across the turn of an hour", () => {
+  const reads: TPageRead[] = [
+    { book_id: "a", page: 1, started_at: new Date(2026, 10, 23, 19, 55).getTime(), seconds: 10 * 60 },
+    { book_id: "b", page: 4, started_at: new Date(2026, 10, 23, 7, 0).getTime(), seconds: 120 },
+    { book_id: "a", page: 2, started_at: new Date(2026, 10, 22, 23, 59).getTime(), seconds: 120 },
+  ];
+  const hours = secondsByHour(reads, "2026-11-23");
+  assert.equal(hours.length, 24);
+  assert.equal(hours[19], 5 * 60);
+  assert.equal(hours[20], 5 * 60);
+  assert.equal(hours[7], 120);
+  assert.equal(hours[0], 60);
+  assert.equal(hours.reduce((a, b) => a + b, 0), 5 * 60 + 5 * 60 + 120 + 60);
 });

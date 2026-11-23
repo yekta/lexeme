@@ -101,6 +101,7 @@ end
 function Lexeme:openBook(path)
     if path:find("^lexeme%-delivery:") then return end
     if self.shell then
+        G_reader_settings:saveSetting("lexeme_tab", self.shell.tab)
         self.shell.opening = path
         UIManager:setDirty(self.shell, "fast")
         UIManager:forceRePaint()

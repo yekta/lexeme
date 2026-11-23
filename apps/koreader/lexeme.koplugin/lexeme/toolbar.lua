@@ -40,8 +40,10 @@ function Toolbar:paintTop(bb, x, y, w)
     Status.paint(self, bb, x, y, w, function() self:run("quick") end)
 
     D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
-    D.text(bb, x + D.s(111), y + D.s(169), D.face("regular", 36), "Library")
-    self:hit(x, y + D.s(100), D.s(260), D.s(112), function() self:run("library") end)
+    -- Back to the tab the book was opened from, named like on the Kindle.
+    local label = G_reader_settings:readSetting("lexeme_tab") == "library" and "Library" or "Home"
+    D.text(bb, x + D.s(111), y + D.s(169), D.face("regular", 36), label)
+    self:hit(x, y + D.s(100), D.s(260), D.s(112), function() self:run("back") end)
 
     local buttons = {
         { action = "aa", x = 795 },

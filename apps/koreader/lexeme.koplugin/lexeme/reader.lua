@@ -11,10 +11,7 @@ local Reader = {}
 
 local function actions(ui)
     return {
-        library = function()
-            G_reader_settings:saveSetting("lexeme_tab", "library")
-            ui:onHome()
-        end,
+        back = function() ui:onHome() end,
         aa = function() require("lexeme/aa").show(ui) end,
         ["goto"] = function() require("lexeme/goto").show(ui) end,
         notebook = function() require("lexeme/notebook").show(ui) end,

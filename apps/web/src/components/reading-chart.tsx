@@ -22,7 +22,7 @@ function DaysChart({ days, onSelect }: { days: TReadingDay[]; onSelect: (day: st
   const peak = days.reduce((best, d) => (d.seconds > best.seconds ? d : best), days[0]);
   const bars = days.map((d, i) => ({
     key: d.day,
-    tick: i === 0 ? format(parseISO(d.day), "d MMM") : i === days.length - 1 ? "Today" : "",
+    tick: i === days.length - 1 ? "Today" : format(parseISO(d.day), "d MMM"),
     tip: format(parseISO(d.day), "EEE d MMM"),
     seconds: d.seconds,
   }));
@@ -30,7 +30,7 @@ function DaysChart({ days, onSelect }: { days: TReadingDay[]; onSelect: (day: st
     <ChartFrame
       caption={peak && peak.seconds > 0 ? `Most: ${formatReadingTime(peak.seconds)}` : "No reading yet"}
       bars={bars}
-      ticks={[bars[0].tick, "Today"]}
+      ticks={[bars[0].key, bars[bars.length - 1].key]}
       onSelect={(bar) => bar.seconds > 0 && onSelect(bar.key)}
     />
   );
@@ -56,7 +56,7 @@ function DayChart({ day, pageReads, onBack }: { day: string; pageReads: readonly
         </Button>
       }
       bars={bars}
-      ticks={[0, 6, 12, 18].map(hourLabel)}
+      ticks={["0", "6", "12", "18"]}
     />
   );
 }
@@ -80,15 +80,25 @@ function ChartFrame({
         <span>{caption}</span>
         {action}
       </div>
-      <ChartContainer config={CONFIG} className="aspect-auto h-44 w-full">
-        <BarChart accessibilityLayer data={bars} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barCategoryGap={2}>
+      <ChartContainer config={CONFIG} className="aspect-auto h-44 w-full [&_*:focus]:outline-hidden">
+        <BarChart
+          accessibilityLayer
+          data={bars}
+          margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+          barCategoryGap={2}
+          className={onSelect ? "cursor-pointer" : undefined}
+          onClick={(state) => {
+            const bar = bars.find((b) => b.key === String(state.activeLabel));
+            if (bar) onSelect?.(bar);
+          }}
+        >
           <XAxis
-            dataKey="tick"
+            dataKey="key"
             ticks={ticks}
             interval={0}
             tickLine={false}
             axisLine={{ stroke: "var(--border)" }}
-            tick={(props: XAxisTickContentProps) => <EdgeTick {...props} count={bars.length} />}
+            tick={(props: XAxisTickContentProps) => <EdgeTick {...props} bars={bars} />}
           />
           <ChartTooltip
             cursor={{ fill: "var(--muted)", opacity: 0.6 }}
@@ -111,8 +121,6 @@ function ChartFrame({
             fill="var(--color-seconds)"
             radius={[4, 4, 0, 0]}
             isAnimationActive={false}
-            className={onSelect ? "cursor-pointer" : undefined}
-            onClick={(_, index) => onSelect?.(bars[index])}
           />
         </BarChart>
       </ChartContainer>
@@ -120,17 +128,21 @@ function ChartFrame({
   );
 }
 
-/** Axis labels inside the chart's edges: the first starts at the left, a last "Today" ends at the right. */
-function EdgeTick({ x, y, width, payload, count }: XAxisTickContentProps & { count: number }) {
-  const value = String(payload.value);
-  const band = Number(width ?? 0) / count;
-  const first = value === "00:00" || /^\d+ \w+$/.test(value);
-  const last = value === "Today";
-  const anchor = first ? "start" : last ? "end" : "middle";
-  const dx = first ? -band / 2 : last ? band / 2 : 0;
+/** Axis labels inside the chart's edges: the first starts at the left, the last ends at the right. */
+function EdgeTick({ x, y, width, payload, bars }: XAxisTickContentProps & { bars: TBar[] }) {
+  const index = bars.findIndex((bar) => bar.key === String(payload.value));
+  if (index < 0) return null;
+  const band = Number(width ?? 0) / bars.length;
+  const first = index === 0;
+  const last = index === bars.length - 1;
   return (
-    <text x={Number(x) + dx} y={Number(y) + 12} textAnchor={anchor} className="fill-muted-foreground text-xs">
-      {value}
+    <text
+      x={Number(x) + (first ? -band / 2 : last ? band / 2 : 0)}
+      y={Number(y) + 12}
+      textAnchor={first ? "start" : last ? "end" : "middle"}
+      className="fill-muted-foreground text-xs"
+    >
+      {bars[index].tick}
     </text>
   );
 }

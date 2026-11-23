@@ -1,5 +1,5 @@
-import { updateProfileArgs } from "@lexeme/contracts";
-import { cards, decks, learningProfiles, reviewLogs, user } from "@lexeme/db";
+import { syncReadingArgs, updateProfileArgs } from "@lexeme/contracts";
+import { cards, decks, learningProfiles, lookups, reviewLogs, user } from "@lexeme/db";
 import {
   DECK_EXPORT_KIND,
   DECK_EXPORT_VERSION,
@@ -14,9 +14,10 @@ import {
   type Grade,
   type TAccessRole,
 } from "@lexeme/shared";
-import { and, asc, desc, eq, gte, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { generateBack } from "../ai/generate-back.ts";
 import { generateBackForDeck, generateCardForDeck } from "../ai/generate-card.ts";
 import type { TCaller } from "../caller.ts";
 import { db } from "../db.ts";
@@ -78,6 +79,27 @@ async function recentLogs(userId: string, now: number) {
     .from(reviewLogs)
     .where(and(eq(reviewLogs.user_id, userId), gte(reviewLogs.review, new Date(now - 2 * DAY_MS))));
   return rows.map((log) => ({ ...log, review: log.review.getTime() }));
+}
+
+/** Where words from an e-reader go when the device hasn't picked a deck. */
+const DEVICE_DECK_NAME = "Kindle";
+
+async function deviceDeck(userId: string) {
+  const [existing] = await db
+    .select()
+    .from(decks)
+    .where(and(eq(decks.user_id, userId), eq(decks.name, DEVICE_DECK_NAME)))
+    .orderBy(asc(decks.created_at))
+    .limit(1);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  await runMutator(userId, serverMutators.deck.create, {
+    id,
+    name: DEVICE_DECK_NAME,
+    description: "Words added while reading.",
+    learning_profile_id: await defaultProfileId(userId),
+  });
+  return mustFindDeck(userId, id);
 }
 
 async function studyBuckets(userId: string, deck: typeof decks.$inferSelect) {
@@ -441,6 +463,94 @@ export const operations: TOperation[] = [
     run: async (caller, input) => {
       await mustFindDeck(caller.userId, input.deck_id);
       return { back: await generateBackForDeck({ deckId: input.deck_id, front: input.front }) };
+    },
+  }),
+
+  defineOperation({
+    name: "add-word",
+    title: "Add word",
+    description:
+      "Add a word met while reading as a card. The back is written for the sense the word has in `context`, in the deck's style. A word already in the deck isn't added again. Without a deck, the word goes to a deck named \"Kindle\", created if needed.",
+    role: "editor",
+    method: "POST",
+    path: "/words",
+    input: z.object({
+      id: z.uuid().describe("Minted by the caller, so a retried request adds the word once."),
+      deck_id: deckId.optional(),
+      word: z.string().trim().min(1).max(200),
+      context: z.string().trim().max(5000).optional().describe("The sentence the word was read in."),
+      book_key: z.string().trim().min(1).max(500).optional().describe("A book sent with sync-reading."),
+      looked_up_at: z.number().int().min(0).optional().describe("Epoch milliseconds."),
+    }),
+    run: async (caller, input) => {
+      const [done] = await db
+        .select({ card_id: lookups.card_id })
+        .from(lookups)
+        .where(and(eq(lookups.id, input.id), eq(lookups.user_id, caller.userId)))
+        .limit(1);
+      if (done?.card_id) {
+        return { card: presentCard(await mustFindCard(caller.userId, done.card_id)), created: false };
+      }
+
+      const deck = input.deck_id ? await mustFindDeck(caller.userId, input.deck_id) : await deviceDeck(caller.userId);
+      let [card] = await db
+        .select()
+        .from(cards)
+        .where(and(eq(cards.deck_id, deck.id), sql`lower(${cards.front}) = lower(${input.word})`))
+        .limit(1);
+      const created = !card;
+      if (!card) {
+        const examples = await db
+          .select({ front: cards.front, back: cards.back })
+          .from(cards)
+          .where(eq(cards.deck_id, deck.id))
+          .orderBy(desc(cards.created_at))
+          .limit(20);
+        const back = await generateBack({ front: input.word, recentCards: examples, context: input.context });
+        const id = crypto.randomUUID();
+        await runMutator(caller.userId, serverMutators.card.insert, {
+          deck_id: deck.id,
+          cards: [{ id, front: input.word, back }],
+        });
+        card = await mustFindCard(caller.userId, id);
+      }
+
+      await runMutator(caller.userId, serverMutators.reading.sync, {
+        books: [],
+        days: [],
+        highlights: [],
+        lookups: [
+          {
+            id: input.id,
+            book_key: input.book_key,
+            word: input.word,
+            context: input.context,
+            card_id: card.id,
+            looked_up_at: input.looked_up_at ?? Date.now(),
+          },
+        ],
+      });
+      return { card: presentCard(card), deck: presentDeck(deck), created };
+    },
+  }),
+
+  defineOperation({
+    name: "sync-reading",
+    title: "Sync reading data",
+    description:
+      "Send books, reading time per day, highlights and looked-up words from an e-reader. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
+    role: "editor",
+    method: "POST",
+    path: "/reading",
+    input: syncReadingArgs,
+    run: async (caller, input) => {
+      await runMutator(caller.userId, serverMutators.reading.sync, input);
+      return {
+        books: input.books.length,
+        days: input.days.length,
+        highlights: input.highlights.length,
+        lookups: input.lookups.length,
+      };
     },
   }),
 

@@ -15,6 +15,8 @@ import { proxiedImageUrl } from "@/lib/image";
 import {
   ArrowLeftIcon,
   BlocksIcon,
+  BookOpenIcon,
+  BookUpIcon,
   KeyRoundIcon,
   LoaderIcon,
   LogOutIcon,
@@ -132,6 +134,15 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
               <DropdownMenuContent align="end" className="min-w-48">
                 <DropdownMenuItem className="font-normal pointer-events-none py-1.25 text-xs text-muted-foreground">
                   <DropdownMenuItemText>{user.email}</DropdownMenuItemText>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link to="/reading" />}>
+                  <BookOpenIcon className="size-5 shrink-0" />
+                  <DropdownMenuItemText>Reading</DropdownMenuItemText>
+                </DropdownMenuItem>
+                <DropdownMenuItem render={<Link to="/send" />}>
+                  <BookUpIcon className="size-5 shrink-0" />
+                  <DropdownMenuItemText>Send to Kindle</DropdownMenuItemText>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem render={<Link to="/settings/api-keys" />}>

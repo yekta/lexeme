@@ -71,7 +71,7 @@ async function request<TSchema extends z.ZodType>(
     ...init,
     credentials: "include",
     headers: {
-      ...(init?.body ? { "content-type": "application/json" } : {}),
+      ...(typeof init?.body === "string" ? { "content-type": "application/json" } : {}),
       ...init?.headers,
     },
   });
@@ -100,6 +100,15 @@ export function apiPost<TSchema extends z.ZodType>(
   body: unknown,
 ): Promise<z.infer<TSchema>> {
   return request(path, schema, { method: "POST", body: JSON.stringify(body) });
+}
+
+/** A file upload; the browser sets the multipart content type and boundary itself. */
+export function apiUpload<TSchema extends z.ZodType>(
+  path: string,
+  schema: TSchema,
+  form: FormData,
+): Promise<z.infer<TSchema>> {
+  return request(path, schema, { method: "POST", body: form });
 }
 
 export function apiDelete<TSchema extends z.ZodType>(

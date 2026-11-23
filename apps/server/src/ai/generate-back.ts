@@ -11,22 +11,29 @@ You are given the user's previous cards (front → back pairs) and the front of 
 new card. Infer the user's conventions from the examples: the language(s) \
 involved, whether backs are translations, definitions, or multiple \
 translations, their length, and their tone (formal or friendly), and produce \
-a back for the new card that matches those conventions. Output only the back content, nothing else.`;
+a back for the new card that matches those conventions. When the user's deck \
+has no cards yet, write a short definition in the language of the word. When \
+you are given the sentence the word was read in, define the sense it has there. \
+Output only the back content, nothing else.`;
 
 export async function generateBack({
   front,
   recentCards,
+  context,
 }: {
   front: string;
   recentCards: { front: string; back: string }[];
+  /** The sentence the front was read in, to pick the right sense. */
+  context?: string;
 }): Promise<string> {
-  const examples = recentCards
-    .map((c) => `Front: ${c.front}\nBack: ${c.back}`)
-    .join("\n\n");
+  const examples = recentCards.length
+    ? recentCards.map((c) => `Front: ${c.front}\nBack: ${c.back}`).join("\n\n")
+    : "(none yet)";
+  const sentence = context ? `\n\nIt was read in this sentence: ${context}` : "";
 
   const output = await generateStructured({
     system: SYSTEM_PROMPT,
-    prompt: `Previous cards:\n\n${examples}\n\nNew card front: ${front}\n\nGenerate the back for the new card.`,
+    prompt: `Previous cards:\n\n${examples}\n\nNew card front: ${front}${sentence}\n\nGenerate the back for the new card.`,
     schema: backSchema,
   });
 

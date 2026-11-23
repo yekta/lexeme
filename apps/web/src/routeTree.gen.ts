@@ -10,6 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PairIndexRouteImport } from './routes/pair/index'
+import { Route as ReadingIndexRouteImport } from './routes/reading/index'
+import { Route as ReadingIdRouteImport } from './routes/reading/$id'
+import { Route as SendIndexRouteImport } from './routes/send/index'
 import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as DeckIdIndexRouteImport } from './routes/deck/$id/index'
 import { Route as OauthConsentIndexRouteImport } from './routes/oauth/consent/index'
@@ -20,6 +24,26 @@ import { Route as StudyIdIndexRouteImport } from './routes/study/$id/index'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PairIndexRoute = PairIndexRouteImport.update({
+  id: '/pair/',
+  path: '/pair/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingIndexRoute = ReadingIndexRouteImport.update({
+  id: '/reading/',
+  path: '/reading/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingIdRoute = ReadingIdRouteImport.update({
+  id: '/reading/$id',
+  path: '/reading/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SendIndexRoute = SendIndexRouteImport.update({
+  id: '/send/',
+  path: '/send/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInIndexRoute = SignInIndexRouteImport.update({
@@ -56,6 +80,10 @@ const StudyIdIndexRoute = StudyIdIndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/reading/$id': typeof ReadingIdRoute
+  '/pair/': typeof PairIndexRoute
+  '/reading/': typeof ReadingIndexRoute
+  '/send/': typeof SendIndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/oauth/consent/': typeof OauthConsentIndexRoute
@@ -65,6 +93,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/reading/$id': typeof ReadingIdRoute
+  '/pair': typeof PairIndexRoute
+  '/reading': typeof ReadingIndexRoute
+  '/send': typeof SendIndexRoute
   '/sign-in': typeof SignInIndexRoute
   '/deck/$id': typeof DeckIdIndexRoute
   '/oauth/consent': typeof OauthConsentIndexRoute
@@ -75,6 +107,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/reading/$id': typeof ReadingIdRoute
+  '/pair/': typeof PairIndexRoute
+  '/reading/': typeof ReadingIndexRoute
+  '/send/': typeof SendIndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/oauth/consent/': typeof OauthConsentIndexRoute
@@ -86,6 +122,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/reading/$id'
+    | '/pair/'
+    | '/reading/'
+    | '/send/'
     | '/sign-in/'
     | '/deck/$id/'
     | '/oauth/consent/'
@@ -95,6 +135,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/reading/$id'
+    | '/pair'
+    | '/reading'
+    | '/send'
     | '/sign-in'
     | '/deck/$id'
     | '/oauth/consent'
@@ -104,6 +148,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/reading/$id'
+    | '/pair/'
+    | '/reading/'
+    | '/send/'
     | '/sign-in/'
     | '/deck/$id/'
     | '/oauth/consent/'
@@ -114,6 +162,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ReadingIdRoute: typeof ReadingIdRoute
+  PairIndexRoute: typeof PairIndexRoute
+  ReadingIndexRoute: typeof ReadingIndexRoute
+  SendIndexRoute: typeof SendIndexRoute
   SignInIndexRoute: typeof SignInIndexRoute
   DeckIdIndexRoute: typeof DeckIdIndexRoute
   OauthConsentIndexRoute: typeof OauthConsentIndexRoute
@@ -129,6 +181,34 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pair/': {
+      id: '/pair/'
+      path: '/pair'
+      fullPath: '/pair/'
+      preLoaderRoute: typeof PairIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/': {
+      id: '/reading/'
+      path: '/reading'
+      fullPath: '/reading/'
+      preLoaderRoute: typeof ReadingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/$id': {
+      id: '/reading/$id'
+      path: '/reading/$id'
+      fullPath: '/reading/$id'
+      preLoaderRoute: typeof ReadingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/send/': {
+      id: '/send/'
+      path: '/send'
+      fullPath: '/send/'
+      preLoaderRoute: typeof SendIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in/': {
@@ -178,6 +258,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ReadingIdRoute: ReadingIdRoute,
+  PairIndexRoute: PairIndexRoute,
+  ReadingIndexRoute: ReadingIndexRoute,
+  SendIndexRoute: SendIndexRoute,
   SignInIndexRoute: SignInIndexRoute,
   DeckIdIndexRoute: DeckIdIndexRoute,
   OauthConsentIndexRoute: OauthConsentIndexRoute,

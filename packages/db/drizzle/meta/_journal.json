@@ -43,6 +43,34 @@
       "when": 1794921707331,
       "tag": "0005_rainy_adam_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795436066601,
+      "tag": "0006_reading_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795436067130,
+      "tag": "0007_reading_data_publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795448746973,
+      "tag": "0008_sent_books",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795448747509,
+      "tag": "0009_sent_books_publication",
+      "breakpoints": true
     }
   ]
 }

@@ -12,7 +12,7 @@ import {
 
 import type { Row } from "@rocicorp/zero";
 
-import type { TCardState } from "@lexeme/shared";
+import type { TBookStatus, TCardState } from "@lexeme/shared";
 
 /**
  * The Zero schema: the subset of the Postgres schema that clients sync.
@@ -120,6 +120,81 @@ const reviewLogs = table("review_logs")
   })
   .primaryKey("id");
 
+const books = table("books")
+  .columns({
+    id: string(),
+    user_id: string(),
+    /** The device's identity for the file, e.g. its KOReader hash. */
+    key: string(),
+    title: string(),
+    authors: string().optional(),
+    /** 0..1 */
+    progress: number().optional(),
+    status: enumeration<TBookStatus>(),
+    pages: number().optional(),
+    last_read_at: number().optional(),
+    finished_at: number().optional(),
+    created_at: number(),
+    updated_at: number(),
+  })
+  .primaryKey("id");
+
+const readingDays = table("reading_days")
+  .columns({
+    id: string(),
+    user_id: string(),
+    book_id: string(),
+    /** YYYY-MM-DD, in the device's time zone. */
+    day: string(),
+    seconds: number(),
+    pages: number(),
+    created_at: number(),
+    updated_at: number(),
+  })
+  .primaryKey("id");
+
+const highlights = table("highlights")
+  .columns({
+    id: string(),
+    user_id: string(),
+    book_id: string(),
+    text: string(),
+    note: string().optional(),
+    chapter: string().optional(),
+    page: string().optional(),
+    highlighted_at: number(),
+    created_at: number(),
+    updated_at: number(),
+  })
+  .primaryKey("id");
+
+const lookups = table("lookups")
+  .columns({
+    id: string(),
+    user_id: string(),
+    book_id: string().optional(),
+    word: string(),
+    context: string().optional(),
+    /** Set once the word became a card. */
+    card_id: string().optional(),
+    looked_up_at: number(),
+    created_at: number(),
+  })
+  .primaryKey("id");
+
+/** Books sent to the user's e-readers; the files themselves stay on the server. */
+const sentBooks = table("sent_books")
+  .columns({
+    id: string(),
+    user_id: string(),
+    title: string(),
+    file_name: string(),
+    size_bytes: number(),
+    delivered_at: number().optional(),
+    created_at: number(),
+  })
+  .primaryKey("id");
+
 const deckRelationships = relationships(decks, ({ one, many }) => ({
   cards: many({ sourceField: ["id"], destField: ["deck_id"], destSchema: cards }),
   learning_profile: one({
@@ -153,13 +228,30 @@ const learningProfileRelationships = relationships(
   }),
 );
 
+const bookRelationships = relationships(books, ({ many }) => ({
+  reading_days: many({ sourceField: ["id"], destField: ["book_id"], destSchema: readingDays }),
+  highlights: many({ sourceField: ["id"], destField: ["book_id"], destSchema: highlights }),
+  lookups: many({ sourceField: ["id"], destField: ["book_id"], destSchema: lookups }),
+}));
+
 export const schema = createSchema({
-  tables: [learningProfiles, decks, cards, reviewLogs],
+  tables: [
+    learningProfiles,
+    decks,
+    cards,
+    reviewLogs,
+    books,
+    readingDays,
+    highlights,
+    lookups,
+    sentBooks,
+  ],
   relationships: [
     deckRelationships,
     cardRelationships,
     reviewLogRelationships,
     learningProfileRelationships,
+    bookRelationships,
   ],
 });
 
@@ -177,3 +269,8 @@ export type TDeckRow = Row<TSchema["tables"]["decks"]>;
 export type TCardRow = Row<TSchema["tables"]["cards"]>;
 export type TLearningProfileRow = Row<TSchema["tables"]["learning_profiles"]>;
 export type TReviewLogRow = Row<TSchema["tables"]["review_logs"]>;
+export type TBookRow = Row<TSchema["tables"]["books"]>;
+export type TReadingDayRow = Row<TSchema["tables"]["reading_days"]>;
+export type THighlightRow = Row<TSchema["tables"]["highlights"]>;
+export type TLookupRow = Row<TSchema["tables"]["lookups"]>;
+export type TSentBookRow = Row<TSchema["tables"]["sent_books"]>;

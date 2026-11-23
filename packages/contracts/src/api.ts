@@ -185,3 +185,69 @@ export type TOAuthAuthorizeParams = z.infer<typeof oauthAuthorizeParams>;
 
 /** An empty body, for calls that only answer success. */
 export const okResponse = z.object({ ok: z.literal(true) });
+
+// --- /api/devices/pair ---
+//
+// Pairing an e-reader: the device starts a pairing and shows its code as text
+// and a QR code, the signed-in user approves it on the web, and the device's
+// poll then receives an API key of its own.
+
+export const startPairingRequest = z.object({
+  device_name: z.string().trim().min(1).max(100),
+});
+
+export const startPairingResponse = z.object({
+  user_code: z.string(),
+  /** Secret; only the device has it. Polling with it claims the key. */
+  poll_token: z.string(),
+  /** Where to approve, with the code filled in: what the QR code encodes. */
+  approve_url: z.string(),
+  expires_at: z.string(),
+  poll_interval_seconds: z.number(),
+});
+
+export const pollPairingRequest = z.object({ poll_token: z.string().min(1) });
+
+export const pollPairingResponse = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("pending") }),
+  z.object({ status: z.literal("expired") }),
+  z.object({
+    status: z.literal("approved"),
+    /** An API key for the device, shown once. */
+    token: z.string(),
+    user_name: z.string(),
+  }),
+]);
+
+/** What the approve page shows before the user confirms (session only). */
+export const pairingResponse = z.object({
+  device_name: z.string(),
+  status: z.enum(["pending", "approved", "expired"]),
+});
+
+export type TStartPairingResponse = z.infer<typeof startPairingResponse>;
+export type TPollPairingResponse = z.infer<typeof pollPairingResponse>;
+export type TPairingResponse = z.infer<typeof pairingResponse>;
+
+// --- /api/books and /api/devices/books ---
+//
+// Send to Kindle: the web app uploads a book (multipart, field `file`), and the
+// device lists what's waiting, downloads each file and marks it delivered.
+
+export const SENDABLE_BOOK_EXTENSIONS = ["epub", "pdf", "mobi", "azw3", "fb2", "txt", "cbz", "djvu"] as const;
+export const MAX_SENT_BOOK_BYTES = 100 * 1024 * 1024;
+
+export const sendBookResponse = z.object({ id: z.string() });
+
+export const deviceBook = z.object({
+  id: z.string(),
+  title: z.string(),
+  file_name: z.string(),
+  size_bytes: z.number(),
+  sent_at: z.string(),
+});
+
+export const deviceBooksResponse = z.object({ books: z.array(deviceBook) });
+
+export type TDeviceBook = z.infer<typeof deviceBook>;
+export type TDeviceBooksResponse = z.infer<typeof deviceBooksResponse>;

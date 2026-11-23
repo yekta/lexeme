@@ -16,6 +16,7 @@ import {
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { RequireIdentity } from "@/components/require-identity";
+import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Button } from "@/components/ui/button";
 import { useSendBook, useSentBooks, useUnsendBook, type TSentBook } from "@/hooks/data/use-sent-books";
@@ -128,7 +129,7 @@ function SendPage() {
           </EmptyList>
         ) : (
           <section className="flex flex-col gap-3">
-            <h2 className="font-semibold">Sent books</h2>
+            <SectionTitle title="Sent books" count={sent.books.length} />
             <div className="rounded-xl border divide-y">
               {sent.books.map((book) => (
                 <SentBookRow

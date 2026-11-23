@@ -16,6 +16,7 @@ import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
+import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
@@ -79,13 +80,13 @@ function ReadingPage() {
             </section>
 
             <section className="flex flex-col gap-3">
-              <h2 className="font-semibold">Reading time, last 30 days</h2>
+              <SectionTitle title="Reading time, last 30 days" />
               <DailyBars days={summary.lastDays} />
             </section>
 
             {recentSessions.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Recent sessions</h2>
+                <SectionTitle title="Recent sessions" />
                 <div className="rounded-xl border divide-y">
                   {recentSessions.map((session) => (
                     <SessionRow
@@ -100,7 +101,7 @@ function ReadingPage() {
 
             {current.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Reading now</h2>
+                <SectionTitle title="Reading now" count={current.length} />
                 <div className="grid sm:grid-cols-2 gap-3">
                   {current.map((book) => (
                     <BookRow key={book.id} book={book} />
@@ -111,7 +112,7 @@ function ReadingPage() {
 
             {recentWords.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Words</h2>
+                <SectionTitle title="Words" count={reading.lookups.length} />
                 <div className="rounded-xl border divide-y">
                   {recentWords.map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined} />
@@ -122,7 +123,7 @@ function ReadingPage() {
 
             {finished.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Finished</h2>
+                <SectionTitle title="Finished" count={finished.length} />
                 <div className="grid sm:grid-cols-2 gap-3">
                   {finished.map((book) => (
                     <BookRow key={book.id} book={book} />
@@ -148,9 +149,9 @@ function isReadingNow(book: TBook) {
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-xl font-semibold tabular-nums">{value}</span>
+    <div className="min-w-0 rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground truncate">{label}</span>
+      <span className="text-xl font-semibold tabular-nums truncate">{value}</span>
     </div>
   );
 }
@@ -191,7 +192,7 @@ function BookRow({ book }: { book: TBook }) {
     <Link
       to="/reading/$id"
       params={{ id: book.id }}
-      className="rounded-xl border bg-card p-4 flex flex-col gap-2 hover:border-foreground/30 transition-colors"
+      className="min-w-0 rounded-xl border bg-card p-4 flex flex-col gap-2 hover:border-foreground/30 transition-colors"
     >
       <div className="flex flex-col gap-0.5 min-w-0">
         <span className="font-medium truncate">{book.title}</span>

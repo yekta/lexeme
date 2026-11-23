@@ -7,6 +7,7 @@ import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
+import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
@@ -64,8 +65,8 @@ function BookPage() {
         ) : (
           <>
             <section className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold text-balance">{book.title}</h1>
+              <div className="mx-1 flex flex-col gap-1">
+                <h1 className="text-2xl font-semibold text-balance wrap-break-word">{book.title}</h1>
                 {book.authors && <p className="text-muted-foreground">{book.authors}</p>}
               </div>
               <div className="flex items-center gap-3">
@@ -90,7 +91,7 @@ function BookPage() {
 
             {sessions.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Sessions</h2>
+                <SectionTitle title="Sessions" count={sessions.length} />
                 <div className="rounded-xl border divide-y">
                   {sessions.map((session) => (
                     <SessionRow key={session.started_at} session={session} />
@@ -101,7 +102,7 @@ function BookPage() {
 
             {highlights.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Highlights</h2>
+                <SectionTitle title="Highlights" count={highlights.length} />
                 <div className="flex flex-col gap-3">
                   {highlights.map((highlight) => (
                     <figure key={highlight.id} className="border-l-4 border-foreground pl-4 flex flex-col gap-1">
@@ -118,7 +119,7 @@ function BookPage() {
 
             {words.length > 0 && (
               <section className="flex flex-col gap-3">
-                <h2 className="font-semibold">Words</h2>
+                <SectionTitle title="Words" count={words.length} />
                 <div className="rounded-xl border divide-y">
                   {words.map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} />
@@ -135,9 +136,9 @@ function BookPage() {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="font-semibold tabular-nums">{value}</span>
+    <div className="min-w-0 rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground truncate">{label}</span>
+      <span className="font-semibold tabular-nums truncate">{value}</span>
     </div>
   );
 }

@@ -210,6 +210,8 @@ export const syncReadingArgs = z.object({
     )
     .max(5000)
     .default([]),
+  /** Books deleted from the device; removed here with what was recorded about them. */
+  removed_book_keys: z.array(bookKey).max(2000).default([]),
 });
 
 // --- access ---
@@ -515,6 +517,12 @@ export const mutatorDefs = {
           looked_up_at: lookup.looked_up_at,
           created_at: existing?.created_at ?? now,
         });
+      }
+
+      for (const key of args.removed_book_keys) {
+        const id = await findBookId(key);
+        if (!id) continue;
+        await tx.mutate.books.delete({ id });
       }
     }),
   },

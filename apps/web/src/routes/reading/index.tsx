@@ -17,6 +17,7 @@ import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
+import { SeeAllRow } from "@/components/see-all-row";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
@@ -82,11 +83,8 @@ function ReadingPage() {
 
             {recentSessions.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle
-                  title="Sessions"
-                  seeAllHref={reading.sessions.length > RECENT_SESSIONS ? "/reading/sessions" : undefined}
-                />
-                <div className="rounded-xl border divide-y">
+                <SectionTitle title="Sessions" count={reading.sessions.length} />
+                <div className="rounded-xl border divide-y overflow-hidden">
                   {recentSessions.map((session) => (
                     <SessionRow
                       key={`${session.book_id}-${session.started_at}`}
@@ -94,6 +92,9 @@ function ReadingPage() {
                       bookTitle={titles.get(session.book_id)}
                     />
                   ))}
+                  {reading.sessions.length > RECENT_SESSIONS && (
+                    <SeeAllRow href="/reading/sessions" more={reading.sessions.length - RECENT_SESSIONS} />
+                  )}
                 </div>
               </section>
             )}
@@ -111,31 +112,29 @@ function ReadingPage() {
 
             {recentWords.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle
-                  title="Words"
-                  count={reading.lookups.length}
-                  seeAllHref={reading.lookups.length > RECENT_WORDS ? "/reading/words" : undefined}
-                />
-                <div className="rounded-xl border divide-y">
+                <SectionTitle title="Words" count={reading.lookups.length} />
+                <div className="rounded-xl border divide-y overflow-hidden">
                   {recentWords.map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined} />
                   ))}
+                  {reading.lookups.length > RECENT_WORDS && (
+                    <SeeAllRow href="/reading/words" more={reading.lookups.length - RECENT_WORDS} />
+                  )}
                 </div>
               </section>
             )}
 
             {finished.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle
-                  title="Finished"
-                  count={finished.length}
-                  seeAllHref={finished.length > RECENT_FINISHED ? "/reading/finished" : undefined}
-                />
+                <SectionTitle title="Finished" count={finished.length} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {finished.slice(0, RECENT_FINISHED).map((book) => (
                     <BookCard key={book.id} book={book} />
                   ))}
                 </div>
+                {finished.length > RECENT_FINISHED && (
+                  <SeeAllRow href="/reading/finished" more={finished.length - RECENT_FINISHED} standalone />
+                )}
               </section>
             )}
           </>

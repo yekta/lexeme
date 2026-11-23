@@ -7,6 +7,7 @@ import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
+import { SeeAllRow } from "@/components/see-all-row";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
@@ -74,45 +75,46 @@ function BookPage() {
 
             {sessions.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle
-                  title="Sessions"
-                  count={sessions.length}
-                  seeAllHref={sessions.length > RECENT_SESSIONS ? `/reading/${id}/sessions` : undefined}
-                />
-                <div className="rounded-xl border divide-y">
+                <SectionTitle title="Sessions" count={sessions.length} />
+                <div className="rounded-xl border divide-y overflow-hidden">
                   {sessions.slice(0, RECENT_SESSIONS).map((session) => (
                     <SessionRow key={session.started_at} session={session} />
                   ))}
+                  {sessions.length > RECENT_SESSIONS && (
+                    <SeeAllRow href={`/reading/${id}/sessions`} more={sessions.length - RECENT_SESSIONS} />
+                  )}
                 </div>
               </section>
             )}
 
             {highlights.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle
-                  title="Highlights"
-                  count={highlights.length}
-                  seeAllHref={highlights.length > RECENT_HIGHLIGHTS ? `/reading/${id}/highlights` : undefined}
-                />
+                <SectionTitle title="Highlights" count={highlights.length} />
                 <div className="flex flex-col gap-3">
                   {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
                     <HighlightItem key={highlight.id} highlight={highlight} />
                   ))}
                 </div>
+                {highlights.length > RECENT_HIGHLIGHTS && (
+                  <SeeAllRow
+                    href={`/reading/${id}/highlights`}
+                    more={highlights.length - RECENT_HIGHLIGHTS}
+                    standalone
+                  />
+                )}
               </section>
             )}
 
             {words.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle
-                  title="Words"
-                  count={words.length}
-                  seeAllHref={words.length > RECENT_WORDS ? `/reading/${id}/words` : undefined}
-                />
-                <div className="rounded-xl border divide-y">
+                <SectionTitle title="Words" count={words.length} />
+                <div className="rounded-xl border divide-y overflow-hidden">
                   {words.slice(0, RECENT_WORDS).map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} />
                   ))}
+                  {words.length > RECENT_WORDS && (
+                    <SeeAllRow href={`/reading/${id}/words`} more={words.length - RECENT_WORDS} />
+                  )}
                 </div>
               </section>
             )}

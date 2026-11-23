@@ -40,6 +40,12 @@ domain code with no side of its own: FSRS, study bucketing, the card-state
 enum, the export format. Tests live next to the code they test in
 `packages/shared`.
 
+### 5- apps/koreader
+
+The KOReader plugin that gives a jailbroken Kindle the Kindle's own interface
+and syncs its reading to Lexeme. `apps/koreader/README.md` has how to deploy,
+screenshot and tap the device, and what not to do to it.
+
 Plus **zero-cache**, which is not in this repo: it replicates Postgres and
 serves each client its slice (`pnpm dev:zero-cache` runs it locally).
 
@@ -81,6 +87,11 @@ serves each client its slice (`pnpm dev:zero-cache` runs it locally).
 - Never make a PR unless explicitly asked to do so.
 - Do not insert yourself into our code, commits or PRs in any way. Our codebase
   is not your ad space.
+- The Kindle you test on is someone's real reader. Before deploying to it,
+  opening books or tapping anything, run `apps/koreader/scripts/dev-mode.sh on`;
+  run `dev-mode.sh off` when you're done. On snapshots their reading data and
+  pauses syncing to Lexeme; off restores it, so nothing you did counts as their
+  reading. Never leave it on.
 - After you make code changes, run `pnpm typecheck`, `pnpm lint` and
   `pnpm test` and fix what they raise.
 

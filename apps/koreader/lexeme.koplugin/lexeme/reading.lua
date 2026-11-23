@@ -8,6 +8,7 @@ derived from stable keys, so the same record always produces the same id.
 local DataStorage = require("datastorage")
 local DocSettings = require("docsettings")
 local ReadHistory = require("readhistory")
+local Books = require("lexeme/books")
 local lfs = require("libs/libkoreader-lfs")
 local md5 = require("ffi/sha2").md5
 local util = require("util")
@@ -76,9 +77,10 @@ local function highlightsOf(key, settings)
     return result
 end
 
--- Books in the reading history, with their highlights. Returns books, highlights.
+-- Books in the reading history, with their highlights. Returns books, highlights and
+-- each book's key by the file name it may have been known by before it had a title.
 function Reading.books()
-    local books, highlights, seen = {}, {}, {}
+    local books, highlights, seen, aliases = {}, {}, {}, {}
     for _, entry in ipairs(ReadHistory.hist) do
         local file = entry.file
         if file and lfs.attributes(file, "mode") == "file" and DocSettings:hasSidecarFile(file) then
@@ -88,14 +90,17 @@ function Reading.books()
                 seen[key] = true
                 local props = settings:readSetting("doc_props") or {}
                 local summary = settings:readSetting("summary") or {}
-                local title = props.title and props.title ~= "" and props.title or file:match("([^/]+)%.[^.]+$")
-                local finished = summary.status == "complete"
                 local function text(value) return type(value) == "string" and value ~= "" and value or nil end
+                -- A book never opened in KOReader has no props yet; the library's copy of its metadata does.
+                local listed = Books.forPath(file)
+                aliases[file:match("([^/]+)%.[^.]+$")] = key
+                local title = text(props.title) or listed.title
+                local finished = summary.status == "complete"
                 table.insert(books, {
                     id = Reading.stableId("book:" .. key),
                     key = key,
                     title = title,
-                    authors = text(props.authors),
+                    authors = text(props.authors) or text(listed.authors),
                     series = text(props.series),
                     language = text(props.language),
                     description = text(props.description),
@@ -111,7 +116,7 @@ function Reading.books()
             end
         end
     end
-    return books, highlights
+    return books, highlights, aliases
 end
 
 local function query(path, sql)
@@ -203,8 +208,8 @@ resolves. A page still open at the last sync keeps counting, so the last few
 hours are always resent.
 ]]
 function Reading.snapshot(since)
-    local books, highlights = Reading.books()
-    local keys, key_by_title = {}, {}
+    local books, highlights, aliases = Reading.books()
+    local keys, key_by_title = {}, aliases
     for _, book in ipairs(books) do
         keys[book.key] = true
         key_by_title[book.title] = book.key

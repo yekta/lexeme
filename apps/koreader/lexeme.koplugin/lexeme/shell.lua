@@ -115,11 +115,10 @@ function Shell:toggleRead(book)
 end
 
 function Shell:deleteBook(book)
-    local DocSettings = require("docsettings")
-    local ReadHistory = require("readhistory")
+    -- Settings can be beside the book or in KOReader's folder; purge clears every copy.
+    require("docsettings"):open(book.path):purge()
     os.remove(book.path)
-    DocSettings.removeSidecarDir(DocSettings:getSidecarDir(book.path))
-    ReadHistory:fileDeleted(book.path)
+    require("readhistory"):removeItemByPath(book.path)
     self:reload()
     self:refresh()
 end

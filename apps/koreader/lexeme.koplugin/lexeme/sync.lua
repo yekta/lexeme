@@ -13,7 +13,7 @@ local Reading = require("lexeme/reading")
 local Sync = {}
 
 -- Bumped when a sync starts sending something new, so the next one sends it all.
-local SYNC_VERSION = 2
+local SYNC_VERSION = 3
 
 local CHUNK = { books = 200, page_reads = 2000, highlights = 500, lookups = 500 }
 

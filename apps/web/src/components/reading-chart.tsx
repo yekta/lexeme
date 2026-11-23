@@ -38,7 +38,7 @@ function DayChart({ day, pageReads, onBack }: { day: string; pageReads: readonly
     <ChartFrame
       caption={`${format(parseISO(day), "EEEE d MMMM")} · ${formatReadingTime(total)}`}
       action={
-        <Button variant="ghost" size="xs" onClick={onBack} className="-my-1 -mr-1.5">
+        <Button variant="ghost" size="xs" onClick={onBack} className="-mt-2 -mr-2.5">
           <ArrowLeftIcon className="size-3.5" />
           30 days
         </Button>
@@ -72,7 +72,7 @@ function ChartFrame({
   const max = Math.max(...bars.map((bar) => bar.seconds), 1);
   return (
     <div className="rounded-xl border bg-card p-4 flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
+      <div className="h-4 mb-2 flex items-start justify-between gap-4 text-xs text-muted-foreground">
         <span>{caption}</span>
         {action}
       </div>
@@ -84,14 +84,14 @@ function ChartFrame({
             disabled={!bar.onClick}
             onClick={bar.onClick}
             aria-label={bar.tip}
-            className="group relative flex-1 h-full flex items-end enabled:cursor-pointer"
+            className="group relative flex-1 h-full flex items-end enabled:cursor-pointer outline-none"
           >
             <div
-              className={cn("w-full rounded-t-[4px] bg-primary group-enabled:group-hover:opacity-80 group-enabled:group-active:opacity-80", bar.seconds === 0 && "bg-transparent")}
+              className={cn("w-full rounded-t-[4px] bg-primary group-enabled:group-hover:opacity-80 group-enabled:group-active:opacity-80 group-focus-visible:ring-3 group-focus-visible:ring-ring/50", bar.seconds === 0 && "bg-transparent")}
               style={{ height: `${(bar.seconds / max) * 100}%` }}
             />
             {bar.seconds > 0 && (
-              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block group-active:block whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md z-10">
+              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block group-active:block group-focus-visible:block whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md z-10">
                 {bar.tip}
               </div>
             )}

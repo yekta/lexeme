@@ -80,24 +80,6 @@ function ReadingPage() {
               <ReadingChart days={summary.lastDays} pageReads={reading.pageReads} />
             </section>
 
-            {recentSessions.length > 0 && (
-              <section className="flex flex-col gap-3">
-                <SectionTitle title="Sessions" count={reading.sessions.length} />
-                <div className="rounded-xl border divide-y overflow-hidden">
-                  {recentSessions.map((session) => (
-                    <SessionRow
-                      key={`${session.book_id}-${session.started_at}`}
-                      session={session}
-                      bookTitle={titles.get(session.book_id)}
-                    />
-                  ))}
-                  {reading.sessions.length > RECENT_SESSIONS && (
-                    <SeeAllRow href="/reading/sessions" more={reading.sessions.length - RECENT_SESSIONS} />
-                  )}
-                </div>
-              </section>
-            )}
-
             {current.length > 0 && (
               <section className="flex flex-col gap-3">
                 <SectionTitle title="Reading" count={current.length} />
@@ -118,6 +100,24 @@ function ReadingPage() {
                   ))}
                   {reading.lookups.length > RECENT_WORDS && (
                     <SeeAllRow href="/reading/words" more={reading.lookups.length - RECENT_WORDS} />
+                  )}
+                </div>
+              </section>
+            )}
+
+            {recentSessions.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <SectionTitle title="Sessions" count={reading.sessions.length} />
+                <div className="rounded-xl border divide-y overflow-hidden">
+                  {recentSessions.map((session) => (
+                    <SessionRow
+                      key={`${session.book_id}-${session.started_at}`}
+                      session={session}
+                      bookTitle={titles.get(session.book_id)}
+                    />
+                  ))}
+                  {reading.sessions.length > RECENT_SESSIONS && (
+                    <SeeAllRow href="/reading/sessions" more={reading.sessions.length - RECENT_SESSIONS} />
                   )}
                 </div>
               </section>

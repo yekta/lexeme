@@ -46,8 +46,11 @@ export function BookCard({ book }: { book: TBook }) {
   const percent = Math.round((book.progress ?? 0) * 100);
   const finished = book.status === "finished";
   return (
-    <Link to="/reading/$id" params={{ id: book.id }} className="group/book min-w-0 flex flex-col gap-2.5">
-      <BookCover book={book} className="transition-transform group-hover/book:-translate-y-1 group-active/book:-translate-y-1" />
+    <Link to="/reading/$id" params={{ id: book.id }} className="group/book min-w-0 flex flex-col gap-2.5 outline-none">
+      <BookCover
+        book={book}
+        className="transition-transform group-hover/book:-translate-y-1 group-active/book:-translate-y-1 group-focus-visible/book:ring-3 group-focus-visible/book:ring-ring/50"
+      />
       {finished ? (
         <span className="text-xs text-muted-foreground truncate">
           {book.finished_at ? format(book.finished_at, "d MMM yyyy") : "Finished"}

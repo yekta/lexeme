@@ -12,6 +12,7 @@ import {
   EmptyListIcon,
   EmptyListTitle,
 } from "@/components/empty-list";
+import { HighlightItem } from "@/components/highlight-item";
 import { LoadError } from "@/components/load-error";
 import { ReadingChart } from "@/components/reading-chart";
 import { Navbar } from "@/components/navbar";
@@ -54,6 +55,10 @@ function ReadingPage() {
   const recentWords = useMemo(
     () => [...reading.lookups].sort((a, b) => b.looked_up_at - a.looked_up_at).slice(0, RECENT_WORDS),
     [reading.lookups],
+  );
+  const highlights = useMemo(
+    () => [...reading.highlights].sort((a, b) => b.highlighted_at - a.highlighted_at),
+    [reading.highlights],
   );
   const recentSessions = useMemo(() => reading.sessions.slice(0, RECENT_SESSIONS), [reading.sessions]);
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
@@ -105,6 +110,20 @@ function ReadingPage() {
               </section>
             )}
 
+            {highlights.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <SectionTitle title="Highlights" count={highlights.length} />
+                <div className="flex flex-col gap-3">
+                  {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
+                    <HighlightItem key={highlight.id} highlight={highlight} bookTitle={titles.get(highlight.book_id)} />
+                  ))}
+                  {highlights.length > RECENT_HIGHLIGHTS && (
+                    <SeeAllRow href="/reading/highlights" more={highlights.length - RECENT_HIGHLIGHTS} standalone />
+                  )}
+                </div>
+              </section>
+            )}
+
             {recentSessions.length > 0 && (
               <section className="flex flex-col gap-3">
                 <SectionTitle title="Sessions" count={reading.sessions.length} />
@@ -151,6 +170,7 @@ function ReadingPage() {
 const READING_NOW_DAYS = 90;
 const RECENT_SESSIONS = 10;
 const RECENT_WORDS = 6;
+const RECENT_HIGHLIGHTS = 3;
 const RECENT_FINISHED = 12;
 
 /** In progress and touched lately; a book opened once years ago isn't being read. */

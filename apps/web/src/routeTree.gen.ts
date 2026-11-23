@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PairIndexRouteImport } from './routes/pair/index'
 import { Route as ReadingIndexRouteImport } from './routes/reading/index'
 import { Route as ReadingFinishedRouteImport } from './routes/reading/finished'
+import { Route as ReadingHighlightsRouteImport } from './routes/reading/highlights'
 import { Route as ReadingSessionsRouteImport } from './routes/reading/sessions'
 import { Route as ReadingWordsRouteImport } from './routes/reading/words'
 import { Route as SendIndexRouteImport } from './routes/send/index'
@@ -45,6 +46,11 @@ const ReadingIndexRoute = ReadingIndexRouteImport.update({
 const ReadingFinishedRoute = ReadingFinishedRouteImport.update({
   id: '/reading/finished',
   path: '/reading/finished',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingHighlightsRoute = ReadingHighlightsRouteImport.update({
+  id: '/reading/highlights',
+  path: '/reading/highlights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReadingSessionsRoute = ReadingSessionsRouteImport.update({
@@ -117,6 +123,7 @@ const StudyIdIndexRoute = StudyIdIndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/highlights': typeof ReadingHighlightsRoute
   '/reading/sessions': typeof ReadingSessionsRoute
   '/reading/words': typeof ReadingWordsRoute
   '/pair/': typeof PairIndexRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/highlights': typeof ReadingHighlightsRoute
   '/reading/sessions': typeof ReadingSessionsRoute
   '/reading/words': typeof ReadingWordsRoute
   '/pair': typeof PairIndexRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/highlights': typeof ReadingHighlightsRoute
   '/reading/sessions': typeof ReadingSessionsRoute
   '/reading/words': typeof ReadingWordsRoute
   '/pair/': typeof PairIndexRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/reading/finished'
+    | '/reading/highlights'
     | '/reading/sessions'
     | '/reading/words'
     | '/pair/'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/reading/finished'
+    | '/reading/highlights'
     | '/reading/sessions'
     | '/reading/words'
     | '/pair'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/reading/finished'
+    | '/reading/highlights'
     | '/reading/sessions'
     | '/reading/words'
     | '/pair/'
@@ -235,6 +247,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ReadingFinishedRoute: typeof ReadingFinishedRoute
+  ReadingHighlightsRoute: typeof ReadingHighlightsRoute
   ReadingSessionsRoute: typeof ReadingSessionsRoute
   ReadingWordsRoute: typeof ReadingWordsRoute
   PairIndexRoute: typeof PairIndexRoute
@@ -280,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/reading/finished'
       fullPath: '/reading/finished'
       preLoaderRoute: typeof ReadingFinishedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/highlights': {
+      id: '/reading/highlights'
+      path: '/reading/highlights'
+      fullPath: '/reading/highlights'
+      preLoaderRoute: typeof ReadingHighlightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reading/sessions': {
@@ -379,6 +399,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ReadingFinishedRoute: ReadingFinishedRoute,
+  ReadingHighlightsRoute: ReadingHighlightsRoute,
   ReadingSessionsRoute: ReadingSessionsRoute,
   ReadingWordsRoute: ReadingWordsRoute,
   PairIndexRoute: PairIndexRoute,

@@ -1,9 +1,10 @@
 import { formatReadingTime, type TReadingDay } from "@lexeme/shared";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { BookOpenIcon } from "lucide-react";
 import { useMemo } from "react";
 
+import { BookCard, finishedBooks } from "@/components/book-card";
 import {
   EmptyList,
   EmptyListContent,
@@ -18,8 +19,7 @@ import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { WordRow } from "@/components/word-row";
 import { useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
 import { cn } from "@/lib/utils";
@@ -50,11 +50,9 @@ function ReadingPage() {
     [reading.books],
   );
   const current = booksByRecent.filter(isReadingNow);
-  const finished = booksByRecent
-    .filter((book) => book.status === "finished")
-    .sort((a, b) => (b.finished_at ?? 0) - (a.finished_at ?? 0));
+  const finished = useMemo(() => finishedBooks(reading.books), [reading.books]);
   const recentWords = useMemo(
-    () => [...reading.lookups].sort((a, b) => b.looked_up_at - a.looked_up_at).slice(0, 30),
+    () => [...reading.lookups].sort((a, b) => b.looked_up_at - a.looked_up_at).slice(0, RECENT_WORDS),
     [reading.lookups],
   );
   const recentSessions = useMemo(
@@ -73,7 +71,7 @@ function ReadingPage() {
           <NoBooks />
         ) : (
           <>
-            <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatTile label="Today" value={formatReadingTime(summary.todaySeconds)} />
               <StatTile label="This week" value={formatReadingTime(summary.weekSeconds)} />
               <StatTile label="Streak" value={`${summary.streak} ${summary.streak === 1 ? "day" : "days"}`} />
@@ -103,9 +101,9 @@ function ReadingPage() {
             {current.length > 0 && (
               <section className="flex flex-col gap-3">
                 <SectionTitle title="Reading now" count={current.length} />
-                <div className="grid sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {current.map((book) => (
-                    <BookRow key={book.id} book={book} />
+                    <BookCard key={book.id} book={book} />
                   ))}
                 </div>
               </section>
@@ -113,7 +111,11 @@ function ReadingPage() {
 
             {recentWords.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Words" count={reading.lookups.length} />
+                <SectionTitle
+                  title="Words"
+                  count={reading.lookups.length}
+                  seeAllHref={reading.lookups.length > RECENT_WORDS ? "/reading/words" : undefined}
+                />
                 <div className="rounded-xl border divide-y">
                   {recentWords.map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined} />
@@ -124,10 +126,14 @@ function ReadingPage() {
 
             {finished.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Finished" count={finished.length} />
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {finished.map((book) => (
-                    <BookRow key={book.id} book={book} />
+                <SectionTitle
+                  title="Finished"
+                  count={finished.length}
+                  seeAllHref={finished.length > RECENT_FINISHED ? "/reading/finished" : undefined}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {finished.slice(0, RECENT_FINISHED).map((book) => (
+                    <BookCard key={book.id} book={book} />
                   ))}
                 </div>
               </section>
@@ -140,6 +146,8 @@ function ReadingPage() {
 }
 
 const READING_NOW_DAYS = 90;
+const RECENT_WORDS = 6;
+const RECENT_FINISHED = 12;
 
 /** In progress and touched lately; a book opened once years ago isn't being read. */
 function isReadingNow(book: TBook) {
@@ -189,34 +197,6 @@ function DailyBars({ days }: { days: TReadingDay[] }) {
   );
 }
 
-function BookRow({ book }: { book: TBook }) {
-  const percent = Math.round((book.progress ?? 0) * 100);
-  const finished = book.status === "finished";
-  const status = finished
-    ? `Finished${book.finished_at ? ` ${format(book.finished_at, "d MMM yyyy")}` : ""}`
-    : book.last_read_at
-      ? `Read ${formatDistanceToNowStrict(book.last_read_at, { addSuffix: true })}`
-      : null;
-  return (
-    <Link to="/reading/$id" params={{ id: book.id }} className="min-w-0 rounded-xl">
-      <Card className="h-full hover:border-foreground/30 transition-colors">
-        <CardHeader>
-          <CardTitle className="truncate">{book.title}</CardTitle>
-          {book.authors && <CardDescription className="truncate">{book.authors}</CardDescription>}
-        </CardHeader>
-        <CardContent className="flex-1 flex flex-col justify-end gap-2">
-          {!finished && (
-            <div className="flex items-center gap-3">
-              <Progress value={percent} className="flex-1" />
-              <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">{percent}%</span>
-            </div>
-          )}
-          {status && <span className="text-sm text-muted-foreground truncate">{status}</span>}
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
 
 function NoBooks() {
   return (

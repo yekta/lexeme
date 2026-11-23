@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PairIndexRouteImport } from './routes/pair/index'
 import { Route as ReadingIndexRouteImport } from './routes/reading/index'
 import { Route as ReadingIdRouteImport } from './routes/reading/$id'
+import { Route as ReadingFinishedRouteImport } from './routes/reading/finished'
+import { Route as ReadingWordsRouteImport } from './routes/reading/words'
 import { Route as SendIndexRouteImport } from './routes/send/index'
 import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as DeckIdIndexRouteImport } from './routes/deck/$id/index'
@@ -39,6 +41,16 @@ const ReadingIndexRoute = ReadingIndexRouteImport.update({
 const ReadingIdRoute = ReadingIdRouteImport.update({
   id: '/reading/$id',
   path: '/reading/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingFinishedRoute = ReadingFinishedRouteImport.update({
+  id: '/reading/finished',
+  path: '/reading/finished',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingWordsRoute = ReadingWordsRouteImport.update({
+  id: '/reading/words',
+  path: '/reading/words',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SendIndexRoute = SendIndexRouteImport.update({
@@ -81,6 +93,8 @@ const StudyIdIndexRoute = StudyIdIndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/reading/$id': typeof ReadingIdRoute
+  '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/words': typeof ReadingWordsRoute
   '/pair/': typeof PairIndexRoute
   '/reading/': typeof ReadingIndexRoute
   '/send/': typeof SendIndexRoute
@@ -94,6 +108,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/reading/$id': typeof ReadingIdRoute
+  '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/words': typeof ReadingWordsRoute
   '/pair': typeof PairIndexRoute
   '/reading': typeof ReadingIndexRoute
   '/send': typeof SendIndexRoute
@@ -108,6 +124,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/reading/$id': typeof ReadingIdRoute
+  '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/words': typeof ReadingWordsRoute
   '/pair/': typeof PairIndexRoute
   '/reading/': typeof ReadingIndexRoute
   '/send/': typeof SendIndexRoute
@@ -123,6 +141,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/reading/$id'
+    | '/reading/finished'
+    | '/reading/words'
     | '/pair/'
     | '/reading/'
     | '/send/'
@@ -136,6 +156,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/reading/$id'
+    | '/reading/finished'
+    | '/reading/words'
     | '/pair'
     | '/reading'
     | '/send'
@@ -149,6 +171,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/reading/$id'
+    | '/reading/finished'
+    | '/reading/words'
     | '/pair/'
     | '/reading/'
     | '/send/'
@@ -163,6 +187,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ReadingIdRoute: typeof ReadingIdRoute
+  ReadingFinishedRoute: typeof ReadingFinishedRoute
+  ReadingWordsRoute: typeof ReadingWordsRoute
   PairIndexRoute: typeof PairIndexRoute
   ReadingIndexRoute: typeof ReadingIndexRoute
   SendIndexRoute: typeof SendIndexRoute
@@ -202,6 +228,20 @@ declare module '@tanstack/react-router' {
       path: '/reading/$id'
       fullPath: '/reading/$id'
       preLoaderRoute: typeof ReadingIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/finished': {
+      id: '/reading/finished'
+      path: '/reading/finished'
+      fullPath: '/reading/finished'
+      preLoaderRoute: typeof ReadingFinishedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/words': {
+      id: '/reading/words'
+      path: '/reading/words'
+      fullPath: '/reading/words'
+      preLoaderRoute: typeof ReadingWordsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/send/': {
@@ -259,6 +299,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ReadingIdRoute: ReadingIdRoute,
+  ReadingFinishedRoute: ReadingFinishedRoute,
+  ReadingWordsRoute: ReadingWordsRoute,
   PairIndexRoute: PairIndexRoute,
   ReadingIndexRoute: ReadingIndexRoute,
   SendIndexRoute: SendIndexRoute,

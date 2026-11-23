@@ -74,7 +74,7 @@ function BookPage() {
                 <Progress value={percent} className="flex-1" />
                 <span className="text-sm text-muted-foreground tabular-nums">{percent}%</span>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 <Fact label="Time read" value={formatReadingTime(totalSeconds)} />
                 <Fact label="Days read" value={String(days.length)} />
                 <Fact

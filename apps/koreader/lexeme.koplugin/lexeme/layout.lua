@@ -151,12 +151,16 @@ function Layout.setSize(ui, level)
     applyCss(ui)
 end
 
-function Layout.setBold(ui, level)
-    local weight = Layout.WEIGHTS[level]
+local function applyBold(ui)
+    local weight = Layout.WEIGHTS[Layout.get("lexeme_bold")]
     ui.document.configurable.font_base_weight = weight
     ui.document:setFontBaseWeight(weight)
-    set("lexeme_bold", level)
     G_reader_settings:saveSetting("copt_font_base_weight", weight)
+end
+
+function Layout.setBold(ui, level)
+    set("lexeme_bold", level)
+    applyBold(ui)
     updatePos(ui)
 end
 
@@ -210,12 +214,12 @@ function Layout.applyMargins(ui)
     G_reader_settings:saveSetting("copt_t_page_margin", config.t_page_margin)
     G_reader_settings:saveSetting("copt_b_page_margin", config.b_page_margin)
     ui.document:setPageMargins(side, top, side, bottom)
-    updatePos(ui)
 end
 
 function Layout.setMargins(ui, level)
     set("lexeme_margins", level)
     Layout.applyMargins(ui)
+    updatePos(ui)
 end
 
 function Layout.setAlign(ui, align)
@@ -255,9 +259,9 @@ function Layout.applyAll(ui)
     if stylesheet and ui.typeset.css ~= stylesheet then ui.typeset:setStyleSheet(stylesheet) end
     local font = Layout.get("lexeme_font")
     if ui.font.font_face ~= font then ui.font:onSetFont(font) end
+    -- Everything is set on the document first and laid out once, by the stylesheet below.
     applySize(ui)
-    local weight = Layout.WEIGHTS[Layout.get("lexeme_bold")]
-    if config.font_base_weight ~= weight then Layout.setBold(ui, Layout.get("lexeme_bold")) end
+    applyBold(ui)
     config.line_spacing = 100
     document:setInterlineSpacePercent(100)
     G_reader_settings:saveSetting("copt_line_spacing", 100)
@@ -327,8 +331,7 @@ function Layout.applyTheme(ui, theme)
     Layout.setBold(ui, theme.bold or 0)
     Layout.setSize(ui, theme.size)
     Layout.setLineSpacing(ui, theme.line_spacing)
-    set("lexeme_margins", theme.margins)
-    Layout.applyMargins(ui)
+    Layout.setMargins(ui, theme.margins)
 end
 
 function Layout.saveTheme(label)

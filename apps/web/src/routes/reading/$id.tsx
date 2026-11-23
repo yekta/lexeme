@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
+import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -40,6 +41,10 @@ function BookPage() {
   const highlights = useMemo(
     () => reading.highlights.filter((h) => h.book_id === id).sort((a, b) => a.highlighted_at - b.highlighted_at),
     [reading.highlights, id],
+  );
+  const sessions = useMemo(
+    () => reading.sessions.filter((s) => s.book_id === id).sort((a, b) => b.started_at - a.started_at),
+    [reading.sessions, id],
   );
   const words = useMemo(
     () => reading.lookups.filter((l) => l.book_id === id).sort((a, b) => b.looked_up_at - a.looked_up_at),
@@ -82,6 +87,17 @@ function BookPage() {
                 />
               </div>
             </section>
+
+            {sessions.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <h2 className="font-semibold">Sessions</h2>
+                <div className="rounded-xl border divide-y">
+                  {sessions.map((session) => (
+                    <SessionRow key={session.id} session={session} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {highlights.length > 0 && (
               <section className="flex flex-col gap-3">

@@ -176,6 +176,19 @@ export const syncReadingArgs = z.object({
     )
     .max(10_000)
     .default([]),
+  sessions: z
+    .array(
+      z.object({
+        id: uuidArg,
+        book_key: bookKey,
+        started_at: epochMs,
+        ended_at: epochMs,
+        seconds: z.number().int().min(0),
+        pages: z.number().int().min(0),
+      }),
+    )
+    .max(5000)
+    .default([]),
   highlights: z
     .array(
       z.object({
@@ -477,6 +490,23 @@ export const mutatorDefs = {
             updated_at: now,
           });
         }
+      }
+
+      for (const session of args.sessions) {
+        const book_id = await bookId(session.book_key);
+        const existing = await tx.run(zql.reading_sessions.where("id", session.id).one());
+        mustBeMineOrNew(existing);
+        await tx.mutate.reading_sessions.upsert({
+          id: session.id,
+          user_id,
+          book_id,
+          started_at: session.started_at,
+          ended_at: session.ended_at,
+          seconds: session.seconds,
+          pages: session.pages,
+          created_at: existing?.created_at ?? now,
+          updated_at: now,
+        });
       }
 
       for (const highlight of args.highlights) {

@@ -62,6 +62,11 @@ export const queries = defineQueries({
     zql.reading_days.where("user_id", ctx.user_id),
   ),
 
+  /** Each sitting with a book, for the session lists. */
+  readingSessions: defineQuery(({ ctx }) =>
+    zql.reading_sessions.where("user_id", ctx.user_id),
+  ),
+
   highlights: defineQuery(({ ctx }) =>
     zql.highlights.where("user_id", ctx.user_id),
   ),

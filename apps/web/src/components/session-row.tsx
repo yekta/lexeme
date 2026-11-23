@@ -1,0 +1,23 @@
+import { formatReadingTime } from "@lexeme/shared";
+import { format, isSameDay } from "date-fns";
+
+import type { TReadingSession } from "@/hooks/data/use-reading";
+
+/** One sitting: when it was, how long, how many pages, and from which book when that isn't obvious. */
+export function SessionRow({ session, bookTitle }: { session: TReadingSession; bookTitle?: string }) {
+  const sameDay = isSameDay(session.started_at, session.ended_at);
+  const range = `${format(session.started_at, "HH:mm")}–${format(session.ended_at, sameDay ? "HH:mm" : "d MMM HH:mm")}`;
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <span className="font-medium">
+          {format(session.started_at, "EEE d MMM")} · {range}
+        </span>
+        {bookTitle && <span className="text-xs text-muted-foreground truncate">{bookTitle}</span>}
+      </div>
+      <span className="text-sm text-muted-foreground tabular-nums shrink-0">
+        {formatReadingTime(session.seconds)} · {session.pages} {session.pages === 1 ? "page" : "pages"}
+      </span>
+    </div>
+  );
+}

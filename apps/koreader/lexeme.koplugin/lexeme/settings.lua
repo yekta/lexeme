@@ -63,8 +63,8 @@ end
 local function accountLabel()
     local Sync = require("lexeme/sync")
     if not Sync.isConnected() then return "Not connected" end
-    local name = G_reader_settings:readSetting("lexeme_user_name")
-    return name and name ~= "" and name or "Connected"
+    local email = G_reader_settings:readSetting("lexeme_user_email")
+    return email and email ~= "" and email or "Connected"
 end
 
 -- The open book, when Settings was opened from the reader; its settings change along with the defaults.
@@ -193,10 +193,12 @@ end
 
 function Settings:connectLexeme()
     require("lexeme/pairing"):new{
-        on_connected = function(name)
-            require("lexeme/toast").show("Connected to Lexeme as " .. (name ~= "" and name or "you"))
-            self:refresh()
-            self:syncNow()
+        on_connected = function()
+            self:refresh("full")
+            UIManager:scheduleIn(1, function()
+                require("lexeme/toast").show("Connected to Lexeme as " .. accountLabel())
+                self:syncNow()
+            end)
         end,
     }:show()
 end
@@ -708,15 +710,17 @@ function Settings:rowHeight(row, w, icons)
     if row.plain then return D.s(126) end
     local h = D.s(112)
     if row.subtitle then
-        h = h + #D.wrap(D.face("regular", 28), row.subtitle, self:textWidth(row, w), 3) * D.s(37)
+        h = h + #D.wrap(D.face("regular", 28), row.subtitle, self:textWidth(row, w, icons), 3) * D.s(37)
     end
     return h
 end
 
-function Settings:textWidth(row, w)
-    local reserved = D.s(200)
-    if row.value then reserved = reserved + D.width(D.face("regular", 32), row.value) end
-    return w - D.s(60) - reserved
+-- Room for a row's title and subtitle: after its icon, before its value and chevron.
+function Settings:textWidth(row, w, icons)
+    local left = icons and D.s(131) or row.icon and D.s(142) or D.s(59)
+    local right = D.s(icons and 89 or 140) + D.s(50)
+    if row.value then right = right + D.width(D.face("regular", 32), row.value) + D.s(30) end
+    return w - left - right
 end
 
 function Settings:paintRow(bb, x, top, w, row_h, row, icons)
@@ -730,14 +734,14 @@ function Settings:paintRow(bb, x, top, w, row_h, row, icons)
     end
     local face = (row.plain or row.network) and D.face("regular", 34) or D.face("bold", 34)
     if row.subtitle and not icons then
-        D.text(bb, tx, top + D.s(62), face, row.title, color, self:textWidth(row, w))
+        D.text(bb, tx, top + D.s(62), face, row.title, color, self:textWidth(row, w, icons))
         local line_y = top + D.s(98)
-        for _, line in ipairs(D.wrap(D.face("regular", 28), row.subtitle, self:textWidth(row, w), 3)) do
+        for _, line in ipairs(D.wrap(D.face("regular", 28), row.subtitle, self:textWidth(row, w, icons), 3)) do
             D.text(bb, tx, line_y, D.face("regular", 28), line, color)
             line_y = line_y + D.s(37)
         end
     else
-        D.text(bb, tx, top + math.floor(row_h / 2) + D.s(12), face, row.title, color, self:textWidth(row, w))
+        D.text(bb, tx, top + math.floor(row_h / 2) + D.s(12), face, row.title, color, self:textWidth(row, w, icons))
     end
 
     local cy = top + math.floor(row_h / 2)

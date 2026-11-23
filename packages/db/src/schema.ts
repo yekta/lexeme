@@ -296,6 +296,31 @@ export const readingDays = pgTable(
   ],
 );
 
+/** One sitting with a book: from the first page turn to the last, with no long pause between. */
+export const readingSessions = pgTable(
+  "reading_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    book_id: uuid("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    started_at: timestamp("started_at", { withTimezone: true }).notNull(),
+    ended_at: timestamp("ended_at", { withTimezone: true }).notNull(),
+    /** Time actually spent on pages, which leaves out short pauses. */
+    seconds: integer("seconds").notNull(),
+    pages: integer("pages").notNull(),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => [
+    index("reading_sessions_user_id_idx").on(t.user_id),
+    index("reading_sessions_book_id_idx").on(t.book_id),
+  ],
+);
+
 export const highlights = pgTable(
   "highlights",
   {

@@ -12,10 +12,18 @@ local Reading = require("lexeme/reading")
 
 local Sync = {}
 
-local CHUNK = { books = 200, days = 1000, highlights = 500, lookups = 500 }
+local CHUNK = { books = 200, days = 1000, sessions = 1000, highlights = 500, lookups = 500 }
 
 function Sync.isConnected()
     return Api.token() ~= nil
+end
+
+-- Remembers the account's email, which Settings shows; returns it.
+function Sync.fetchAccount()
+    local ok, body = Api.get("/api/v1/me")
+    local email = ok and type(body.user) == "table" and body.user.email
+    if email then G_reader_settings:saveSetting("lexeme_user_email", email) end
+    return email
 end
 
 function Sync.lastSyncedAt()
@@ -29,7 +37,7 @@ sent as a JSON object, which the server refuses.
 ]]
 function Sync.queueReading(snapshot)
     local queued = false
-    for _, kind in ipairs({ "books", "days", "highlights", "lookups" }) do
+    for _, kind in ipairs({ "books", "days", "sessions", "highlights", "lookups" }) do
         local rows = snapshot[kind] or {}
         for first = 1, #rows, CHUNK[kind] do
             local body = { [kind] = {} }
@@ -54,7 +62,7 @@ local function changedSince(snapshot, since)
     for _, highlight in ipairs(snapshot.highlights) do
         if changed[highlight.book_key] then table.insert(highlights, highlight) end
     end
-    return { books = books, days = snapshot.days, highlights = highlights, lookups = {} }
+    return { books = books, days = snapshot.days, sessions = snapshot.sessions, highlights = highlights, lookups = {} }
 end
 
 local running = false
@@ -71,6 +79,7 @@ function Sync.run(on_done)
     running = true
     local ok, err = pcall(function()
         local started = os.time()
+        if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
         local since = Sync.lastSyncedAt() or 0
         Sync.queueReading(changedSince(Reading.snapshot(since), since))
         local _, failure = Outbox.flush()
@@ -102,6 +111,7 @@ end
 function Sync.disconnect()
     G_reader_settings:delSetting("lexeme_token")
     G_reader_settings:delSetting("lexeme_user_name")
+    G_reader_settings:delSetting("lexeme_user_email")
     G_reader_settings:delSetting("lexeme_synced_at")
     G_reader_settings:delSetting("lexeme_deck_id")
     G_reader_settings:delSetting("lexeme_deck_name")

@@ -55,6 +55,7 @@ function Pairing:check()
     end
     G_reader_settings:saveSetting("lexeme_token", body.token)
     G_reader_settings:saveSetting("lexeme_user_name", body.user_name)
+    require("lexeme/sync").fetchAccount()
     G_reader_settings:flush()
     self:close("flashui")
     if self.on_connected then self.on_connected(body.user_name) end

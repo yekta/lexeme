@@ -136,6 +136,59 @@ function Reading.days(since, known_keys)
     return days
 end
 
+-- A pause longer than this between page turns ends a reading session.
+local SESSION_GAP = 10 * 60
+
+--[[
+Reading sessions per book from the statistics database's page turns, for those
+starting on or after `since` (epoch seconds), only for books in `known_keys`.
+A session's id comes from its book and start, so one still going is updated.
+]]
+function Reading.sessions(since, known_keys)
+    local path = DataStorage:getSettingsDir() .. "/statistics.sqlite3"
+    if lfs.attributes(path, "mode") ~= "file" then return {} end
+    local SQ3 = require("lua-ljsqlite3/init")
+    local conn = SQ3.open(path)
+    local ok, rows = pcall(conn.exec, conn, string.format([[
+        SELECT b.md5, p.start_time, p.duration, p.page
+        FROM page_stat_data p JOIN book b ON b.id = p.id_book
+        WHERE p.start_time >= %d AND b.md5 IS NOT NULL
+        ORDER BY b.md5, p.start_time;]], math.floor(since)))
+    conn:close()
+    local sessions = {}
+    if not ok or not rows then return sessions end
+    local current
+    local function finish()
+        if not current then return end
+        local pages = 0
+        for _ in pairs(current.page_set) do pages = pages + 1 end
+        table.insert(sessions, {
+            id = Reading.stableId("session:" .. current.key .. ":" .. current.start),
+            book_key = current.key,
+            started_at = current.start * 1000,
+            ended_at = current.finish * 1000,
+            seconds = current.seconds,
+            pages = pages,
+        })
+        current = nil
+    end
+    for i = 1, #rows[1] do
+        local key, start = rows[1][i], tonumber(rows[2][i])
+        local duration, page = tonumber(rows[3][i]) or 0, rows[4][i]
+        if known_keys[key] and start then
+            if not current or current.key ~= key or start - current.finish > SESSION_GAP then
+                finish()
+                current = { key = key, start = start, finish = start, seconds = 0, page_set = {} }
+            end
+            current.finish = math.max(current.finish, start + duration)
+            current.seconds = current.seconds + duration
+            current.page_set[page] = true
+        end
+    end
+    finish()
+    return sessions
+end
+
 --[[
 Everything to send since the last sync, as sync-reading bodies of at most
 `chunk` rows each. Books always go first so their days and highlights resolve.
@@ -146,7 +199,9 @@ function Reading.snapshot(since)
     for _, book in ipairs(books) do keys[book.key] = true end
     -- A day already sent keeps changing until it's over, so the last one is always resent.
     local days = Reading.days(math.max(0, since - 24 * 3600), keys)
-    return { books = books, days = days, highlights = highlights, lookups = {} }
+    -- A session can still be going at the last sync; going back a few hours resends it whole.
+    local sessions = Reading.sessions(math.max(0, since - 6 * 3600), keys)
+    return { books = books, days = days, sessions = sessions, highlights = highlights, lookups = {} }
 end
 
 return Reading

@@ -14,6 +14,7 @@ import {
 } from "@/components/empty-list";
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
+import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -54,6 +55,10 @@ function ReadingPage() {
     () => [...reading.lookups].sort((a, b) => b.looked_up_at - a.looked_up_at).slice(0, 30),
     [reading.lookups],
   );
+  const recentSessions = useMemo(
+    () => [...reading.sessions].sort((a, b) => b.started_at - a.started_at).slice(0, 10),
+    [reading.sessions],
+  );
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
 
   return (
@@ -77,6 +82,17 @@ function ReadingPage() {
               <h2 className="font-semibold">Reading time, last 30 days</h2>
               <DailyBars days={summary.lastDays} />
             </section>
+
+            {recentSessions.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <h2 className="font-semibold">Recent sessions</h2>
+                <div className="rounded-xl border divide-y">
+                  {recentSessions.map((session) => (
+                    <SessionRow key={session.id} session={session} bookTitle={titles.get(session.book_id)} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {current.length > 0 && (
               <section className="flex flex-col gap-3">

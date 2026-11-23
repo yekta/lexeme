@@ -4,6 +4,7 @@ import {
   type THighlightRow,
   type TLookupRow,
   type TReadingDayRow,
+  type TReadingSessionRow,
 } from "@lexeme/contracts";
 import { dayKey, lastDays, readingStreak, secondsByDay, type TReadingDay } from "@lexeme/shared";
 import { useQuery } from "@rocicorp/zero/react";
@@ -14,15 +15,24 @@ import { useZeroStatus } from "@/zero/status";
 export type TBook = TBookRow;
 export type THighlight = THighlightRow;
 export type TLookup = TLookupRow;
+export type TReadingSession = TReadingSessionRow;
 
 /** Everything the e-readers reported, for the reading screens. */
 export function useReading() {
   const [books, booksDetails] = useQuery(queries.books());
   const [days, daysDetails] = useQuery(queries.readingDays());
+  const [sessions, sessionsDetails] = useQuery(queries.readingSessions());
   const [highlights, highlightsDetails] = useQuery(queries.highlights());
   const [lookups, lookupsDetails] = useQuery(queries.lookups());
-  const status = useZeroStatus(books.length > 0, booksDetails, daysDetails, highlightsDetails, lookupsDetails);
-  return { books, days, highlights, lookups, ...status };
+  const status = useZeroStatus(
+    books.length > 0,
+    booksDetails,
+    daysDetails,
+    sessionsDetails,
+    highlightsDetails,
+    lookupsDetails,
+  );
+  return { books, days, sessions, highlights, lookups, ...status };
 }
 
 export type TReadingSummary = {

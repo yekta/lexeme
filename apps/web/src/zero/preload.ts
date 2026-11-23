@@ -83,6 +83,7 @@ export function preloadAccount(zero: Zero<TSchema>): void {
       // Reading data from paired e-readers: only its own screens read it.
       zero.preload(queries.books(), { ttl: "forever" });
       zero.preload(queries.readingDays(), { ttl: "forever" });
+      zero.preload(queries.readingSessions(), { ttl: "forever" });
       zero.preload(queries.highlights(), { ttl: "forever" });
       zero.preload(queries.lookups(), { ttl: "forever" });
     });

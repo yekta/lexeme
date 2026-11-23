@@ -153,6 +153,20 @@ const readingDays = table("reading_days")
   })
   .primaryKey("id");
 
+const readingSessions = table("reading_sessions")
+  .columns({
+    id: string(),
+    user_id: string(),
+    book_id: string(),
+    started_at: number(),
+    ended_at: number(),
+    seconds: number(),
+    pages: number(),
+    created_at: number(),
+    updated_at: number(),
+  })
+  .primaryKey("id");
+
 const highlights = table("highlights")
   .columns({
     id: string(),
@@ -242,6 +256,7 @@ export const schema = createSchema({
     reviewLogs,
     books,
     readingDays,
+    readingSessions,
     highlights,
     lookups,
     sentBooks,
@@ -271,6 +286,7 @@ export type TLearningProfileRow = Row<TSchema["tables"]["learning_profiles"]>;
 export type TReviewLogRow = Row<TSchema["tables"]["review_logs"]>;
 export type TBookRow = Row<TSchema["tables"]["books"]>;
 export type TReadingDayRow = Row<TSchema["tables"]["reading_days"]>;
+export type TReadingSessionRow = Row<TSchema["tables"]["reading_sessions"]>;
 export type THighlightRow = Row<TSchema["tables"]["highlights"]>;
 export type TLookupRow = Row<TSchema["tables"]["lookups"]>;
 export type TSentBookRow = Row<TSchema["tables"]["sent_books"]>;

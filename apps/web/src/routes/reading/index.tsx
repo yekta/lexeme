@@ -118,12 +118,12 @@ function ReadingPage() {
             <section className="flex flex-col gap-3">
               <SectionTitle title="Highlights" count={highlights.length} />
               {highlights.length > 0 ? (
-                <div className="flex flex-col gap-3">
+                <div className="rounded-xl border divide-y overflow-hidden">
                   {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
                     <HighlightItem key={highlight.id} highlight={highlight} bookTitle={titles.get(highlight.book_id)} />
                   ))}
                   {highlights.length > RECENT_HIGHLIGHTS && (
-                    <SeeAllRow href="/reading/highlights" more={highlights.length - RECENT_HIGHLIGHTS} standalone />
+                    <SeeAllRow href="/reading/highlights" more={highlights.length - RECENT_HIGHLIGHTS} />
                   )}
                 </div>
               ) : (

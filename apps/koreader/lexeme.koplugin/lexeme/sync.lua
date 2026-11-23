@@ -56,7 +56,8 @@ local function changedSince(snapshot, since)
     if since == 0 then return snapshot end
     local books, changed = {}, {}
     for _, book in ipairs(snapshot.books) do
-        if (book.last_read_at or 0) >= since * 1000 then
+        -- Opened since the last sync, or changed since: a highlight made after a sync mid-book.
+        if (book.last_read_at or 0) >= since * 1000 or (snapshot.changed_at[book.key] or 0) >= since then
             table.insert(books, book)
             changed[book.key] = true
         end

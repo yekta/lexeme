@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { HighlightItem } from "@/components/highlight-item";
 import { ReadingListPage, ReadingRoute } from "@/components/reading-list-page";
-import { WindowVirtualGrid } from "@/components/window-virtual-grid";
+import { DividedVirtualList } from "@/components/window-virtual-grid";
 import { useBookReading } from "@/hooks/data/use-reading";
 
 export const Route = createFileRoute("/reading/$id/highlights")({
@@ -26,11 +26,9 @@ function HighlightsPage() {
       error={reading.error}
       onRetry={reading.refetch}
     >
-      <WindowVirtualGrid
+      <DividedVirtualList
         items={reading.highlights}
-        columns={1}
-        estimateRowHeight={70}
-        gap={12}
+        estimateRowHeight={90}
         getKey={(highlight) => highlight.id}
         renderItem={(highlight) => <HighlightItem highlight={highlight} />}
       />

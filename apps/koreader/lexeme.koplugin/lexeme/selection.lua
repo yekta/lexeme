@@ -19,6 +19,8 @@ local Selection = View:extend{
     word = nil,
     results = nil, -- dictionary results; nil when no lookup was made
     boxes = nil,
+    -- Set when an existing highlight was tapped: the toolbar acts on it.
+    highlight_index = nil,
     close_cb = nil,
     background = false,
 }
@@ -82,8 +84,10 @@ function Selection:paintPopup(bb, screen_w)
     local cy = py + math.floor(h / 2)
 
     local ax = px + D.s(30)
-    D.roundRect(bb, ax, cy - D.s(18), D.s(36), D.s(36), D.gray(204), D.s(6))
-    D.textCenter(bb, ax + D.s(18), cy + D.s(11), D.face("medium", 28), "A")
+    -- Filled when the selection is a highlight already; tapping it removes the highlight.
+    local highlighted = self.highlight_index ~= nil
+    D.roundRect(bb, ax, cy - D.s(18), D.s(36), D.s(36), highlighted and D.BLACK or D.gray(204), D.s(6))
+    D.textCenter(bb, ax + D.s(18), cy + D.s(11), D.face("medium", 28), "A", highlighted and D.WHITE or D.BLACK)
     self:hit(ax - D.s(20), py, D.s(76), h, function() self:highlight() end)
 
     D.icon(bb, "sticky-note", px + D.s(106), cy - D.s(21), D.s(42), D.s(42))
@@ -111,15 +115,53 @@ function Selection:closeKeepingSelection()
     View.close(self)
 end
 
+--[[
+Highlighting over existing highlights joins them into one, as on a Kindle: they
+are removed and the selection grows to cover them, keeping their notes.
+]]
+local function absorbOverlapping(ui)
+    local selected = ui.highlight.selected_text
+    if not (ui.rolling and selected and selected.pos0 and selected.pos1) then return end
+    local document = ui.document
+    local function before(a, b) return document:compareXPointers(a, b) == 1 end
+    local pos0, pos1, notes, overlapping = selected.pos0, selected.pos1, {}, {}
+    for i, item in ipairs(ui.annotation.annotations) do
+        local overlaps = item.pos0 and item.pos1
+            and not before(item.pos1, selected.pos0) and not before(selected.pos1, item.pos0)
+        if overlaps then
+            table.insert(overlapping, i)
+            if before(item.pos0, pos0) then pos0 = item.pos0 end
+            if before(pos1, item.pos1) then pos1 = item.pos1 end
+            if item.note then table.insert(notes, item.note) end
+        end
+    end
+    if #overlapping == 0 then return end
+    for i = #overlapping, 1, -1 do ui.highlight:deleteHighlight(overlapping[i]) end
+    selected.pos0, selected.pos1 = pos0, pos1
+    selected.text = document:getTextFromXPointers(pos0, pos1)
+    if #notes > 0 then selected.note = table.concat(notes, "\n\n") end
+end
+
+-- Saves the selection as one highlight, joining any it overlaps; returns its index.
+local function saveSelection(ui)
+    absorbOverlapping(ui)
+    return ui.highlight:saveHighlight()
+end
+
 function Selection:highlight()
-    self.ui.highlight:saveHighlight()
+    if self.highlight_index then
+        self.ui.highlight:deleteHighlight(self.highlight_index)
+    else
+        saveSelection(self.ui)
+    end
     self:close()
 end
 
 function Selection:note()
-    self.ui.highlight:saveHighlight()
-    self:closeKeepingSelection()
-    self.ui.highlight:addNote()
+    local index = self.highlight_index or saveSelection(self.ui)
+    local item = index and self.ui.annotation.annotations[index]
+    self:close()
+    if item then self.ui.highlight:editNote(index, item.note == nil) end
 end
 
 function Selection:addToLexeme()
@@ -269,6 +311,7 @@ function Selection.show(ui, opts)
         word = opts.word,
         results = opts.results,
         boxes = opts.boxes,
+        highlight_index = opts.highlight_index,
         close_cb = opts.close_cb,
     }
     UIManager:show(selection, "ui")

@@ -63,6 +63,13 @@ function Lexeme:onNetworkConnected()
     require("lexeme/sync").soon()
 end
 
+-- A highlight or note added, changed or removed goes to Lexeme without waiting for the book to close.
+function Lexeme:onAnnotationsModified()
+    if not self.ui.document then return end
+    self.ui:saveSettings()
+    require("lexeme/sync").soon()
+end
+
 function Lexeme:onCloseDocument()
     require("lexeme/sync").soon()
 end

@@ -77,10 +77,11 @@ local function highlightsOf(key, settings)
     return result
 end
 
--- Books in the reading history, with their highlights. Returns books, highlights and
--- each book's key by the file name it may have been known by before it had a title.
+-- Books in the reading history, with their highlights. Also returns each book's key by
+-- the file name it may have been known by before it had a title, and when each book's
+-- settings (highlights included) last changed, in seconds.
 function Reading.books()
-    local books, highlights, seen, aliases = {}, {}, {}, {}
+    local books, highlights, seen, aliases, changed_at = {}, {}, {}, {}, {}
     for _, entry in ipairs(ReadHistory.hist) do
         local file = entry.file
         if file and lfs.attributes(file, "mode") == "file" and DocSettings:hasSidecarFile(file) then
@@ -94,6 +95,8 @@ function Reading.books()
                 -- A book never opened in KOReader has no props yet; the library's copy of its metadata does.
                 local listed = Books.forPath(file)
                 aliases[file:match("([^/]+)%.[^.]+$")] = key
+                local sidecar = DocSettings:findSidecarFile(file)
+                changed_at[key] = sidecar and lfs.attributes(sidecar, "modification") or 0
                 local title = text(props.title) or listed.title
                 local progress = settings:readSetting("percent_finished")
                 -- A book read to the end counts as read even if nobody marked it.
@@ -118,7 +121,7 @@ function Reading.books()
             end
         end
     end
-    return books, highlights, aliases
+    return books, highlights, aliases, changed_at
 end
 
 --[[
@@ -235,7 +238,7 @@ resolves. A page still open at the last sync keeps counting, so the last few
 hours are always resent.
 ]]
 function Reading.snapshot(since)
-    local books, highlights, aliases = Reading.books()
+    local books, highlights, aliases, changed_at = Reading.books()
     local keys, key_by_title = {}, aliases
     for _, book in ipairs(books) do
         keys[book.key] = true
@@ -246,6 +249,7 @@ function Reading.snapshot(since)
     local removed_keys = {}
     for _, book in ipairs(removed) do table.insert(removed_keys, book.key) end
     return {
+        changed_at = changed_at,
         removed = removed,
         removed_book_keys = removed_keys,
         books = books,

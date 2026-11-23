@@ -3,7 +3,7 @@ import { useMemo } from "react";
 
 import { HighlightItem } from "@/components/highlight-item";
 import { ReadingListPage, ReadingRoute } from "@/components/reading-list-page";
-import { WindowVirtualGrid } from "@/components/window-virtual-grid";
+import { DividedVirtualList } from "@/components/window-virtual-grid";
 import { useReading } from "@/hooks/data/use-reading";
 
 export const Route = createFileRoute("/reading/highlights")({
@@ -32,11 +32,9 @@ function HighlightsPage() {
       error={reading.error}
       onRetry={reading.refetch}
     >
-      <WindowVirtualGrid
+      <DividedVirtualList
         items={highlights}
-        columns={1}
-        estimateRowHeight={80}
-        gap={12}
+        estimateRowHeight={90}
         getKey={(highlight) => highlight.id}
         renderItem={(highlight) => <HighlightItem highlight={highlight} bookTitle={titles.get(highlight.book_id)} />}
       />

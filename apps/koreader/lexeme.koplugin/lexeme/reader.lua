@@ -64,10 +64,22 @@ function Reader.install(ui)
     end
     local show_highlight_menu = ui.highlight.onShowHighlightMenu
     ui.highlight.onShowHighlightMenu = function(highlight, index)
-        -- An existing highlight keeps KOReader's edit dialog.
         if index then return show_highlight_menu(highlight, index) end
         if not highlight.selected_text then return end
         Selection.show(ui, { boxes = highlight.selected_text.sboxes })
+        return true
+    end
+    -- Tapping a highlight selects all of it, with the toolbar acting on that highlight.
+    local choose_highlight = ui.highlight.showChooseHighlightDialog
+    ui.highlight.showChooseHighlightDialog = function(highlight, indices)
+        local index = indices[#indices]
+        local item = ui.annotation.annotations[index]
+        if not (ui.rolling and item and item.pos0 and item.pos1) then return choose_highlight(highlight, indices) end
+        local boxes = ui.document:getScreenBoxesFromPositions(item.pos0, item.pos1, true)
+        highlight.selected_text = { text = item.text, pos0 = item.pos0, pos1 = item.pos1, sboxes = boxes }
+        ui.document:getTextFromXPointers(item.pos0, item.pos1, true)
+        UIManager:setDirty(ui.dialog, "ui")
+        Selection.show(ui, { boxes = boxes, highlight_index = index })
         return true
     end
 end

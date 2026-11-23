@@ -71,7 +71,7 @@ function ChartFrame({
 }) {
   const max = Math.max(...bars.map((bar) => bar.seconds), 1);
   return (
-    <div className="rounded-xl border bg-card px-4 pt-3.5 pb-4 flex flex-col gap-2">
+    <div className="rounded-xl border bg-card px-4 py-3.5 flex flex-col gap-2">
       <div className="h-4 mb-2 flex items-start justify-between gap-4 text-xs text-muted-foreground">
         <span>{caption}</span>
         {action}

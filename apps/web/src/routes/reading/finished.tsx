@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-import { BookCard, finishedBooks } from "@/components/book-card";
+import { BOOK_GRID, BookCard, bookColumns, finishedBooks } from "@/components/book-card";
 import { ReadingListPage, ReadingRoute } from "@/components/reading-list-page";
 import { WindowVirtualGrid } from "@/components/window-virtual-grid";
 import { useReading } from "@/hooks/data/use-reading";
@@ -32,11 +32,11 @@ function FinishedPage() {
     >
       <WindowVirtualGrid
         items={books}
-        columns={isMobile ? 1 : 2}
-        estimateRowHeight={110}
-        gap={16}
+        columns={bookColumns(isMobile)}
+        estimateRowHeight={260}
+        gap={24}
         getKey={(book) => book.id}
-        rowClassName="grid grid-cols-1 md:grid-cols-2 gap-4"
+        rowClassName={BOOK_GRID}
         renderItem={(book) => <BookCard book={book} />}
       />
     </ReadingListPage>

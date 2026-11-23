@@ -8,7 +8,7 @@ export function SeeAllRow({ href, more, standalone }: { href: string; more: numb
     <Link
       to={href}
       className={cn(
-        "flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors",
+        "flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50",
         standalone && "rounded-xl border",
       )}
     >

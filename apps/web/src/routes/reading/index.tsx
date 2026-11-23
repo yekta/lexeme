@@ -4,7 +4,7 @@ import { format, parseISO } from "date-fns";
 import { BookOpenIcon } from "lucide-react";
 import { useMemo } from "react";
 
-import { BookCard, finishedBooks } from "@/components/book-card";
+import { BOOK_GRID, BookCard, finishedBooks } from "@/components/book-card";
 import {
   EmptyList,
   EmptyListContent,
@@ -102,7 +102,7 @@ function ReadingPage() {
             {current.length > 0 && (
               <section className="flex flex-col gap-3">
                 <SectionTitle title="Reading" count={current.length} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={BOOK_GRID}>
                   {current.map((book) => (
                     <BookCard key={book.id} book={book} />
                   ))}
@@ -127,7 +127,7 @@ function ReadingPage() {
             {finished.length > 0 && (
               <section className="flex flex-col gap-3">
                 <SectionTitle title="Finished" count={finished.length} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={BOOK_GRID}>
                   {finished.slice(0, RECENT_FINISHED).map((book) => (
                     <BookCard key={book.id} book={book} />
                   ))}

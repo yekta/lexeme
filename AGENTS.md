@@ -89,9 +89,9 @@ serves each client its slice (`pnpm dev:zero-cache` runs it locally).
   is not your ad space.
 - The Kindle you test on is someone's real reader. Before deploying to it,
   opening books or tapping anything, run `apps/koreader/scripts/dev-mode.sh on`;
-  run `dev-mode.sh off` when you're done. On snapshots their reading data and
-  pauses syncing to Lexeme; off restores it, so nothing you did counts as their
-  reading. Never leave it on.
+  when you're done, go back to the Home screen and then run `dev-mode.sh off`.
+  On snapshots their reading data and pauses syncing to Lexeme; off restores
+  it, so nothing you did counts as their reading. Never leave it on.
 - After you make code changes, run `pnpm typecheck`, `pnpm lint` and
   `pnpm test` and fix what they raise.
 

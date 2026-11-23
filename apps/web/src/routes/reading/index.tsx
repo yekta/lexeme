@@ -76,14 +76,14 @@ function ReadingPage() {
             </section>
 
             <section className="flex flex-col gap-3">
-              <SectionTitle title="Reading time, last 30 days" />
+              <SectionTitle title="Reading Time" />
               <DailyBars days={summary.lastDays} />
             </section>
 
             {recentSessions.length > 0 && (
               <section className="flex flex-col gap-3">
                 <SectionTitle
-                  title="Recent sessions"
+                  title="Sessions"
                   seeAllHref={reading.sessions.length > RECENT_SESSIONS ? "/reading/sessions" : undefined}
                 />
                 <div className="rounded-xl border divide-y">
@@ -100,7 +100,7 @@ function ReadingPage() {
 
             {current.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Reading now" count={current.length} />
+                <SectionTitle title="Reading" count={current.length} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {current.map((book) => (
                     <BookCard key={book.id} book={book} />

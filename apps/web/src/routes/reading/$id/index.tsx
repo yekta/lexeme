@@ -1,8 +1,8 @@
 import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { useMemo } from "react";
 
+import { HighlightItem } from "@/components/highlight-item";
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
 import { SessionRow } from "@/components/session-row";
@@ -12,9 +12,9 @@ import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
-import { useReading } from "@/hooks/data/use-reading";
+import { useBookReading } from "@/hooks/data/use-reading";
 
-export const Route = createFileRoute("/reading/$id")({
+export const Route = createFileRoute("/reading/$id/")({
   component: BookRoute,
 });
 
@@ -34,24 +34,8 @@ function BookRoute() {
 
 function BookPage() {
   const { id } = Route.useParams();
-  const reading = useReading();
-  const book = reading.books.find((b) => b.id === id);
-  const days = useMemo(
-    () => reading.days.filter((d) => d.book_id === id).sort((a, b) => b.day.localeCompare(a.day)),
-    [reading.days, id],
-  );
-  const highlights = useMemo(
-    () => reading.highlights.filter((h) => h.book_id === id).sort((a, b) => a.highlighted_at - b.highlighted_at),
-    [reading.highlights, id],
-  );
-  const sessions = useMemo(
-    () => reading.sessions.filter((s) => s.book_id === id),
-    [reading.sessions, id],
-  );
-  const words = useMemo(
-    () => reading.lookups.filter((l) => l.book_id === id).sort((a, b) => b.looked_up_at - a.looked_up_at),
-    [reading.lookups, id],
-  );
+  const reading = useBookReading(id);
+  const { book, days, sessions, highlights, words } = reading;
   const totalSeconds = days.reduce((sum, d) => sum + d.seconds, 0);
   const percent = Math.round((book?.progress ?? 0) * 100);
 
@@ -92,9 +76,13 @@ function BookPage() {
 
             {sessions.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Sessions" count={sessions.length} />
+                <SectionTitle
+                  title="Sessions"
+                  count={sessions.length}
+                  seeAllHref={sessions.length > RECENT_SESSIONS ? `/reading/${id}/sessions` : undefined}
+                />
                 <div className="rounded-xl border divide-y">
-                  {sessions.map((session) => (
+                  {sessions.slice(0, RECENT_SESSIONS).map((session) => (
                     <SessionRow key={session.started_at} session={session} />
                   ))}
                 </div>
@@ -103,16 +91,14 @@ function BookPage() {
 
             {highlights.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Highlights" count={highlights.length} />
+                <SectionTitle
+                  title="Highlights"
+                  count={highlights.length}
+                  seeAllHref={highlights.length > RECENT_HIGHLIGHTS ? `/reading/${id}/highlights` : undefined}
+                />
                 <div className="flex flex-col gap-3">
-                  {highlights.map((highlight) => (
-                    <figure key={highlight.id} className="border-l-4 border-foreground pl-4 flex flex-col gap-1">
-                      <blockquote className="text-sm leading-relaxed">{highlight.text}</blockquote>
-                      {highlight.note && <p className="text-sm italic text-muted-foreground">{highlight.note}</p>}
-                      <figcaption className="text-xs text-muted-foreground">
-                        {[highlight.chapter, highlight.page && `Page ${highlight.page}`].filter(Boolean).join(" · ")}
-                      </figcaption>
-                    </figure>
+                  {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
+                    <HighlightItem key={highlight.id} highlight={highlight} />
                   ))}
                 </div>
               </section>
@@ -120,9 +106,13 @@ function BookPage() {
 
             {words.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Words" count={words.length} />
+                <SectionTitle
+                  title="Words"
+                  count={words.length}
+                  seeAllHref={words.length > RECENT_WORDS ? `/reading/${id}/words` : undefined}
+                />
                 <div className="rounded-xl border divide-y">
-                  {words.map((lookup) => (
+                  {words.slice(0, RECENT_WORDS).map((lookup) => (
                     <WordRow key={lookup.id} lookup={lookup} />
                   ))}
                 </div>
@@ -134,6 +124,10 @@ function BookPage() {
     </div>
   );
 }
+
+const RECENT_SESSIONS = 10;
+const RECENT_HIGHLIGHTS = 6;
+const RECENT_WORDS = 6;
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (

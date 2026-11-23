@@ -12,13 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PairIndexRouteImport } from './routes/pair/index'
 import { Route as ReadingIndexRouteImport } from './routes/reading/index'
-import { Route as ReadingIdRouteImport } from './routes/reading/$id'
 import { Route as ReadingFinishedRouteImport } from './routes/reading/finished'
+import { Route as ReadingSessionsRouteImport } from './routes/reading/sessions'
 import { Route as ReadingWordsRouteImport } from './routes/reading/words'
 import { Route as SendIndexRouteImport } from './routes/send/index'
 import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as DeckIdIndexRouteImport } from './routes/deck/$id/index'
 import { Route as OauthConsentIndexRouteImport } from './routes/oauth/consent/index'
+import { Route as ReadingIdIndexRouteImport } from './routes/reading/$id/index'
+import { Route as ReadingIdHighlightsRouteImport } from './routes/reading/$id/highlights'
+import { Route as ReadingIdSessionsRouteImport } from './routes/reading/$id/sessions'
+import { Route as ReadingIdWordsRouteImport } from './routes/reading/$id/words'
 import { Route as SettingsApiKeysIndexRouteImport } from './routes/settings/api-keys/index'
 import { Route as SettingsConnectedAppsIndexRouteImport } from './routes/settings/connected-apps/index'
 import { Route as StudyIdIndexRouteImport } from './routes/study/$id/index'
@@ -38,14 +42,14 @@ const ReadingIndexRoute = ReadingIndexRouteImport.update({
   path: '/reading/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReadingIdRoute = ReadingIdRouteImport.update({
-  id: '/reading/$id',
-  path: '/reading/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ReadingFinishedRoute = ReadingFinishedRouteImport.update({
   id: '/reading/finished',
   path: '/reading/finished',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingSessionsRoute = ReadingSessionsRouteImport.update({
+  id: '/reading/sessions',
+  path: '/reading/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReadingWordsRoute = ReadingWordsRouteImport.update({
@@ -73,6 +77,26 @@ const OauthConsentIndexRoute = OauthConsentIndexRouteImport.update({
   path: '/oauth/consent/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReadingIdIndexRoute = ReadingIdIndexRouteImport.update({
+  id: '/reading/$id/',
+  path: '/reading/$id/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingIdHighlightsRoute = ReadingIdHighlightsRouteImport.update({
+  id: '/reading/$id/highlights',
+  path: '/reading/$id/highlights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingIdSessionsRoute = ReadingIdSessionsRouteImport.update({
+  id: '/reading/$id/sessions',
+  path: '/reading/$id/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadingIdWordsRoute = ReadingIdWordsRouteImport.update({
+  id: '/reading/$id/words',
+  path: '/reading/$id/words',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsApiKeysIndexRoute = SettingsApiKeysIndexRouteImport.update({
   id: '/settings/api-keys/',
   path: '/settings/api-keys/',
@@ -92,30 +116,38 @@ const StudyIdIndexRoute = StudyIdIndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/reading/$id': typeof ReadingIdRoute
   '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/sessions': typeof ReadingSessionsRoute
   '/reading/words': typeof ReadingWordsRoute
   '/pair/': typeof PairIndexRoute
   '/reading/': typeof ReadingIndexRoute
   '/send/': typeof SendIndexRoute
   '/sign-in/': typeof SignInIndexRoute
+  '/reading/$id/highlights': typeof ReadingIdHighlightsRoute
+  '/reading/$id/sessions': typeof ReadingIdSessionsRoute
+  '/reading/$id/words': typeof ReadingIdWordsRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/oauth/consent/': typeof OauthConsentIndexRoute
+  '/reading/$id/': typeof ReadingIdIndexRoute
   '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
   '/settings/connected-apps/': typeof SettingsConnectedAppsIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/reading/$id': typeof ReadingIdRoute
   '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/sessions': typeof ReadingSessionsRoute
   '/reading/words': typeof ReadingWordsRoute
   '/pair': typeof PairIndexRoute
   '/reading': typeof ReadingIndexRoute
   '/send': typeof SendIndexRoute
   '/sign-in': typeof SignInIndexRoute
+  '/reading/$id/highlights': typeof ReadingIdHighlightsRoute
+  '/reading/$id/sessions': typeof ReadingIdSessionsRoute
+  '/reading/$id/words': typeof ReadingIdWordsRoute
   '/deck/$id': typeof DeckIdIndexRoute
   '/oauth/consent': typeof OauthConsentIndexRoute
+  '/reading/$id': typeof ReadingIdIndexRoute
   '/settings/api-keys': typeof SettingsApiKeysIndexRoute
   '/settings/connected-apps': typeof SettingsConnectedAppsIndexRoute
   '/study/$id': typeof StudyIdIndexRoute
@@ -123,15 +155,19 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/reading/$id': typeof ReadingIdRoute
   '/reading/finished': typeof ReadingFinishedRoute
+  '/reading/sessions': typeof ReadingSessionsRoute
   '/reading/words': typeof ReadingWordsRoute
   '/pair/': typeof PairIndexRoute
   '/reading/': typeof ReadingIndexRoute
   '/send/': typeof SendIndexRoute
   '/sign-in/': typeof SignInIndexRoute
+  '/reading/$id/highlights': typeof ReadingIdHighlightsRoute
+  '/reading/$id/sessions': typeof ReadingIdSessionsRoute
+  '/reading/$id/words': typeof ReadingIdWordsRoute
   '/deck/$id/': typeof DeckIdIndexRoute
   '/oauth/consent/': typeof OauthConsentIndexRoute
+  '/reading/$id/': typeof ReadingIdIndexRoute
   '/settings/api-keys/': typeof SettingsApiKeysIndexRoute
   '/settings/connected-apps/': typeof SettingsConnectedAppsIndexRoute
   '/study/$id/': typeof StudyIdIndexRoute
@@ -140,45 +176,57 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/reading/$id'
     | '/reading/finished'
+    | '/reading/sessions'
     | '/reading/words'
     | '/pair/'
     | '/reading/'
     | '/send/'
     | '/sign-in/'
+    | '/reading/$id/highlights'
+    | '/reading/$id/sessions'
+    | '/reading/$id/words'
     | '/deck/$id/'
     | '/oauth/consent/'
+    | '/reading/$id/'
     | '/settings/api-keys/'
     | '/settings/connected-apps/'
     | '/study/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/reading/$id'
     | '/reading/finished'
+    | '/reading/sessions'
     | '/reading/words'
     | '/pair'
     | '/reading'
     | '/send'
     | '/sign-in'
+    | '/reading/$id/highlights'
+    | '/reading/$id/sessions'
+    | '/reading/$id/words'
     | '/deck/$id'
     | '/oauth/consent'
+    | '/reading/$id'
     | '/settings/api-keys'
     | '/settings/connected-apps'
     | '/study/$id'
   id:
     | '__root__'
     | '/'
-    | '/reading/$id'
     | '/reading/finished'
+    | '/reading/sessions'
     | '/reading/words'
     | '/pair/'
     | '/reading/'
     | '/send/'
     | '/sign-in/'
+    | '/reading/$id/highlights'
+    | '/reading/$id/sessions'
+    | '/reading/$id/words'
     | '/deck/$id/'
     | '/oauth/consent/'
+    | '/reading/$id/'
     | '/settings/api-keys/'
     | '/settings/connected-apps/'
     | '/study/$id/'
@@ -186,15 +234,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ReadingIdRoute: typeof ReadingIdRoute
   ReadingFinishedRoute: typeof ReadingFinishedRoute
+  ReadingSessionsRoute: typeof ReadingSessionsRoute
   ReadingWordsRoute: typeof ReadingWordsRoute
   PairIndexRoute: typeof PairIndexRoute
   ReadingIndexRoute: typeof ReadingIndexRoute
   SendIndexRoute: typeof SendIndexRoute
   SignInIndexRoute: typeof SignInIndexRoute
+  ReadingIdHighlightsRoute: typeof ReadingIdHighlightsRoute
+  ReadingIdSessionsRoute: typeof ReadingIdSessionsRoute
+  ReadingIdWordsRoute: typeof ReadingIdWordsRoute
   DeckIdIndexRoute: typeof DeckIdIndexRoute
   OauthConsentIndexRoute: typeof OauthConsentIndexRoute
+  ReadingIdIndexRoute: typeof ReadingIdIndexRoute
   SettingsApiKeysIndexRoute: typeof SettingsApiKeysIndexRoute
   SettingsConnectedAppsIndexRoute: typeof SettingsConnectedAppsIndexRoute
   StudyIdIndexRoute: typeof StudyIdIndexRoute
@@ -223,18 +275,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReadingIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reading/$id': {
-      id: '/reading/$id'
-      path: '/reading/$id'
-      fullPath: '/reading/$id'
-      preLoaderRoute: typeof ReadingIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/reading/finished': {
       id: '/reading/finished'
       path: '/reading/finished'
       fullPath: '/reading/finished'
       preLoaderRoute: typeof ReadingFinishedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/sessions': {
+      id: '/reading/sessions'
+      path: '/reading/sessions'
+      fullPath: '/reading/sessions'
+      preLoaderRoute: typeof ReadingSessionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reading/words': {
@@ -272,6 +324,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthConsentIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reading/$id/': {
+      id: '/reading/$id/'
+      path: '/reading/$id'
+      fullPath: '/reading/$id/'
+      preLoaderRoute: typeof ReadingIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/$id/highlights': {
+      id: '/reading/$id/highlights'
+      path: '/reading/$id/highlights'
+      fullPath: '/reading/$id/highlights'
+      preLoaderRoute: typeof ReadingIdHighlightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/$id/sessions': {
+      id: '/reading/$id/sessions'
+      path: '/reading/$id/sessions'
+      fullPath: '/reading/$id/sessions'
+      preLoaderRoute: typeof ReadingIdSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reading/$id/words': {
+      id: '/reading/$id/words'
+      path: '/reading/$id/words'
+      fullPath: '/reading/$id/words'
+      preLoaderRoute: typeof ReadingIdWordsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/api-keys/': {
       id: '/settings/api-keys/'
       path: '/settings/api-keys'
@@ -298,15 +378,19 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ReadingIdRoute: ReadingIdRoute,
   ReadingFinishedRoute: ReadingFinishedRoute,
+  ReadingSessionsRoute: ReadingSessionsRoute,
   ReadingWordsRoute: ReadingWordsRoute,
   PairIndexRoute: PairIndexRoute,
   ReadingIndexRoute: ReadingIndexRoute,
   SendIndexRoute: SendIndexRoute,
   SignInIndexRoute: SignInIndexRoute,
+  ReadingIdHighlightsRoute: ReadingIdHighlightsRoute,
+  ReadingIdSessionsRoute: ReadingIdSessionsRoute,
+  ReadingIdWordsRoute: ReadingIdWordsRoute,
   DeckIdIndexRoute: DeckIdIndexRoute,
   OauthConsentIndexRoute: OauthConsentIndexRoute,
+  ReadingIdIndexRoute: ReadingIdIndexRoute,
   SettingsApiKeysIndexRoute: SettingsApiKeysIndexRoute,
   SettingsConnectedAppsIndexRoute: SettingsConnectedAppsIndexRoute,
   StudyIdIndexRoute: StudyIdIndexRoute,

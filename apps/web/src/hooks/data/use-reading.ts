@@ -59,3 +59,23 @@ export function useReadingSummary(books: readonly TBookRow[], days: readonly TRe
     };
   }, [books, days]);
 }
+
+/** One book and everything recorded about it, newest first. */
+export function useBookReading(id: string) {
+  const reading = useReading();
+  const book = reading.books.find((b) => b.id === id);
+  const days = useMemo(
+    () => reading.days.filter((d) => d.book_id === id).sort((a, b) => b.day.localeCompare(a.day)),
+    [reading.days, id],
+  );
+  const sessions = useMemo(() => reading.sessions.filter((s) => s.book_id === id), [reading.sessions, id]);
+  const highlights = useMemo(
+    () => reading.highlights.filter((h) => h.book_id === id).sort((a, b) => b.highlighted_at - a.highlighted_at),
+    [reading.highlights, id],
+  );
+  const words = useMemo(
+    () => reading.lookups.filter((l) => l.book_id === id).sort((a, b) => b.looked_up_at - a.looked_up_at),
+    [reading.lookups, id],
+  );
+  return { ...reading, book, days, sessions, highlights, words };
+}

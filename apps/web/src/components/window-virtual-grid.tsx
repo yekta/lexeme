@@ -121,3 +121,28 @@ export function WindowVirtualGrid<T>({
     </div>
   );
 }
+
+/** A bordered list with a divider between rows, like `rounded-xl border divide-y`, virtualized. */
+export function DividedVirtualList<T>({
+  items,
+  estimateRowHeight,
+  getKey,
+  renderItem,
+}: {
+  items: T[];
+  estimateRowHeight: number;
+  getKey: (item: T) => string;
+  renderItem: (item: T) => ReactNode;
+}) {
+  return (
+    <WindowVirtualGrid
+      items={items}
+      columns={1}
+      estimateRowHeight={estimateRowHeight}
+      gap={0}
+      getKey={getKey}
+      className="rounded-xl border overflow-hidden"
+      renderItem={(item, index) => <div className={index > 0 ? "border-t" : undefined}>{renderItem(item)}</div>}
+    />
+  );
+}

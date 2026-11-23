@@ -55,10 +55,7 @@ function ReadingPage() {
     () => [...reading.lookups].sort((a, b) => b.looked_up_at - a.looked_up_at).slice(0, RECENT_WORDS),
     [reading.lookups],
   );
-  const recentSessions = useMemo(
-    () => reading.sessions.slice(0, 10),
-    [reading.sessions],
-  );
+  const recentSessions = useMemo(() => reading.sessions.slice(0, RECENT_SESSIONS), [reading.sessions]);
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
 
   return (
@@ -85,7 +82,10 @@ function ReadingPage() {
 
             {recentSessions.length > 0 && (
               <section className="flex flex-col gap-3">
-                <SectionTitle title="Recent sessions" />
+                <SectionTitle
+                  title="Recent sessions"
+                  seeAllHref={reading.sessions.length > RECENT_SESSIONS ? "/reading/sessions" : undefined}
+                />
                 <div className="rounded-xl border divide-y">
                   {recentSessions.map((session) => (
                     <SessionRow
@@ -146,6 +146,7 @@ function ReadingPage() {
 }
 
 const READING_NOW_DAYS = 90;
+const RECENT_SESSIONS = 10;
 const RECENT_WORDS = 6;
 const RECENT_FINISHED = 12;
 

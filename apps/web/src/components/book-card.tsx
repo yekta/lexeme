@@ -22,7 +22,7 @@ export function BookCard({ book }: { book: TBook }) {
         className="@container relative aspect-[2/3] overflow-hidden rounded-l-sm rounded-r-md shadow-md shadow-shadow/shadow transition-transform group-hover/book:-translate-y-1"
         style={{ backgroundColor: `oklch(0.42 0.06 ${hue})`, color: `oklch(0.96 0.025 ${hue})` }}
       >
-        <div aria-hidden className="absolute inset-y-0 left-0 w-[8%] bg-linear-to-r from-black/35 to-black/5" />
+        <div aria-hidden className="absolute inset-y-0 left-0 w-[8%] bg-black/20" />
         <div aria-hidden className="absolute inset-y-0 left-[8%] w-px bg-white/15" />
         <div className="absolute inset-0 flex flex-col justify-between gap-2 py-[13%] pr-[10%] pl-[16%]">
           <p

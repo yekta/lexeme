@@ -19,7 +19,7 @@ To quiz the user, call get-study-queue, show one card's front, wait for their an
 
 Reading data comes from the user's e-readers: list-books, list-reading-sessions, list-highlights and list-lookups. Deleting it here doesn't delete it from the e-reader.
 
-To send a book to the user's Kindle, call send-book with url, a direct link to the file (preferred), or with content_base64 and file_name for a file you have. Kindles open epub, pdf, mobi, azw3, fb2, txt, cbz and djvu, up to 100 MB. The book arrives when the Kindle next syncs; list-sent-books shows delivered_at once it has, and delete-sent-book takes one back.
+To send a book to the user's Kindle: for a file on disk, call upload-book and run the command it returns on the machine that has the file; for a book at a public link, call send-book with url. Don't base64 a file into send-book unless it's a few KB. Kindles open epub, pdf, mobi, azw3, fb2, txt, cbz and djvu, up to 100 MB. The book arrives when the Kindle next syncs; list-sent-books shows delivered_at once it has, and delete-sent-book takes one back.
 
 Everything you change appears in the user's Lexeme apps right away.`;
 

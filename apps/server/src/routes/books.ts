@@ -7,7 +7,7 @@ import { authenticateApiKey } from "../caller.ts";
 import { db } from "../db.ts";
 import { ApiError } from "../errors.ts";
 import { requireUserId } from "../http.ts";
-import { checkBookFile, deleteSentBook, findSentBook, saveSentBook } from "../sent-books.ts";
+import { checkBookFile, deleteSentBook, findSentBook, finishBookUpload, presentSentBook, saveSentBook } from "../sent-books.ts";
 import { getObject } from "../storage.ts";
 import { bearerToken } from "../tokens.ts";
 
@@ -29,6 +29,12 @@ export const bookRoutes = new Hono()
     await deleteSentBook(userId, c.req.param("id"));
     return c.json({ ok: true as const });
   });
+
+/** The second half of upload-book's command: the file is in storage, so send it. The signed token is the authorization. */
+export const bookUploadRoutes = new Hono().post("/:token", async (c) => {
+  const book = await finishBookUpload(c.req.param("token"));
+  return c.json({ book: presentSentBook(book) });
+});
 
 async function requireDeviceUser(c: Context) {
   const token = bearerToken(c.req.raw);

@@ -5,9 +5,12 @@ import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { BlockList } from "node:net";
 
+import { readBookUpload, signBookUpload } from "./book-uploads.ts";
 import { db } from "./db.ts";
+import { env } from "./env.ts";
 import { ApiError } from "./errors.ts";
-import { deleteObject, putObject } from "./storage.ts";
+import { deleteObject, objectSize, putObject, uploadUrl } from "./storage.ts";
+import { ISSUER } from "./urls.ts";
 
 const CONTENT_TYPES: Record<string, string> = {
   epub: "application/epub+zip",
@@ -19,6 +22,8 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 const DOWNLOAD_TIMEOUT_MS = 120_000;
+const UPLOAD_LINK_SECONDS = 60 * 60;
+const FINISH_LINK_MS = 2 * 60 * 60 * 1000;
 const MAX_REDIRECTS = 5;
 
 const PRIVATE_ADDRESSES = new BlockList();
@@ -41,14 +46,17 @@ export function checkBookFile(fileName: string, size: number) {
   if (size > MAX_SENT_BOOK_BYTES) throw new ApiError("BAD_REQUEST", TOO_BIG);
 }
 
-export async function saveSentBook(userId: string, fileName: string, bytes: Uint8Array, title?: string) {
-  checkBookFile(fileName, bytes.byteLength);
-  const id = randomUUID();
+function storedFile(userId: string, id: string, fileName: string) {
   const extension = extensionOf(fileName);
-  const storageKey = `sent-books/${userId}/${id}.${extension}`;
-  const contentType = CONTENT_TYPES[extension] ?? "application/octet-stream";
-  await putObject(storageKey, bytes, contentType);
-  const [book] = await db
+  return {
+    storageKey: `sent-books/${userId}/${id}.${extension}`,
+    contentType: CONTENT_TYPES[extension] ?? "application/octet-stream",
+  };
+}
+
+async function recordSentBook(userId: string, id: string, fileName: string, size: number, title?: string) {
+  const { storageKey, contentType } = storedFile(userId, id, fileName);
+  await db
     .insert(sentBooks)
     .values({
       id,
@@ -56,11 +64,57 @@ export async function saveSentBook(userId: string, fileName: string, bytes: Uint
       title: title ?? fileName.replace(/\.[^.]+$/, ""),
       file_name: fileName,
       content_type: contentType,
-      size_bytes: bytes.byteLength,
+      size_bytes: size,
       storage_key: storageKey,
     })
-    .returning();
-  return book!;
+    .onConflictDoNothing({ target: sentBooks.id });
+  return findSentBook(userId, id);
+}
+
+export async function saveSentBook(userId: string, fileName: string, bytes: Uint8Array, title?: string) {
+  checkBookFile(fileName, bytes.byteLength);
+  const id = randomUUID();
+  const { storageKey, contentType } = storedFile(userId, id, fileName);
+  await putObject(storageKey, bytes, contentType);
+  return recordSentBook(userId, id, fileName, bytes.byteLength, title);
+}
+
+/** A link to put the file straight into storage, and one that sends it once it's there. */
+export async function startBookUpload(userId: string, fileName: string, title?: string) {
+  checkBookFile(fileName, 0);
+  const id = randomUUID();
+  const expiresAt = Date.now() + FINISH_LINK_MS;
+  const token = signBookUpload({ userId, id, fileName, title, expiresAt }, env.BETTER_AUTH_SECRET);
+  return {
+    uploadUrl: await uploadUrl(storedFile(userId, id, fileName).storageKey, UPLOAD_LINK_SECONDS),
+    finishUrl: `${ISSUER}/api/book-uploads/${token}`,
+    expiresAt: new Date(Date.now() + UPLOAD_LINK_SECONDS * 1000),
+  };
+}
+
+export async function finishBookUpload(token: string) {
+  const upload = readBookUpload(token, env.BETTER_AUTH_SECRET);
+  if (!upload) throw new ApiError("UNAUTHORIZED", "This upload link isn't valid or has expired; call upload-book again.");
+  const { storageKey } = storedFile(upload.userId, upload.id, upload.fileName);
+  const size = await objectSize(storageKey);
+  if (size === undefined) throw new ApiError("BAD_REQUEST", "The file isn't uploaded yet; run the whole command.");
+  if (size === 0 || size > MAX_SENT_BOOK_BYTES) {
+    await deleteObject(storageKey);
+    throw new ApiError("BAD_REQUEST", size === 0 ? "The uploaded file is empty." : TOO_BIG);
+  }
+  return recordSentBook(upload.userId, upload.id, upload.fileName, size, upload.title);
+}
+
+/** What the API and MCP show of a sent book. */
+export function presentSentBook(book: typeof sentBooks.$inferSelect) {
+  return {
+    id: book.id,
+    title: book.title,
+    file_name: book.file_name,
+    size_bytes: book.size_bytes,
+    sent_at: book.created_at.toISOString(),
+    delivered_at: book.delivered_at?.toISOString() ?? null,
+  };
 }
 
 export async function findSentBook(userId: string, id: string) {

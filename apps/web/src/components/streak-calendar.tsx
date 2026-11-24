@@ -49,8 +49,13 @@ export function StreakCalendar({
   const scroller = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    const element = scroller.current;
-    if (element) element.scrollLeft = element.scrollWidth;
+    const toToday = () => {
+      const element = scroller.current;
+      if (element) element.scrollLeft = element.scrollWidth;
+    };
+    toToday();
+    const frame = requestAnimationFrame(toToday);
+    return () => cancelAnimationFrame(frame);
   }, [weeks.length, isPlaceholder]);
 
   return (
@@ -70,7 +75,7 @@ export function StreakCalendar({
               </span>
             ))}
           </div>
-          <div className="flex-1 grid grid-flow-col auto-cols-[0.625rem] sm:auto-cols-fr gap-0.5 sm:gap-0.75">
+          <div className="flex-1 grid grid-flow-col auto-cols-[0.75rem] sm:auto-cols-fr gap-0.5 sm:gap-0.75">
             {weeks.map((week, i) => (
               <div key={i} className="min-w-0 flex flex-col gap-0.5 sm:gap-0.75">
                 <span className="h-4 text-[10px] leading-none text-muted-foreground whitespace-nowrap group-data-placeholder:text-transparent">

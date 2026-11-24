@@ -1,26 +1,43 @@
 diff --git a/crengine/src/lvfntman.cpp b/crengine/src/lvfntman.cpp
-index 3384ef50..65dbcd33 100644
+index 3384ef50..88d5a26b 100644
 --- a/crengine/src/lvfntman.cpp
 +++ b/crengine/src/lvfntman.cpp
-@@ -1115,7 +1115,9 @@ static LVFontGlyphCacheItem * newItem( LVFontLocalGlyphCache * local_cache, lCha
+@@ -1115,7 +1115,8 @@ static LVFontGlyphCacheItem * newItem( LVFontLocalGlyphCache * local_cache, lCha
          } // else:
          #endif
          if (bitmap->buffer && w > 0 && h > 0) {
 -            memcpy( item->bmp, bitmap->buffer, w*h );
-+            // Rows can be padded (bitmap->pitch > w), like with Amazon's FreeType on Kindles
-+            for (int y = 0; y < h; y++)
-+                memcpy(item->bmp + y * w, bitmap->buffer + y * bitmap->pitch, w);
++            for ( int y=0; y<h; y++ )
++                memcpy( item->bmp + y*w, bitmap->buffer + y*bitmap->pitch, w );
              // correct gamma
              if ( gammaIndex!=GAMMA_NO_CORRECTION_INDEX )
                  cr_correct_gamma_buf(item->bmp, w*h, gammaIndex);
-@@ -1166,7 +1168,9 @@ static LVFontGlyphCacheItem * newItem(LVFontLocalGlyphCache *local_cache, lUInt3
+@@ -1166,7 +1167,8 @@ static LVFontGlyphCacheItem * newItem(LVFontLocalGlyphCache *local_cache, lUInt3
      }
      else {
          if (bitmap->buffer && w > 0 && h > 0) {
 -            memcpy( item->bmp, bitmap->buffer, w*h );
-+            // Rows can be padded (bitmap->pitch > w), like with Amazon's FreeType on Kindles
-+            for (int y = 0; y < h; y++)
-+                memcpy(item->bmp + y * w, bitmap->buffer + y * bitmap->pitch, w);
++            for ( int y=0; y<h; y++ )
++                memcpy( item->bmp + y*w, bitmap->buffer + y*bitmap->pitch, w );
              // correct gamma
              if ( gammaIndex!=GAMMA_NO_CORRECTION_INDEX )
                  cr_correct_gamma_buf(item->bmp, w*h, gammaIndex);
+@@ -4910,9 +4912,17 @@ public:
+         if (bitmap->pixel_mode == FT_PIXEL_MODE_BGRA)
+             buf->DrawColorGlyph( x + pad_x, y + pad_y,
+                 bitmap->buffer, bitmap->width, bitmap->rows, bitmap->pitch, palette);
+-        else
++        else if ( bitmap->pitch <= (int)bitmap->width )
+             buf->Draw( x + pad_x, y + pad_y,
+                 bitmap->buffer, bitmap->width, bitmap->rows, palette);
++        else {
++            // Draw() expects rows without padding
++            LVArray<lUInt8> rows( bitmap->width * bitmap->rows, 0 );
++            for ( unsigned int r=0; r<bitmap->rows; r++ )
++                memcpy( rows.get() + r*bitmap->width, bitmap->buffer + r*bitmap->pitch, bitmap->width );
++            buf->Draw( x + pad_x, y + pad_y,
++                rows.get(), bitmap->width, bitmap->rows, palette);
++        }
+ 
+         // Restore original pixel size
+         error = FT_Set_Pixel_Sizes(

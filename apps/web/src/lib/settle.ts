@@ -63,6 +63,12 @@ export const SETTLE_BUDGET = {
    * down, and "you're offline" has to stop being the answer.
    */
   probeInterval: 15_000,
+  /**
+   * How long the local store may take to open. It normally opens in well under
+   * a second; past this, IndexedDB has hung (WebKit does this on cold launches)
+   * and only a reload recovers it.
+   */
+  localStore: 5_000,
 } as const;
 
 /** True once `active` has held continuously for `ms`. Good news can be instant; bad news waits. */

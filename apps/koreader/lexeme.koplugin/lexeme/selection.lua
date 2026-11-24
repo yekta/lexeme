@@ -3,6 +3,7 @@ What a long-press on text shows: the selection toolbar above the selection
 and, for a single word, the dictionary sheet at the bottom.
 ]]
 local Geom = require("ui/geometry")
+local GestureRange = require("ui/gesturerange")
 local HtmlBoxWidget = require("ui/widget/htmlboxwidget")
 local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
@@ -25,8 +26,11 @@ local Selection = View:extend{
     background = false,
 }
 
-local SHEET_TOP = 938
-local POPUP_W, POPUP_H = 514, 85
+-- The dictionary sheet as the Kindle lays it out at the bottom of the screen; it opens at the
+-- top instead, in the reverse order, when it would cover the selection.
+local SHEET_TOP, SHEET_H, TOP_SHIFT = 938, 758, 1042
+local TAB_X = { 27, 227, 413, 589 }
+local POPUP_W, POPUP_H, POPUP_GAP = 525, 93, 33
 
 local CSS = [[
 @page { margin: 0; font-family: 'Noto Sans'; }
@@ -42,12 +46,17 @@ function Selection:init()
     self.entry = Words.fromSelection(self.ui)
     self.index = 1
     self.page = 1
+    local full = Geom:new{ x = 0, y = 0, w = Screen:getWidth(), h = Screen:getHeight() }
+    self.ges_events.LexemePan = { GestureRange:new{ ges = "pan", range = full } }
+    self.ges_events.LexemePanRelease = { GestureRange:new{ ges = "pan_release", range = full } }
 end
 
 function Selection:close(refresh)
     if self.html then self.html:free() end
     View.close(self, refresh)
     self.ui.highlight:clear()
+    self.ui.highlight.selected_text = nil
+    UIManager:setDirty(self.ui.dialog, "ui")
     if self.close_cb then self.close_cb() end
 end
 
@@ -55,59 +64,83 @@ function Selection:onTapOutside()
     self:close()
 end
 
+function Selection:sheetAtTop()
+    local bottom = 0
+    for _, box in ipairs(self.boxes or {}) do bottom = math.max(bottom, box.y + box.h) end
+    return bottom + D.s(60) > Screen:getHeight() - D.s(SHEET_H)
+end
+
+-- The sheet's top and bottom edges on screen.
+function Selection:sheetSpan()
+    if self:sheetAtTop() then return 0, D.s(SHEET_H) end
+    return Screen:getHeight() - D.s(SHEET_H), Screen:getHeight()
+end
+
 function Selection:render(bb, x, y, w, h)
     -- Taps anywhere but the toolbar and the sheet dismiss the selection.
     self:hit(x, y, w, h, function() self:close() end)
-    if self.results then self:paintSheet(bb, x, y + h - D.s(1696 - SHEET_TOP), w, D.s(1696 - SHEET_TOP)) end
+    if self.results then self:paintSheet(bb, x, w) end
     self:paintPopup(bb, w)
 end
 
 -- Selection toolbar ---------------------------------------------------------------
 
+-- Centred on the selection, above it while the dictionary takes the bottom of the screen and
+-- below it otherwise, as on a Kindle; on the other side when it doesn't fit.
 function Selection:popupPosition(screen_w)
-    local box = self.boxes and self.boxes[1]
-    local w, h = D.s(POPUP_W), D.s(POPUP_H)
-    if not box then return math.floor((screen_w - w) / 2), D.s(400) end
-    local px = math.floor(box.x + box.w / 2 - w / 2)
+    local w, h, gap = D.s(POPUP_W), D.s(POPUP_H), D.s(POPUP_GAP)
+    local boxes = self.boxes or {}
+    if #boxes == 0 then return math.floor((screen_w - w) / 2), D.s(400) end
+    local left, right, top, bottom = math.huge, -math.huge, math.huge, -math.huge
+    for _, box in ipairs(boxes) do
+        left, right = math.min(left, box.x), math.max(right, box.x + box.w)
+        top, bottom = math.min(top, box.y), math.max(bottom, box.y + box.h)
+    end
+    local px = math.floor((left + right - w) / 2)
     px = math.max(D.s(20), math.min(screen_w - w - D.s(20), px))
-    local py = box.y - h - D.s(28)
-    if py < D.s(100) then py = box.y + box.h + D.s(28) end
-    return px, py
+    local floor, limit = 0, Screen:getHeight()
+    if self.results then
+        local sheet_top, sheet_bottom = self:sheetSpan()
+        if sheet_top == 0 then floor = sheet_bottom else limit = sheet_top end
+    end
+    local above, below = top - h - gap, bottom + gap
+    local fits_above, fits_below = above >= floor + D.s(20), below + h <= limit - D.s(20)
+    if self.results then
+        return px, (fits_above or not fits_below) and above or below
+    end
+    return px, (fits_below or not fits_above) and below or above
 end
 
 function Selection:paintPopup(bb, screen_w)
     local px, py = self:popupPosition(screen_w)
     local w, h = D.s(POPUP_W), D.s(POPUP_H)
     self:hit(px, py, w, h, function() end)
-    D.rect(bb, px, py, w, h, D.WHITE)
-    D.border(bb, px, py, w, h, D.s(3), D.BLACK, D.s(12))
-    local cy = py + math.floor(h / 2)
-
-    local ax = px + D.s(30)
-    -- Filled when the selection is a highlight already; tapping it removes the highlight.
+    -- A highlight already: the A sits on black, and tapping it removes the highlight.
     local highlighted = self.highlight_index ~= nil
-    D.roundRect(bb, ax, cy - D.s(18), D.s(36), D.s(36), highlighted and D.BLACK or D.gray(204), D.s(6))
-    D.textCenter(bb, ax + D.s(18), cy + D.s(11), D.face("medium", 28), "A", highlighted and D.WHITE or D.BLACK)
-    self:hit(ax - D.s(20), py, D.s(76), h, function() self:highlight() end)
+    D.icon(bb, highlighted and "selection-toolbar-highlighted" or "selection-toolbar", px, py, w, h)
+    if highlighted then D.rect(bb, px + D.s(26), py + D.s(26), D.s(43), D.s(43), D.WHITE) end
+    D.rect(bb, px + D.s(30), py + D.s(30), D.s(35), D.s(35), D.gray(221))
+    D.textCenter(bb, px + D.s(47), py + D.s(59), D.face("medium", 34), "A")
+    self:hit(px, py, D.s(92), h, function() self:highlight() end)
 
-    D.icon(bb, "sticky-note", px + D.s(106), cy - D.s(21), D.s(42), D.s(42))
-    self:hit(px + D.s(90), py, D.s(76), h, function() self:note() end)
+    D.icon(bb, "kindle-note", px + D.s(115), py + D.s(29), D.s(37), D.s(37))
+    self:hit(px + D.s(92), py, D.s(86), h, function() self:note() end)
 
     local lookup_enabled = self.results == nil
-    D.textCenter(bb, px + D.s(257), cy + D.s(12), D.face("regular", 32), "Look up",
-        lookup_enabled and D.BLACK or D.gray(150))
+    D.text(bb, px + D.s(206), py + D.s(58), D.face("regular", 32), "Look up",
+        lookup_enabled and D.BLACK or D.gray(119))
     if lookup_enabled then
-        self:hit(px + D.s(180), py, D.s(156), h, function()
+        self:hit(px + D.s(178), py, D.s(170), h, function()
             self:closeKeepingSelection()
             self.ui.highlight:lookupDict()
         end)
     end
 
-    D.icon(bb, "book-plus", px + D.s(372), cy - D.s(21), D.s(42), D.s(42))
-    self:hit(px + D.s(350), py, D.s(86), h, function() self:addToLexeme() end)
+    D.icon(bb, "book-plus", px + D.s(376), py + D.s(30), D.s(34), D.s(34))
+    self:hit(px + D.s(348), py, D.s(90), h, function() self:addToLexeme() end)
 
-    D.icon(bb, "ellipsis-vertical", px + D.s(456), cy - D.s(19), D.s(38), D.s(38))
-    self:hit(px + D.s(440), py, D.s(74), h, function() self:openMore(px + w, py + h + D.s(8)) end)
+    D.icon(bb, "ellipsis-vertical", px + D.s(458), py + D.s(25), D.s(45), D.s(45))
+    self:hit(px + D.s(438), py, w - D.s(438), h, function() self:openMore(px + w, py + h + D.s(8)) end)
 end
 
 function Selection:closeKeepingSelection()
@@ -220,20 +253,24 @@ function Selection:htmlWidget(w, h)
     return self.html
 end
 
-function Selection:paintSheet(bb, x, top, w, h)
-    self:hit(x, top, w, h, function() end)
-    D.rect(bb, x, top, w, h, D.WHITE)
-    D.rect(bb, x, top, w, D.s(5))
-    D.roundRect(bb, x + math.floor((w - D.s(84)) / 2), top + D.s(52), D.s(84), D.s(9), D.BLACK, D.s(4))
+function Selection:paintSheet(bb, x, w)
+    local at_top = self:sheetAtTop()
+    local sheet_top, sheet_bottom = self:sheetSpan()
+    -- Everything from the tabs to the footer sits at the same place relative to this.
+    local block = at_top and D.s(SHEET_TOP - TOP_SHIFT) or sheet_top
+    self:hit(x, sheet_top, w, sheet_bottom - sheet_top, function() end)
+    D.rect(bb, x, sheet_top, w, sheet_bottom - sheet_top, D.WHITE)
+    local edge_y = at_top and sheet_bottom - D.s(9) or sheet_top
+    local handle_y = at_top and sheet_bottom - D.s(52) or sheet_top + D.s(52)
+    D.rect(bb, x, edge_y, w, D.s(9))
+    D.icon(bb, "sheet-handle", x + math.floor((w - D.s(111)) / 2) + D.s(1), handle_y, D.s(111), D.s(7))
 
-    local tx = x + D.s(27)
     for i, label in ipairs(TABS) do
         local active = i == 1
-        local face = D.face(active and "bold" or "regular", 32)
-        local tw = D.text(bb, tx, top + D.s(1100 - SHEET_TOP), face, label)
-        if active then D.rect(bb, tx - D.s(13), top + D.s(1112 - SHEET_TOP), tw + D.s(26), D.s(7)) end
+        local tx = x + D.s(TAB_X[i])
+        local tw = D.text(bb, tx, block + D.s(172), D.face(active and "bold" or "regular", 32), label)
         if not active then
-            self:hit(tx - D.s(20), top + D.s(1050 - SHEET_TOP), tw + D.s(40), D.s(90), function()
+            self:hit(tx - D.s(20), block + D.s(122), tw + D.s(40), D.s(90), function()
                 local hl = self.ui.highlight
                 self:closeKeepingSelection()
                 if label == "Wikipedia" then hl:lookupWikipedia()
@@ -241,12 +278,11 @@ function Selection:paintSheet(bb, x, top, w, h)
                 else hl:onHighlightSearch() end
             end)
         end
-        tx = tx + tw + D.s(49)
     end
+    D.rect(bb, x + D.s(5), block + D.s(210), D.s(200), D.s(9))
+    D.rect(bb, x + D.s(5), block + D.s(219), w - D.s(11), D.s(4))
 
-    local content_top = top + D.s(1150 - SHEET_TOP)
-    local content_h = D.s(1580 - 1150)
-    local content_w = w - D.s(40 + 110)
+    local content_top, content_h, content_w = block + D.s(257), D.s(350), D.s(1096)
     if #self.results == 0 then
         D.text(bb, x + D.s(40), content_top + D.s(40), D.face("regular", 32), "No definition found for “" ..
             (self.word or "") .. "”.", D.BLACK, content_w)
@@ -254,29 +290,45 @@ function Selection:paintSheet(bb, x, top, w, h)
         local html = self:htmlWidget(content_w, content_h)
         html:setPageNumber(self.page)
         html:paintTo(bb, x + D.s(40), content_top)
-        local up, down = self.page > 1, self.page < html.page_count
-        D.icon(bb, up and "triangle-up" or "triangle-up-gray", x + w - D.s(74), content_top, D.s(34), D.s(21))
-        D.icon(bb, down and "triangle-down" or "triangle-down-gray", x + w - D.s(74),
-            content_top + content_h - D.s(21), D.s(34), D.s(21))
-        self:hit(x + w - D.s(110), content_top - D.s(30), D.s(110), D.s(100), function() self:turn(-1) end)
-        self:hit(x + w - D.s(110), content_top + content_h - D.s(70), D.s(110), D.s(100), function() self:turn(1) end)
+        self:paintScroll(bb, x + D.s(1192), block, html.page_count)
     end
 
-    local footer = top + h - D.s(1696 - 1640)
+    local footer = block + D.s(702)
     local link_face = D.face("regular", 30)
     local lw = D.text(bb, x + D.s(72), footer, link_face, "Add to Lexeme")
-    D.rect(bb, x + D.s(72), footer + D.s(8), lw, D.s(2))
+    D.rect(bb, x + D.s(72), footer + D.s(7), lw, D.s(3))
     self:hit(x + D.s(40), footer - D.s(50), lw + D.s(64), D.s(80), function() self:addToLexeme() end)
     local dict = self.results[self.index] and self.results[self.index].dict
     if dict then
-        D.textRight(bb, x + w - D.s(90), footer, link_face, dict, D.BLACK)
-        D.icon(bb, "ellipsis-vertical", x + w - D.s(70), footer - D.s(30), D.s(38), D.s(38))
+        D.textRight(bb, x + D.s(1183), footer, link_face, dict, D.BLACK)
+        D.icon(bb, "ellipsis-vertical", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
         if #self.results > 1 then
             self:hit(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
                 self:chooseDictionary(x + w - D.s(37), footer - D.s(60))
             end)
         end
     end
+end
+
+-- The arrows and the Kindle's hatched scrollbar beside the definition.
+function Selection:paintScroll(bb, left, block, pages)
+    local up, down = self.page > 1, self.page < pages
+    local arrow_w, arrow_h = D.s(35), D.s(21)
+    D.icon(bb, up and "triangle-up" or "triangle-up-gray", left, block + D.s(263), arrow_w, arrow_h)
+    D.icon(bb, down and "triangle-down" or "triangle-down-gray", left, block + D.s(582), arrow_w, arrow_h)
+    self:hit(left - D.s(40), block + D.s(233), D.s(110), D.s(90), function() self:turn(-1) end)
+    self:hit(left - D.s(40), block + D.s(552), D.s(110), D.s(90), function() self:turn(1) end)
+    if pages <= 1 then return end
+    local track_x, track_top, track_bottom = left + D.s(12), block + D.s(326), block + D.s(538)
+    for ty = track_top, track_bottom do
+        local dx = 4 - (ty - track_top + 1) % 5
+        bb:setPixel(track_x + dx, ty, D.BLACK)
+        bb:setPixel(track_x + dx + 5, ty, D.BLACK)
+    end
+    local span = track_bottom - track_top + 1
+    local thumb_h = math.max(D.s(20), math.floor(span / pages))
+    local thumb_y = track_top + math.floor((span - thumb_h) * (self.page - 1) / (pages - 1))
+    D.roundRect(bb, track_x + D.s(1), thumb_y, D.s(9), thumb_h, D.BLACK, D.s(4))
 end
 
 function Selection:turn(delta)
@@ -287,8 +339,94 @@ function Selection:turn(delta)
     self:refresh()
 end
 
+-- Dragging a handle moves that end of the selection, as on a Kindle --------------------
+
+-- The ends of the selection on screen, and the handles' centres.
+function Selection:ends()
+    local boxes = self.boxes or {}
+    if #boxes == 0 then return end
+    local first, last = boxes[1], boxes[1]
+    for _, box in ipairs(boxes) do
+        if box.y < first.y or (box.y == first.y and box.x < first.x) then first = box end
+        if box.y > last.y or (box.y == last.y and box.x > last.x) then last = box end
+    end
+    local start_pos = { x = first.x + 2, y = first.y + math.floor(first.h / 2) }
+    local end_pos = { x = last.x + last.w - 3, y = last.y + math.floor(last.h / 2) }
+    local start_handle = { x = first.x, y = first.y - D.s(14) }
+    local end_handle = { x = last.x + last.w - 2, y = last.y + last.h + D.s(20) }
+    return start_pos, end_pos, start_handle, end_handle
+end
+
+function Selection:handleAt(pos)
+    if not self.ui.rolling then return end
+    local _, _, start_handle, end_handle = self:ends()
+    if not start_handle then return end
+    local reach = D.s(50)
+    local function near(p) return math.abs(pos.x - p.x) <= reach and math.abs(pos.y - p.y) <= reach end
+    if near(end_handle) then return "end" end
+    if near(start_handle) then return "start" end
+end
+
+function Selection:dragTo(pos)
+    local hl = self.ui.highlight
+    local start_pos, end_pos = self.drag_start, self.drag_end
+    if self.dragging == "end" then end_pos = pos else start_pos = pos end
+    local selected = self.ui.document:getTextFromPositions(start_pos, end_pos)
+    if not (selected and selected.sboxes and #selected.sboxes > 0) then return end
+    hl.selected_text = selected
+    self.boxes = selected.sboxes
+    self.highlight_index = nil
+    UIManager:setDirty(self.ui.dialog, "ui")
+    self:refresh()
+end
+
+function Selection:endDrag()
+    self.dragging = nil
+    local selected = self.ui.highlight.selected_text
+    if not (selected and selected.text) then return end
+    local text = util.cleanupSelectedText(selected.text)
+    if text ~= "" and not text:find("%s") then
+        self:closeKeepingSelection()
+        self.ui.highlight:lookupDict()
+        return
+    end
+    if self.html then self.html:free() end
+    self.html = nil
+    self.results = nil
+    self.word = nil
+    self.entry = Words.fromSelection(self.ui)
+    self:refresh()
+end
+
+function Selection:startDrag(pos)
+    local which = self:handleAt(pos)
+    if not which then return false end
+    self.dragging = which
+    self.drag_start, self.drag_end = self:ends()
+    return true
+end
+
+function Selection:onLexemePan(_, ges)
+    if not self.dragging and not self:startDrag(ges.start_pos or ges.pos) then return true end
+    self:dragTo(ges.pos)
+    return true
+end
+
+function Selection:onLexemePanRelease(_, ges)
+    if not self.dragging then return true end
+    self:dragTo(ges.pos)
+    self:endDrag()
+    return true
+end
+
 function Selection:onSwipe(direction, ges)
-    if not self.results or ges.pos.y < Screen:getHeight() - D.s(1696 - SHEET_TOP) then return end
+    if self.dragging or self:startDrag(ges.pos) then
+        self:dragTo(ges.end_pos)
+        self:endDrag()
+        return true
+    end
+    local sheet_top, sheet_bottom = self:sheetSpan()
+    if not self.results or ges.pos.y < sheet_top or ges.pos.y > sheet_bottom then return end
     if direction == "north" then self:turn(1) elseif direction == "south" then self:turn(-1) end
     return true
 end

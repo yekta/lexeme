@@ -432,11 +432,12 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
     local ox, oy = x, cover_top - D.s(10)
     for _, item in ipairs(visible) do
         local book, cx = item.book, item.cx
-        self:paintCover(area, ox, oy, book, cx, cover_top, cell_w, row_h, true)
+        local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, cx, cover_top, cell_w, row_h, true)
         self:paintBadge(area, ox, oy, book, cx, cover_top + row_h + D.s(41))
         self:hit(cx, cover_top, cell_w, row_h + D.s(60),
             function() self.open_book(book.path) end,
             function() self:openBookMenu(book) end)
+        self:hit(dx + dw - D.s(60), dy + dh - D.s(80), D.s(60), D.s(80), function() self:openBookMenu(book) end)
     end
     return cover_top + row_h + D.s(55)
 end

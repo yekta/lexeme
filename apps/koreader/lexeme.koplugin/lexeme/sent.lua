@@ -39,7 +39,9 @@ function Sent.addDeleted(snapshot, outgoing)
     local before = store():readSetting("sent") or {}
     local now = { highlights = {}, lookups = {}, page_reads = Reading.pageReadCounts() }
     for _, book in ipairs(snapshot.books) do now.highlights[book.key] = {} end
-    for _, highlight in ipairs(snapshot.highlights) do table.insert(now.highlights[highlight.book_key], highlight.id) end
+    for _, highlight in ipairs(snapshot.highlights) do
+        table.insert(now.highlights[highlight.book_key], highlight.id)
+    end
     for _, lookup in ipairs(Reading.lookups(0, snapshot.key_by_title)) do table.insert(now.lookups, lookup.id) end
 
     outgoing.removed_highlight_ids = {}

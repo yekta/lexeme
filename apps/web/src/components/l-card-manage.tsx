@@ -77,16 +77,16 @@ export function LCardManage(props: TLCardManageProps) {
       {/* Menu */}
       <div className="absolute top-1 right-1 z-10">
         {isPlaceholder && (
-          <Button variant="ghost" isPlaceholder={true} className="size-9">
-            <MoreVertical className="size-5 text-muted-foreground shrink-0" />
+          <Button variant="ghost" isPlaceholder={true} className="size-9 text-muted-foreground">
+            <MoreVertical className="size-5 shrink-0" />
           </Button>
         )}
         {!isPlaceholder && (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="ghost" className="size-9">
-                  <MoreVertical className="size-5 shrink-0 text-muted-foreground group-data-popup-open/button:rotate-90 transition" />
+                <Button variant="ghost" className="size-9 text-muted-foreground">
+                  <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
                 </Button>
               }
             ></DropdownMenuTrigger>

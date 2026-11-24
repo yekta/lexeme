@@ -39,8 +39,8 @@ export function WordRow({ lookup, bookTitle, isCard }: { lookup: TLookup; bookTi
           {isCard ? (
             <span className="size-9 -my-2 -mr-2.5 shrink-0" />
           ) : (
-            <Button variant="ghost" className="size-9 -my-2 -mr-2.5" aria-label="Add as card" onClick={() => setIsAdding(true)}>
-              <Plus className="size-5 shrink-0 text-muted-foreground" />
+            <Button variant="ghost" className="size-9 -my-2 -mr-2.5 text-muted-foreground" aria-label="Add as card" onClick={() => setIsAdding(true)}>
+              <Plus className="size-5 shrink-0" />
             </Button>
           )}
         </div>

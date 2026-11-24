@@ -42,8 +42,8 @@ export function ReadingGoalMenu({ isPlaceholder }: { isPlaceholder?: boolean }) 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { goal, isPending } = useReadingGoal();
   const trigger = (
-    <Button variant="ghost" size="icon-lg" isPlaceholder={isPlaceholder} className="-my-0.5 shrink-0">
-      <MoreVertical className="size-5 shrink-0 text-muted-foreground group-data-popup-open/button:rotate-90 transition" />
+    <Button variant="ghost" size="icon-lg" isPlaceholder={isPlaceholder} className="-my-0.5 shrink-0 text-muted-foreground">
+      <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
     </Button>
   );
   if (isPlaceholder) return trigger;

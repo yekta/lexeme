@@ -100,9 +100,9 @@ export function DeckSettingsMenu({
             <Button
               variant="ghost"
               size="icon-lg"
-              className={cn("relative", triggerClassName)}
+              className={cn("relative text-muted-foreground", triggerClassName)}
             >
-              <MoreVertical className="size-5 shrink-0 text-muted-foreground group-data-popup-open/button:rotate-90 transition" />
+              <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
               <CalibrationDot profileId={deck.learning_profile_id} />
             </Button>
           }

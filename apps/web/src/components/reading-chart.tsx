@@ -4,7 +4,7 @@ import { Bar, BarChart, XAxis, type XAxisTickContentProps } from "recharts";
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
-const CONFIG = { seconds: { label: "Read", color: "var(--primary)" } } satisfies ChartConfig;
+const CONFIG = { seconds: { label: "Read", color: "var(--muted-foreground)" } } satisfies ChartConfig;
 
 type TBar = { key: string; tick: string; tip: string; seconds: number };
 

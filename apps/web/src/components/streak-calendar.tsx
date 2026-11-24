@@ -75,7 +75,7 @@ export function StreakCalendar({
                     title={`${format(parseISO(cell.day), "EEE d MMM yyyy")}: ${formatReadingTime(cell.seconds)}`}
                     className={cn(
                       "aspect-square rounded-[3px] border",
-                      cell.reached ? "bg-primary border-primary" : "bg-muted-foreground/8 border-border",
+                      cell.reached ? "bg-muted-foreground border-muted-foreground" : "bg-muted-foreground/8 border-border",
                       "group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:border-transparent group-data-placeholder:animate-pulse",
                     )}
                   />

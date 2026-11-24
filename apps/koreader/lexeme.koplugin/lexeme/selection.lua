@@ -34,8 +34,9 @@ local POPUP_W, POPUP_H, POPUP_GAP = 525, 93, 33
 
 local CSS = [[
 @page { margin: 0; font-family: 'Noto Sans'; }
-body { margin: 0; line-height: 1.35; }
-.lexeme-hw { font-weight: bold; font-size: 1.15em; margin-bottom: 0.3em; }
+body { margin: 0; line-height: 1.3; }
+.lexeme-hw { font-weight: bold; font-size: 1.1em; margin-bottom: 0.2em; }
+.lexeme-ipa { font-weight: normal; font-size: 0.8em; }
 ol, ul { margin: 0; padding: 0 0 0 1.4em; }
 blockquote, dd { margin: 0 1em; }
 ]]
@@ -234,12 +235,23 @@ end
 
 local TABS = { "Dictionary", "Wikipedia", "Translate", "Search" }
 
+-- The entry as a Kindle dictionary shows it: the headword with its pronunciation, then
+-- the senses, without Wiktionary's regional pronunciations and inflections line.
 local function definitionHtml(result)
     local body = result.definition or ""
-    if not result.is_html then
+    local ipa
+    if result.is_html then
+        body = body:gsub("<ul>(.-)</ul>", function(list)
+            if not list:find("IPA") then return nil end
+            ipa = ipa or list:match('<span class="IPA[^"]*">(.-)</span>')
+            return ""
+        end)
+        body = body:gsub('<p><span class="headword%-line">.-</p>', "")
+    else
         body = util.htmlEscape(body):gsub("\n", "<br/>")
     end
-    return '<div class="lexeme-hw">' .. util.htmlEscape(result.word or "") .. "</div>" .. body
+    local pronunciation = ipa and (' <span class="lexeme-ipa">' .. ipa .. "</span>") or ""
+    return '<div class="lexeme-hw">' .. util.htmlEscape(result.word or "") .. pronunciation .. "</div>" .. body
 end
 
 function Selection:htmlWidget(w, h)
@@ -247,7 +259,7 @@ function Selection:htmlWidget(w, h)
     if self.html then self.html:free() end
     local result = self.results[self.index]
     self.html = HtmlBoxWidget:new{ dimen = Geom:new{ w = w, h = h } }
-    self.html:setContent(definitionHtml(result), (result.css or "") .. CSS, D.s(34), false, nil,
+    self.html:setContent(definitionHtml(result), (result.css or "") .. CSS, D.s(30), false, nil,
         result.dictionary_resource_directory)
     self.html_index = self.index
     return self.html
@@ -336,6 +348,7 @@ function Selection:turn(delta)
     local page = math.max(1, math.min(self.html.page_count, self.page + delta))
     if page == self.page then return end
     self.page = page
+    self.html:freeBb()
     self:refresh()
 end
 

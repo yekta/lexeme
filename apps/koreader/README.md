@@ -28,11 +28,13 @@ Amazon's reader draws text with the Kindle's own FreeType
 (`/usr/lib/libfreetype.so.6`), which hands glyphs to Monotype's iType
 rasterizer. `deploy.sh` copies that library into KOReader, so book text comes
 out pixel for pixel as on Amazon's reader. iType pads glyph rows, which stock
-crengine doesn't handle, so `patches/` fixes that and
-`scripts/build-engine.sh` builds crengine for the KOReader version on the
-Kindle with Docker (it needs to run `linux/amd64` images; on Apple silicon use
-a Rosetta VM, e.g. `colima start --vm-type vz --vz-rosetta`). `deploy.sh`
-installs both only when that build matches the Kindle's KOReader. A KOReader
+crengine doesn't handle, and reports glyph widths differently from FreeType's
+own drivers, which breaks MuPDF's layout of dictionary entries. `patches/`
+fixes both and `scripts/build-engine.sh` builds crengine and MuPDF for the
+KOReader version on the Kindle with Docker (it needs to run `linux/amd64`
+images; on Apple silicon use a Rosetta VM, e.g.
+`colima start --vm-type vz --vz-rosetta`). `deploy.sh` installs them and the
+FreeType only when that build matches the Kindle's KOReader. A KOReader
 update replaces them; build again for the new version.
 
 ### Rules that keep the Kindle alive

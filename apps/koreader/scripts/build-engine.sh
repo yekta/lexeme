@@ -1,7 +1,7 @@
 #!/bin/sh
-# Builds KOReader's crengine library for the Kindle with patches/ applied.
+# Builds KOReader's crengine and MuPDF libraries for the Kindle with patches/ applied.
 # Usage: build-engine.sh [KOREADER_VERSION], e.g. v2026.07.1; defaults to the version on the Kindle.
-# Needs Docker able to run linux/amd64 images (Rosetta on Apple silicon). The library lands in
+# Needs Docker able to run linux/amd64 images (Rosetta on Apple silicon). The libraries land in
 # build/<version>/libs/, where deploy.sh picks it up.
 set -e
 HOST="${KINDLE_HOST:-kindle}"
@@ -16,7 +16,11 @@ docker run --rm --platform linux/amd64 -v "$PWD/patches:/patches:ro" -v "$OUT:/o
     cd ~/koreader && git submodule update -q --init --depth 1 base
     cd base && git submodule update -q --init thirdparty/kpvcrlib/crengine
     for p in /patches/crengine-*.patch; do git -C thirdparty/kpvcrlib/crengine apply \"\$p\"; done
-    make TARGET=kindlehf -j\$(nproc) koreader-cre >/dev/null
-    cp build/arm-kindlehf-linux-gnueabihf/libs/libkoreader-cre.so /out/
+    for p in /patches/mupdf-*.patch; do
+      cp \"\$p\" thirdparty/mupdf/
+      sed -i \"/^list(APPEND PATCH_FILES/,/^)/ s|^)|    \$(basename \"\$p\")\\n)|\" thirdparty/mupdf/CMakeLists.txt
+    done
+    make TARGET=kindlehf -j\$(nproc) koreader-cre wrap-mupdf >/dev/null
+    cp build/arm-kindlehf-linux-gnueabihf/libs/libkoreader-cre.so build/arm-kindlehf-linux-gnueabihf/libs/libwrap-mupdf.so /out/
   "
 echo "Built $OUT"

@@ -1,0 +1,98 @@
+--- a/include/mupdf/fitz/font.h
++++ b/include/mupdf/fitz/font.h
+@@ -833,6 +833,11 @@
+ 
+ void fz_ft_unlock(fz_context *ctx);
+ 
++/* FT_Get_Advance for FT_LOAD_NO_SCALE, in font units. The Kindle's
++ * FreeType hands TrueType fonts to Monotype iType, which returns
++ * those in 26.6. */
++int fz_ft_get_unscaled_advance(void *face, unsigned int gid, int load_flags, long *adv);
++
+ /* Internal function. Must be called with FT_ALLOC_LOCK
+  * held. Returns 1 if this thread (context!) already holds
+  * the freeetype lock. */
+--- a/source/fitz/font.c
++++ b/source/fitz/font.c
+@@ -1003,6 +1003,18 @@
+ 	return font;
+ }
+ 
++int
++fz_ft_get_unscaled_advance(void *face_, unsigned int gid, int load_flags, long *adv)
++{
++	FT_Face face = face_;
++	FT_Fixed value = 0;
++	FT_Error fterr = FT_Get_Advance(face, gid, load_flags, &value);
++	if (!fterr && face->driver == (FT_Driver)FT_Get_Module(face->glyph->library, "itype drv"))
++		value /= 64;
++	*adv = value;
++	return fterr;
++}
++
+ static fz_matrix *
+ fz_adjust_ft_glyph_width(fz_context *ctx, fz_font *font, int gid, fz_matrix *trm)
+ {
+@@ -1015,7 +1027,7 @@
+ 		float realw;
+ 
+ 		fz_ft_lock(ctx);
+-		fterr = FT_Get_Advance(font->ft_face, gid, FT_LOAD_NO_SCALE | FT_LOAD_NO_HINTING | FT_LOAD_IGNORE_TRANSFORM, &adv);
++		fterr = fz_ft_get_unscaled_advance(font->ft_face, gid, FT_LOAD_NO_SCALE | FT_LOAD_NO_HINTING | FT_LOAD_IGNORE_TRANSFORM, &adv);
+ 		fz_ft_unlock(ctx);
+ 		if (fterr && fterr != FT_Err_Invalid_Argument)
+ 			fz_warn(ctx, "FT_Get_Advance(%s,%d): %s", font->name, gid, ft_error_string(fterr));
+@@ -1919,7 +1931,7 @@
+ 		mask |= FT_LOAD_VERTICAL_LAYOUT;
+ 	if (!locked)
+ 		fz_ft_lock(ctx);
+-	fterr = FT_Get_Advance(font->ft_face, gid, mask, &adv);
++	fterr = fz_ft_get_unscaled_advance(font->ft_face, gid, mask, &adv);
+ 	if (!locked)
+ 		fz_ft_unlock(ctx);
+ 	if (fterr && fterr != FT_Err_Invalid_Argument)
+--- a/source/html/html-layout.c
++++ b/source/html/html-layout.c
+@@ -26,6 +26,7 @@
+ 
+ #include "hb.h"
+ #include "hb-ft.h"
++#include "hb-ot.h"
+ #include <ft2build.h>
+ 
+ #include <math.h>
+@@ -280,6 +281,10 @@
+ 			{
+ 				hb->destroy = destroy_hb_shaper_data;
+ 				hb->shaper_handle = hb_ft_font_create(face, NULL);
++				/* Glyph metrics straight from the font: the Kindle's FreeType
++				 * (iType) rounds advances to whole pixels and applies the
++				 * transform glyphs were last drawn with. */
++				hb_ot_font_set_funcs(hb->shaper_handle);
+ 			}
+ 
+ 			hb_buffer_guess_segment_properties(walker->hb_buf);
+--- a/source/pdf/pdf-font.c
++++ b/source/pdf/pdf-font.c
+@@ -325,7 +325,7 @@
+ 	FT_Face face = fontdesc->font->ft_face;
+ 	FT_UShort units_per_EM;
+ 
+-	fterr = FT_Get_Advance(face, gid, mask, &adv);
++	fterr = fz_ft_get_unscaled_advance(face, gid, mask, &adv);
+ 	if (fterr && fterr != FT_Err_Invalid_Argument)
+ 		fz_warn(ctx, "FT_Get_Advance(%d): %s", gid, ft_error_string(fterr));
+ 
+--- a/source/xps/xps-glyphs.c
++++ b/source/xps/xps-glyphs.c
+@@ -87,8 +87,8 @@
+ 	FT_Fixed hadv = 0, vadv = 0;
+ 
+ 	fz_ft_lock(ctx);
+-	FT_Get_Advance(face, gid, mask, &hadv);
+-	FT_Get_Advance(face, gid, mask | FT_LOAD_VERTICAL_LAYOUT, &vadv);
++	fz_ft_get_unscaled_advance(face, gid, mask, &hadv);
++	fz_ft_get_unscaled_advance(face, gid, mask | FT_LOAD_VERTICAL_LAYOUT, &vadv);
+ 	fz_ft_unlock(ctx);
+ 
+ 	mtx->hadv = (float) hadv / face->units_per_EM;

@@ -23,7 +23,7 @@ for (const candidate of [".env", "../../.env"]) {
 export const env = createEnv({
   server: {
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    /** Railway injects PORT; 3001 locally, which is what the web dev server proxies to. */
+    /** 3001 locally, which is what the web dev server proxies to, and what Unbind routes to. */
     PORT: z.coerce.number().int().default(3001),
 
     DATABASE_URL: z.url(),

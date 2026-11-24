@@ -55,7 +55,7 @@ const publicCors = cors({ origin: "*" });
 /**
  * Dev goes through the web dev server's proxy, so it is same-origin and this
  * does nothing. In production the app is on Cloudflare Pages and this is on
- * Railway: different origins, so every call needs an allow-list entry, and
+ * Unbind: different origins, so every call needs an allow-list entry, and
  * `credentials` is what lets the session cookie ride along.
  */
 app.use("/api/*", async (c, next) => {
@@ -73,8 +73,8 @@ app.onError((error, c) => {
   return c.json(body, status as 400);
 });
 
-// Railway's health check, and a readiness probe for the web dev server, which
-// waits on it before starting Vite so the proxy never opens onto a dead port.
+// A readiness probe for the web dev server, which waits on it before starting
+// Vite so the proxy never opens onto a dead port.
 app.get("/health", (c) => c.json({ ok: true }));
 
 app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));

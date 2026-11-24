@@ -6,12 +6,12 @@ works if they are sibling subdomains of one registrable name.
 
 ```
 lexeme.fyi         apps/web      Cloudflare Pages (static)
-api.lexeme.fyi     apps/server   Railway
-zero.lexeme.fyi    zero-cache    Railway
-                   Postgres      Railway
+api.lexeme.fyi     apps/server   Unbind (API)
+zero.lexeme.fyi    zero-cache    Unbind (Zero)
+                   Postgres      Unbind (Postgres)
 ```
 
-A `*.up.railway.app` or `*.pages.dev` hostname will **not** do for this: those
+A `*.unbind.yekta.cc` or `*.pages.dev` hostname will **not** do for this: those
 are separate sites, not subdomains of a shared registrable domain, so a cookie
 issued for one is invisible to the others and sync 401s on every request. Put
 custom domains on all three before setting `COOKIE_DOMAIN`.
@@ -37,18 +37,21 @@ the browser, so a hard refresh on `/deck/<id>` has to be answered with
 headers the FSRS optimizer needs. Both are copied into `dist` by the build;
 Pages reads them from there.
 
-## apps/server → Railway
+## apps/server → Unbind
 
 | Setting | Value |
 | --- | --- |
-| Build command | `pnpm install && pnpm --filter @lexeme/server build` |
-| Start command | `pnpm --filter @lexeme/server start` |
-| Health check path | `/health` |
+| Source | GitHub `yekta/lexeme`, `master`, auto-deploy |
+| Builder | railpack |
+| Build command | `pnpm --filter @lexeme/server build` |
+| Run command | `pnpm --filter @lexeme/server start` |
+| Port | 3001 |
+| Watch paths | `apps/server/**`, `packages/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.base.json` |
 
 Variables:
 
 ```
-DATABASE_URL=            # the Railway Postgres, private URL
+DATABASE_URL=            # the Unbind Postgres, private URL
 BETTER_AUTH_URL=https://api.lexeme.fyi
 BETTER_AUTH_SECRET=      # openssl rand -base64 32
 WEB_ORIGIN=https://lexeme.fyi
@@ -68,9 +71,10 @@ app: Better Auth handles the callback and then sends the browser back to
 `WEB_ORIGIN`, which it will only do because `WEB_ORIGIN` is in its trusted
 origins.
 
-## zero-cache → Railway
+## zero-cache → Unbind
 
-Runs `@rocicorp/zero`'s `zero-cache` against the same Postgres, and calls back
+The `rocicorp/zero` image, pinned to the same version as `@rocicorp/zero`, with
+a volume on `/data` for its replica. Runs against the same Postgres, and calls back
 into the API to authorize reads and apply writes:
 
 ```

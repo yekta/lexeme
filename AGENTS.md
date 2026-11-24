@@ -19,7 +19,7 @@ replica; there is no read API to call.
 
 ### 2- apps/server
 
-Hono on Node, deployed to Railway. Auth (Better Auth), the two Zero endpoints
+Hono on Node, deployed to Unbind. Auth (Better Auth), the two Zero endpoints
 that zero-cache calls back into, deck exports, and the model calls that need an
 API key kept off the browser. The web dev server proxies `/api` here so
 everything is one origin in development.

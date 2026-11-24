@@ -37,9 +37,9 @@ export function WordRow({ lookup, bookTitle, isCard }: { lookup: TLookup; bookTi
             {formatDistanceToNowStrict(lookup.looked_up_at, { addSuffix: true })}
           </span>
           {isCard ? (
-            <span className="size-9 -my-2 -mr-2 shrink-0" />
+            <span className="size-9 -my-2 -mr-2.5 shrink-0" />
           ) : (
-            <Button variant="ghost" className="size-9 -my-2 -mr-2" aria-label="Add as card" onClick={() => setIsAdding(true)}>
+            <Button variant="ghost" className="size-9 -my-2 -mr-2.5" aria-label="Add as card" onClick={() => setIsAdding(true)}>
               <Plus className="size-5 shrink-0 text-muted-foreground" />
             </Button>
           )}

@@ -619,7 +619,7 @@ export const operations: TOperation[] = [
     name: "get-reading-days",
     title: "Get reading days",
     description:
-      "Time read on each of the last days, oldest first, with the daily goal, the streak (consecutive days that reached the goal, up to today), all the time ever read and how many books are finished. Days are cut on the clock utc_offset_minutes ahead of UTC.",
+      "Time read on each of the last days, oldest first, with the daily goal, the streak (consecutive days that reached the goal, up to today), all the time ever read, and how many books are finished, in all and this year. Days are cut on the clock utc_offset_minutes ahead of UTC.",
     role: "viewer",
     method: "GET",
     path: "/reading/days",
@@ -641,15 +641,20 @@ export const operations: TOperation[] = [
         dayStartsAt,
       );
       const today = dayKeyAtOffset(Date.now(), input.utc_offset_minutes, dayStartsAt);
-      const [finished] = await db
-        .select({ count: sql<number>`count(*)::int` })
+      const finished = await db
+        .select({ finished_at: books.finished_at })
         .from(books)
         .where(and(eq(books.user_id, caller.userId), eq(books.status, "finished")));
+      const year = today.slice(0, 4);
+      const finishedThisYear = finished.filter(
+        (book) => book.finished_at && dayKeyAtOffset(book.finished_at.getTime(), input.utc_offset_minutes).startsWith(year),
+      ).length;
       return {
         goal: { daily_minutes: dailyMinutes, day_starts_at: dayStartsAt },
         streak: streakEndingOn(totals, today, dailyMinutes * 60),
         total_seconds: reads.reduce((sum, read) => sum + read.seconds, 0),
-        finished_books: finished?.count ?? 0,
+        finished_books: finished.length,
+        finished_this_year: finishedThisYear,
         days: daysEndingOn(totals, today, input.days),
       };
     },

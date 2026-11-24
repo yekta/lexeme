@@ -158,7 +158,7 @@ function Shell:render(bb, x, y, w, h)
     if self.tab == "library" then
         self:paintLibrary(bb, x, y, w, h)
     else
-        self:paintHome(bb, x, y, w)
+        self:paintHome(bb, x, y, w, h)
     end
     self:paintTabs(bb, x, y, w, h)
 end
@@ -495,29 +495,34 @@ end
 -- The reading below the covers lines up with the first cover's left edge, the same in from the right.
 local HOME_MARGIN = 34
 
--- Today, Total, Streak and Finished side by side. Returns the y where they end.
+-- The same six figures as Lexeme's reading page, three to a row. Returns the y where they end.
 local function paintTiles(bb, x, top, w, reading)
     local tiles = {
         { "Today", readingTime(reading.today) },
+        { "This week", readingTime(reading.week) },
         { "Total", readingTime(reading.total) },
         { "Streak", count(reading.streak, "day", "days") },
+        { "Finished in " .. reading.year, count(reading.finished_this_year, "book", "books") },
         { "Finished", count(reading.finished, "book", "books") },
     }
-    local gap, h = D.s(18), D.s(136)
+    local per_row, gap, h = 3, D.s(18), D.s(128)
     local left, right = x + D.s(HOME_MARGIN), x + w - D.s(HOME_MARGIN)
-    local function tileX(i) return left + math.floor((i - 1) * (right - left + gap) / #tiles + 0.5) end
+    -- Whole-pixel widths leave pixels over; they go between tiles so the last ends at `right`.
+    local function tileX(column) return left + math.floor(column * (right - left + gap) / per_row + 0.5) end
     for i, tile in ipairs(tiles) do
-        local tx = tileX(i)
-        local tile_w = tileX(i + 1) - gap - tx
-        D.border(bb, tx, top, tile_w, h, D.s(3), D.BLACK)
-        D.text(bb, tx + D.s(24), top + D.s(50), D.face("regular", 28), tile[1], D.BLACK, tile_w - D.s(48))
-        D.text(bb, tx + D.s(24), top + D.s(106), D.face("bold", 36), tile[2], D.BLACK, tile_w - D.s(48))
+        local column, row = (i - 1) % per_row, math.floor((i - 1) / per_row)
+        local tx, ty = tileX(column), top + row * (h + gap)
+        local tile_w = tileX(column + 1) - gap - tx
+        D.border(bb, tx, ty, tile_w, h, D.s(3), D.BLACK)
+        D.text(bb, tx + D.s(24), ty + D.s(48), D.face("regular", 28), tile[1], D.BLACK, tile_w - D.s(48))
+        D.text(bb, tx + D.s(24), ty + D.s(102), D.face("bold", 36), tile[2], D.BLACK, tile_w - D.s(48))
     end
-    return top + h
+    local rows = math.ceil(#tiles / per_row)
+    return top + rows * h + (rows - 1) * gap
 end
 
 -- The last year as a grid of days, a week to a column, like Lexeme's streak calendar.
-local function paintCalendar(bb, x, top, w, days, goal_minutes)
+local function paintCalendar(bb, x, top, w, bottom, days, goal_minutes)
     local goal, reached = goal_minutes * 60, 0
     for _, day in ipairs(days) do
         if day.seconds >= goal then reached = reached + 1 end
@@ -534,16 +539,20 @@ local function paintCalendar(bb, x, top, w, days, goal_minutes)
     for _, name in ipairs(WEEKDAYS) do label_w = math.max(label_w, D.width(small, name)) end
     local left = x + D.s(HOME_MARGIN) + label_w + D.s(14)
     local gap, right = D.s(4), x + w - D.s(HOME_MARGIN)
-    local pitch = math.floor((right - left + gap) / columns)
-    local cell = pitch - gap
+    local cell = math.floor((right - left + gap) / columns) - gap
     -- Whole-pixel cells leave pixels over; they go between columns so the grid ends where the tiles do.
     local function columnX(column)
         return left + math.floor(column * (right - left - cell) / (columns - 1) + 0.5)
     end
     local grid_top = top + D.s(90)
+    -- Days stretch down to `bottom`, so the calendar fills what Home has left.
+    local row_pitch = math.max(cell + gap, math.floor((bottom - grid_top + gap) / 7))
+    local cell_h = row_pitch - gap
 
     for row, name in ipairs(WEEKDAYS) do
-        if name ~= "" then D.text(bb, x + D.s(HOME_MARGIN), grid_top + (row - 1) * pitch + cell, small, name) end
+        if name ~= "" then
+            D.text(bb, x + D.s(HOME_MARGIN), grid_top + (row - 1) * row_pitch + math.floor(cell_h / 2) + D.s(8), small, name)
+        end
     end
     local months, last_month = {}, nil
     for i, day in ipairs(days) do
@@ -553,7 +562,7 @@ local function paintCalendar(bb, x, top, w, days, goal_minutes)
             months[column] = os.date("%b", first + (i - 1) * 86400)
             last_month = month
         end
-        D.rect(bb, columnX(column), grid_top + ((lead + i - 1) % 7) * pitch, cell, cell,
+        D.rect(bb, columnX(column), grid_top + ((lead + i - 1) % 7) * row_pitch, cell, cell_h,
             day.seconds >= goal and D.BLACK or D.gray(0xDD))
     end
     -- A month's name is left out where the next one would touch it.
@@ -564,7 +573,7 @@ local function paintCalendar(bb, x, top, w, days, goal_minutes)
     end
 end
 
-function Shell:paintHome(bb, x, y, w)
+function Shell:paintHome(bb, x, y, w, h)
     self.carousels = {}
     local recent = Books.query(self.all, nil, "recent", true)
     if #recent == 0 then
@@ -579,7 +588,9 @@ function Shell:paintHome(bb, x, y, w)
     local reading = Sync.isConnected() and Streak.summary()
     if reading then
         local tiles_bottom = paintTiles(bb, x, next_top + D.s(20), w, reading)
-        return paintCalendar(bb, x, tiles_bottom + D.s(60), w, reading.days, reading.goal_minutes)
+        -- Clear of the tab bar and the cover of the book being read, which stands above it.
+        local bottom = y + h - D.s(111) - D.s(70)
+        return paintCalendar(bb, x, tiles_bottom + D.s(56), w, bottom, reading.days, reading.goal_minutes)
     end
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)
 end

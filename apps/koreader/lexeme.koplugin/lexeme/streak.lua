@@ -43,6 +43,8 @@ function Streak.refresh()
         streak = tonumber(body.streak) or 0,
         total_seconds = tonumber(body.total_seconds) or 0,
         finished_books = tonumber(body.finished_books) or 0,
+        finished_this_year = tonumber(body.finished_this_year) or 0,
+        year = body.days[#body.days] and body.days[#body.days].day:sub(1, 4),
     })
     settings:flush()
     return true
@@ -88,8 +90,9 @@ end
 
 --[[
 What Home shows, or nil until Lexeme has sent it once: `days`, the year ending today,
-oldest first, as { day = "YYYY-MM-DD", seconds = n }; `goal_minutes`; `today` and
-`total` in seconds; `streak` in days; `finished` books.
+oldest first, as { day = "YYYY-MM-DD", seconds = n }; `goal_minutes`; `today`, `week`
+and `total` in seconds; `streak` in days; `finished` books, and `finished_this_year`
+of them in `year`.
 ]]
 function Streak.summary()
     local saved = store():readSetting("streak")
@@ -115,13 +118,20 @@ function Streak.summary()
     local streak, whole_year = streakOf(days, goal_minutes * 60)
     -- A streak longer than the year shown is Lexeme's to count.
     if whole_year then streak = math.max(streak, saved.streak or 0) end
+    local week = 0
+    for i = #days - 6, #days do week = week + days[i].seconds end
+    local year = days[#days].day:sub(1, 4)
     return {
         days = days,
         goal_minutes = goal_minutes,
         today = days[#days].seconds,
+        week = week,
         total = total,
         streak = streak,
         finished = saved.finished_books or 0,
+        -- Counted for the year it was fetched in; a new year starts at none.
+        finished_this_year = saved.year == year and saved.finished_this_year or 0,
+        year = year,
     }
 end
 

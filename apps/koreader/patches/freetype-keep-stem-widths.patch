@@ -1,7 +1,37 @@
 diff -ru a/src/autofit/aflatin.c b/src/autofit/aflatin.c
---- a/src/autofit/aflatin.c	2026-11-24 03:24:06.203244864 +0000
-+++ b/src/autofit/aflatin.c	2026-11-24 03:24:06.215244900 +0000
-@@ -3963,6 +3963,23 @@
+--- a/src/autofit/aflatin.c	2026-11-24 06:49:32
++++ b/src/autofit/aflatin.c	2026-11-24 06:58:32
+@@ -1245,6 +1245,10 @@
+ 
+         fitted = ( scaled + threshold ) & ~63;
+ 
++        /* with `keep-stem-widths', glyphs keep their height too */
++        if ( metrics->root.globals->module->keep_stem_widths )
++          fitted = scaled;
++
+         if ( scaled != fitted )
+         {
+ #if 0
+@@ -1419,11 +1423,17 @@
+ 
+           if ( delta2 < 32 )
+             delta2 = 0;
+-          else if ( delta2 < 48 )
++          else if ( delta2 < 48                                         &&
++                    !metrics->root.globals->module->keep_stem_widths )
+             delta2 = 32;
+           else
+             delta2 = 64;
+ 
++          /* with `keep-stem-widths', round shapes don't dip below */
++          /* bottom zones like the baseline                        */
++          if ( dist > 0 && metrics->root.globals->module->keep_stem_widths )
++            delta2 = 0;
++
+           if ( dist < 0 )
+             delta2 = -delta2;
+ 
+@@ -3963,6 +3973,23 @@
    /* There is a lot of voodoo in this function; changing the hard-coded  */
    /* parameters influence the whole hinting process.                     */
  
@@ -25,7 +55,7 @@ diff -ru a/src/autofit/aflatin.c b/src/autofit/aflatin.c
    static FT_Pos
    af_latin_compute_stem_width( AF_GlyphHints  hints,
                                 AF_Dimension   dim,
-@@ -3982,6 +3999,9 @@
+@@ -3982,6 +4009,9 @@
           axis->extra_light                       )
        return width;
  
@@ -35,10 +65,11 @@ diff -ru a/src/autofit/aflatin.c b/src/autofit/aflatin.c
      if ( dist < 0 )
      {
        dist = -width;
-@@ -4426,6 +4446,16 @@
+@@ -4425,6 +4455,16 @@
+ 
            edge->pos  = cur_pos1 - cur_len / 2;
            edge2->pos = edge->pos + cur_len;
-         }
++        }
 +        else if ( af_latin_keeps_stem_widths( hints, dim ) )
 +        {
 +          FT_Pos  pos1 = FT_PIX_ROUND( edge->opos );
@@ -48,13 +79,12 @@ diff -ru a/src/autofit/aflatin.c b/src/autofit/aflatin.c
 +          edge->pos = FT_ABS( pos1 - edge->opos ) <= FT_ABS( pos2 - edge->opos )
 +                        ? pos1
 +                        : pos2;
-+        }
+         }
          else
            edge->pos = FT_PIX_ROUND( edge->opos );
- 
 diff -ru a/src/autofit/afmodule.c b/src/autofit/afmodule.c
---- a/src/autofit/afmodule.c	2026-11-24 03:24:06.227244935 +0000
-+++ b/src/autofit/afmodule.c	2026-11-24 03:24:06.239244971 +0000
+--- a/src/autofit/afmodule.c	2026-11-24 06:49:32
++++ b/src/autofit/afmodule.c	2026-11-24 06:49:33
 @@ -250,6 +250,22 @@
  
        return error;
@@ -100,8 +130,8 @@ diff -ru a/src/autofit/afmodule.c b/src/autofit/afmodule.c
      module->darken_params[0]  = CFF_CONFIG_OPTION_DARKENING_PARAMETER_X1;
      module->darken_params[1]  = CFF_CONFIG_OPTION_DARKENING_PARAMETER_Y1;
 diff -ru a/src/autofit/afmodule.h b/src/autofit/afmodule.h
---- a/src/autofit/afmodule.h	2026-11-24 03:24:06.251245007 +0000
-+++ b/src/autofit/afmodule.h	2026-11-24 03:24:06.263245042 +0000
+--- a/src/autofit/afmodule.h	2026-11-24 06:49:32
++++ b/src/autofit/afmodule.h	2026-11-24 06:49:33
 @@ -39,6 +39,7 @@
      FT_UInt       fallback_style;
      AF_Script     default_script;

@@ -1,5 +1,11 @@
 import { formatDistanceToNowStrict } from "date-fns";
+import { useState } from "react";
 
+import { Plus } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { WordCardForm } from "@/components/word-card-form";
 import type { TLookup } from "@/hooks/data/use-reading";
 
 /** The word in bold inside the sentence it was read in. */
@@ -16,8 +22,9 @@ function WordInContext({ word, context }: { word: string; context?: string | nul
   );
 }
 
-/** A looked-up word in its sentence; `isCard` when the word is in a deck already. */
+/** A looked-up word in its sentence; `isCard` when the word is in a deck already, otherwise it can be added as one. */
 export function WordRow({ lookup, bookTitle, isCard }: { lookup: TLookup; bookTitle?: string; isCard?: boolean }) {
+  const [isAdding, setIsAdding] = useState(false);
   return (
     <div className="px-4 py-3 flex flex-col gap-2">
       <div className="flex flex-col gap-0.5 min-w-0">
@@ -29,6 +36,13 @@ export function WordRow({ lookup, bookTitle, isCard }: { lookup: TLookup; bookTi
           <span className="ml-auto text-xs text-muted-foreground shrink-0">
             {formatDistanceToNowStrict(lookup.looked_up_at, { addSuffix: true })}
           </span>
+          {isCard ? (
+            <span className="size-9 -my-2 -mr-2 shrink-0" />
+          ) : (
+            <Button variant="ghost" className="size-9 -my-2 -mr-2" aria-label="Add as card" onClick={() => setIsAdding(true)}>
+              <Plus className="size-5 shrink-0 text-muted-foreground" />
+            </Button>
+          )}
         </div>
         {bookTitle && <span className="text-xs text-muted-foreground truncate">{bookTitle}</span>}
       </div>
@@ -37,6 +51,9 @@ export function WordRow({ lookup, bookTitle, isCard }: { lookup: TLookup; bookTi
           <WordInContext word={lookup.word} context={lookup.context} />
         </p>
       )}
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent>{isAdding && <WordCardForm lookup={lookup} onDone={() => setIsAdding(false)} />}</DialogContent>
+      </Dialog>
     </div>
   );
 }

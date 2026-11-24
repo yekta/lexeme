@@ -12,7 +12,7 @@ export const cardRoutes = new Hono()
     const input = await parseBody(c, generateBackRequest);
     await requireDeck({ deckId: input.deckId, userId });
 
-    return c.json({ back: await generateBackForDeck({ deckId: input.deckId, front: input.front }) });
+    return c.json({ back: await generateBackForDeck(input) });
   })
   .post("/generate-card", async (c) => {
     const userId = await requireUserId(c);

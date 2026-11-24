@@ -24,15 +24,17 @@ function recentCards(deckId: string, exceptFront?: string) {
 export async function generateBackForDeck({
   deckId,
   front,
+  context,
 }: {
   deckId: string;
   front: string;
+  context?: string;
 }): Promise<string> {
   const examples = await recentCards(deckId, front);
   if (examples.length === 0) {
     throw new ApiError("PRECONDITION_FAILED", "Add at least one card before generating a back.");
   }
-  return generateBack({ front, recentCards: examples });
+  return generateBack({ front, recentCards: examples, context });
 }
 
 /** Callers must have checked the deck belongs to the user. */

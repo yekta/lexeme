@@ -463,14 +463,20 @@ export const operations: TOperation[] = [
     name: "generate-back",
     title: "Generate back",
     description:
-      "Write the back for a front, following the style of the deck's existing cards. Nothing is saved. The deck needs at least one other card.",
+      "Write the back for a front, following the style of the deck's existing cards. Nothing is saved. The deck needs at least one other card. For a word read in a book, pass the sentence as context so the back gives the sense it had there.",
     role: "editor",
     method: "POST",
     path: "/decks/:deck_id/generate-back",
-    input: z.object({ deck_id: deckId, front: cardContent.shape.front }),
+    input: z.object({
+      deck_id: deckId,
+      front: cardContent.shape.front,
+      context: z.string().trim().max(5000).optional().describe("The sentence the word was read in."),
+    }),
     run: async (caller, input) => {
       await mustFindDeck(caller.userId, input.deck_id);
-      return { back: await generateBackForDeck({ deckId: input.deck_id, front: input.front }) };
+      return {
+        back: await generateBackForDeck({ deckId: input.deck_id, front: input.front, context: input.context }),
+      };
     },
   }),
 

@@ -1,7 +1,7 @@
 import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
-import { format } from "date-fns";
+import { differenceInCalendarDays, differenceInMonths, format } from "date-fns";
 
 import { BookCover } from "@/components/book-card";
 import { HighlightItem } from "@/components/highlight-item";
@@ -111,8 +111,8 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
   const finished = book.status === "finished";
   const description = book.description ? plainText(book.description) : null;
   const facts = [
-    finished && book.finished_at && { label: "Finished", value: format(book.finished_at, "d MMM yyyy") },
-    !finished && book.last_read_at && { label: "Last read", value: format(book.last_read_at, "d MMM yyyy") },
+    finished && book.finished_at && { label: "Finished", value: formatRelativeDay(book.finished_at) },
+    !finished && book.last_read_at && { label: "Last read", value: formatRelativeDay(book.last_read_at) },
     totalSeconds > 0 && { label: "Time read", value: formatReadingTime(totalSeconds) },
     daysRead > 0 && { label: daysRead === 1 ? "Day" : "Days", value: String(daysRead) },
     book.pages && { label: "Pages", value: String(book.pages) },
@@ -158,6 +158,23 @@ function plainText(html: string) {
   const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n");
   const text = new DOMParser().parseFromString(withBreaks, "text/html").body.textContent ?? "";
   return text.replace(/\n{3,}/g, "\n\n").trim() || null;
+}
+
+const relativeDay = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+const relativeTime = new Intl.RelativeTimeFormat("en");
+
+function formatRelativeDay(date: number) {
+  const now = new Date();
+  const days = differenceInCalendarDays(now, date);
+  const months = differenceInMonths(now, date);
+  if (months >= 12) return format(date, "d MMM yyyy");
+  if (days < 7) return capitalize(relativeDay.format(-days, "day"));
+  if (days < 30) return relativeTime.format(-Math.floor(days / 7), "week");
+  return relativeTime.format(-Math.max(1, months), "month");
+}
+
+function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const RECENT_SESSIONS = 3;

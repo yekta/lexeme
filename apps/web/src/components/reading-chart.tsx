@@ -10,7 +10,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 
 const CONFIG = { seconds: { label: "Read", color: "var(--primary)" } } satisfies ChartConfig;
 
-type TBar = { key: string; tick: string; tip: string; seconds: number };
+type TBar = { key: string; tick: string; tip: ReactNode; seconds: number };
 
 /** Reading time per day; a day's bar opens that day hour by hour. */
 export function ReadingChart({ days, pageReads }: { days: TReadingDay[]; pageReads: readonly TPageRead[] }) {
@@ -44,7 +44,13 @@ function DayChart({ day, pageReads, onBack }: { day: string; pageReads: readonly
   const bars = hours.map((seconds, hour) => ({
     key: String(hour),
     tick: hourLabel(hour),
-    tip: `${hourLabel(hour)}–${hourLabel(hour + 1)}`,
+    tip: (
+      <>
+        {hourLabel(hour)}
+        <span className="text-muted-foreground">–</span>
+        {hourLabel(hour + 1)}
+      </>
+    ),
     seconds,
   }));
   return (

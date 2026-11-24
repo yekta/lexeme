@@ -232,7 +232,8 @@ export type TPairingResponse = z.infer<typeof pairingResponse>;
 // --- /api/books and /api/devices/books ---
 //
 // Send to Kindle: the web app uploads a book (multipart, field `file`), and the
-// device lists what's waiting, downloads each file and marks it delivered.
+// device lists what's waiting, downloads each file and marks it delivered. The
+// public API and MCP send books through the send-book operation.
 
 export const SENDABLE_BOOK_EXTENSIONS = ["epub", "pdf", "mobi", "azw3", "fb2", "txt", "cbz", "djvu"] as const;
 export const MAX_SENT_BOOK_BYTES = 100 * 1024 * 1024;

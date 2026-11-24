@@ -13,7 +13,7 @@ no build step between them.
 apps/
   web        Vite + React + TanStack Router. A static bundle → Cloudflare Pages.
   server     Hono on Node. Auth, the two Zero endpoints, exports, model calls
-             → Railway.
+             → Unbind.
 packages/
   db         Drizzle schema, the Postgres client, and the migrations.
   contracts  What both ends have to agree on: the Zero schema, the synced

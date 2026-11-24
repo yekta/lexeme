@@ -14,7 +14,7 @@ export { schema };
  * a Cloudflare Workers one. Workerd binds an outbound TCP socket to the request
  * that opened it and rejects any later request that reuses it, so a
  * module-scope pool eventually threw on a socket it had every right to keep.
- * The server runs on Railway now, as an ordinary long-lived Node process, where
+ * The server runs on Unbind now, as an ordinary long-lived Node process, where
  * a shared pool is simply the correct shape: connections are established once
  * rather than per request, and Postgres stops seeing a connect/disconnect for
  * every page load.

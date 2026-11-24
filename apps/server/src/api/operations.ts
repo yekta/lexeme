@@ -1,5 +1,5 @@
-import { syncReadingArgs, updateProfileArgs } from "@lexeme/contracts";
-import { books, cards, decks, highlights, learningProfiles, lookups, pageReads, reviewLogs, user } from "@lexeme/db";
+import { SENDABLE_BOOK_EXTENSIONS, syncReadingArgs, updateProfileArgs } from "@lexeme/contracts";
+import { books, cards, decks, highlights, learningProfiles, lookups, pageReads, reviewLogs, sentBooks, user } from "@lexeme/db";
 import {
   DECK_EXPORT_KIND,
   DECK_EXPORT_VERSION,
@@ -23,6 +23,7 @@ import { generateBackForDeck, generateCardForDeck } from "../ai/generate-card.ts
 import type { TCaller } from "../caller.ts";
 import { db } from "../db.ts";
 import { ApiError } from "../errors.ts";
+import { deleteSentBook, downloadBook, saveSentBook } from "../sent-books.ts";
 import { serverMutators } from "../zero.ts";
 import {
   defaultProfileId,
@@ -69,6 +70,17 @@ const cardContent = z.object({
   front: z.string().trim().min(1).describe("The prompt side of the card."),
   back: z.string().trim().min(1).describe("The answer side of the card."),
 });
+
+function presentSentBook(book: typeof sentBooks.$inferSelect) {
+  return {
+    id: book.id,
+    title: book.title,
+    file_name: book.file_name,
+    size_bytes: book.size_bytes,
+    sent_at: book.created_at.toISOString(),
+    delivered_at: book.delivered_at?.toISOString() ?? null,
+  };
+}
 
 const RATINGS: Record<"again" | "hard" | "good" | "easy", Grade> = { again: Rating.Again, hard: Rating.Hard, good: Rating.Good, easy: Rating.Easy };
 
@@ -764,6 +776,73 @@ export const operations: TOperation[] = [
         .where(and(eq(lookups.id, input.lookup_id), eq(lookups.user_id, caller.userId)));
       if (!lookup) throw new ApiError("NOT_FOUND", "That look-up doesn't exist.");
       await runMutator(caller.userId, serverMutators.reading.deleteLookup, { id: input.lookup_id });
+      return { deleted: true };
+    },
+  }),
+
+  defineOperation({
+    name: "send-book",
+    title: "Send book to Kindle",
+    description: `Send a book to the user's Kindle; it downloads the next time the Kindle syncs. Pass either \`url\`, a direct link to the file (not a web page about it) that the server downloads, or \`content_base64\` with \`file_name\` for a file you have. Prefer \`url\` for anything over a few MB. Books can be ${SENDABLE_BOOK_EXTENSIONS.join(", ")}, up to 100 MB.`,
+    role: "editor",
+    method: "POST",
+    path: "/sent-books",
+    input: z
+      .object({
+        url: z.url().optional().describe("A link to the book file."),
+        content_base64: z.string().min(1).optional().describe("The book file, base64-encoded."),
+        file_name: z
+          .string()
+          .trim()
+          .min(1)
+          .optional()
+          .describe("The file name with its extension, like dune.epub. Needed with content_base64; with url it's taken from the download when left out."),
+        title: z.string().trim().min(1).optional().describe("Defaults to the file name without its extension."),
+      })
+      .refine((input) => Boolean(input.url) !== Boolean(input.content_base64), {
+        message: "Pass either url or content_base64.",
+      })
+      .refine((input) => !input.content_base64 || input.file_name, {
+        message: "file_name is needed with content_base64.",
+        path: ["file_name"],
+      }),
+    run: async (caller, input) => {
+      const file = input.url
+        ? await downloadBook(input.url, input.file_name)
+        : { fileName: input.file_name!, bytes: Buffer.from(input.content_base64!, "base64") };
+      const book = await saveSentBook(caller.userId, file.fileName, file.bytes, input.title);
+      return { book: presentSentBook(book) };
+    },
+  }),
+
+  defineOperation({
+    name: "list-sent-books",
+    title: "List sent books",
+    description: "Books sent to the user's Kindle, newest first. delivered_at is null until the Kindle has downloaded it.",
+    role: "viewer",
+    method: "GET",
+    path: "/sent-books",
+    input: z.object({}),
+    run: async (caller) => {
+      const rows = await db
+        .select()
+        .from(sentBooks)
+        .where(eq(sentBooks.user_id, caller.userId))
+        .orderBy(desc(sentBooks.created_at));
+      return { books: rows.map(presentSentBook) };
+    },
+  }),
+
+  defineOperation({
+    name: "delete-sent-book",
+    title: "Delete sent book",
+    description: "Take back a sent book. If the Kindle already downloaded it, it stays on the Kindle.",
+    role: "admin",
+    method: "DELETE",
+    path: "/sent-books/:sent_book_id",
+    input: z.object({ sent_book_id: z.uuid().describe("The sent book's id, from list-sent-books.") }),
+    run: async (caller, input) => {
+      await deleteSentBook(caller.userId, input.sent_book_id);
       return { deleted: true };
     },
   }),

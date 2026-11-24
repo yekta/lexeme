@@ -88,7 +88,7 @@ export const auth = betterAuth({
    * `SameSite=Lax` still applies, nothing here needs `SameSite=None`.
    *
    * Unset in dev, where the web dev server proxies `/api` and there is one
-   * origin. Note that a Railway-style `*.up.railway.app` host cannot be used
+   * origin. Note that an Unbind `*.unbind.yekta.cc` host cannot be used
    * for this: those are separate sites, not subdomains of a registrable one.
    */
   ...(env.COOKIE_DOMAIN

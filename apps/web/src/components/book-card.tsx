@@ -53,7 +53,7 @@ export function BookCard({ book }: { book: TBook }) {
       />
       {finished ? (
         <span className="text-xs text-muted-foreground truncate">
-          {book.finished_at ? formatRelativeDay(book.finished_at) : "Finished"}
+          {book.finished_at ? formatRelativeDay(book.finished_at, "short") : "Finished"}
         </span>
       ) : (
         <div className="flex items-center gap-2">

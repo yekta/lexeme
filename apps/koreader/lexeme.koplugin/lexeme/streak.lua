@@ -92,7 +92,7 @@ end
 What Home shows, or nil until Lexeme has sent it once: `days`, the year ending today,
 oldest first, as { day = "YYYY-MM-DD", seconds = n }; `goal_minutes`; `today`, `week`
 and `total` in seconds; `streak` in days; `finished` books, and `finished_this_year`
-of them in `year`.
+of them this year.
 ]]
 function Streak.summary()
     local saved = store():readSetting("streak")
@@ -131,7 +131,6 @@ function Streak.summary()
         finished = saved.finished_books or 0,
         -- Counted for the year it was fetched in; a new year starts at none.
         finished_this_year = saved.year == year and saved.finished_this_year or 0,
-        year = year,
     }
 end
 

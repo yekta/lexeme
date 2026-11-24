@@ -82,7 +82,7 @@ function ReadingPage() {
             <StatTile label="This week" value={formatReadingTime(summary.weekSeconds)} />
             <StatTile label="Total" value={formatReadingTime(summary.totalSeconds)} />
             <StatTile label="Streak" value={count(summary.streak, "day", "days")} />
-            <StatTile label={`Finished (${new Date().getFullYear()})`} value={count(summary.finishedThisYear, "book", "books")} />
+            <StatTile label="Finished (This Year)" value={count(summary.finishedThisYear, "book", "books")} />
             <StatTile label="Finished (All Time)" value={count(summary.finished, "book", "books")} />
           </section>
 

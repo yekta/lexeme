@@ -69,6 +69,10 @@ serves each client its slice (`pnpm dev:zero-cache` runs it locally).
   tables in `packages/contracts/src/schema.ts`, or the table syncs as a
   permanently empty view. It is also what keeps the auth tables out of client
   replicas.
+- The public API and the MCP server offer the same things. Each operation in
+  `apps/server/src/api/operations.ts` is both a REST endpoint under
+  `/api/v1` and an MCP tool; add new capabilities there, never as a route of
+  their own.
 - Better Auth is pinned exactly because it owns database columns; bumping it is
   a schema change and moves only with a migration.
 - The FSRS optimizer needs cross-origin isolation (`SharedArrayBuffer`). Do not

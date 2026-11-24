@@ -213,6 +213,11 @@ export const syncReadingArgs = z.object({
   removed_book_keys: z.array(bookKey).max(2000).default([]),
 });
 
+/** A reading session is a book's page visits that started between `started_at` and `ended_at`. */
+export const deleteReadingSessionArgs = z
+  .object({ book_id: uuidArg, started_at: epochMs, ended_at: epochMs })
+  .refine((args) => args.ended_at >= args.started_at, "A session can't end before it starts.");
+
 // --- access ---
 //
 // The old tRPC procedures asked Postgres these questions through
@@ -523,6 +528,34 @@ export const mutatorDefs = {
         if (!id) continue;
         await tx.mutate.books.delete({ id });
       }
+    }),
+
+    deleteSession: defineMutator(deleteReadingSessionArgs, async ({ tx, ctx, args }) => {
+      const { user_id } = mustBeSignedIn(ctx);
+      const reads = await tx.run(
+        zql.page_reads
+          .where("user_id", user_id)
+          .where("book_id", args.book_id)
+          .where("started_at", ">=", args.started_at)
+          .where("started_at", "<=", args.ended_at),
+      );
+      for (const read of reads) await tx.mutate.page_reads.delete({ id: read.id });
+    }),
+
+    deleteHighlight: defineMutator(idArgs, async ({ tx, ctx, args }) => {
+      const { user_id } = mustBeSignedIn(ctx);
+      const highlight = await tx.run(zql.highlights.where("id", args.id).one());
+      if (!highlight) throw new Error("That highlight no longer exists.");
+      if (highlight.user_id !== user_id) throw new Error("You don't have access to that highlight.");
+      await tx.mutate.highlights.delete({ id: args.id });
+    }),
+
+    deleteLookup: defineMutator(idArgs, async ({ tx, ctx, args }) => {
+      const { user_id } = mustBeSignedIn(ctx);
+      const lookup = await tx.run(zql.lookups.where("id", args.id).one());
+      if (!lookup) throw new Error("That look-up no longer exists.");
+      if (lookup.user_id !== user_id) throw new Error("You don't have access to that look-up.");
+      await tx.mutate.lookups.delete({ id: args.id });
     }),
   },
 

@@ -1,5 +1,5 @@
 import { syncReadingArgs, updateProfileArgs } from "@lexeme/contracts";
-import { cards, decks, learningProfiles, lookups, reviewLogs, user } from "@lexeme/db";
+import { books, cards, decks, highlights, learningProfiles, lookups, pageReads, reviewLogs, user } from "@lexeme/db";
 import {
   DECK_EXPORT_KIND,
   DECK_EXPORT_VERSION,
@@ -9,12 +9,13 @@ import {
   createUserScheduler,
   dbRowToFSRSCard,
   fsrsCardToDbRow,
+  readingSessions,
   reviewLogToDbRow,
   type DeckExport,
   type Grade,
   type TAccessRole,
 } from "@lexeme/shared";
-import { and, asc, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { generateBack } from "../ai/generate-back.ts";
@@ -60,6 +61,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const deckId = z.uuid().describe("The deck's id.");
 const cardId = z.uuid().describe("The card's id.");
 const profileId = z.uuid().describe("The learning profile's id.");
+const bookId = z.uuid().describe("The book's id, from list-books.");
+const isoTime = z.iso.datetime({ offset: true });
+const STILL_ON_DEVICE =
+  "If it's still on the e-reader, the e-reader sends it again when it next syncs reading it, so delete it there too.";
 const cardContent = z.object({
   front: z.string().trim().min(1).describe("The prompt side of the card."),
   back: z.string().trim().min(1).describe("The answer side of the card."),
@@ -525,6 +530,238 @@ export const operations: TOperation[] = [
         lookups: input.lookups.length,
         removed_books: input.removed_book_keys.length,
       };
+    },
+  }),
+
+  defineOperation({
+    name: "list-books",
+    title: "List books",
+    description: "Books from the user's e-readers, most recently read first.",
+    role: "viewer",
+    method: "GET",
+    path: "/books",
+    input: z.object({}),
+    run: async (caller) => {
+      const rows = await db
+        .select()
+        .from(books)
+        .where(eq(books.user_id, caller.userId))
+        .orderBy(sql`${books.last_read_at} desc nulls last`, asc(books.title));
+      return {
+        books: rows.map((book) => ({
+          id: book.id,
+          title: book.title,
+          authors: book.authors,
+          status: book.status,
+          progress: book.progress,
+          pages: book.pages,
+          last_read_at: book.last_read_at?.toISOString() ?? null,
+          finished_at: book.finished_at?.toISOString() ?? null,
+        })),
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "list-reading-sessions",
+    title: "List reading sessions",
+    description:
+      "Reading sessions, newest first: one book's page turns with no pause longer than ten minutes. Pass a session's book_id, started_at and ended_at to delete-reading-session to delete it.",
+    role: "viewer",
+    method: "GET",
+    path: "/reading/sessions",
+    input: z.object({
+      book_id: bookId.optional(),
+      from: isoTime.optional().describe("Only sessions that started at or after this time."),
+      to: isoTime.optional().describe("Only sessions that started before this time."),
+      limit: z.coerce.number().int().min(1).max(500).default(50),
+    }),
+    run: async (caller, input) => {
+      const reads = await db
+        .select({
+          book_id: pageReads.book_id,
+          page: pageReads.page,
+          started_at: pageReads.started_at,
+          seconds: pageReads.seconds,
+        })
+        .from(pageReads)
+        .where(
+          and(
+            eq(pageReads.user_id, caller.userId),
+            input.book_id ? eq(pageReads.book_id, input.book_id) : undefined,
+          ),
+        );
+      const from = input.from ? Date.parse(input.from) : -Infinity;
+      const to = input.to ? Date.parse(input.to) : Infinity;
+      const sessions = readingSessions(reads.map((read) => ({ ...read, started_at: read.started_at.getTime() })))
+        .filter((session) => session.started_at >= from && session.started_at < to)
+        .slice(0, input.limit);
+      const titles = new Map(
+        (await db.select({ id: books.id, title: books.title }).from(books).where(eq(books.user_id, caller.userId)))
+          .map((book) => [book.id, book.title]),
+      );
+      return {
+        sessions: sessions.map((session) => ({
+          book_id: session.book_id,
+          book_title: titles.get(session.book_id) ?? null,
+          started_at: new Date(session.started_at).toISOString(),
+          ended_at: new Date(session.ended_at).toISOString(),
+          seconds: session.seconds,
+          pages: session.pages,
+        })),
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "delete-reading-session",
+    title: "Delete reading session",
+    description: `Delete a reading session from list-reading-sessions: the book's page visits that started between started_at and ended_at. ${STILL_ON_DEVICE}`,
+    role: "admin",
+    method: "DELETE",
+    path: "/reading/sessions",
+    input: z.object({ book_id: bookId, started_at: isoTime, ended_at: isoTime }),
+    run: async (caller, input) => {
+      const started_at = Date.parse(input.started_at);
+      const ended_at = Date.parse(input.ended_at);
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(pageReads)
+        .where(
+          and(
+            eq(pageReads.user_id, caller.userId),
+            eq(pageReads.book_id, input.book_id),
+            gte(pageReads.started_at, new Date(started_at)),
+            lte(pageReads.started_at, new Date(ended_at)),
+          ),
+        );
+      if (count === 0) throw new ApiError("NOT_FOUND", "There's no reading in that book at that time.");
+      await runMutator(caller.userId, serverMutators.reading.deleteSession, {
+        book_id: input.book_id,
+        started_at,
+        ended_at,
+      });
+      return { deleted_page_reads: count };
+    },
+  }),
+
+  defineOperation({
+    name: "list-highlights",
+    title: "List highlights",
+    description: "Highlights and bookmarks made on the user's e-readers, newest first.",
+    role: "viewer",
+    method: "GET",
+    path: "/highlights",
+    input: z.object({
+      book_id: bookId.optional(),
+      limit: z.coerce.number().int().min(1).max(500).default(100),
+      offset: z.coerce.number().int().min(0).default(0),
+    }),
+    run: async (caller, input) => {
+      const rows = await db
+        .select()
+        .from(highlights)
+        .where(
+          and(
+            eq(highlights.user_id, caller.userId),
+            input.book_id ? eq(highlights.book_id, input.book_id) : undefined,
+          ),
+        )
+        .orderBy(desc(highlights.highlighted_at), desc(highlights.id))
+        .limit(input.limit + 1)
+        .offset(input.offset);
+      return {
+        highlights: rows.slice(0, input.limit).map((highlight) => ({
+          id: highlight.id,
+          book_id: highlight.book_id,
+          kind: highlight.kind,
+          text: highlight.text,
+          note: highlight.note,
+          chapter: highlight.chapter,
+          page: highlight.page,
+          highlighted_at: highlight.highlighted_at.toISOString(),
+        })),
+        has_more: rows.length > input.limit,
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "delete-highlight",
+    title: "Delete highlight",
+    description: `Delete a highlight or bookmark. ${STILL_ON_DEVICE}`,
+    role: "admin",
+    method: "DELETE",
+    path: "/highlights/:highlight_id",
+    input: z.object({ highlight_id: z.uuid().describe("The highlight's id.") }),
+    run: async (caller, input) => {
+      const [highlight] = await db
+        .select({ id: highlights.id })
+        .from(highlights)
+        .where(and(eq(highlights.id, input.highlight_id), eq(highlights.user_id, caller.userId)));
+      if (!highlight) throw new ApiError("NOT_FOUND", "That highlight doesn't exist.");
+      await runMutator(caller.userId, serverMutators.reading.deleteHighlight, { id: input.highlight_id });
+      return { deleted: true };
+    },
+  }),
+
+  defineOperation({
+    name: "list-lookups",
+    title: "List looked-up words",
+    description: "Words the user looked up while reading, newest first.",
+    role: "viewer",
+    method: "GET",
+    path: "/lookups",
+    input: z.object({
+      book_id: bookId.optional(),
+      search: z.string().trim().min(1).optional().describe("Case-insensitive text to look for in the word."),
+      limit: z.coerce.number().int().min(1).max(500).default(100),
+      offset: z.coerce.number().int().min(0).default(0),
+    }),
+    run: async (caller, input) => {
+      const pattern = input.search && `%${input.search.replace(/[\\%_]/g, "\\$&")}%`;
+      const rows = await db
+        .select()
+        .from(lookups)
+        .where(
+          and(
+            eq(lookups.user_id, caller.userId),
+            input.book_id ? eq(lookups.book_id, input.book_id) : undefined,
+            pattern ? ilike(lookups.word, pattern) : undefined,
+          ),
+        )
+        .orderBy(desc(lookups.looked_up_at), desc(lookups.id))
+        .limit(input.limit + 1)
+        .offset(input.offset);
+      return {
+        lookups: rows.slice(0, input.limit).map((lookup) => ({
+          id: lookup.id,
+          book_id: lookup.book_id,
+          word: lookup.word,
+          context: lookup.context,
+          looked_up_at: lookup.looked_up_at.toISOString(),
+        })),
+        has_more: rows.length > input.limit,
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "delete-lookup",
+    title: "Delete looked-up word",
+    description: `Delete a looked-up word. Cards made from it stay. ${STILL_ON_DEVICE}`,
+    role: "admin",
+    method: "DELETE",
+    path: "/lookups/:lookup_id",
+    input: z.object({ lookup_id: z.uuid().describe("The look-up's id.") }),
+    run: async (caller, input) => {
+      const [lookup] = await db
+        .select({ id: lookups.id })
+        .from(lookups)
+        .where(and(eq(lookups.id, input.lookup_id), eq(lookups.user_id, caller.userId)));
+      if (!lookup) throw new ApiError("NOT_FOUND", "That look-up doesn't exist.");
+      await runMutator(caller.userId, serverMutators.reading.deleteLookup, { id: input.lookup_id });
+      return { deleted: true };
     },
   }),
 

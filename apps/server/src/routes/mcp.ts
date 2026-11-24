@@ -17,6 +17,8 @@ Ids come from list-decks, list-cards and list-learning-profiles. Before adding c
 
 To quiz the user, call get-study-queue, show one card's front, wait for their answer, show the back, then record how it went with review-card. Rate honestly: again when they forgot, hard when it was a struggle, good when they recalled it, easy when it was effortless.
 
+Reading data comes from the user's e-readers: list-books, list-reading-sessions, list-highlights and list-lookups. Deleting it here doesn't delete it from the e-reader.
+
 Everything you change appears in the user's Lexeme apps right away.`;
 
 function annotations(op: TOperation) {

@@ -36,6 +36,18 @@ G_reader_settings:saveSetting("vocabulary_builder", { enabled = true, with_conte
 local plugins_disabled = G_reader_settings:readSetting("plugins_disabled") or {}
 plugins_disabled.externalkeyboard = true
 G_reader_settings:saveSetting("plugins_disabled", plugins_disabled)
+-- The Kindle's FreeType never kerns, and errors when asked before a font has drawn a glyph,
+-- which KOReader's text drawing treats as fatal. Its UI text isn't kerned anyway.
+local RenderText = require("ui/rendertext")
+local KERNING_ARGUMENT = { getSubTextByWidth = 4, sizeUtf8Text = 5, renderUtf8Text = 6 }
+for name, position in pairs(KERNING_ARGUMENT) do
+    local draw = RenderText[name]
+    RenderText[name] = function(self, ...)
+        local args = { n = select("#", ...), ... }
+        args[position] = false
+        return draw(self, unpack(args, 1, math.max(args.n, position)))
+    end
+end
 
 local Lexeme = WidgetContainer:extend{
     name = "lexeme",

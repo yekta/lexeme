@@ -79,7 +79,7 @@ function SendPage() {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         className={cn(
-          "rounded-xl border-2 border-dashed px-6 py-10 flex flex-col items-center gap-2 text-center outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+          "rounded-xl border-2 border-dashed px-6 py-16 flex flex-col items-center gap-2 text-center outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           dragging ? "border-primary bg-accent" : "hover:bg-accent/50 active:bg-accent/50",
         )}
       >
@@ -109,7 +109,7 @@ function SendPage() {
         <LoadError error={sent.error} onRetry={sent.refetch} />
       ) : (
         <section className="flex flex-col gap-3">
-          <SectionTitle title="Sent books" count={sent.books.length} />
+          <SectionTitle title="Sent Books" count={sent.books.length} />
           {!sent.isPending && (
             <div className="rounded-xl border divide-y">
               {sent.books.length === 0 ? (

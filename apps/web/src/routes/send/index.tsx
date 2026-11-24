@@ -1,10 +1,11 @@
 import { MAX_SENT_BOOK_BYTES, SENDABLE_BOOK_EXTENSIONS } from "@lexeme/contracts";
 import { createFileRoute } from "@tanstack/react-router";
 import { formatDistanceToNowStrict } from "date-fns";
-import { BookUpIcon, CheckIcon, LoaderCircleIcon, Trash2Icon } from "lucide-react";
+import { BookUpIcon, CheckIcon, LoaderCircleIcon } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 
+import { RevokeButton } from "@/components/access/revoke-button";
 import { Dot } from "@/components/dot";
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
@@ -12,7 +13,6 @@ import { Page } from "@/components/page";
 import { RequireIdentity } from "@/components/require-identity";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
-import { Button } from "@/components/ui/button";
 import { useSendBook, useSentBooks, useUnsendBook, type TSentBook } from "@/hooks/data/use-sent-books";
 import { cn } from "@/lib/utils";
 
@@ -119,10 +119,7 @@ function SendPage() {
                   <SentBookRow
                     key={book.id}
                     book={book}
-                    removing={unsend.isPending && unsend.variables === book.id}
-                    onRemove={() =>
-                      unsend.mutate(book.id, { onError: (error) => toast.error(error.message) })
-                    }
+                    onRemove={() => unsend.mutateAsync(book.id)}
                   />
                 ))
               )}
@@ -148,7 +145,7 @@ function NothingSentRow() {
   );
 }
 
-function SentBookRow({ book, removing, onRemove }: { book: TSentBook; removing: boolean; onRemove: () => void }) {
+function SentBookRow({ book, onRemove }: { book: TSentBook; onRemove: () => Promise<unknown> }) {
   const delivered = book.delivered_at != null;
   return (
     <div className="flex items-center gap-3 px-4 py-3">
@@ -167,9 +164,16 @@ function SentBookRow({ book, removing, onRemove }: { book: TSentBook; removing: 
         {delivered && <CheckIcon className="size-3.5" />}
         {delivered ? "On your Kindle" : "Waiting for your Kindle"}
       </span>
-      <Button variant="ghost" size="icon" aria-label={`Remove ${book.title}`} disabled={removing} onClick={onRemove}>
-        <Trash2Icon className="size-4" />
-      </Button>
+      <RevokeButton
+        title="Remove sent book"
+        description={
+          delivered
+            ? `"${book.title}" leaves this list. It stays on your Kindle.`
+            : `Your Kindle won't download "${book.title}".`
+        }
+        actionLabel="Remove"
+        onRevoke={onRemove}
+      />
     </div>
   );
 }

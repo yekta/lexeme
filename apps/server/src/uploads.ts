@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type TUploadKind = "book-upload" | "reading-upload";
+export type TUploadKind = "book-upload" | "reading-import";
 
 function signature(kind: TUploadKind, payload: string, secret: string) {
   return createHmac("sha256", secret).update(`${kind}:${payload}`).digest("base64url");

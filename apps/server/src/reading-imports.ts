@@ -11,30 +11,30 @@ import { readUpload, signUpload } from "./uploads.ts";
 import { ISSUER } from "./urls.ts";
 import { serverMutators } from "./zero.ts";
 
-type TReadingUpload = { userId: string; id: string; expiresAt: number };
+type TReadingImport = { userId: string; id: string; expiresAt: number };
 
-const MAX_READING_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_READING_IMPORT_BYTES = 50 * 1024 * 1024;
 
-const storageKey = (userId: string, id: string) => `reading-uploads/${userId}/${id}.json`;
+const storageKey = (userId: string, id: string) => `reading-imports/${userId}/${id}.json`;
 
 /** A link to put a sync-reading file straight into storage, and one that applies it once it's there. */
-export async function startReadingUpload(userId: string) {
+export async function startReadingImport(userId: string) {
   const id = randomUUID();
-  const token = signUpload("reading-upload", { userId, id, expiresAt: Date.now() + FINISH_LINK_MS }, env.BETTER_AUTH_SECRET);
+  const token = signUpload("reading-import", { userId, id, expiresAt: Date.now() + FINISH_LINK_MS }, env.BETTER_AUTH_SECRET);
   return {
     uploadUrl: await uploadUrl(storageKey(userId, id), UPLOAD_LINK_SECONDS),
-    finishUrl: `${ISSUER}/api/reading-uploads/${token}`,
+    finishUrl: `${ISSUER}/api/reading-imports/${token}`,
     expiresAt: new Date(Date.now() + UPLOAD_LINK_SECONDS * 1000),
   };
 }
 
-export async function finishReadingUpload(token: string) {
-  const upload = readUpload<TReadingUpload>("reading-upload", token, env.BETTER_AUTH_SECRET);
-  if (!upload) throw new ApiError("UNAUTHORIZED", "This upload link isn't valid or has expired; call upload-reading again.");
+export async function finishReadingImport(token: string) {
+  const upload = readUpload<TReadingImport>("reading-import", token, env.BETTER_AUTH_SECRET);
+  if (!upload) throw new ApiError("UNAUTHORIZED", "This upload link isn't valid or has expired; call import-reading again.");
   const key = storageKey(upload.userId, upload.id);
   const size = await objectSize(key);
   if (size === undefined) throw new ApiError("BAD_REQUEST", "The file isn't uploaded yet; run the whole command.");
-  if (size > MAX_READING_UPLOAD_BYTES) {
+  if (size > MAX_READING_IMPORT_BYTES) {
     await deleteObject(key);
     throw new ApiError("BAD_REQUEST", "Reading files can be up to 50 MB.");
   }

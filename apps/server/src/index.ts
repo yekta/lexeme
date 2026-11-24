@@ -18,7 +18,7 @@ import { bookRoutes, bookUploadRoutes, deviceBookRoutes } from "./routes/books.t
 import { deviceRoutes } from "./routes/devices.ts";
 import { mcpRoutes } from "./routes/mcp.ts";
 import { oauthRoutes } from "./routes/oauth.ts";
-import { readingUploadRoutes } from "./routes/reading-uploads.ts";
+import { readingImportRoutes } from "./routes/reading-imports.ts";
 import { oauthConsentRoutes } from "./routes/oauth-consent.ts";
 import { v1Routes } from "./routes/v1.ts";
 import { zeroRoutes } from "./routes/zero.ts";
@@ -85,7 +85,7 @@ app.route("/api/devices/books", deviceBookRoutes);
 app.route("/api/devices", deviceRoutes);
 app.route("/api/books", bookRoutes);
 app.route("/api/book-uploads", bookUploadRoutes);
-app.route("/api/reading-uploads", readingUploadRoutes);
+app.route("/api/reading-imports", readingImportRoutes);
 app.route("/api/cards", cardRoutes);
 app.route("/api/avatar", avatarRoutes);
 app.route("/api/api-keys", apiKeyRoutes);

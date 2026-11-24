@@ -1,6 +1,6 @@
 // Brings a Kindle's reading history from Amazon's "Request your data" export
 // into Lexeme as imported page visits. It writes sync-reading's input to
-// <out.json>, for upload-reading to apply. Amazon keeps no page numbers, so
+// <out.json>, for import-reading to apply. Amazon keeps no page numbers, so
 // pages are estimated from each book's page count. Every row has a stable id,
 // so applying the same file twice changes nothing.
 //

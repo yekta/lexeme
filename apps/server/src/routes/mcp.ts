@@ -17,7 +17,7 @@ Ids come from list-decks, list-cards and list-learning-profiles. Before adding c
 
 To quiz the user, call get-study-queue, show one card's front, wait for their answer, show the back, then record how it went with review-card. Rate honestly: again when they forgot, hard when it was a struggle, good when they recalled it, easy when it was effortless.
 
-Reading data comes from the user's e-readers: list-books, list-reading-sessions, list-highlights and list-lookups. Deleting it here doesn't delete it from the e-reader. To bring in reading data too big for one call, like a reader's whole history, write sync-reading's input to a JSON file and use upload-reading.
+Reading data comes from the user's e-readers: list-books, list-reading-sessions, list-highlights and list-lookups. Deleting it here doesn't delete it from the e-reader. To bring in reading data too big for one call, like a reader's whole history, write sync-reading's input to a JSON file and use import-reading.
 
 To send a book to the user's Kindle: for a file on disk, call upload-book and run the command it returns on the machine that has the file; for a book at a public link, call send-book with url. Don't base64 a file into send-book unless it's a few KB. Kindles open epub, pdf, mobi, azw3, fb2, txt, cbz and djvu, up to 100 MB. The book arrives when the Kindle next syncs; list-sent-books shows delivered_at once it has, and delete-sent-book takes one back.
 

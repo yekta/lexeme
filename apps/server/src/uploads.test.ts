@@ -20,7 +20,7 @@ describe("upload tokens", () => {
     const forged = `${Buffer.from(JSON.stringify({ ...upload, userId: "user-2" })).toString("base64url")}.${sig}`;
     assert.equal(readUpload("book-upload", forged, SECRET, 1_000), undefined);
     assert.equal(readUpload("book-upload", token, "b".repeat(32), 1_000), undefined);
-    assert.equal(readUpload("reading-upload", token, SECRET, 1_000), undefined);
+    assert.equal(readUpload("reading-import", token, SECRET, 1_000), undefined);
     assert.equal(readUpload("book-upload", "not-a-token", SECRET, 1_000), undefined);
   });
 });

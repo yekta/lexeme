@@ -1,0 +1,112 @@
+diff -ru a/src/autofit/aflatin.c b/src/autofit/aflatin.c
+--- a/src/autofit/aflatin.c	2026-11-24 03:24:06.203244864 +0000
++++ b/src/autofit/aflatin.c	2026-11-24 03:24:06.215244900 +0000
+@@ -3963,6 +3963,23 @@
+   /* There is a lot of voodoo in this function; changing the hard-coded  */
+   /* parameters influence the whole hinting process.                     */
+ 
++  /* With the `keep-stem-widths' property, anti-aliased stems keep  */
++  /* their unhinted width and only get moved so that the edge closer */
++  /* to the pixel grid lands on it.                                  */
++  static FT_Bool
++  af_latin_keeps_stem_widths( AF_GlyphHints  hints,
++                              AF_Dimension   dim )
++  {
++    if ( !hints->metrics->globals->module->keep_stem_widths )
++      return FALSE;
++
++    if ( dim == AF_DIMENSION_VERT )
++      return !AF_LATIN_HINTS_DO_VERT_SNAP( hints );
++
++    return !AF_LATIN_HINTS_DO_HORZ_SNAP( hints );
++  }
++
++
+   static FT_Pos
+   af_latin_compute_stem_width( AF_GlyphHints  hints,
+                                AF_Dimension   dim,
+@@ -3982,6 +3999,9 @@
+          axis->extra_light                       )
+       return width;
+ 
++    if ( af_latin_keeps_stem_widths( hints, dim ) )
++      return width;
++
+     if ( dist < 0 )
+     {
+       dist = -width;
+@@ -4426,6 +4446,16 @@
+           edge->pos  = cur_pos1 - cur_len / 2;
+           edge2->pos = edge->pos + cur_len;
+         }
++        else if ( af_latin_keeps_stem_widths( hints, dim ) )
++        {
++          FT_Pos  pos1 = FT_PIX_ROUND( edge->opos );
++          FT_Pos  pos2 = FT_PIX_ROUND( edge->opos + cur_len ) - cur_len;
++
++
++          edge->pos = FT_ABS( pos1 - edge->opos ) <= FT_ABS( pos2 - edge->opos )
++                        ? pos1
++                        : pos2;
++        }
+         else
+           edge->pos = FT_PIX_ROUND( edge->opos );
+ 
+diff -ru a/src/autofit/afmodule.c b/src/autofit/afmodule.c
+--- a/src/autofit/afmodule.c	2026-11-24 03:24:06.227244935 +0000
++++ b/src/autofit/afmodule.c	2026-11-24 03:24:06.239244971 +0000
+@@ -250,6 +250,22 @@
+ 
+       return error;
+     }
++    else if ( !ft_strcmp( property_name, "keep-stem-widths" ) )
++    {
++#ifdef FT_CONFIG_OPTION_ENVIRONMENT_PROPERTIES
++      if ( value_is_string )
++      {
++        const char*  s = (const char*)value;
++
++
++        module->keep_stem_widths = ft_strtol( s, NULL, 10 ) ? TRUE : FALSE;
++      }
++      else
++#endif
++        module->keep_stem_widths = *(FT_Bool*)value;
++
++      return error;
++    }
+     else if ( !ft_strcmp( property_name, "no-stem-darkening" ) )
+     {
+ #ifdef FT_CONFIG_OPTION_ENVIRONMENT_PROPERTIES
+@@ -352,6 +368,12 @@
+ 
+       return error;
+     }
++    else if ( !ft_strcmp( property_name, "keep-stem-widths" ) )
++    {
++      *(FT_Bool*)value = module->keep_stem_widths;
++
++      return error;
++    }
+     else if ( !ft_strcmp( property_name, "no-stem-darkening" ) )
+     {
+       FT_Bool   no_stem_darkening = module->no_stem_darkening;
+@@ -402,6 +424,7 @@
+     module->fallback_style    = AF_STYLE_FALLBACK;
+     module->default_script    = AF_SCRIPT_DEFAULT;
+     module->no_stem_darkening = TRUE;
++    module->keep_stem_widths  = FALSE;
+ 
+     module->darken_params[0]  = CFF_CONFIG_OPTION_DARKENING_PARAMETER_X1;
+     module->darken_params[1]  = CFF_CONFIG_OPTION_DARKENING_PARAMETER_Y1;
+diff -ru a/src/autofit/afmodule.h b/src/autofit/afmodule.h
+--- a/src/autofit/afmodule.h	2026-11-24 03:24:06.251245007 +0000
++++ b/src/autofit/afmodule.h	2026-11-24 03:24:06.263245042 +0000
+@@ -39,6 +39,7 @@
+     FT_UInt       fallback_style;
+     AF_Script     default_script;
+     FT_Bool       no_stem_darkening;
++    FT_Bool       keep_stem_widths;
+     FT_Int        darken_params[8];
+ 
+ #if defined( FT_CONFIG_OPTION_USE_HARFBUZZ )         && \

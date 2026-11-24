@@ -22,6 +22,19 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a
   Paperwhite).
 
+### Text rendering
+
+Amazon's reader moves each stem of a letter onto the pixel grid without
+changing its width, which is why its text looks crisper. KOReader can't do
+that, so `patches/` adds it to crengine (hinting mode 3) and to FreeType's
+autohinter (the `keep-stem-widths` property). `scripts/build-engine.sh`
+builds both libraries for the KOReader version on the Kindle with Docker
+(it needs to run `linux/amd64` images; on Apple silicon use a Rosetta VM,
+e.g. `colima start --vm-type vz --vz-rosetta`), and `deploy.sh` installs
+them when they match that version. A KOReader update replaces them; build
+again for the new version. Without them, text falls back to KOReader's own
+hinting.
+
 ### Rules that keep the Kindle alive
 
 - Touches must look like a finger: tracking id 0, a growing

@@ -50,11 +50,10 @@ Layout.MARGINS = { 82, 164, 246 }
 -- The text box's top and bottom: the first baseline lands at 106 px and 27 lines fit, as on the Kindle.
 Layout.TOP_MARGIN = 66
 Layout.BOTTOM_MARGIN = 70
+-- Hinting 3 is our crengine's: stems keep their width and move onto the pixel grid, as in
+-- Amazon's reader (patches/, built by scripts/build-engine.sh). Gamma 15 is neutral.
+local FONT_HINTING, FONT_GAMMA = 3, 15
 -- crengine won't draw a font bigger than this, so bigger sizes are scaled up in CSS.
--- Measured against Amazon's reader on the same page. A higher contrast matches its
--- edges but adds ink; thinning the text to make up for it narrows the letters, so
--- lines break somewhere else than on the Kindle.
-local FONT_HINTING, FONT_GAMMA = 1, 22
 local MAX_ENGINE_SIZE = 72
 
 local DEFAULTS = {

@@ -31,6 +31,11 @@ G_reader_settings:saveSetting("document_metadata_folder", "dir")
 G_reader_settings:saveSetting("cre_partial_rerendering", false)
 -- Vocabulary Builder keeps the sentence each looked-up word was read in, which Lexeme shows.
 G_reader_settings:saveSetting("vocabulary_builder", { enabled = true, with_context = true })
+-- A Kindle can't take a keyboard; KOReader's External Keyboard plugin mistakes one of its input
+-- devices for one, says "Keyboard connected" and switches KOReader to keyboard input.
+local plugins_disabled = G_reader_settings:readSetting("plugins_disabled") or {}
+plugins_disabled.externalkeyboard = true
+G_reader_settings:saveSetting("plugins_disabled", plugins_disabled)
 
 local Lexeme = WidgetContainer:extend{
     name = "lexeme",

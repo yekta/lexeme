@@ -20,13 +20,16 @@ function weekColumns(days: readonly TReadingDay[], goalSeconds: number) {
   return weeks;
 }
 
-/** A month's short name over the first week it starts in. */
-function monthLabel(week: (TCell | null)[], previous: (TCell | null)[] | undefined) {
-  const day = week.find((cell) => cell !== null);
-  if (!day) return "";
-  const month = format(parseISO(day.day), "MMM");
-  const before = previous?.find((cell) => cell !== null);
-  return before && format(parseISO(before.day), "MMM") === month ? "" : month;
+const LABEL_COLUMNS = 3;
+
+/** Each month's short name over the first week it starts in, left out where the next month's would touch it. */
+function monthLabels(weeks: (TCell | null)[][]) {
+  const months = weeks.map((week) => {
+    const day = week.find((cell) => cell !== null);
+    return day ? format(parseISO(day.day), "MMM") : "";
+  });
+  const labels = months.map((month, i) => (month !== months[i - 1] ? month : ""));
+  return labels.map((label, i) => (labels.slice(i + 1, i + LABEL_COLUMNS).some(Boolean) ? "" : label));
 }
 
 /** The last year as a GitHub-style grid: a day is filled once it reached the goal. */
@@ -40,6 +43,7 @@ export function StreakCalendar({
   isPlaceholder?: boolean;
 }) {
   const weeks = useMemo(() => weekColumns(days, goalMinutes * 60), [days, goalMinutes]);
+  const labels = useMemo(() => monthLabels(weeks), [weeks]);
   const reached = weeks.flat().filter((cell) => cell?.reached).length;
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -52,7 +56,7 @@ export function StreakCalendar({
     <div className="rounded-xl border bg-card px-4 py-3.5 flex flex-col gap-2">
       <div className="h-4 mb-1 flex items-start text-xs text-muted-foreground">
         <span className="group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-          {reached} {reached === 1 ? "day" : "days"} of {goalMinutes} min or more in the last year
+          {reached} {reached === 1 ? "day" : "days"} of {goalMinutes} min+
         </span>
       </div>
       <div ref={scroller} className="overflow-x-auto -mx-4 px-4 pb-1">
@@ -60,7 +64,7 @@ export function StreakCalendar({
           {weeks.map((week, i) => (
             <div key={i} className="flex flex-col gap-0.75">
               <span className="h-4 text-[10px] leading-none text-muted-foreground whitespace-nowrap overflow-visible group-data-placeholder:text-transparent">
-                {monthLabel(week, weeks[i - 1])}
+                {labels[i]}
               </span>
               {Array.from({ length: 7 }, (_, d) => {
                 const cell = week[d];

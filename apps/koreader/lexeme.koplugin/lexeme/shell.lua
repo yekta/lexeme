@@ -41,6 +41,7 @@ function Shell:init()
 end
 
 function Shell:reload()
+    self.carousel_first, self.carousel_h = {}, {}
     self.all = Books.scan()
     self:query()
     Books.extractMissing(self.all, function()
@@ -392,11 +393,29 @@ function Shell:openQuick()
     Quick:new{ open_settings = self.open_settings }:show()
 end
 
+-- Swiped left or right on a row of covers: the next or previous screenful, as on the Kindle.
+function Shell:scrollCarousel(direction, y)
+    if direction ~= "west" and direction ~= "east" then return end
+    for _, row in ipairs(self.carousels or {}) do
+        if y >= row.top and y <= row.bottom then
+            local first = self.carousel_first[row.title] or 1
+            local last_first = math.max(1, row.count - row.step + 1)
+            local moved = direction == "west" and math.min(first + row.step, last_first) or math.max(1, first - row.step)
+            if moved ~= first then
+                self.carousel_first[row.title] = moved
+                self:refresh()
+            end
+            return true
+        end
+    end
+end
+
 function Shell:onSwipe(direction, ges)
     if direction == "south" and ges.pos.y < D.s(200) then
         self:openQuick()
         return true
     end
+    if self.tab == "home" then return self:scrollCarousel(direction, ges.pos.y) end
     if self.tab ~= "library" then return end
     if direction == "north" or direction == "west" then
         self:turnPage(1, self:pageCount())
@@ -414,26 +433,35 @@ end
 -- Home ------------------------------------------------------------------------
 
 -- A titled row of covers. As on the Kindle, covers share a bottom edge and the
--- row is as tall as its tallest cover. Returns the y where the row ends.
+-- row is as tall as its tallest cover, and it scrolls sideways when swiped.
+-- Returns the y where the row ends.
 local function paintCarousel(self, bb, x, top, w, title, books, on_more)
+    local first = math.min(self.carousel_first[title] or 1, math.max(1, #books))
     D.text(bb, x + D.s(57), top + D.s(58), D.face("display", 55), title)
     if on_more then
         D.icon(bb, "chevron-right-thin", x + D.s(1105), top - D.s(7), D.s(80), D.s(80))
         self:hit(x, top - D.s(30), w, D.s(110), on_more)
     end
     local cell_w, max_h = D.s(287), D.s(480)
-    local visible = {}
-    for i, book in ipairs(books) do
-        local cx = x + D.s(36) + (i - 1) * D.s(316)
+    local visible, whole = {}, 0
+    for i = first, #books do
+        local cx = x + D.s(36) + (i - first) * D.s(316)
         if cx > x + w - D.s(116) then break end
-        table.insert(visible, { book = book, cx = cx })
+        if cx + cell_w <= x + w - D.s(116) then whole = whole + 1 end
+        table.insert(visible, { book = books[i], cx = cx })
     end
-    local row_h = 0
+    -- Swiping to shorter covers keeps the row's height, so what's below doesn't move.
+    local row_h = self.carousel_h[title] or 0
     for _, item in ipairs(visible) do
         local cover = Books.cover(item.book, cell_w, max_h)
         row_h = math.max(row_h, cover and cover:getHeight() or max_h)
     end
+    self.carousel_h[title] = row_h
     local cover_top = top + D.s(100)
+    table.insert(self.carousels, {
+        title = title, top = top - D.s(30), bottom = cover_top + row_h + D.s(60),
+        count = #books, step = math.max(1, whole),
+    })
     local area = bb:viewport(x, cover_top - D.s(10), w - D.s(116), row_h + D.s(90))
     local ox, oy = x, cover_top - D.s(10)
     for _, item in ipairs(visible) do
@@ -448,18 +476,24 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
     return cover_top + row_h + D.s(55)
 end
 
-local WEEKDAYS = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
+-- Every other weekday is named, as there is no room for all seven.
+local WEEKDAYS = { "Mon", "", "Wed", "", "Fri", "", "" }
 
--- "1 h 20 min", "45 min", as Lexeme writes reading time.
+-- "1 h 20 min", "2 h", "45 min", as Lexeme writes reading time.
 local function readingTime(seconds)
-    local hours, minutes = math.floor(seconds / 3600), math.floor(seconds % 3600 / 60)
-    if hours > 0 then return string.format("%d h %d min", hours, minutes) end
-    return string.format("%d min", minutes)
+    local minutes = math.floor(seconds / 60 + 0.5)
+    local hours, rest = math.floor(minutes / 60), minutes % 60
+    if hours == 0 then return string.format("%d min", minutes) end
+    if rest == 0 then return string.format("%d h", hours) end
+    return string.format("%d h %d min", hours, rest)
 end
 
 local function count(n, one, many)
     return string.format("%d %s", n, n == 1 and one or many)
 end
+
+-- The reading below the covers lines up with the first cover's left edge, the same in from the right.
+local HOME_MARGIN = 34
 
 -- Today, Total, Streak and Finished side by side. Returns the y where they end.
 local function paintTiles(bb, x, top, w, reading)
@@ -470,10 +504,11 @@ local function paintTiles(bb, x, top, w, reading)
         { "Finished", count(reading.finished, "book", "books") },
     }
     local gap, h = D.s(18), D.s(136)
-    local left, right = x + D.s(57), x + w - D.s(57)
-    local tile_w = math.floor((right - left - gap * (#tiles - 1)) / #tiles)
+    local left, right = x + D.s(HOME_MARGIN), x + w - D.s(HOME_MARGIN)
+    local function tileX(i) return left + math.floor((i - 1) * (right - left + gap) / #tiles + 0.5) end
     for i, tile in ipairs(tiles) do
-        local tx = left + (i - 1) * (tile_w + gap)
+        local tx = tileX(i)
+        local tile_w = tileX(i + 1) - gap - tx
         D.border(bb, tx, top, tile_w, h, D.s(3), D.BLACK)
         D.text(bb, tx + D.s(24), top + D.s(50), D.face("regular", 28), tile[1], D.BLACK, tile_w - D.s(48))
         D.text(bb, tx + D.s(24), top + D.s(106), D.face("bold", 36), tile[2], D.BLACK, tile_w - D.s(48))
@@ -487,8 +522,8 @@ local function paintCalendar(bb, x, top, w, days, goal_minutes)
     for _, day in ipairs(days) do
         if day.seconds >= goal then reached = reached + 1 end
     end
-    local small = D.face("regular", 24)
-    D.text(bb, x + D.s(57), top + D.s(30), D.face("regular", 28),
+    local small = D.face("regular", 22)
+    D.text(bb, x + D.s(HOME_MARGIN), top + D.s(30), D.face("regular", 28),
         string.format("%s of %d min+", count(reached, "day", "days"), goal_minutes))
 
     local y, m, d = days[1].day:match("^(%d+)-(%d+)-(%d+)$")
@@ -497,14 +532,18 @@ local function paintCalendar(bb, x, top, w, days, goal_minutes)
     local columns = math.ceil((lead + #days) / 7)
     local label_w = 0
     for _, name in ipairs(WEEKDAYS) do label_w = math.max(label_w, D.width(small, name)) end
-    local left = x + D.s(57) + label_w + D.s(14)
-    local gap = D.s(4)
-    local pitch = math.floor((x + w - D.s(57) - left + gap) / columns)
+    local left = x + D.s(HOME_MARGIN) + label_w + D.s(14)
+    local gap, right = D.s(4), x + w - D.s(HOME_MARGIN)
+    local pitch = math.floor((right - left + gap) / columns)
     local cell = pitch - gap
-    local grid_top = top + D.s(96)
+    -- Whole-pixel cells leave pixels over; they go between columns so the grid ends where the tiles do.
+    local function columnX(column)
+        return left + math.floor(column * (right - left - cell) / (columns - 1) + 0.5)
+    end
+    local grid_top = top + D.s(90)
 
     for row, name in ipairs(WEEKDAYS) do
-        D.text(bb, x + D.s(57), grid_top + (row - 1) * pitch + math.floor(cell * 0.8), small, name)
+        if name ~= "" then D.text(bb, x + D.s(HOME_MARGIN), grid_top + (row - 1) * pitch + cell, small, name) end
     end
     local months, last_month = {}, nil
     for i, day in ipairs(days) do
@@ -514,18 +553,19 @@ local function paintCalendar(bb, x, top, w, days, goal_minutes)
             months[column] = os.date("%b", first + (i - 1) * 86400)
             last_month = month
         end
-        D.rect(bb, left + column * pitch, grid_top + ((lead + i - 1) % 7) * pitch, cell, cell,
+        D.rect(bb, columnX(column), grid_top + ((lead + i - 1) % 7) * pitch, cell, cell,
             day.seconds >= goal and D.BLACK or D.gray(0xDD))
     end
     -- A month's name is left out where the next one would touch it.
     for column, name in pairs(months) do
-        if not (months[column + 1] or months[column + 2]) and left + column * pitch + D.width(small, name) <= x + w then
-            D.text(bb, left + column * pitch, grid_top - D.s(16), small, name)
+        if not (months[column + 1] or months[column + 2]) and columnX(column) + D.width(small, name) <= x + w then
+            D.text(bb, columnX(column), grid_top - D.s(14), small, name)
         end
     end
 end
 
 function Shell:paintHome(bb, x, y, w)
+    self.carousels = {}
     local recent = Books.query(self.all, nil, "recent", true)
     if #recent == 0 then
         D.textCenter(bb, x + w / 2, y + D.s(800), D.face("regular", 36), "No books found in " .. Books.homeDir())
@@ -538,8 +578,8 @@ function Shell:paintHome(bb, x, y, w)
     local next_top = bottom + D.s(94 - 58)
     local reading = Sync.isConnected() and Streak.summary()
     if reading then
-        local tiles_bottom = paintTiles(bb, x, next_top - D.s(20), w, reading)
-        return paintCalendar(bb, x, tiles_bottom + D.s(40), w, reading.days, reading.goal_minutes)
+        local tiles_bottom = paintTiles(bb, x, next_top + D.s(20), w, reading)
+        return paintCalendar(bb, x, tiles_bottom + D.s(60), w, reading.days, reading.goal_minutes)
     end
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)
 end

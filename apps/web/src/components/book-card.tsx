@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { format } from "date-fns";
 
 import { Progress } from "@/components/ui/progress";
 import type { TBook } from "@/hooks/data/use-reading";
+import { formatRelativeDay } from "@/lib/relative-day";
 import { cn } from "@/lib/utils";
 
 /** A hue picked from the book's id, so a book keeps its colour everywhere and forever. */
@@ -53,7 +53,7 @@ export function BookCard({ book }: { book: TBook }) {
       />
       {finished ? (
         <span className="text-xs text-muted-foreground truncate">
-          {book.finished_at ? format(book.finished_at, "d MMM yyyy") : "Finished"}
+          {book.finished_at ? formatRelativeDay(book.finished_at, "short") : "Finished"}
         </span>
       ) : (
         <div className="flex items-center gap-2">

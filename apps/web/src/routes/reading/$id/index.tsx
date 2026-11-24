@@ -1,7 +1,6 @@
 import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
-import { format } from "date-fns";
 
 import { BookCover } from "@/components/book-card";
 import { HighlightItem } from "@/components/highlight-item";
@@ -17,6 +16,7 @@ import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
 import { useBookReading, useCardWords, type TBook } from "@/hooks/data/use-reading";
+import { formatRelativeDay } from "@/lib/relative-day";
 
 export const Route = createFileRoute("/reading/$id/")({
   component: BookRoute,
@@ -111,8 +111,8 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
   const finished = book.status === "finished";
   const description = book.description ? plainText(book.description) : null;
   const facts = [
-    finished && book.finished_at && { label: "Finished", value: format(book.finished_at, "d MMM yyyy") },
-    !finished && book.last_read_at && { label: "Last read", value: format(book.last_read_at, "d MMM yyyy") },
+    finished && book.finished_at && { label: "Finished", value: formatRelativeDay(book.finished_at) },
+    !finished && book.last_read_at && { label: "Last read", value: formatRelativeDay(book.last_read_at) },
     totalSeconds > 0 && { label: "Time read", value: formatReadingTime(totalSeconds) },
     daysRead > 0 && { label: daysRead === 1 ? "Day" : "Days", value: String(daysRead) },
     book.pages && { label: "Pages", value: String(book.pages) },
@@ -134,11 +134,11 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
           </div>
         )}
         {facts.length > 0 && (
-          <dl className="flex flex-wrap gap-x-8 gap-y-3">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:flex md:flex-wrap md:gap-x-8">
             {facts.map((fact) => (
-              <div key={fact.label} className="flex flex-col gap-0.5">
+              <div key={fact.label} className="min-w-0 flex flex-col gap-0.5">
                 <dt className="text-xs text-muted-foreground">{fact.label}</dt>
-                <dd className="font-semibold tabular-nums">{fact.value}</dd>
+                <dd className="font-semibold tabular-nums wrap-break-word">{fact.value}</dd>
               </div>
             ))}
           </dl>

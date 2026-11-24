@@ -74,7 +74,7 @@ function ReadingPage() {
         <NoBooks />
       ) : (
         <>
-          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <StatTile label="Today" value={formatReadingTime(summary.todaySeconds)} />
             <StatTile label="This week" value={formatReadingTime(summary.weekSeconds)} />
             <StatTile label="Streak" value={`${summary.streak} ${summary.streak === 1 ? "day" : "days"}`} />

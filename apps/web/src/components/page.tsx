@@ -16,7 +16,7 @@ export function Page({ isPlaceholder, className, children, ...navbarProps }: TPa
       className="min-h-screen relative group flex flex-col"
     >
       <Navbar {...navbarProps} />
-      <main className={cn("w-full max-w-5xl mx-auto px-5 pt-6 pb-16 flex-1 flex flex-col", className)}>
+      <main className={cn("w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-16 flex-1 flex flex-col", className)}>
         {children}
       </main>
     </div>

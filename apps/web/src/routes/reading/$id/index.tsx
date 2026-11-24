@@ -62,7 +62,7 @@ function BookPage() {
                     <SessionRow key={session.started_at} session={session} />
                   ))}
                   {sessions.length > RECENT_SESSIONS && (
-                    <SeeAllRow href={`/reading/${id}/sessions`} more={sessions.length - RECENT_SESSIONS} />
+                    <SeeAllRow href={`/reading/${id}/sessions`} />
                   )}
                 </div>
               ) : (
@@ -78,7 +78,7 @@ function BookPage() {
                     <HighlightItem key={highlight.id} highlight={highlight} />
                   ))}
                   {highlights.length > RECENT_HIGHLIGHTS && (
-                    <SeeAllRow href={`/reading/${id}/highlights`} more={highlights.length - RECENT_HIGHLIGHTS} />
+                    <SeeAllRow href={`/reading/${id}/highlights`} />
                   )}
                 </div>
               ) : (
@@ -94,7 +94,7 @@ function BookPage() {
                     <WordRow key={lookup.id} lookup={lookup} isCard={cardWords.has(lookup.word.trim().toLowerCase())} />
                   ))}
                   {words.length > RECENT_WORDS && (
-                    <SeeAllRow href={`/reading/${id}/words`} more={words.length - RECENT_WORDS} />
+                    <SeeAllRow href={`/reading/${id}/words`} />
                   )}
                 </div>
               ) : (

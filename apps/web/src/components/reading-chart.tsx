@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, XAxis, type XAxisTickContentProps } from "recharts";
 
+import { Dot } from "@/components/dot";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
@@ -48,7 +49,11 @@ function DayChart({ day, pageReads, onBack }: { day: string; pageReads: readonly
   }));
   return (
     <ChartFrame
-      caption={`${format(parseISO(day), "EEEE d MMMM")} · ${formatReadingTime(total)}`}
+      caption={
+        <>
+          {format(parseISO(day), "EEEE d MMMM")} <Dot /> {formatReadingTime(total)}
+        </>
+      }
       action={
         <Button variant="ghost" size="xs" onClick={onBack} className="-mt-2 -mr-2.5">
           <ArrowLeftIcon className="size-3.5 -ml-0.75" />
@@ -68,7 +73,7 @@ function ChartFrame({
   ticks,
   onSelect,
 }: {
-  caption: string;
+  caption: ReactNode;
   action?: ReactNode;
   bars: TBar[];
   ticks: string[];

@@ -12,6 +12,7 @@ import {
   SettingsPage,
   SettingsSection,
 } from "@/components/access/settings-page";
+import { Dot } from "@/components/dot";
 import {
   EmptyList,
   EmptyListContent,
@@ -111,8 +112,8 @@ function ConnectedAppList({
             <>
               {app.last_used_at
                 ? `Last used ${formatDistanceToNowStrict(new Date(app.last_used_at), { addSuffix: true })}`
-                : "Never used"}
-              {" · "}
+                : "Never used"}{" "}
+              <Dot />{" "}
               Connected {format(new Date(app.created_at), "MMM d, yyyy")}
             </>
           }

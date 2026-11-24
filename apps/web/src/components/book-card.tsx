@@ -18,7 +18,7 @@ export function BookCover({ book, className }: { book: TBook; className?: string
   return (
     <div
       className={cn(
-        "@container relative aspect-[2/3] overflow-hidden rounded-l-sm rounded-r-md shadow-md shadow-shadow/shadow",
+        "@container relative aspect-[2/3] overflow-hidden rounded-l-sm rounded-r-md",
         className,
       )}
       style={{ backgroundColor: `oklch(0.42 0.06 ${hue})`, color: `oklch(0.96 0.025 ${hue})` }}

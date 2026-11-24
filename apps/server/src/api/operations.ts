@@ -23,7 +23,8 @@ import { generateBackForDeck, generateCardForDeck } from "../ai/generate-card.ts
 import type { TCaller } from "../caller.ts";
 import { db } from "../db.ts";
 import { ApiError } from "../errors.ts";
-import { deleteSentBook, downloadBook, saveSentBook } from "../sent-books.ts";
+import { fileNameOfPath, uploadCommand } from "../book-uploads.ts";
+import { deleteSentBook, downloadBook, presentSentBook, saveSentBook, startBookUpload } from "../sent-books.ts";
 import { serverMutators } from "../zero.ts";
 import {
   defaultProfileId,
@@ -70,17 +71,6 @@ const cardContent = z.object({
   front: z.string().trim().min(1).describe("The prompt side of the card."),
   back: z.string().trim().min(1).describe("The answer side of the card."),
 });
-
-function presentSentBook(book: typeof sentBooks.$inferSelect) {
-  return {
-    id: book.id,
-    title: book.title,
-    file_name: book.file_name,
-    size_bytes: book.size_bytes,
-    sent_at: book.created_at.toISOString(),
-    delivered_at: book.delivered_at?.toISOString() ?? null,
-  };
-}
 
 const RATINGS: Record<"again" | "hard" | "good" | "easy", Grade> = { again: Rating.Again, hard: Rating.Hard, good: Rating.Good, easy: Rating.Easy };
 
@@ -783,7 +773,7 @@ export const operations: TOperation[] = [
   defineOperation({
     name: "send-book",
     title: "Send book to Kindle",
-    description: `Send a book to the user's Kindle; it downloads the next time the Kindle syncs. Pass either \`url\`, a direct link to the file (not a web page about it) that the server downloads, or \`content_base64\` with \`file_name\` for a file you have. Prefer \`url\` for anything over a few MB. Books can be ${SENDABLE_BOOK_EXTENSIONS.join(", ")}, up to 100 MB.`,
+    description: `Send a book to the user's Kindle; it downloads the next time the Kindle syncs. Use this when the book is online: pass \`url\`, a direct link to the file (not a web page about it), and the server downloads it. For a file on disk, use upload-book instead. \`content_base64\` with \`file_name\` carries the whole file inside this request: fine for a program calling the REST API, but an agent would have to write the file out itself, so agents use it only for files of a few KB. Books can be ${SENDABLE_BOOK_EXTENSIONS.join(", ")}, up to 100 MB.`,
     role: "editor",
     method: "POST",
     path: "/sent-books",
@@ -812,6 +802,34 @@ export const operations: TOperation[] = [
         : { fileName: input.file_name!, bytes: Buffer.from(input.content_base64!, "base64") };
       const book = await saveSentBook(caller.userId, file.fileName, file.bytes, input.title);
       return { book: presentSentBook(book) };
+    },
+  }),
+
+  defineOperation({
+    name: "upload-book",
+    title: "Upload book to Kindle",
+    description: `Send a book file on disk to the user's Kindle, any size up to 100 MB. Returns \`command\`: run it on the machine that has the file. It uploads the file straight from disk to storage, then sends it, and prints the sent book as JSON; the file never passes through this call. Use this whenever you have the file and can run commands; use send-book with \`url\` when the book is at a public link instead. Programs calling the REST API can do the same without curl: PUT the file to \`upload_url\`, then POST to \`finish_url\`. The links work for an hour. Books can be ${SENDABLE_BOOK_EXTENSIONS.join(", ")}.`,
+    role: "editor",
+    method: "POST",
+    path: "/sent-books/uploads",
+    input: z.object({
+      path: z
+        .string()
+        .trim()
+        .min(1)
+        .describe("The book file's path on the machine that will run the command, like ~/Books/dune.epub. Its name becomes the book's file name."),
+      title: z.string().trim().min(1).optional().describe("Defaults to the file name without its extension."),
+    }),
+    run: async (caller, input) => {
+      const fileName = fileNameOfPath(input.path);
+      const upload = await startBookUpload(caller.userId, fileName, input.title);
+      return {
+        file_name: fileName,
+        command: uploadCommand(input.path, upload.uploadUrl, upload.finishUrl),
+        upload_url: upload.uploadUrl,
+        finish_url: upload.finishUrl,
+        expires_at: upload.expiresAt.toISOString(),
+      };
     },
   }),
 

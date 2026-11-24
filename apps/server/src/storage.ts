@@ -1,9 +1,11 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { env } from "./env.ts";
 import { ApiError } from "./errors.ts";
@@ -23,6 +25,8 @@ function storage() {
     region: env.S3_REGION,
     // Self-hosted S3 (MinIO and friends) serves buckets by path, not subdomain.
     forcePathStyle: Boolean(env.S3_ENDPOINT),
+    // Otherwise signed upload links carry the checksum of an empty body and every upload fails.
+    requestChecksumCalculation: "WHEN_REQUIRED",
     credentials: { accessKeyId: env.S3_ACCESS_KEY_ID!, secretAccessKey: env.S3_SECRET_ACCESS_KEY! },
   });
   return client;
@@ -49,6 +53,22 @@ export async function putObject(key: string, body: Uint8Array, contentType: stri
   await call(() =>
     storage().send(new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key, Body: body, ContentType: contentType })),
   );
+}
+
+/** A link that lets whoever holds it PUT this one object, straight to the bucket. */
+export async function uploadUrl(key: string, expiresInSeconds: number) {
+  return call(() => getSignedUrl(storage(), new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key }), { expiresIn: expiresInSeconds }));
+}
+
+/** The object's size, or undefined when there is none. */
+export async function objectSize(key: string) {
+  try {
+    const head = await call(() => storage().send(new HeadObjectCommand({ Bucket: env.S3_BUCKET, Key: key })));
+    return head.ContentLength ?? 0;
+  } catch (error) {
+    if (error instanceof Error && (error.name === "NotFound" || error.name === "NoSuchKey")) return undefined;
+    throw error;
+  }
 }
 
 export async function getObject(key: string) {

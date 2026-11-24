@@ -97,9 +97,12 @@ function Lexeme:onLexemeSync()
     local Sync = require("lexeme/sync")
     local Toast = require("lexeme/toast")
     if not Sync.isConnected() then return Toast.show("Connect to Lexeme in Settings first.") end
-    Toast.show("Syncing with Lexeme…")
+    local done = Toast.busy("Syncing with Lexeme…")
     UIManager:nextTick(function()
-        Sync.run(function(_, message) Toast.show(message) end)
+        Sync.run(function(_, message)
+            done()
+            Toast.show(message)
+        end)
     end)
 end
 

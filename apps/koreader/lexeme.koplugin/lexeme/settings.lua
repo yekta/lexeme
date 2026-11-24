@@ -182,9 +182,10 @@ end
 
 function Settings:syncNow()
     local Toast = require("lexeme/toast")
-    Toast.show("Syncing with Lexeme…")
+    local done = Toast.busy("Syncing with Lexeme…")
     UIManager:nextTick(function()
         require("lexeme/sync").run(function(_, message)
+            done()
             Toast.show(message)
             self:refresh()
         end)

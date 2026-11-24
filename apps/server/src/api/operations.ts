@@ -23,7 +23,8 @@ import { generateBackForDeck, generateCardForDeck } from "../ai/generate-card.ts
 import type { TCaller } from "../caller.ts";
 import { db } from "../db.ts";
 import { ApiError } from "../errors.ts";
-import { fileNameOfPath, uploadCommand } from "../book-uploads.ts";
+import { startReadingUpload } from "../reading-uploads.ts";
+import { fileNameOfPath, uploadCommand } from "../uploads.ts";
 import { deleteSentBook, downloadBook, presentSentBook, saveSentBook, startBookUpload } from "../sent-books.ts";
 import { serverMutators } from "../zero.ts";
 import {
@@ -518,7 +519,7 @@ export const operations: TOperation[] = [
     name: "sync-reading",
     title: "Sync reading data",
     description:
-      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. What was deleted on the device goes too: removed_highlight_ids and removed_lookup_ids by id, and book_page_reads lists every page visit a book still has, so its others are deleted. Page visits sent with imported: true came from another reader's history, so book_page_reads never deletes them. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
+      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. What was deleted on the device goes too: removed_highlight_ids and removed_lookup_ids by id, and book_page_reads lists every page visit a book still has, so its others are deleted. Page visits sent with imported: true came from another reader's history, so book_page_reads never deletes them. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing. For more than fits in one call, write this same input to a JSON file and use upload-reading.",
     role: "editor",
     method: "POST",
     path: "/reading",
@@ -534,6 +535,28 @@ export const operations: TOperation[] = [
         removed_highlights: input.removed_highlight_ids.length,
         removed_lookups: input.removed_lookup_ids.length,
         removed_books: input.removed_book_keys.length,
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "upload-reading",
+    title: "Upload reading data",
+    description:
+      "sync-reading for a JSON file on disk, for reading data too big to pass in a call, like a reader's whole history. The file holds sync-reading's input. Returns `command`: run it on the machine that has the file. It uploads the file straight to storage, then applies it and prints how many rows it took; the data never passes through this call. Programs calling the REST API can do the same without curl: PUT the file to `upload_url`, then POST to `finish_url`. The links work for an hour.",
+    role: "editor",
+    method: "POST",
+    path: "/reading/uploads",
+    input: z.object({
+      path: z.string().trim().min(1).describe("The JSON file's path on the machine that will run the command."),
+    }),
+    run: async (caller, input) => {
+      const upload = await startReadingUpload(caller.userId);
+      return {
+        command: uploadCommand(input.path, upload.uploadUrl, upload.finishUrl),
+        upload_url: upload.uploadUrl,
+        finish_url: upload.finishUrl,
+        expires_at: upload.expiresAt.toISOString(),
       };
     },
   }),

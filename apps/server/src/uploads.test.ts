@@ -2,25 +2,26 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { describe, it } from "node:test";
 
-import { fileNameOfPath, readBookUpload, signBookUpload, uploadCommand } from "./book-uploads.ts";
+import { fileNameOfPath, readUpload, signUpload, uploadCommand } from "./uploads.ts";
 
 const SECRET = "a".repeat(32);
 const upload = { userId: "user-1", id: "book-1", fileName: "Dune.epub", title: "Dune", expiresAt: 2_000 };
 
-describe("book upload tokens", () => {
+describe("upload tokens", () => {
   it("reads back what was signed until it expires", () => {
-    const token = signBookUpload(upload, SECRET);
-    assert.deepEqual(readBookUpload(token, SECRET, 1_000), upload);
-    assert.equal(readBookUpload(token, SECRET, 2_000), undefined);
+    const token = signUpload("book-upload", upload, SECRET);
+    assert.deepEqual(readUpload("book-upload", token, SECRET, 1_000), upload);
+    assert.equal(readUpload("book-upload", token, SECRET, 2_000), undefined);
   });
 
-  it("refuses a changed token, another secret and garbage", () => {
-    const token = signBookUpload(upload, SECRET);
+  it("refuses a changed token, another secret, another kind of upload and garbage", () => {
+    const token = signUpload("book-upload", upload, SECRET);
     const [, sig] = token.split(".");
     const forged = `${Buffer.from(JSON.stringify({ ...upload, userId: "user-2" })).toString("base64url")}.${sig}`;
-    assert.equal(readBookUpload(forged, SECRET, 1_000), undefined);
-    assert.equal(readBookUpload(token, "b".repeat(32), 1_000), undefined);
-    assert.equal(readBookUpload("not-a-token", SECRET, 1_000), undefined);
+    assert.equal(readUpload("book-upload", forged, SECRET, 1_000), undefined);
+    assert.equal(readUpload("book-upload", token, "b".repeat(32), 1_000), undefined);
+    assert.equal(readUpload("reading-upload", token, SECRET, 1_000), undefined);
+    assert.equal(readUpload("book-upload", "not-a-token", SECRET, 1_000), undefined);
   });
 });
 

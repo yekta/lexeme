@@ -1,22 +1,24 @@
 // Brings a Kindle's reading history from Amazon's "Request your data" export
-// into Lexeme as imported page visits, through the public API's sync-reading.
-// Amazon keeps no page numbers, so pages are estimated from each book's page
-// count. Rerunning sends the same ids, so it changes nothing.
+// into Lexeme as imported page visits. It writes sync-reading's input to
+// <out.json>, for upload-reading to apply. Amazon keeps no page numbers, so
+// pages are estimated from each book's page count. Every row has a stable id,
+// so applying the same file twice changes nothing.
 //
-//   pnpm --filter @lexeme/server import:amazon <export-dir> <books.json> [--apply]
+//   pnpm --filter @lexeme/server import:amazon <export-dir> <books.json> <out.json>
 //
 // books.json lists the books to bring in, by the key KOReader stored for the
 // file (partial_md5_checksum in its settings):
 //   [{ "key": "...", "title": "...", "pages": 284, "amazon": ["Amazon's product name", ...],
 //      "new": true, "authors": "...", "read_to": 124, "finished_on": "2025-11-02" }]
+// Check the keys against list-books first: an unknown key becomes a new book.
 // new marks a book Lexeme doesn't have yet, which authors is for; read_to is
 // the page Amazon's reading reached in a book finished elsewhere; finished_on
-// overrides the date Amazon marked the book finished.
-// LEXEME_API_KEY (an editor key) and LEXEME_URL are needed with --apply.
+// overrides the date Amazon marked the book finished. Only finished and new
+// books are sent as books; the rest keep what Lexeme has.
 
 import { estimatePageReads, type TUnpagedSession } from "@lexeme/shared";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
@@ -30,10 +32,6 @@ type TBookEntry = {
   read_to?: number;
   finished_on?: string;
 };
-
-type TLexemeBook = { key: string; title: string; status: string };
-
-const PAGE_READS_PER_REQUEST = 2000;
 
 function parseCsv(text: string): Record<string, string>[] {
   const rows: string[][] = [];
@@ -135,21 +133,9 @@ function planBook(entry: TBookEntry, data: Awaited<ReturnType<typeof loadExport>
   };
 }
 
-async function api(baseUrl: string, apiKey: string, method: string, route: string, body?: unknown) {
-  const response = await fetch(`${baseUrl}/api/v1${route}`, {
-    method,
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`${method} ${route} failed (${response.status}): ${text}`);
-  return JSON.parse(text) as unknown;
-}
-
 async function main() {
-  const { positionals, values } = parseArgs({ allowPositionals: true, options: { apply: { type: "boolean" } } });
-  const [exportDir, booksFile] = positionals;
-  if (!exportDir || !booksFile) throw new Error("Usage: import-amazon-export <export-dir> <books.json> [--apply]");
+  const [exportDir, booksFile, outFile] = parseArgs({ allowPositionals: true }).positionals;
+  if (!exportDir || !booksFile || !outFile) throw new Error("Usage: import-amazon-export <export-dir> <books.json> <out.json>");
 
   const entries = JSON.parse(await readFile(booksFile, "utf8")) as TBookEntry[];
   const data = await loadExport(exportDir);
@@ -162,37 +148,23 @@ async function main() {
       `${plan.entry.title.padEnd(40).slice(0, 40)} ${String(plan.sessions.length).padStart(4)} sessions ${hours.toFixed(1).padStart(5)} h ${String(plan.reads.length).padStart(5)} page visits  finished ${finished}`,
     );
   }
-  const reads = plans.flatMap((plan) => plan.reads);
-  console.log(`${plans.length} books, ${reads.length} page visits`);
-  if (!values.apply) return console.log("Dry run; pass --apply to send.");
 
-  const apiKey = process.env.LEXEME_API_KEY;
-  if (!apiKey) throw new Error("Set LEXEME_API_KEY to an editor API key.");
-  const baseUrl = process.env.LEXEME_URL ?? "https://api.lexeme.fyi";
-  const { books: existing } = (await api(baseUrl, apiKey, "GET", "/books")) as { books: TLexemeBook[] };
-  const byKey = new Map(existing.map((book) => [book.key, book]));
-  const missing = entries.filter((entry) => !entry.new && !byKey.has(entry.key));
-  if (missing.length) throw new Error(`Not in Lexeme: ${missing.map((entry) => entry.title).join(", ")}`);
-
-  const books = plans.map(({ entry, finishedAt, lastReadAt }) => {
-    const known = byKey.get(entry.key);
-    return {
+  const books = plans
+    .filter(({ entry, finishedAt }) => entry.new || finishedAt)
+    .map(({ entry, finishedAt, lastReadAt }) => ({
       id: stableId(`book:${entry.key}`),
       key: entry.key,
-      title: known?.title ?? entry.title,
-      authors: known ? undefined : entry.authors,
-      status: finishedAt ? "finished" : (known?.status ?? "reading"),
+      title: entry.title,
+      authors: entry.new ? entry.authors : undefined,
+      status: finishedAt ? "finished" : "reading",
       progress: finishedAt ? 1 : undefined,
       pages: entry.pages,
       finished_at: finishedAt,
-      last_read_at: known ? undefined : lastReadAt,
-    };
-  });
-  await api(baseUrl, apiKey, "POST", "/reading", { books });
-  for (let i = 0; i < reads.length; i += PAGE_READS_PER_REQUEST) {
-    await api(baseUrl, apiKey, "POST", "/reading", { page_reads: reads.slice(i, i + PAGE_READS_PER_REQUEST) });
-    console.log(`Sent ${Math.min(i + PAGE_READS_PER_REQUEST, reads.length)} of ${reads.length} page visits`);
-  }
+      last_read_at: entry.new ? lastReadAt : undefined,
+    }));
+  const page_reads = plans.flatMap((plan) => plan.reads);
+  await writeFile(outFile, JSON.stringify({ books, page_reads }));
+  console.log(`${books.length} books and ${page_reads.length} page visits written to ${outFile}`);
 }
 
 await main();

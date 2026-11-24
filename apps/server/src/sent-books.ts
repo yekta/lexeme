@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { BlockList } from "node:net";
 
-import { readBookUpload, signBookUpload } from "./book-uploads.ts";
+import { readUpload, signUpload } from "./uploads.ts";
 import { db } from "./db.ts";
 import { env } from "./env.ts";
 import { ApiError } from "./errors.ts";
@@ -21,9 +21,11 @@ const CONTENT_TYPES: Record<string, string> = {
   txt: "text/plain",
 };
 
+type TBookUpload = { userId: string; id: string; fileName: string; title?: string; expiresAt: number };
+
 const DOWNLOAD_TIMEOUT_MS = 120_000;
-const UPLOAD_LINK_SECONDS = 60 * 60;
-const FINISH_LINK_MS = 2 * 60 * 60 * 1000;
+export const UPLOAD_LINK_SECONDS = 60 * 60;
+export const FINISH_LINK_MS = 2 * 60 * 60 * 1000;
 const MAX_REDIRECTS = 5;
 
 const PRIVATE_ADDRESSES = new BlockList();
@@ -84,7 +86,7 @@ export async function startBookUpload(userId: string, fileName: string, title?: 
   checkBookFile(fileName, 0);
   const id = randomUUID();
   const expiresAt = Date.now() + FINISH_LINK_MS;
-  const token = signBookUpload({ userId, id, fileName, title, expiresAt }, env.BETTER_AUTH_SECRET);
+  const token = signUpload("book-upload", { userId, id, fileName, title, expiresAt }, env.BETTER_AUTH_SECRET);
   return {
     uploadUrl: await uploadUrl(storedFile(userId, id, fileName).storageKey, UPLOAD_LINK_SECONDS),
     finishUrl: `${ISSUER}/api/book-uploads/${token}`,
@@ -93,7 +95,7 @@ export async function startBookUpload(userId: string, fileName: string, title?: 
 }
 
 export async function finishBookUpload(token: string) {
-  const upload = readBookUpload(token, env.BETTER_AUTH_SECRET);
+  const upload = readUpload<TBookUpload>("book-upload", token, env.BETTER_AUTH_SECRET);
   if (!upload) throw new ApiError("UNAUTHORIZED", "This upload link isn't valid or has expired; call upload-book again.");
   const { storageKey } = storedFile(upload.userId, upload.id, upload.fileName);
   const size = await objectSize(storageKey);

@@ -3,6 +3,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 
 import { SyncBanner } from "@/components/sync-banner";
 import { useAuth } from "@/hooks/use-auth";
+import { SETTLE_BUDGET } from "@/lib/settle";
 import { lexemeZeroOptions, ZERO_CACHE_URL } from "@/zero/options";
 import { AccountProvider } from "@/zero/account";
 import { startAutoCalibration } from "@/zero/auto-calibration";
@@ -50,6 +51,7 @@ function ZeroClient({ userID, children }: { userID: string; children: ReactNode 
 
   return (
     <ZeroProvider {...options} init={preloadAccount}>
+      <LocalStoreWatchdog />
       <AutoCalibration />
       <AccountProvider>
         <SyncBanner />
@@ -57,6 +59,33 @@ function ZeroClient({ userID, children }: { userID: string; children: ReactNode 
       </AccountProvider>
     </ZeroProvider>
   );
+}
+
+const LAST_STORE_RELOAD_KEY = "lexeme:last-store-reload";
+
+/**
+ * Reloads the page when the local store never opens. Zero reads its client
+ * group from IndexedDB before it opens the socket, so a hung IndexedDB leaves
+ * the app with no local data and no connection, and only a reload recovers it.
+ * At most one reload a minute, so a store that is broken for good can't loop.
+ */
+function LocalStoreWatchdog() {
+  const zero = useZero();
+  useEffect(() => {
+    let opened = false;
+    void zero.clientGroupID.then(() => {
+      opened = true;
+    });
+    const timer = setTimeout(() => {
+      if (opened) return;
+      const lastReload = Number(sessionStorage.getItem(LAST_STORE_RELOAD_KEY) ?? 0);
+      if (Date.now() - lastReload < 60_000) return;
+      sessionStorage.setItem(LAST_STORE_RELOAD_KEY, String(Date.now()));
+      window.location.reload();
+    }, SETTLE_BUDGET.localStore);
+    return () => clearTimeout(timer);
+  }, [zero]);
+  return null;
 }
 
 /**

@@ -476,9 +476,6 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
     return cover_top + row_h + D.s(55)
 end
 
--- Every other weekday is named, as there is no room for all seven.
-local WEEKDAYS = { "Mon", "", "Wed", "", "Fri", "", "" }
-
 -- "1 h 20 min", "2 h", "45 min", as Lexeme writes reading time.
 local function readingTime(seconds)
     local minutes = math.floor(seconds / 60 + 0.5)
@@ -522,12 +519,12 @@ local function paintTiles(bb, x, top, w, reading)
 end
 
 -- The last year as a grid of days, a week to a column, like Lexeme's streak calendar.
+-- Days stretch down to `bottom`, so it fills what Home has left.
 local function paintCalendar(bb, x, top, w, bottom, days, goal_minutes)
     local goal, reached = goal_minutes * 60, 0
     for _, day in ipairs(days) do
         if day.seconds >= goal then reached = reached + 1 end
     end
-    local small = D.face("regular", 22)
     D.text(bb, x + D.s(HOME_MARGIN), top + D.s(30), D.face("regular", 28),
         string.format("%s of %d min+", count(reached, "day", "days"), goal_minutes))
 
@@ -535,41 +532,19 @@ local function paintCalendar(bb, x, top, w, bottom, days, goal_minutes)
     local first = os.time{ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 }
     local lead = (os.date("*t", first).wday + 5) % 7
     local columns = math.ceil((lead + #days) / 7)
-    local label_w = 0
-    for _, name in ipairs(WEEKDAYS) do label_w = math.max(label_w, D.width(small, name)) end
-    local left = x + D.s(HOME_MARGIN) + label_w + D.s(14)
-    local gap, right = D.s(4), x + w - D.s(HOME_MARGIN)
+    local gap = D.s(4)
+    local left, right = x + D.s(HOME_MARGIN), x + w - D.s(HOME_MARGIN)
     local cell = math.floor((right - left + gap) / columns) - gap
     -- Whole-pixel cells leave pixels over; they go between columns so the grid ends where the tiles do.
     local function columnX(column)
         return left + math.floor(column * (right - left - cell) / (columns - 1) + 0.5)
     end
-    local grid_top = top + D.s(90)
-    -- Days stretch down to `bottom`, so the calendar fills what Home has left.
+    local grid_top = top + D.s(56)
     local row_pitch = math.max(cell + gap, math.floor((bottom - grid_top + gap) / 7))
-    local cell_h = row_pitch - gap
-
-    for row, name in ipairs(WEEKDAYS) do
-        if name ~= "" then
-            D.text(bb, x + D.s(HOME_MARGIN), grid_top + (row - 1) * row_pitch + math.floor(cell_h / 2) + D.s(8), small, name)
-        end
-    end
-    local months, last_month = {}, nil
     for i, day in ipairs(days) do
-        local column = math.floor((lead + i - 1) / 7)
-        local month = day.day:sub(1, 7)
-        if month ~= last_month then
-            months[column] = os.date("%b", first + (i - 1) * 86400)
-            last_month = month
-        end
-        D.rect(bb, columnX(column), grid_top + ((lead + i - 1) % 7) * row_pitch, cell, cell_h,
+        local slot = lead + i - 1
+        D.rect(bb, columnX(math.floor(slot / 7)), grid_top + (slot % 7) * row_pitch, cell, row_pitch - gap,
             day.seconds >= goal and D.BLACK or D.gray(0xDD))
-    end
-    -- A month's name is left out where the next one would touch it.
-    for column, name in pairs(months) do
-        if not (months[column + 1] or months[column + 2]) and columnX(column) + D.width(small, name) <= x + w then
-            D.text(bb, columnX(column), grid_top - D.s(14), small, name)
-        end
     end
 end
 
@@ -588,8 +563,9 @@ function Shell:paintHome(bb, x, y, w, h)
     local reading = Sync.isConnected() and Streak.summary()
     if reading then
         local tiles_bottom = paintTiles(bb, x, next_top + D.s(20), w, reading)
-        -- Clear of the tab bar and the cover of the book being read, which stands above it.
-        local bottom = y + h - D.s(111) - D.s(70)
+        -- As far above the cover of the book being read, which stands over the tab bar, as the
+        -- tiles are below the covers.
+        local bottom = y + h - D.s(111) - D.s(105)
         return paintCalendar(bb, x, tiles_bottom + D.s(56), w, bottom, reading.days, reading.goal_minutes)
     end
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)

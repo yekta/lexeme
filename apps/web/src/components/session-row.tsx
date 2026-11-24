@@ -13,7 +13,7 @@ export function SessionRow({ session, bookTitle }: { session: TReadingSession; b
         <span className="font-medium">
           {format(session.started_at, "EEE d MMM")} <Dot className="text-muted-foreground" />{" "}
           {format(session.started_at, "HH:mm")}
-          <span className="text-muted-foreground">–</span>
+          {" "}<span className="text-muted-foreground">-</span>{" "}
           {format(session.ended_at, sameDay ? "HH:mm" : "d MMM HH:mm")}
         </span>
         {bookTitle && <span className="text-xs text-muted-foreground truncate">{bookTitle}</span>}

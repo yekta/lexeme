@@ -47,7 +47,7 @@ function DayChart({ day, pageReads, onBack }: { day: string; pageReads: readonly
     tip: (
       <>
         {hourLabel(hour)}
-        <span className="text-muted-foreground">–</span>
+        {" "}<span className="text-muted-foreground">-</span>{" "}
         {hourLabel(hour + 1)}
       </>
     ),

@@ -297,6 +297,8 @@ export const pageReads = pgTable(
     total_pages: integer("total_pages").notNull(),
     started_at: timestamp("started_at", { withTimezone: true }).notNull(),
     seconds: integer("seconds").notNull(),
+    /** Brought in from another reader's history; the device's own deletions leave it alone. */
+    imported: boolean("imported").notNull().default(false),
     created_at: createdAt(),
     updated_at: updatedAt(),
   },

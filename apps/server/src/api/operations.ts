@@ -518,7 +518,7 @@ export const operations: TOperation[] = [
     name: "sync-reading",
     title: "Sync reading data",
     description:
-      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. What was deleted on the device goes too: removed_highlight_ids and removed_lookup_ids by id, and book_page_reads lists every page visit a book still has, so its others are deleted. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
+      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. What was deleted on the device goes too: removed_highlight_ids and removed_lookup_ids by id, and book_page_reads lists every page visit a book still has, so its others are deleted. Page visits sent with imported: true came from another reader's history, so book_page_reads never deletes them. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
     role: "editor",
     method: "POST",
     path: "/reading",
@@ -541,7 +541,7 @@ export const operations: TOperation[] = [
   defineOperation({
     name: "list-books",
     title: "List books",
-    description: "Books from the user's e-readers, most recently read first.",
+    description: "Books from the user's e-readers, most recently read first. key is the e-reader's id for the book's file, which sync-reading matches books on.",
     role: "viewer",
     method: "GET",
     path: "/books",
@@ -555,6 +555,7 @@ export const operations: TOperation[] = [
       return {
         books: rows.map((book) => ({
           id: book.id,
+          key: book.key,
           title: book.title,
           authors: book.authors,
           status: book.status,

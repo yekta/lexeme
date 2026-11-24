@@ -155,6 +155,7 @@ const pageReads = table("page_reads")
     total_pages: number(),
     started_at: number(),
     seconds: number(),
+    imported: boolean(),
     created_at: number(),
     updated_at: number(),
   })

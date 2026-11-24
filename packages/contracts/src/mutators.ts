@@ -178,6 +178,7 @@ export const syncReadingArgs = z.object({
         total_pages: z.number().int().min(0),
         started_at: epochMs,
         seconds: z.number().int().min(0),
+        imported: z.boolean().default(false),
       }),
     )
     .max(20_000)
@@ -209,7 +210,7 @@ export const syncReadingArgs = z.object({
     )
     .max(5000)
     .default([]),
-  /** Every page visit a book has on the device, sent when some were deleted there; the book's others are deleted here. */
+  /** Every page visit a book has on the device, sent when some were deleted there; the book's others are deleted here, except imported ones. */
   book_page_reads: z
     .array(z.object({ book_key: bookKey, page_read_ids: z.array(uuidArg).max(20_000).default([]) }))
     .max(2000)
@@ -497,6 +498,7 @@ export const mutatorDefs = {
           total_pages: read.total_pages,
           started_at: read.started_at,
           seconds: read.seconds,
+          imported: read.imported,
           created_at: existing?.created_at ?? now,
           updated_at: now,
         });
@@ -543,7 +545,8 @@ export const mutatorDefs = {
         const kept = new Set(page_read_ids);
         const existing = await tx.run(zql.page_reads.where("user_id", user_id).where("book_id", book_id));
         for (const read of existing) {
-          if (!kept.has(read.id)) await tx.mutate.page_reads.delete({ id: read.id });
+          if (read.imported || kept.has(read.id)) continue;
+          await tx.mutate.page_reads.delete({ id: read.id });
         }
       }
 

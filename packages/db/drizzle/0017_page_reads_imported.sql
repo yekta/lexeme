@@ -1,0 +1,1 @@
+ALTER TABLE "page_reads" ADD COLUMN "imported" boolean DEFAULT false NOT NULL;

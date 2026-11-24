@@ -1,7 +1,6 @@
 import { formatReadingTime } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
-import { differenceInCalendarDays, differenceInMonths, format } from "date-fns";
 
 import { BookCover } from "@/components/book-card";
 import { HighlightItem } from "@/components/highlight-item";
@@ -17,6 +16,7 @@ import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
 import { useBookReading, useCardWords, type TBook } from "@/hooks/data/use-reading";
+import { formatRelativeDay } from "@/lib/relative-day";
 
 export const Route = createFileRoute("/reading/$id/")({
   component: BookRoute,
@@ -158,23 +158,6 @@ function plainText(html: string) {
   const withBreaks = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n");
   const text = new DOMParser().parseFromString(withBreaks, "text/html").body.textContent ?? "";
   return text.replace(/\n{3,}/g, "\n\n").trim() || null;
-}
-
-const relativeDay = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-const relativeTime = new Intl.RelativeTimeFormat("en");
-
-function formatRelativeDay(date: number) {
-  const now = new Date();
-  const days = differenceInCalendarDays(now, date);
-  const months = differenceInMonths(now, date);
-  if (months >= 12) return format(date, "d MMM yyyy");
-  if (days < 7) return capitalize(relativeDay.format(-days, "day"));
-  if (days < 30) return relativeTime.format(-Math.floor(days / 7), "week");
-  return relativeTime.format(-Math.max(1, months), "month");
-}
-
-function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 const RECENT_SESSIONS = 3;

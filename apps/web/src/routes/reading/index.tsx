@@ -16,6 +16,7 @@ import { HighlightItem } from "@/components/highlight-item";
 import { LoadError } from "@/components/load-error";
 import { ReadingChart } from "@/components/reading-chart";
 import { Navbar } from "@/components/navbar";
+import { Page } from "@/components/page";
 import { SessionRow } from "@/components/session-row";
 import { RequireIdentity } from "@/components/require-identity";
 import { SectionEmpty } from "@/components/section-empty";
@@ -66,120 +67,117 @@ function ReadingPage() {
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar title="Reading" backHref="/" />
-      <main className="w-full max-w-5xl mx-auto px-5 pt-6 pb-16 flex-1 flex flex-col gap-8">
-        {reading.isError ? (
-          <LoadError error={reading.error} onRetry={reading.refetch} />
-        ) : !reading.isPending && reading.books.length === 0 ? (
-          <NoBooks />
-        ) : (
-          <>
-            <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatTile label="Today" value={formatReadingTime(summary.todaySeconds)} />
-              <StatTile label="This week" value={formatReadingTime(summary.weekSeconds)} />
-              <StatTile label="Streak" value={`${summary.streak} ${summary.streak === 1 ? "day" : "days"}`} />
-              <StatTile label={`Finished in ${new Date().getFullYear()}`} value={String(summary.finishedThisYear)} />
-            </section>
+    <Page title="Reading" backHref="/" className="gap-8">
+      {reading.isError ? (
+        <LoadError error={reading.error} onRetry={reading.refetch} />
+      ) : !reading.isPending && reading.books.length === 0 ? (
+        <NoBooks />
+      ) : (
+        <>
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatTile label="Today" value={formatReadingTime(summary.todaySeconds)} />
+            <StatTile label="This week" value={formatReadingTime(summary.weekSeconds)} />
+            <StatTile label="Streak" value={`${summary.streak} ${summary.streak === 1 ? "day" : "days"}`} />
+            <StatTile label={`Finished in ${new Date().getFullYear()}`} value={String(summary.finishedThisYear)} />
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <SectionTitle title="Reading Time" />
-              <ReadingChart days={summary.lastDays} pageReads={reading.pageReads} />
-            </section>
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="Reading Time" />
+            <ReadingChart days={summary.lastDays} pageReads={reading.pageReads} />
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <SectionTitle title="Reading" count={current.length} />
-              {current.length > 0 ? (
-                <div className={BOOK_GRID}>
-                  {current.map((book) => (
-                    <BookCard key={book.id} book={book} />
-                  ))}
-                </div>
-              ) : (
-                <SectionEmpty icon={<BookOpenIcon />} title="Nothing in progress" description="Books you're reading on your Kindle show up here." />
-              )}
-            </section>
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="Reading" count={current.length} />
+            {current.length > 0 ? (
+              <div className={BOOK_GRID}>
+                {current.map((book) => (
+                  <BookCard key={book.id} book={book} />
+                ))}
+              </div>
+            ) : (
+              <SectionEmpty icon={<BookOpenIcon />} title="Nothing in progress" description="Books you're reading on your Kindle show up here." />
+            )}
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <SectionTitle title="Words" count={reading.lookups.length} />
-              {recentWords.length > 0 ? (
-                <div className="rounded-xl border divide-y overflow-hidden">
-                  {recentWords.map((lookup) => (
-                    <WordRow
-                      key={lookup.id}
-                      lookup={lookup}
-                      isCard={cardWords.has(lookup.word.trim().toLowerCase())}
-                      bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined}
-                    />
-                  ))}
-                  {reading.lookups.length > RECENT_WORDS && (
-                    <SeeAllRow href="/reading/words" />
-                  )}
-                </div>
-              ) : (
-                <SectionEmpty icon={<LanguagesIcon />} title="No words yet" description="Words you look up while reading show up here." />
-              )}
-            </section>
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="Words" count={reading.lookups.length} />
+            {recentWords.length > 0 ? (
+              <div className="rounded-xl border divide-y overflow-hidden">
+                {recentWords.map((lookup) => (
+                  <WordRow
+                    key={lookup.id}
+                    lookup={lookup}
+                    isCard={cardWords.has(lookup.word.trim().toLowerCase())}
+                    bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined}
+                  />
+                ))}
+                {reading.lookups.length > RECENT_WORDS && (
+                  <SeeAllRow href="/reading/words" />
+                )}
+              </div>
+            ) : (
+              <SectionEmpty icon={<LanguagesIcon />} title="No words yet" description="Words you look up while reading show up here." />
+            )}
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <SectionTitle title="Highlights" count={highlights.length} />
-              {highlights.length > 0 ? (
-                <div className="rounded-xl border divide-y overflow-hidden">
-                  {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
-                    <HighlightItem key={highlight.id} highlight={highlight} bookTitle={titles.get(highlight.book_id)} />
-                  ))}
-                  {highlights.length > RECENT_HIGHLIGHTS && (
-                    <SeeAllRow href="/reading/highlights" />
-                  )}
-                </div>
-              ) : (
-                <SectionEmpty icon={<HighlighterIcon />} title="No highlights yet" description="Passages you highlight on your Kindle show up here, with your notes." />
-              )}
-            </section>
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="Highlights" count={highlights.length} />
+            {highlights.length > 0 ? (
+              <div className="rounded-xl border divide-y overflow-hidden">
+                {highlights.slice(0, RECENT_HIGHLIGHTS).map((highlight) => (
+                  <HighlightItem key={highlight.id} highlight={highlight} bookTitle={titles.get(highlight.book_id)} />
+                ))}
+                {highlights.length > RECENT_HIGHLIGHTS && (
+                  <SeeAllRow href="/reading/highlights" />
+                )}
+              </div>
+            ) : (
+              <SectionEmpty icon={<HighlighterIcon />} title="No highlights yet" description="Passages you highlight on your Kindle show up here, with your notes." />
+            )}
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <SectionTitle title="Sessions" count={reading.sessions.length} />
-              {recentSessions.length > 0 ? (
-                <div className="rounded-xl border divide-y overflow-hidden">
-                  {recentSessions.map((session) => (
-                    <SessionRow
-                      key={`${session.book_id}-${session.started_at}`}
-                      session={session}
-                      bookTitle={titles.get(session.book_id)}
-                    />
-                  ))}
-                  {reading.sessions.length > RECENT_SESSIONS && (
-                    <SeeAllRow href="/reading/sessions" />
-                  )}
-                </div>
-              ) : (
-                <SectionEmpty icon={<ClockIcon />} title="No sessions yet" description="Time you spend reading on your Kindle shows up here." />
-              )}
-            </section>
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="Sessions" count={reading.sessions.length} />
+            {recentSessions.length > 0 ? (
+              <div className="rounded-xl border divide-y overflow-hidden">
+                {recentSessions.map((session) => (
+                  <SessionRow
+                    key={`${session.book_id}-${session.started_at}`}
+                    session={session}
+                    bookTitle={titles.get(session.book_id)}
+                  />
+                ))}
+                {reading.sessions.length > RECENT_SESSIONS && (
+                  <SeeAllRow href="/reading/sessions" />
+                )}
+              </div>
+            ) : (
+              <SectionEmpty icon={<ClockIcon />} title="No sessions yet" description="Time you spend reading on your Kindle shows up here." />
+            )}
+          </section>
 
-            <section className="flex flex-col gap-3">
-              <SectionTitle title="Finished" count={finished.length} />
-              {finished.length > 0 ? (
-                <div className={BOOK_GRID}>
-                  {finished.slice(0, RECENT_FINISHED).map((book) => (
-                    <BookCard key={book.id} book={book} />
-                  ))}
-                  {finished.length > RECENT_FINISHED && (
-                    <SeeAllRow
-                      href="/reading/finished"
-                      standalone
-                      className="col-span-full"
-                    />
-                  )}
-                </div>
-              ) : (
-                <SectionEmpty icon={<BookCheckIcon />} title="Nothing finished yet" description="Books you finish on your Kindle show up here." />
-              )}
-            </section>
-          </>
-        )}
-      </main>
-    </div>
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="Finished" count={finished.length} />
+            {finished.length > 0 ? (
+              <div className={BOOK_GRID}>
+                {finished.slice(0, RECENT_FINISHED).map((book) => (
+                  <BookCard key={book.id} book={book} />
+                ))}
+                {finished.length > RECENT_FINISHED && (
+                  <SeeAllRow
+                    href="/reading/finished"
+                    standalone
+                    className="col-span-full"
+                  />
+                )}
+              </div>
+            ) : (
+              <SectionEmpty icon={<BookCheckIcon />} title="Nothing finished yet" description="Books you finish on your Kindle show up here." />
+            )}
+          </section>
+        </>
+      )}
+    </Page>
   );
 }
 

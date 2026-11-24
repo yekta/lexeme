@@ -5,8 +5,8 @@ import { ThemeProvider } from "next-themes";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { FormDraftProvider } from "@/components/form-draft-provider";
 import { LoadError } from "@/components/load-error";
-import { Navbar } from "@/components/navbar";
 import { NowProvider } from "@/components/now-provider";
+import { Page } from "@/components/page";
 import { PageNotFound } from "@/components/page-not-found";
 import { SuggestionProvider } from "@/components/suggestion-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -25,20 +25,14 @@ import { queryClient } from "@/lib/query-client";
 export const Route = createRootRoute({
   component: RootComponent,
   errorComponent: ({ error, reset }) => (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1 w-full max-w-5xl mx-auto px-5 flex flex-col items-center justify-center pb-[8vh]">
-        <LoadError error={error} onRetry={reset} />
-      </main>
-    </div>
+    <Page className="items-center justify-center pb-[8vh]">
+      <LoadError error={error} onRetry={reset} />
+    </Page>
   ),
   notFoundComponent: () => (
-    <div className="min-h-screen flex flex-col wrap-anywhere">
-      <Navbar />
-      <main className="flex-1 w-full max-w-5xl mx-auto px-5 flex flex-col items-center justify-center pb-[8vh]">
-        <PageNotFound />
-      </main>
-    </div>
+    <Page className="items-center justify-center pb-[8vh] wrap-anywhere">
+      <PageNotFound />
+    </Page>
   ),
 });
 

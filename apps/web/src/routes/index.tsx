@@ -18,7 +18,7 @@ import { CreateOrImportDeckButton } from "@/components/import-deck-button";
 import { LDeck, type TDeckStats } from "@/components/l-deck";
 import { LearningProfileField } from "@/components/learning-profile-field";
 import { LoadError } from "@/components/load-error";
-import { Navbar } from "@/components/navbar";
+import { Page } from "@/components/page";
 import OptimisticIndicator from "@/components/optimistic-indicator";
 import { Button } from "@/components/ui/button";
 import {
@@ -186,71 +186,65 @@ function HomePageView({
   const [isCreateDeckOpen, setIsCreateDeckOpen] = useState(false);
 
   return (
-    <div
-      data-placeholder={isPlaceholder ? "true" : undefined}
-      className="min-h-screen relative group flex flex-col"
-    >
-      <Navbar />
-      <main className="w-full max-w-5xl mx-auto px-5 pt-4 pb-16 flex-1 flex flex-col gap-4">
-        {isError ? (
-          <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
-            <LoadError error={error} onRetry={onRetry} hideGoHome={true} />
+    <Page isPlaceholder={isPlaceholder} className="gap-4">
+      {isError ? (
+        <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
+          <LoadError error={error} onRetry={onRetry} hideGoHome={true} />
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-4">
+            <div className="shrink min-w-0 flex items-center gap-2">
+              <h2 className="mx-1 text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+                Decks{" "}
+                <span className="font-normal text-xl text-muted-foreground group-data-placeholder:text-transparent">
+                  ({isPlaceholder ? 5 : decks.length})
+                </span>
+              </h2>
+              {!isPlaceholder && (
+                <OptimisticIndicator isOptimistic={isOptimistic} />
+              )}
+            </div>
+            <CreateOrImportDeckButton
+              isPlaceholder={isPlaceholder}
+              onCreate={() => setIsCreateDeckOpen(true)}
+              onImported={async (id) => {
+                await asyncRouterPush(`/deck/${id}`);
+              }}
+            />
+            <Dialog
+              open={isCreateDeckOpen}
+              onOpenChange={setIsCreateDeckOpen}
+            >
+              <DialogContent>
+                <CreateDeckForm
+                  onAfterSubmit={async (id) => {
+                    await asyncRouterPush(`/deck/${id}`);
+                    setIsCreateDeckOpen(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
           </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between gap-4">
-              <div className="shrink min-w-0 flex items-center gap-2">
-                <h2 className="mx-1 text-2xl font-bold tracking-tight truncate min-w-0 group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-                  Decks{" "}
-                  <span className="font-normal text-xl text-muted-foreground group-data-placeholder:text-transparent">
-                    ({isPlaceholder ? 5 : decks.length})
-                  </span>
-                </h2>
-                {!isPlaceholder && (
-                  <OptimisticIndicator isOptimistic={isOptimistic} />
-                )}
-              </div>
-              <CreateOrImportDeckButton
-                isPlaceholder={isPlaceholder}
-                onCreate={() => setIsCreateDeckOpen(true)}
-                onImported={async (id) => {
-                  await asyncRouterPush(`/deck/${id}`);
-                }}
-              />
-              <Dialog
-                open={isCreateDeckOpen}
-                onOpenChange={setIsCreateDeckOpen}
-              >
-                <DialogContent>
-                  <CreateDeckForm
-                    onAfterSubmit={async (id) => {
-                      await asyncRouterPush(`/deck/${id}`);
-                      setIsCreateDeckOpen(false);
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
-            </div>
-            <DecksSection
-              isPlaceholder={isPlaceholder}
-              decks={decks}
-              getDeckStats={(id) => statsByDeck?.get(id) ?? EMPTY_STATS}
-              onCreateDeck={() => setIsCreateDeckOpen(true)}
-            />
-            <div className="w-full py-2">
-              <div className="w-full h-px rounded-full bg-border" />
-            </div>
-            <TodayStatsFooter
-              isPlaceholder={isPlaceholder}
-              stats={todayStats}
-              isPending={todayStatsPending}
-              isError={todayStatsError}
-              className="-mt-1"
-            />
-          </>
-        )}
-      </main>
-    </div>
+          <DecksSection
+            isPlaceholder={isPlaceholder}
+            decks={decks}
+            getDeckStats={(id) => statsByDeck?.get(id) ?? EMPTY_STATS}
+            onCreateDeck={() => setIsCreateDeckOpen(true)}
+          />
+          <div className="w-full py-2">
+            <div className="w-full h-px rounded-full bg-border" />
+          </div>
+          <TodayStatsFooter
+            isPlaceholder={isPlaceholder}
+            stats={todayStats}
+            isPending={todayStatsPending}
+            isError={todayStatsError}
+            className="-mt-1"
+          />
+        </>
+      )}
+    </Page>
   );
 }
 

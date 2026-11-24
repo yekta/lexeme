@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { LoadError } from "@/components/load-error";
 import { Navbar } from "@/components/navbar";
+import { Page } from "@/components/page";
 import { RequireIdentity } from "@/components/require-identity";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
@@ -27,19 +28,16 @@ export function ReadingListPage({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar title={navTitle} backHref={backHref} />
-      <main className="w-full max-w-5xl mx-auto px-5 pt-6 pb-16 flex-1 flex flex-col gap-3">
-        {isError ? (
-          <LoadError error={error} onRetry={onRetry} />
-        ) : (
-          <>
-            <SectionTitle title={title} count={count} />
-            {count > 0 && children}
-          </>
-        )}
-      </main>
-    </div>
+    <Page title={navTitle} backHref={backHref} className="gap-3">
+      {isError ? (
+        <LoadError error={error} onRetry={onRetry} />
+      ) : (
+        <>
+          <SectionTitle title={title} count={count} />
+          {count > 0 && children}
+        </>
+      )}
+    </Page>
   );
 }
 

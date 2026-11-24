@@ -1,6 +1,6 @@
 import { Trash2Icon } from "lucide-react";
 
-import { Navbar } from "@/components/navbar";
+import { Page } from "@/components/page";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,13 +14,10 @@ export function SettingsPage({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar backHref="/" title={title} />
-      <main className="w-full max-w-3xl mx-auto px-5 pt-6 pb-16 flex-1 flex flex-col gap-6">
-        {action && <div className="flex -mb-3">{action}</div>}
-        {children}
-      </main>
-    </div>
+    <Page backHref="/" title={title} className="gap-6">
+      {action && <div className="flex -mb-3">{action}</div>}
+      {children}
+    </Page>
   );
 }
 

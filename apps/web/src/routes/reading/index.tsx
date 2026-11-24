@@ -113,7 +113,7 @@ function ReadingPage() {
                     />
                   ))}
                   {reading.lookups.length > RECENT_WORDS && (
-                    <SeeAllRow href="/reading/words" more={reading.lookups.length - RECENT_WORDS} />
+                    <SeeAllRow href="/reading/words" />
                   )}
                 </div>
               ) : (
@@ -129,7 +129,7 @@ function ReadingPage() {
                     <HighlightItem key={highlight.id} highlight={highlight} bookTitle={titles.get(highlight.book_id)} />
                   ))}
                   {highlights.length > RECENT_HIGHLIGHTS && (
-                    <SeeAllRow href="/reading/highlights" more={highlights.length - RECENT_HIGHLIGHTS} />
+                    <SeeAllRow href="/reading/highlights" />
                   )}
                 </div>
               ) : (
@@ -149,7 +149,7 @@ function ReadingPage() {
                     />
                   ))}
                   {reading.sessions.length > RECENT_SESSIONS && (
-                    <SeeAllRow href="/reading/sessions" more={reading.sessions.length - RECENT_SESSIONS} />
+                    <SeeAllRow href="/reading/sessions" />
                   )}
                 </div>
               ) : (
@@ -167,7 +167,6 @@ function ReadingPage() {
                   {finished.length > RECENT_FINISHED && (
                     <SeeAllRow
                       href="/reading/finished"
-                      more={finished.length - RECENT_FINISHED}
                       standalone
                       className="col-span-full"
                     />

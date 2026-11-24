@@ -14,6 +14,7 @@ import {
   SettingsPage,
   SettingsSection,
 } from "@/components/access/settings-page";
+import { Dot } from "@/components/dot";
 import {
   EmptyList,
   EmptyListContent,
@@ -166,10 +167,7 @@ function ApiKeyMeta({ apiKey }: { apiKey: TApiKey }) {
 
   return (
     <>
-      <span className={cn(isExpired && "text-destructive")}>{expiry}</span>
-      {" · "}
-      {lastUsed}
-      {" · "}
+      <span className={cn(isExpired && "text-destructive")}>{expiry}</span> <Dot /> {lastUsed} <Dot />{" "}
       Created {format(new Date(apiKey.created_at), "MMM d, yyyy")}
     </>
   );

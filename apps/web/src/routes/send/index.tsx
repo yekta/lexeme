@@ -5,6 +5,7 @@ import { BookUpIcon, CheckIcon, LoaderCircleIcon, Trash2Icon } from "lucide-reac
 import { useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 
+import { Dot } from "@/components/dot";
 import {
   EmptyList,
   EmptyListContent,
@@ -161,7 +162,7 @@ function SentBookRow({ book, removing, onRemove }: { book: TSentBook; removing: 
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <span className="font-medium truncate">{book.title}</span>
         <span className="text-xs text-muted-foreground">
-          {formatSize(book.size_bytes)} · sent {formatDistanceToNowStrict(book.created_at, { addSuffix: true })}
+          {formatSize(book.size_bytes)} <Dot /> sent {formatDistanceToNowStrict(book.created_at, { addSuffix: true })}
         </span>
       </div>
       <span

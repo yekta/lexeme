@@ -130,7 +130,7 @@ export function LDeck(props: TLDeckProps) {
                   </p>
                 </div>
                 {(isPlaceholder || retention !== null) && (
-                  <p className="px-2 text-muted-more-foreground group-data-placeholder:text-transparent group-data-placeholder:px-1">
+                  <p className="px-2 text-muted-most-foreground group-data-placeholder:text-transparent group-data-placeholder:px-1">
                     |
                   </p>
                 )}

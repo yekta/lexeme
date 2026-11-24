@@ -18,11 +18,11 @@ import { useGenerateBack } from "@/hooks/data/use-ai";
 import { useCreateCard } from "@/hooks/data/use-cards";
 import { useDecks } from "@/hooks/data/use-decks";
 import type { TLookup } from "@/hooks/data/use-reading";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 const LAST_DECK_KEY = "lexeme:word-card-deck";
 
-/** A looked-up word as a card: the back is written for the sense it had in the sentence it was read in. */
+/** The add-card form for a looked-up word: its front filled in, and a deck to pick. */
 export function WordCardForm({ lookup, onDone }: { lookup: TLookup; onDone: () => void }) {
   const { data: decks, isPending: isPendingDecks } = useDecks();
   const [chosenDeckId, setChosenDeckId] = useState(() => localStorage.getItem(LAST_DECK_KEY) ?? "");
@@ -31,7 +31,6 @@ export function WordCardForm({ lookup, onDone }: { lookup: TLookup; onDone: () =
   const [back, setBack] = useState("");
   const generateBack = useGenerateBack();
   const createCard = useCreateCard();
-  const suggestedFor = useRef<string | null>(null);
 
   const deckOptions = useMemo(() => decks.map((d) => ({ value: d.id, label: d.name })), [decks]);
   const selected = deckOptions.find((o) => o.value === deck?.id) ?? null;
@@ -44,12 +43,6 @@ export function WordCardForm({ lookup, onDone }: { lookup: TLookup; onDone: () =
       { onSuccess: (result) => setBack(result.back) },
     );
   };
-
-  useEffect(() => {
-    if (!deck || suggestedFor.current === deck.id || back.trim()) return;
-    suggestedFor.current = deck.id;
-    suggestBack(deck.id);
-  });
 
   const canSubmit = Boolean(deck) && front.trim() !== "" && back.trim() !== "";
 
@@ -66,9 +59,7 @@ export function WordCardForm({ lookup, onDone }: { lookup: TLookup; onDone: () =
     >
       <DialogHeader>
         <DialogTitle>Add Card</DialogTitle>
-        <DialogDescription>
-          {lookup.context ? "The back explains the word as it was used where you read it." : "Add the word to a deck."}
-        </DialogDescription>
+        <DialogDescription>Add the word to a deck.</DialogDescription>
       </DialogHeader>
       <FormWrapper className="min-w-0">
         <FormFieldWrapper>

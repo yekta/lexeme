@@ -509,8 +509,8 @@ local function paintTiles(bb, x, top, w, reading)
         { "This week", readingTime(reading.week) },
         { "Total", readingTime(reading.total) },
         { "Streak", count(reading.streak, "day", "days") },
-        { "Finished in " .. reading.year, count(reading.finished_this_year, "book", "books") },
-        { "Finished all time", count(reading.finished, "book", "books") },
+        { "Finished (" .. reading.year .. ")", count(reading.finished_this_year, "book", "books") },
+        { "Finished (All Time)", count(reading.finished, "book", "books") },
     }
     local per_row, gap, h = TILE.per_row, D.s(TILE.gap), D.s(TILE.height)
     local left, right = x + D.s(HOME_MARGIN), x + w - D.s(HOME_MARGIN)

@@ -1,6 +1,6 @@
 import { formatReadingTime, type TReadingDay } from "@lexeme/shared";
 import { format, parseISO } from "date-fns";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ function weekColumns(days: readonly TReadingDay[], goalSeconds: number) {
   return weeks;
 }
 
-const LABEL_COLUMNS = 3;
+const LABEL_COLUMNS = 4;
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Each month's short name over the first week it starts in, left out where the next month's would touch it. */
@@ -46,13 +46,6 @@ export function StreakCalendar({
   const weeks = useMemo(() => weekColumns(days, goalMinutes * 60), [days, goalMinutes]);
   const labels = useMemo(() => monthLabels(weeks), [weeks]);
   const reached = weeks.flat().filter((cell) => cell?.reached).length;
-  const scroller = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const element = scroller.current;
-    if (element) element.scrollLeft = element.scrollWidth;
-  }, [weeks.length, isPlaceholder]);
-
   return (
     <div className="rounded-xl border bg-card px-4 py-3.5 flex flex-col gap-2">
       <div className="h-4 mb-1 flex items-start text-xs text-muted-foreground">
@@ -61,7 +54,7 @@ export function StreakCalendar({
         </span>
       </div>
       <div className="flex gap-1.5">
-        <div className="flex flex-col gap-0.75 pb-1 text-[10px] leading-none text-muted-foreground">
+        <div className="hidden sm:flex flex-col gap-0.75 text-[10px] leading-none text-muted-foreground">
           <span className="h-4" />
           {WEEKDAYS.map((day) => (
             <span key={day} className="flex-1 flex items-center">
@@ -69,10 +62,10 @@ export function StreakCalendar({
             </span>
           ))}
         </div>
-        <div ref={scroller} className="min-w-0 flex-1 overflow-x-auto -mr-4 pr-4 pb-1">
-          <div className="grid grid-flow-col auto-cols-[minmax(0.6875rem,1fr)] gap-0.75 min-w-max sm:min-w-0">
+        <div className="min-w-0 flex-1">
+          <div className="grid grid-flow-col auto-cols-fr gap-px sm:gap-0.75">
             {weeks.map((week, i) => (
-              <div key={i} className="flex flex-col gap-0.75">
+              <div key={i} className="min-w-0 flex flex-col gap-px sm:gap-0.75">
                 <span className="h-4 text-[10px] leading-none text-muted-foreground whitespace-nowrap overflow-visible group-data-placeholder:text-transparent">
                   {labels[i]}
                 </span>
@@ -84,8 +77,8 @@ export function StreakCalendar({
                       key={d}
                       title={`${format(parseISO(cell.day), "EEE d MMM yyyy")}: ${formatReadingTime(cell.seconds)}`}
                       className={cn(
-                        "aspect-square rounded-[3px] border",
-                        cell.reached ? "bg-muted-foreground border-muted-foreground" : "bg-muted-foreground/8 border-border",
+                        "aspect-square rounded-[1px] sm:rounded-[3px] border border-muted-foreground",
+                        cell.reached ? "bg-muted-foreground" : "bg-transparent",
                         "group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:border-transparent group-data-placeholder:animate-pulse",
                       )}
                     />

@@ -715,9 +715,11 @@ function Settings:rowHeight(row, w, icons)
     return h
 end
 
--- Room for a row's title and subtitle: after its icon, before its value and chevron.
+-- Room for a row's title and subtitle: after its icon, a gap short of whatever sits on the right.
 function Settings:textWidth(row, w, icons)
     local left = icons and D.s(131) or row.icon and D.s(142) or D.s(59)
+    if row.toggle ~= nil then return w - left - D.s(140 + 84 + 30) end
+    if row.check then return w - left - D.s(210 + 30) end
     local right = D.s(icons and 89 or 140) + D.s(50)
     if row.value then right = right + D.width(D.face("regular", 32), row.value) + D.s(30) end
     return w - left - right

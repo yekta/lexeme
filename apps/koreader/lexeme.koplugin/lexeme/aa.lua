@@ -464,7 +464,7 @@ function Aa:paintMore(bb, x, top, w)
         local baseline = row_top + (row.subtitle and D.s(60) or D.s(72))
         D.text(bb, x + D.s(36), baseline, D.face("bold", 28), row.title)
         if row.subtitle then
-            D.text(bb, x + D.s(36), baseline + D.s(36), D.face("italic", 24), row.subtitle, D.BLACK, w - D.s(200))
+            D.text(bb, x + D.s(36), baseline + D.s(36), D.face("italic", 24), row.subtitle, D.BLACK, w - D.s(230))
         end
         if row.value then
             D.textRight(bb, x + w - D.s(120), baseline, D.face("regular", 28), row.value)

@@ -13,7 +13,7 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
   before tapping; earlier touches are dropped.
 - `scripts/dev-mode.sh on` before testing on a Kindle someone reads on: it
   snapshots what reading leaves behind (statistics, look-ups, highlights,
-  positions, history, the sync outbox) and pauses syncing, with "Dev" shown by
+  positions, history, the sync outbox) and pauses syncing, with "Dev Mode" shown by
   the clock. When you're done, go back to the Home screen, then
   `scripts/dev-mode.sh off` restores the snapshot and resumes syncing;
   `status` says which is on.

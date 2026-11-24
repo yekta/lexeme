@@ -186,7 +186,7 @@ function HomePageView({
   const [isCreateDeckOpen, setIsCreateDeckOpen] = useState(false);
 
   return (
-    <Page isPlaceholder={isPlaceholder} className="gap-4">
+    <Page isPlaceholder={isPlaceholder} className="gap-4 pt-4 sm:pt-6">
       {isError ? (
         <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
           <LoadError error={error} onRetry={onRetry} hideGoHome={true} />

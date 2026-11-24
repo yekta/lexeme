@@ -15,6 +15,8 @@ import {
 import { HighlightItem } from "@/components/highlight-item";
 import { LoadError } from "@/components/load-error";
 import { ReadingChart } from "@/components/reading-chart";
+import { ReadingGoalMenu } from "@/components/reading-goal-menu";
+import { StreakCalendar } from "@/components/streak-calendar";
 import { Navbar } from "@/components/navbar";
 import { Page } from "@/components/page";
 import { SessionRow } from "@/components/session-row";
@@ -48,7 +50,8 @@ function ReadingRoute() {
 function ReadingPage() {
   const reading = useReading();
   const cardWords = useCardWords();
-  const summary = useReadingSummary(reading.books, reading.days);
+  const summary = useReadingSummary(reading.books, reading.days, reading.goal);
+  const isPlaceholder = reading.isPending;
   const booksByRecent = useMemo(
     () => [...reading.books].sort((a, b) => (b.last_read_at ?? 0) - (a.last_read_at ?? 0)),
     [reading.books],
@@ -67,23 +70,33 @@ function ReadingPage() {
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
 
   return (
-    <Page title="Reading" backHref="/" className="gap-8">
+    <Page title="Reading" backHref="/" className="gap-8" isPlaceholder={isPlaceholder}>
       {reading.isError ? (
         <LoadError error={reading.error} onRetry={reading.refetch} />
       ) : !reading.isPending && reading.books.length === 0 ? (
         <NoBooks />
       ) : (
         <>
-          <section className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <section className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             <StatTile label="Today" value={formatReadingTime(summary.todaySeconds)} />
             <StatTile label="This week" value={formatReadingTime(summary.weekSeconds)} />
-            <StatTile label="Streak" value={`${summary.streak} ${summary.streak === 1 ? "day" : "days"}`} />
-            <StatTile label={`Finished in ${new Date().getFullYear()}`} value={String(summary.finishedThisYear)} />
+            <StatTile label="Total" value={formatReadingTime(summary.totalSeconds)} />
+            <StatTile label="Streak" value={count(summary.streak, "day", "days")} />
+            <StatTile label={`Finished in ${new Date().getFullYear()}`} value={count(summary.finishedThisYear, "book", "books")} />
+            <StatTile label="Finished" value={count(summary.finished, "book", "books")} />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-4">
+              <SectionTitle title="Streak" />
+              <ReadingGoalMenu isPlaceholder={isPlaceholder} />
+            </div>
+            <StreakCalendar days={summary.streakDays} goalMinutes={reading.goal.daily_minutes} isPlaceholder={isPlaceholder} />
           </section>
 
           <section className="flex flex-col gap-3">
             <SectionTitle title="Reading Time" />
-            <ReadingChart days={summary.lastDays} pageReads={reading.pageReads} />
+            <ReadingChart days={summary.chartDays} isPlaceholder={isPlaceholder} />
           </section>
 
           <section className="flex flex-col gap-3">
@@ -194,12 +207,16 @@ function isReadingNow(book: TBook) {
   return recent || (book.progress ?? 0) > 0;
 }
 
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <Card className="min-w-0 py-3">
       <CardHeader>
         <CardDescription className="truncate">{label}</CardDescription>
-        <span className="text-xl font-semibold tabular-nums truncate">{value}</span>
+        <span className="text-xl font-semibold tabular-nums truncate self-start group-data-placeholder:text-transparent group-data-placeholder:bg-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
+          {value}
+        </span>
       </CardHeader>
     </Card>
   );

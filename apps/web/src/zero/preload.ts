@@ -85,6 +85,7 @@ export function preloadAccount(zero: Zero<TSchema>): void {
       zero.preload(queries.pageReads(), { ttl: "forever" });
       zero.preload(queries.highlights(), { ttl: "forever" });
       zero.preload(queries.lookups(), { ttl: "forever" });
+      zero.preload(queries.readingGoal(), { ttl: "forever" });
     });
   });
 }

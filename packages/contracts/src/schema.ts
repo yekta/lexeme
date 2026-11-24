@@ -241,6 +241,18 @@ const bookRelationships = relationships(books, ({ many }) => ({
   lookups: many({ sourceField: ["id"], destField: ["book_id"], destSchema: lookups }),
 }));
 
+/** What counts as a day read; a user without a row uses the defaults. */
+const readingGoals = table("reading_goals")
+  .columns({
+    user_id: string(),
+    daily_minutes: number(),
+    /** Minutes past midnight. */
+    day_starts_at: number(),
+    created_at: number(),
+    updated_at: number(),
+  })
+  .primaryKey("user_id");
+
 export const schema = createSchema({
   tables: [
     learningProfiles,
@@ -252,6 +264,7 @@ export const schema = createSchema({
     highlights,
     lookups,
     sentBooks,
+    readingGoals,
   ],
   relationships: [
     deckRelationships,
@@ -281,3 +294,4 @@ export type TPageReadRow = Row<TSchema["tables"]["page_reads"]>;
 export type THighlightRow = Row<TSchema["tables"]["highlights"]>;
 export type TLookupRow = Row<TSchema["tables"]["lookups"]>;
 export type TSentBookRow = Row<TSchema["tables"]["sent_books"]>;
+export type TReadingGoalRow = Row<TSchema["tables"]["reading_goals"]>;

@@ -222,6 +222,12 @@ export const syncReadingArgs = z.object({
   removed_book_keys: z.array(bookKey).max(2000).default([]),
 });
 
+export const readingGoalArgs = z.object({
+  daily_minutes: z.number().int().min(1).max(24 * 60),
+  /** Minutes past midnight. */
+  day_starts_at: z.number().int().min(0).max(24 * 60 - 1),
+});
+
 /** A reading session is a book's page visits that started between `started_at` and `ended_at`. */
 export const deleteReadingSessionArgs = z
   .object({ book_id: uuidArg, started_at: epochMs, ended_at: epochMs })
@@ -593,6 +599,20 @@ export const mutatorDefs = {
       if (!lookup) throw new Error("That look-up no longer exists.");
       if (lookup.user_id !== user_id) throw new Error("You don't have access to that look-up.");
       await tx.mutate.lookups.delete({ id: args.id });
+    }),
+  },
+
+  readingGoal: {
+    update: defineMutator(readingGoalArgs, async ({ tx, ctx, args }) => {
+      const { user_id } = mustBeSignedIn(ctx);
+      const existing = await tx.run(zql.reading_goals.where("user_id", user_id).one());
+      const now = Date.now();
+      await tx.mutate.reading_goals.upsert({
+        user_id,
+        ...args,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+      });
     }),
   },
 

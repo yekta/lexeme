@@ -348,6 +348,17 @@ export const lookups = pgTable(
   (t) => [index("lookups_user_id_idx").on(t.user_id)],
 );
 
+/** What counts as a day read: minutes read, in a day that starts at `day_starts_at` minutes past midnight. */
+export const readingGoals = pgTable("reading_goals", {
+  user_id: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  daily_minutes: integer("daily_minutes").notNull().default(15),
+  day_starts_at: integer("day_starts_at").notNull().default(0),
+  created_at: createdAt(),
+  updated_at: updatedAt(),
+});
+
 /**
  * Books sent from Lexeme to the user's e-readers. The file is in object storage
  * under `storage_key`; a device downloads it and marks it delivered.

@@ -127,7 +127,7 @@ function DeckPageView({
   const deckName = isPlaceholder ? "Loading..." : (deck?.name ?? "Loading...");
 
   return (
-    <Page isPlaceholder={isPlaceholder} className="gap-4">
+    <Page isPlaceholder={isPlaceholder} className="gap-4 pt-4 sm:pt-6">
       {state === "not-found" || state === "forbidden" || state === "error" ? (
         <div className="flex-1 w-full items-center justify-center flex flex-col pb-[8vh]">
           {state === "not-found" ? (

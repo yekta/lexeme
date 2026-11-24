@@ -6,10 +6,10 @@ import {
   dayKey,
   formatReadingTime,
   lastDays,
+  readingDate,
   readingSessions,
   readingStreak,
   secondsByDay,
-  secondsByHour,
   type TPageRead,
 } from "./reading-stats.ts";
 
@@ -41,6 +41,32 @@ test("today not read yet keeps yesterday's streak", () => {
     { day: "2026-11-21", seconds: 60 },
   ]);
   assert.equal(readingStreak(totals, today), 2);
+});
+
+test("only days that reached the goal count toward the streak", () => {
+  const totals = secondsByDay([
+    { day: "2026-11-23", seconds: 15 * 60 },
+    { day: "2026-11-22", seconds: 16 * 60 },
+    { day: "2026-11-21", seconds: 14 * 60 },
+    { day: "2026-11-20", seconds: 30 * 60 },
+  ]);
+  assert.equal(readingStreak(totals, today, 15 * 60), 2);
+});
+
+test("today short of the goal keeps yesterday's streak", () => {
+  const totals = secondsByDay([
+    { day: "2026-11-23", seconds: 5 * 60 },
+    { day: "2026-11-22", seconds: 20 * 60 },
+  ]);
+  assert.equal(readingStreak(totals, today, 15 * 60), 1);
+});
+
+test("reading after midnight counts toward the day before until the day starts", () => {
+  const lateNight = new Date(2026, 10, 24, 2, 30).getTime();
+  const days = bookDays([{ book_id: "a", page: 1, started_at: lateNight, seconds: 600 }], 4 * 60);
+  assert.deepEqual(days, [{ book_id: "a", day: "2026-11-23", seconds: 600, pages: 1 }]);
+  assert.equal(dayKey(readingDate(lateNight, 4 * 60)), "2026-11-23");
+  assert.equal(dayKey(readingDate(lateNight, 0)), "2026-11-24");
 });
 
 test("no reading yesterday or today is no streak", () => {
@@ -96,19 +122,4 @@ test("a pause longer than ten minutes starts a new session", () => {
 test("sessions never mix books", () => {
   const sessions = readingSessions([read(1, 9, 0, 60), read(1, 9, 1, 60, "b")]);
   assert.equal(sessions.length, 2);
-});
-
-test("hours split a page left open across the turn of an hour", () => {
-  const reads: TPageRead[] = [
-    { book_id: "a", page: 1, started_at: new Date(2026, 10, 23, 19, 55).getTime(), seconds: 10 * 60 },
-    { book_id: "b", page: 4, started_at: new Date(2026, 10, 23, 7, 0).getTime(), seconds: 120 },
-    { book_id: "a", page: 2, started_at: new Date(2026, 10, 22, 23, 59).getTime(), seconds: 120 },
-  ];
-  const hours = secondsByHour(reads, "2026-11-23");
-  assert.equal(hours.length, 24);
-  assert.equal(hours[19], 5 * 60);
-  assert.equal(hours[20], 5 * 60);
-  assert.equal(hours[7], 120);
-  assert.equal(hours[0], 60);
-  assert.equal(hours.reduce((a, b) => a + b, 0), 5 * 60 + 5 * 60 + 120 + 60);
 });

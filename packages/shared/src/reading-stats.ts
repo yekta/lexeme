@@ -6,6 +6,10 @@ export type TReadingDay = { day: string; seconds: number };
 
 export type TBookDay = TReadingDay & { book_id: string; pages: number };
 
+export const DEFAULT_DAILY_GOAL_MINUTES = 15;
+/** Minutes past midnight a reading day starts at, unless the user moves it. */
+export const DEFAULT_DAY_STARTS_AT = 0;
+
 /** A pause between page turns longer than this ends a reading session. */
 export const SESSION_GAP_SECONDS = 10 * 60;
 
@@ -26,11 +30,16 @@ export function dayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Time and distinct pages per book per local day. */
-export function bookDays(reads: readonly TPageRead[]): TBookDay[] {
+/** The calendar date a moment counts toward, when days start `dayStartsAt` minutes past midnight. */
+export function readingDate(time: number, dayStartsAt = DEFAULT_DAY_STARTS_AT): Date {
+  return new Date(time - dayStartsAt * 60_000);
+}
+
+/** Time and distinct pages per book per reading day. */
+export function bookDays(reads: readonly TPageRead[], dayStartsAt = DEFAULT_DAY_STARTS_AT): TBookDay[] {
   const byKey = new Map<string, TBookDay & { pageSet: Set<number> }>();
   for (const read of reads) {
-    const day = dayKey(new Date(read.started_at));
+    const day = dayKey(readingDate(read.started_at, dayStartsAt));
     const key = `${read.book_id}|${day}`;
     let entry = byKey.get(key);
     if (!entry) {
@@ -75,14 +84,16 @@ export function secondsByDay(days: readonly TReadingDay[]): Map<string, number> 
 }
 
 /**
- * Consecutive days with reading, counting back from today. A day not read yet
- * doesn't break the streak until it's over, so it counts from yesterday then.
+ * Consecutive days that reached the goal, counting back from today. Today
+ * doesn't break the streak until it's over, so it counts from yesterday until
+ * today reaches the goal.
  */
-export function readingStreak(totals: Map<string, number>, today: Date): number {
+export function readingStreak(totals: Map<string, number>, today: Date, goalSeconds = 1): number {
+  const reached = (date: Date) => (totals.get(dayKey(date)) ?? 0) >= goalSeconds;
   const cursor = new Date(today);
-  if (!totals.get(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  if (!reached(cursor)) cursor.setDate(cursor.getDate() - 1);
   let streak = 0;
-  while (totals.get(dayKey(cursor))) {
+  while (reached(cursor)) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -99,25 +110,6 @@ export function lastDays(totals: Map<string, number>, today: Date, count: number
     result.push({ day: key, seconds: totals.get(key) ?? 0 });
   }
   return result;
-}
-
-/**
- * Seconds read in each of the 24 local hours of `day` (YYYY-MM-DD), across all
- * books. A page left open over the turn of an hour counts toward both hours.
- */
-export function secondsByHour(reads: readonly TPageRead[], day: string): number[] {
-  const hours = Array.from({ length: 24 }, () => 0);
-  const [y, m, d] = day.split("-").map(Number);
-  for (let hour = 0; hour < 24; hour += 1) {
-    const from = new Date(y, m - 1, d, hour).getTime();
-    const to = new Date(y, m - 1, d, hour + 1).getTime();
-    for (const read of reads) {
-      const end = read.started_at + read.seconds * 1000;
-      const overlap = Math.min(end, to) - Math.max(read.started_at, from);
-      if (overlap > 0) hours[hour] += overlap / 1000;
-    }
-  }
-  return hours;
 }
 
 /** "1 h 20 min", "45 min", "0 min". */

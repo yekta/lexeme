@@ -127,6 +127,20 @@
       "when": 1795520669381,
       "tag": "0017_page_reads_imported",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795523564284,
+      "tag": "0018_reading_goals",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795523564852,
+      "tag": "0019_reading_goals_publication",
+      "breakpoints": true
     }
   ]
 }

@@ -597,8 +597,8 @@ function Settings:libraryPage()
         rows = function()
             return {
                 {
-                    title = connected and "Show Streak" or "Show Recently Added",
-                    subtitle = connected and "Show the days you read on Home, as Lexeme counts them."
+                    title = connected and "Show Reading" or "Show Recently Added",
+                    subtitle = connected and "Show your reading time, streak and finished books on Home."
                         or "Show the books you added most recently on Home.",
                     toggle = G_reader_settings:nilOrTrue("lexeme_home_recently_added"),
                     tap = function()

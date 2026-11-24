@@ -450,16 +450,46 @@ end
 
 local WEEKDAYS = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
 
+-- "1 h 20 min", "45 min", as Lexeme writes reading time.
+local function readingTime(seconds)
+    local hours, minutes = math.floor(seconds / 3600), math.floor(seconds % 3600 / 60)
+    if hours > 0 then return string.format("%d h %d min", hours, minutes) end
+    return string.format("%d min", minutes)
+end
+
+local function count(n, one, many)
+    return string.format("%d %s", n, n == 1 and one or many)
+end
+
+-- Today, Total, Streak and Finished side by side. Returns the y where they end.
+local function paintTiles(bb, x, top, w, reading)
+    local tiles = {
+        { "Today", readingTime(reading.today) },
+        { "Total", readingTime(reading.total) },
+        { "Streak", count(reading.streak, "day", "days") },
+        { "Finished", count(reading.finished, "book", "books") },
+    }
+    local gap, h = D.s(18), D.s(136)
+    local left, right = x + D.s(57), x + w - D.s(57)
+    local tile_w = math.floor((right - left - gap * (#tiles - 1)) / #tiles)
+    for i, tile in ipairs(tiles) do
+        local tx = left + (i - 1) * (tile_w + gap)
+        D.border(bb, tx, top, tile_w, h, D.s(3), D.BLACK)
+        D.text(bb, tx + D.s(24), top + D.s(50), D.face("regular", 28), tile[1], D.BLACK, tile_w - D.s(48))
+        D.text(bb, tx + D.s(24), top + D.s(106), D.face("bold", 36), tile[2], D.BLACK, tile_w - D.s(48))
+    end
+    return top + h
+end
+
 -- The last year as a grid of days, a week to a column, like Lexeme's streak calendar.
-local function paintStreak(bb, x, top, w, days, goal_minutes)
-    D.text(bb, x + D.s(57), top + D.s(58), D.face("display", 55), "Streak")
+local function paintCalendar(bb, x, top, w, days, goal_minutes)
     local goal, reached = goal_minutes * 60, 0
     for _, day in ipairs(days) do
         if day.seconds >= goal then reached = reached + 1 end
     end
     local small = D.face("regular", 24)
-    D.text(bb, x + D.s(57), top + D.s(125), D.face("regular", 30),
-        string.format("%d %s of %d min+", reached, reached == 1 and "day" or "days", goal_minutes))
+    D.text(bb, x + D.s(57), top + D.s(30), D.face("regular", 28),
+        string.format("%s of %d min+", count(reached, "day", "days"), goal_minutes))
 
     local y, m, d = days[1].day:match("^(%d+)-(%d+)-(%d+)$")
     local first = os.time{ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 }
@@ -471,7 +501,7 @@ local function paintStreak(bb, x, top, w, days, goal_minutes)
     local gap = D.s(4)
     local pitch = math.floor((x + w - D.s(57) - left + gap) / columns)
     local cell = pitch - gap
-    local grid_top = top + D.s(200)
+    local grid_top = top + D.s(96)
 
     for row, name in ipairs(WEEKDAYS) do
         D.text(bb, x + D.s(57), grid_top + (row - 1) * pitch + math.floor(cell * 0.8), small, name)
@@ -506,9 +536,10 @@ function Shell:paintHome(bb, x, y, w)
     if not G_reader_settings:nilOrTrue("lexeme_home_recently_added") then return end
     -- The next heading's baseline sits 94 px under the badges, as on the Kindle.
     local next_top = bottom + D.s(94 - 58)
-    if Sync.isConnected() then
-        local days, goal_minutes = Streak.days()
-        if days then return paintStreak(bb, x, next_top, w, days, goal_minutes) end
+    local reading = Sync.isConnected() and Streak.summary()
+    if reading then
+        local tiles_bottom = paintTiles(bb, x, next_top - D.s(20), w, reading)
+        return paintCalendar(bb, x, tiles_bottom + D.s(40), w, reading.days, reading.goal_minutes)
     end
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)
 end

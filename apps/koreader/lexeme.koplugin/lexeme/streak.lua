@@ -1,7 +1,8 @@
 --[[
-The last year of reading days Home shows, as Lexeme counts them across every reader.
-It's fetched when a sync has sent this Kindle's reading and kept on the device, so
-Home has it offline; what was read here since it was fetched is added on top.
+The reading Home shows, as Lexeme counts it across every reader: the last year of
+days, the streak, all the time read and the books finished. It's fetched when a sync
+has sent this Kindle's reading and kept on the device, so Home has it offline; what
+was read here since it was fetched is added on top.
 ]]
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
@@ -39,6 +40,9 @@ function Streak.refresh()
         seconds = seconds,
         daily_minutes = tonumber(body.goal.daily_minutes) or 15,
         day_starts_at = tonumber(body.goal.day_starts_at) or 0,
+        streak = tonumber(body.streak) or 0,
+        total_seconds = tonumber(body.total_seconds) or 0,
+        finished_books = tonumber(body.finished_books) or 0,
     })
     settings:flush()
     return true
@@ -70,14 +74,32 @@ local function readHere(since, day_starts_at)
     return totals
 end
 
+-- Consecutive days that reached the goal, back from today; today unread yet doesn't break it.
+local function streakOf(days, goal)
+    local i = #days
+    if days[i].seconds < goal then i = i - 1 end
+    local streak = 0
+    while i >= 1 and days[i].seconds >= goal do
+        streak = streak + 1
+        i = i - 1
+    end
+    return streak, i < 1
+end
+
 --[[
-The year ending today, oldest first, as { day = "YYYY-MM-DD", seconds = n }, and the
-daily goal in minutes; nil until Lexeme has sent it once.
+What Home shows, or nil until Lexeme has sent it once: `days`, the year ending today,
+oldest first, as { day = "YYYY-MM-DD", seconds = n }; `goal_minutes`; `today` and
+`total` in seconds; `streak` in days; `finished` books.
 ]]
-function Streak.days()
+function Streak.summary()
     local saved = store():readSetting("streak")
     if not (saved and saved.first_day and saved.seconds) then return nil end
-    local totals = readHere(saved.fetched_at, saved.day_starts_at)
+    local here = readHere(saved.fetched_at, saved.day_starts_at)
+    local totals, total = {}, saved.total_seconds or 0
+    for key, seconds in pairs(here) do
+        totals[key] = seconds
+        total = total + seconds
+    end
     local first = noonOf(saved.first_day)
     for i, seconds in ipairs(saved.seconds) do
         local key = os.date("%Y-%m-%d", first + (i - 1) * 86400)
@@ -89,7 +111,18 @@ function Streak.days()
         local key = os.date("%Y-%m-%d", today - i * 86400)
         table.insert(days, { day = key, seconds = totals[key] or 0 })
     end
-    return days, saved.daily_minutes
+    local goal_minutes = saved.daily_minutes
+    local streak, whole_year = streakOf(days, goal_minutes * 60)
+    -- A streak longer than the year shown is Lexeme's to count.
+    if whole_year then streak = math.max(streak, saved.streak or 0) end
+    return {
+        days = days,
+        goal_minutes = goal_minutes,
+        today = days[#days].seconds,
+        total = total,
+        streak = streak,
+        finished = saved.finished_books or 0,
+    }
 end
 
 return Streak

@@ -14,10 +14,12 @@ import {
 export function RevokeButton({
   title,
   description,
+  actionLabel = "Revoke",
   onRevoke,
 }: {
   title: string;
   description: string;
+  actionLabel?: string;
   onRevoke: () => Promise<unknown>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -31,7 +33,7 @@ export function RevokeButton({
       await onRevoke();
       setIsOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't revoke. Please try again.");
+      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
       setIsPending(false);
     }
@@ -42,7 +44,7 @@ export function RevokeButton({
       <Button
         variant="ghost-destructive"
         size="icon"
-        aria-label="Revoke"
+        aria-label={actionLabel}
         className="shrink-0 rounded-[calc(var(--radius-lg)-3px)] text-muted-foreground"
         onClick={() => setIsOpen(true)}
       >
@@ -60,7 +62,7 @@ export function RevokeButton({
               Cancel
             </Button>
             <Button variant="destructive" isPending={isPending} onClick={revoke}>
-              Revoke
+              {actionLabel}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -591,13 +591,15 @@ function Settings:screenPage()
 end
 
 function Settings:libraryPage()
+    local connected = require("lexeme/sync").isConnected()
     return {
         title = "Home and Library",
         rows = function()
             return {
                 {
-                    title = "Show Recently Added",
-                    subtitle = "Show the books you added most recently on Home.",
+                    title = connected and "Show Streak" or "Show Recently Added",
+                    subtitle = connected and "Show the days you read on Home, as Lexeme counts them."
+                        or "Show the books you added most recently on Home.",
                     toggle = G_reader_settings:nilOrTrue("lexeme_home_recently_added"),
                     tap = function()
                         G_reader_settings:flipNilOrTrue("lexeme_home_recently_added")

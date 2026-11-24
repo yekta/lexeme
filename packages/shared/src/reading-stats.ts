@@ -112,6 +112,54 @@ export function lastDays(totals: Map<string, number>, today: Date, count: number
   return result;
 }
 
+/**
+ * Seconds read per day where clocks are `utcOffsetMinutes` ahead of UTC, for
+ * working out a device's days on a server that runs in UTC.
+ */
+export function secondsByDayAtOffset(
+  reads: readonly { started_at: number; seconds: number }[],
+  utcOffsetMinutes: number,
+  dayStartsAt = DEFAULT_DAY_STARTS_AT,
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const read of reads) {
+    const day = dayKeyAtOffset(read.started_at, utcOffsetMinutes, dayStartsAt);
+    totals.set(day, (totals.get(day) ?? 0) + read.seconds);
+  }
+  return totals;
+}
+
+/** YYYY-MM-DD of the reading day `time` falls on, `utcOffsetMinutes` ahead of UTC. */
+export function dayKeyAtOffset(time: number, utcOffsetMinutes: number, dayStartsAt = DEFAULT_DAY_STARTS_AT): string {
+  return new Date(time + (utcOffsetMinutes - dayStartsAt) * 60_000).toISOString().slice(0, 10);
+}
+
+function addDays(day: string, count: number): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + count);
+  return date.toISOString().slice(0, 10);
+}
+
+/** The `count` days ending on `lastDay`, oldest first, with what was read on each. */
+export function daysEndingOn(totals: Map<string, number>, lastDay: string, count: number): TReadingDay[] {
+  return Array.from({ length: count }, (_, i) => {
+    const day = addDays(lastDay, i - count + 1);
+    return { day, seconds: totals.get(day) ?? 0 };
+  });
+}
+
+/** `readingStreak` for days keyed by `dayKeyAtOffset`, ending on `today`. */
+export function streakEndingOn(totals: Map<string, number>, today: string, goalSeconds = 1): number {
+  const reached = (day: string) => (totals.get(day) ?? 0) >= goalSeconds;
+  let day = reached(today) ? today : addDays(today, -1);
+  let streak = 0;
+  while (reached(day)) {
+    streak += 1;
+    day = addDays(day, -1);
+  }
+  return streak;
+}
+
 /** "1 h 20 min", "45 min", "0 min". */
 export function formatReadingTime(seconds: number): string {
   const minutes = Math.round(seconds / 60);

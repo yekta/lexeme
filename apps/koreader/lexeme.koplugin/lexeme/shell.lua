@@ -7,6 +7,8 @@ local LibrarySheets = require("lexeme/library_sheets")
 local Menu = require("lexeme/menu")
 local Quick = require("lexeme/quick")
 local Status = require("lexeme/status")
+local Streak = require("lexeme/streak")
+local Sync = require("lexeme/sync")
 local View = require("lexeme/view")
 
 local Shell = View:extend{
@@ -71,6 +73,10 @@ end
 function Shell:onLexemeLibraryChanged()
     self:reload()
     self:refresh()
+end
+
+function Shell:onLexemeStreakChanged()
+    if self.tab == "home" then self:refresh() end
 end
 
 function Shell:setSort(sort, descending)
@@ -442,6 +448,53 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
     return cover_top + row_h + D.s(55)
 end
 
+local WEEKDAYS = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
+
+-- The last year as a grid of days, a week to a column, like Lexeme's streak calendar.
+local function paintStreak(bb, x, top, w, days, goal_minutes)
+    D.text(bb, x + D.s(57), top + D.s(58), D.face("display", 55), "Streak")
+    local goal, reached = goal_minutes * 60, 0
+    for _, day in ipairs(days) do
+        if day.seconds >= goal then reached = reached + 1 end
+    end
+    local small = D.face("regular", 24)
+    D.text(bb, x + D.s(57), top + D.s(125), D.face("regular", 30),
+        string.format("%d %s of %d min+", reached, reached == 1 and "day" or "days", goal_minutes))
+
+    local y, m, d = days[1].day:match("^(%d+)-(%d+)-(%d+)$")
+    local first = os.time{ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 }
+    local lead = (os.date("*t", first).wday + 5) % 7
+    local columns = math.ceil((lead + #days) / 7)
+    local label_w = 0
+    for _, name in ipairs(WEEKDAYS) do label_w = math.max(label_w, D.width(small, name)) end
+    local left = x + D.s(57) + label_w + D.s(14)
+    local gap = D.s(4)
+    local pitch = math.floor((x + w - D.s(57) - left + gap) / columns)
+    local cell = pitch - gap
+    local grid_top = top + D.s(200)
+
+    for row, name in ipairs(WEEKDAYS) do
+        D.text(bb, x + D.s(57), grid_top + (row - 1) * pitch + math.floor(cell * 0.8), small, name)
+    end
+    local months, last_month = {}, nil
+    for i, day in ipairs(days) do
+        local column = math.floor((lead + i - 1) / 7)
+        local month = day.day:sub(1, 7)
+        if month ~= last_month then
+            months[column] = os.date("%b", first + (i - 1) * 86400)
+            last_month = month
+        end
+        D.rect(bb, left + column * pitch, grid_top + ((lead + i - 1) % 7) * pitch, cell, cell,
+            day.seconds >= goal and D.BLACK or D.gray(0xDD))
+    end
+    -- A month's name is left out where the next one would touch it.
+    for column, name in pairs(months) do
+        if not (months[column + 1] or months[column + 2]) and left + column * pitch + D.width(small, name) <= x + w then
+            D.text(bb, left + column * pitch, grid_top - D.s(16), small, name)
+        end
+    end
+end
+
 function Shell:paintHome(bb, x, y, w)
     local recent = Books.query(self.all, nil, "recent", true)
     if #recent == 0 then
@@ -451,9 +504,13 @@ function Shell:paintHome(bb, x, y, w)
     local bottom = paintCarousel(self, bb, x, y + D.s(243), w, "From Your Library", recent,
         function() self:setTab("library") end)
     if not G_reader_settings:nilOrTrue("lexeme_home_recently_added") then return end
-    local added = Books.query(self.all, nil, "added", true)
     -- The next heading's baseline sits 94 px under the badges, as on the Kindle.
-    paintCarousel(self, bb, x, bottom + D.s(94 - 58), w, "Recently Added", added, nil)
+    local next_top = bottom + D.s(94 - 58)
+    if Sync.isConnected() then
+        local days, goal_minutes = Streak.days()
+        if days then return paintStreak(bb, x, next_top, w, days, goal_minutes) end
+    end
+    paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)
 end
 
 -- Bottom tabs -------------------------------------------------------------------

@@ -1,16 +1,34 @@
 import { SENDABLE_BOOK_EXTENSIONS, syncReadingArgs, updateProfileArgs } from "@lexeme/contracts";
-import { books, cards, decks, highlights, learningProfiles, lookups, pageReads, reviewLogs, sentBooks, user } from "@lexeme/db";
+import {
+  books,
+  cards,
+  decks,
+  highlights,
+  learningProfiles,
+  lookups,
+  pageReads,
+  readingGoals,
+  reviewLogs,
+  sentBooks,
+  user,
+} from "@lexeme/db";
 import {
   DECK_EXPORT_KIND,
   DECK_EXPORT_VERSION,
   GENERATE_CARD_EXCLUDE_FRONTS_LIMIT,
+  DEFAULT_DAILY_GOAL_MINUTES,
+  DEFAULT_DAY_STARTS_AT,
   Rating,
   computeStudyBuckets,
   createUserScheduler,
+  dayKeyAtOffset,
+  daysEndingOn,
   dbRowToFSRSCard,
   fsrsCardToDbRow,
   readingSessions,
   reviewLogToDbRow,
+  secondsByDayAtOffset,
+  streakEndingOn,
   type DeckExport,
   type Grade,
   type TAccessRole,
@@ -593,6 +611,40 @@ export const operations: TOperation[] = [
           last_read_at: book.last_read_at?.toISOString() ?? null,
           finished_at: book.finished_at?.toISOString() ?? null,
         })),
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "get-reading-days",
+    title: "Get reading days",
+    description:
+      "Time read on each of the last days, oldest first, with the daily goal and the streak: consecutive days that reached the goal, up to today. Days are cut on the clock utc_offset_minutes ahead of UTC.",
+    role: "viewer",
+    method: "GET",
+    path: "/reading/days",
+    input: z.object({
+      utc_offset_minutes: z.coerce.number().int().min(-720).max(840).default(0),
+      days: z.coerce.number().int().min(1).max(366).default(365),
+    }),
+    run: async (caller, input) => {
+      const [goal] = await db.select().from(readingGoals).where(eq(readingGoals.user_id, caller.userId));
+      const dailyMinutes = goal?.daily_minutes ?? DEFAULT_DAILY_GOAL_MINUTES;
+      const dayStartsAt = goal?.day_starts_at ?? DEFAULT_DAY_STARTS_AT;
+      const reads = await db
+        .select({ started_at: pageReads.started_at, seconds: pageReads.seconds })
+        .from(pageReads)
+        .where(eq(pageReads.user_id, caller.userId));
+      const totals = secondsByDayAtOffset(
+        reads.map((read) => ({ started_at: read.started_at.getTime(), seconds: read.seconds })),
+        input.utc_offset_minutes,
+        dayStartsAt,
+      );
+      const today = dayKeyAtOffset(Date.now(), input.utc_offset_minutes, dayStartsAt);
+      return {
+        goal: { daily_minutes: dailyMinutes, day_starts_at: dayStartsAt },
+        streak: streakEndingOn(totals, today, dailyMinutes * 60),
+        days: daysEndingOn(totals, today, input.days),
       };
     },
   }),

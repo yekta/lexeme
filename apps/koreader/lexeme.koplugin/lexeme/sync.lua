@@ -3,13 +3,16 @@ Sends what's waiting to Lexeme: queued words first, then the reading done since
 the last sync. Everything goes through the outbox, so a sync cut short by the
 network picks up where it stopped.
 ]]
+local Event = require("ui/event")
 local NetworkMgr = require("ui/network/manager")
+local UIManager = require("ui/uimanager")
 local logger = require("logger")
 
 local Api = require("lexeme/api")
 local Outbox = require("lexeme/outbox")
 local Reading = require("lexeme/reading")
 local Sent = require("lexeme/sent")
+local Streak = require("lexeme/streak")
 
 local Sync = {}
 
@@ -110,6 +113,10 @@ function Sync.run(on_done)
         local _, failure = Outbox.flush()
         if failure then error(failure, 0) end
         Sent.remember(now)
+        -- With this Kindle's reading in, the streak Home shows is up to date.
+        if Streak.refresh() then
+            UIManager:broadcastEvent(Event:new("LexemeStreakChanged"))
+        end
         local _, delivery_failure = require("lexeme/delivery").run()
         if delivery_failure then error(delivery_failure, 0) end
         G_reader_settings:saveSetting("lexeme_synced_at", started)
@@ -129,7 +136,7 @@ local scheduled = false
 function Sync.soon()
     if scheduled or not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
     scheduled = true
-    require("ui/uimanager"):scheduleIn(3, function()
+    UIManager:scheduleIn(3, function()
         scheduled = false
         if NetworkMgr:isOnline() then Sync.run() end
     end)

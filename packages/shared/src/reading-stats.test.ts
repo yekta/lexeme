@@ -4,6 +4,10 @@ import { test } from "node:test";
 import {
   bookDays,
   dayKey,
+  dayKeyAtOffset,
+  daysEndingOn,
+  secondsByDayAtOffset,
+  streakEndingOn,
   formatReadingTime,
   lastDays,
   readingDate,
@@ -122,4 +126,41 @@ test("a pause longer than ten minutes starts a new session", () => {
 test("sessions never mix books", () => {
   const sessions = readingSessions([read(1, 9, 0, 60), read(1, 9, 1, 60, "b")]);
   assert.equal(sessions.length, 2);
+});
+
+test("a device's reading day follows its own clock, not UTC", () => {
+  const lateEvening = Date.UTC(2026, 10, 23, 22, 30);
+  assert.equal(dayKeyAtOffset(lateEvening, 0), "2026-11-23");
+  assert.equal(dayKeyAtOffset(lateEvening, 180), "2026-11-24");
+  // A day that starts at 4:00 keeps 1:30 on the day before.
+  assert.equal(dayKeyAtOffset(lateEvening, 180, 240), "2026-11-23");
+});
+
+test("days at an offset add up and end on the given day, oldest first", () => {
+  const totals = secondsByDayAtOffset(
+    [
+      { started_at: Date.UTC(2026, 10, 23, 22, 30), seconds: 600 },
+      { started_at: Date.UTC(2026, 10, 24, 8, 0), seconds: 300 },
+      { started_at: Date.UTC(2026, 10, 22, 10, 0), seconds: 60 },
+    ],
+    180,
+  );
+  assert.deepEqual(daysEndingOn(totals, "2026-11-24", 3), [
+    { day: "2026-11-22", seconds: 60 },
+    { day: "2026-11-23", seconds: 0 },
+    { day: "2026-11-24", seconds: 900 },
+  ]);
+  assert.equal(daysEndingOn(totals, "2026-03-01", 2)[0]!.day, "2026-02-28");
+});
+
+test("a streak ending on a day counts back across months, and today unread keeps it", () => {
+  const totals = new Map([
+    ["2026-10-30", 900],
+    ["2026-10-31", 900],
+    ["2026-11-01", 900],
+    ["2026-11-02", 100],
+  ]);
+  assert.equal(streakEndingOn(totals, "2026-11-01", 900), 3);
+  assert.equal(streakEndingOn(totals, "2026-11-02", 900), 3);
+  assert.equal(streakEndingOn(totals, "2026-11-04", 900), 0);
 });

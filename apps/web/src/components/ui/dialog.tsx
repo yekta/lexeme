@@ -65,8 +65,8 @@ function DialogContent({
               render={
                 <Button
                   variant="ghost"
-                  className="absolute top-1 right-1 text-muted-foreground"
-                  size="icon-sm"
+                  className="absolute top-1.5 right-1.5 rounded-[calc(var(--radius-xl)-0.375rem)] text-muted-foreground"
+                  size="icon-lg"
                 />
               }
             >

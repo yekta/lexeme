@@ -209,6 +209,11 @@ export const syncReadingArgs = z.object({
     )
     .max(5000)
     .default([]),
+  /** Every highlight and bookmark a book has on the device; the book's others are deleted here. */
+  book_highlights: z
+    .array(z.object({ book_key: bookKey, highlight_ids: z.array(uuidArg).max(5000).default([]) }))
+    .max(2000)
+    .default([]),
   /** Books deleted from the device; removed here with what was recorded about them. */
   removed_book_keys: z.array(bookKey).max(2000).default([]),
 });
@@ -417,9 +422,10 @@ export const mutatorDefs = {
 
   reading: {
     /**
-     * Upserts what a device reports. Safe to repeat: books match on the
-     * device's key, reading days on (book, day), and highlights and lookups on
-     * the ids the device minted, so a resent outbox entry changes nothing.
+     * Upserts what a device reports and deletes the highlights and books it no
+     * longer has. Safe to repeat: books match on the device's key, reading days
+     * on (book, day), and highlights and lookups on the ids the device minted,
+     * so a resent outbox entry changes nothing.
      */
     sync: defineMutator(syncReadingArgs, async ({ tx, ctx, args }) => {
       const { user_id } = mustBeSignedIn(ctx);
@@ -521,6 +527,16 @@ export const mutatorDefs = {
           looked_up_at: lookup.looked_up_at,
           created_at: existing?.created_at ?? now,
         });
+      }
+
+      for (const { book_key, highlight_ids } of args.book_highlights) {
+        const book_id = await findBookId(book_key);
+        if (!book_id) continue;
+        const kept = new Set(highlight_ids);
+        const existing = await tx.run(zql.highlights.where("user_id", user_id).where("book_id", book_id));
+        for (const highlight of existing) {
+          if (!kept.has(highlight.id)) await tx.mutate.highlights.delete({ id: highlight.id });
+        }
       }
 
       for (const key of args.removed_book_keys) {

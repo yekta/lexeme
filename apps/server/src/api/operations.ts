@@ -516,7 +516,7 @@ export const operations: TOperation[] = [
     name: "sync-reading",
     title: "Sync reading data",
     description:
-      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
+      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. book_highlights lists every highlight id a book still has on the device; that book's other highlights are deleted. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing.",
     role: "editor",
     method: "POST",
     path: "/reading",
@@ -528,6 +528,7 @@ export const operations: TOperation[] = [
         page_reads: input.page_reads.length,
         highlights: input.highlights.length,
         lookups: input.lookups.length,
+        book_highlights: input.book_highlights.length,
         removed_books: input.removed_book_keys.length,
       };
     },

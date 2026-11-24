@@ -257,10 +257,20 @@ hours are always resent.
 ]]
 function Reading.snapshot(since)
     local books, highlights, aliases, changed_at = Reading.books()
-    local keys, key_by_title = {}, aliases
+    local keys, key_by_title, ids_by_key = {}, aliases, {}
     for _, book in ipairs(books) do
         keys[book.key] = true
         key_by_title[book.title] = book.key
+    end
+    for _, highlight in ipairs(highlights) do
+        ids_by_key[highlight.book_key] = ids_by_key[highlight.book_key] or {}
+        table.insert(ids_by_key[highlight.book_key], highlight.id)
+    end
+    -- Every book's whole set, so Lexeme drops the highlights deleted here. A book with none
+    -- leaves the list out: an empty Lua table would be sent as a JSON object.
+    local book_highlights = {}
+    for _, book in ipairs(books) do
+        table.insert(book_highlights, { book_key = book.key, highlight_ids = ids_by_key[book.key] })
     end
     local recent = math.max(0, since - 6 * 3600)
     local removed = Reading.removedBooks(keys)
@@ -273,6 +283,7 @@ function Reading.snapshot(since)
         books = books,
         page_reads = Reading.pageReads(recent, keys),
         highlights = highlights,
+        book_highlights = book_highlights,
         lookups = Reading.lookups(recent, key_by_title),
     }
 end

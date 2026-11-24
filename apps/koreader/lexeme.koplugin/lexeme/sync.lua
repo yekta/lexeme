@@ -13,9 +13,11 @@ local Reading = require("lexeme/reading")
 local Sync = {}
 
 -- Bumped when a sync starts sending something new, so the next one sends it all.
-local SYNC_VERSION = 4
+local SYNC_VERSION = 5
 
-local CHUNK = { books = 200, page_reads = 2000, highlights = 500, lookups = 500, removed_book_keys = 500 }
+local CHUNK = {
+    books = 200, page_reads = 2000, highlights = 500, lookups = 500, book_highlights = 50, removed_book_keys = 500,
+}
 
 function Sync.isConnected()
     return Api.token() ~= nil
@@ -40,7 +42,7 @@ sent as a JSON object, which the server refuses.
 ]]
 function Sync.queueReading(snapshot)
     local queued = false
-    for _, kind in ipairs({ "books", "page_reads", "highlights", "lookups", "removed_book_keys" }) do
+    for _, kind in ipairs({ "books", "page_reads", "highlights", "lookups", "book_highlights", "removed_book_keys" }) do
         local rows = snapshot[kind] or {}
         for first = 1, #rows, CHUNK[kind] do
             local body = { [kind] = {} }
@@ -62,7 +64,10 @@ local function changedSince(snapshot, since)
             changed[book.key] = true
         end
     end
-    local highlights = {}
+    local highlights, book_highlights = {}, {}
+    for _, set in ipairs(snapshot.book_highlights) do
+        if changed[set.book_key] then table.insert(book_highlights, set) end
+    end
     for _, highlight in ipairs(snapshot.highlights) do
         if changed[highlight.book_key] then table.insert(highlights, highlight) end
     end
@@ -70,6 +75,7 @@ local function changedSince(snapshot, since)
         books = books,
         page_reads = snapshot.page_reads,
         highlights = highlights,
+        book_highlights = book_highlights,
         lookups = snapshot.lookups,
         removed = snapshot.removed,
         removed_book_keys = snapshot.removed_book_keys,

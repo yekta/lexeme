@@ -9,6 +9,7 @@ local logger = require("logger")
 local Api = require("lexeme/api")
 local Outbox = require("lexeme/outbox")
 local Reading = require("lexeme/reading")
+local Sent = require("lexeme/sent")
 
 local Sync = {}
 
@@ -16,7 +17,12 @@ local Sync = {}
 local SYNC_VERSION = 5
 
 local CHUNK = {
-    books = 200, page_reads = 2000, highlights = 500, lookups = 500, book_highlights = 50, removed_book_keys = 500,
+    books = 200, page_reads = 2000, highlights = 500, lookups = 500,
+    book_page_reads = 1, removed_highlight_ids = 1000, removed_lookup_ids = 1000, removed_book_keys = 500,
+}
+local KINDS = {
+    "books", "page_reads", "highlights", "lookups",
+    "book_page_reads", "removed_highlight_ids", "removed_lookup_ids", "removed_book_keys",
 }
 
 function Sync.isConnected()
@@ -42,7 +48,7 @@ sent as a JSON object, which the server refuses.
 ]]
 function Sync.queueReading(snapshot)
     local queued = false
-    for _, kind in ipairs({ "books", "page_reads", "highlights", "lookups", "book_highlights", "removed_book_keys" }) do
+    for _, kind in ipairs(KINDS) do
         local rows = snapshot[kind] or {}
         for first = 1, #rows, CHUNK[kind] do
             local body = { [kind] = {} }
@@ -64,10 +70,7 @@ local function changedSince(snapshot, since)
             changed[book.key] = true
         end
     end
-    local highlights, book_highlights = {}, {}
-    for _, set in ipairs(snapshot.book_highlights) do
-        if changed[set.book_key] then table.insert(book_highlights, set) end
-    end
+    local highlights = {}
     for _, highlight in ipairs(snapshot.highlights) do
         if changed[highlight.book_key] then table.insert(highlights, highlight) end
     end
@@ -75,7 +78,6 @@ local function changedSince(snapshot, since)
         books = books,
         page_reads = snapshot.page_reads,
         highlights = highlights,
-        book_highlights = book_highlights,
         lookups = snapshot.lookups,
         removed = snapshot.removed,
         removed_book_keys = snapshot.removed_book_keys,
@@ -100,11 +102,14 @@ function Sync.run(on_done)
         if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
         local since = G_reader_settings:readSetting("lexeme_sync_version") == SYNC_VERSION
             and Sync.lastSyncedAt() or 0
-        local snapshot = changedSince(Reading.snapshot(since), since)
+        local everything = Reading.snapshot(since)
+        local snapshot = changedSince(everything, since)
+        local now = Sent.addDeleted(everything, snapshot)
         Sync.queueReading(snapshot)
         Reading.forget(snapshot.removed)
         local _, failure = Outbox.flush()
         if failure then error(failure, 0) end
+        Sent.remember(now)
         local _, delivery_failure = require("lexeme/delivery").run()
         if delivery_failure then error(delivery_failure, 0) end
         G_reader_settings:saveSetting("lexeme_synced_at", started)

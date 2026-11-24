@@ -191,6 +191,26 @@ function Reading.pageReads(since, known_keys)
     return reads
 end
 
+-- Each book's page visits in the statistics database: how many, and when the last one started.
+function Reading.pageReadCounts()
+    local counts = {}
+    for _, row in ipairs(query(DataStorage:getSettingsDir() .. "/statistics.sqlite3", [[
+        SELECT b.md5, count(*), max(p.start_time)
+        FROM page_stat_data p JOIN book b ON b.id = p.id_book
+        WHERE b.md5 IS NOT NULL GROUP BY b.md5;]])) do
+        counts[row[1]] = { count = tonumber(row[2]) or 0, last = tonumber(row[3]) or 0 }
+    end
+    return counts
+end
+
+-- How many of a book's page visits started at or before `last`.
+function Reading.pageReadsUpTo(key, last)
+    local rows = query(DataStorage:getSettingsDir() .. "/statistics.sqlite3", string.format([[
+        SELECT count(*) FROM page_stat_data p JOIN book b ON b.id = p.id_book
+        WHERE b.md5 = '%s' AND p.start_time <= %d;]], key:gsub("'", "''"), math.floor(last)))
+    return rows[1] and tonumber(rows[1][1]) or 0
+end
+
 -- The sentence a word was read in, from the text Vocabulary Builder kept around it.
 local function contextOf(before, word, after)
     local text = require("lexeme/words").sentence(before, word, after):gsub("%s+", " ")
@@ -257,20 +277,10 @@ hours are always resent.
 ]]
 function Reading.snapshot(since)
     local books, highlights, aliases, changed_at = Reading.books()
-    local keys, key_by_title, ids_by_key = {}, aliases, {}
+    local keys, key_by_title = {}, aliases
     for _, book in ipairs(books) do
         keys[book.key] = true
         key_by_title[book.title] = book.key
-    end
-    for _, highlight in ipairs(highlights) do
-        ids_by_key[highlight.book_key] = ids_by_key[highlight.book_key] or {}
-        table.insert(ids_by_key[highlight.book_key], highlight.id)
-    end
-    -- Every book's whole set, so Lexeme drops the highlights deleted here. A book with none
-    -- leaves the list out: an empty Lua table would be sent as a JSON object.
-    local book_highlights = {}
-    for _, book in ipairs(books) do
-        table.insert(book_highlights, { book_key = book.key, highlight_ids = ids_by_key[book.key] })
     end
     local recent = math.max(0, since - 6 * 3600)
     local removed = Reading.removedBooks(keys)
@@ -283,8 +293,8 @@ function Reading.snapshot(since)
         books = books,
         page_reads = Reading.pageReads(recent, keys),
         highlights = highlights,
-        book_highlights = book_highlights,
         lookups = Reading.lookups(recent, key_by_title),
+        key_by_title = key_by_title,
     }
 end
 

@@ -209,11 +209,14 @@ export const syncReadingArgs = z.object({
     )
     .max(5000)
     .default([]),
-  /** Every highlight and bookmark a book has on the device; the book's others are deleted here. */
-  book_highlights: z
-    .array(z.object({ book_key: bookKey, highlight_ids: z.array(uuidArg).max(5000).default([]) }))
+  /** Every page visit a book has on the device, sent when some were deleted there; the book's others are deleted here. */
+  book_page_reads: z
+    .array(z.object({ book_key: bookKey, page_read_ids: z.array(uuidArg).max(20_000).default([]) }))
     .max(2000)
     .default([]),
+  /** Highlights and looked-up words deleted on the device, by the ids it sent them with. */
+  removed_highlight_ids: z.array(uuidArg).max(5000).default([]),
+  removed_lookup_ids: z.array(uuidArg).max(5000).default([]),
   /** Books deleted from the device; removed here with what was recorded about them. */
   removed_book_keys: z.array(bookKey).max(2000).default([]),
 });
@@ -452,10 +455,15 @@ export const mutatorDefs = {
 
       for (const book of args.books) {
         const existing = await tx.run(zql.books.where("user_id", user_id).where("key", book.key).one());
+        // Opening a finished book again lands on its first page; it stays as far as it was read.
+        const progress =
+          book.status === "finished" && book.progress != null
+            ? Math.max(book.progress, existing?.progress ?? 0)
+            : book.progress;
         const fields = {
           title: book.title,
           authors: book.authors ?? undefined,
-          progress: book.progress ?? undefined,
+          progress: progress ?? undefined,
           status: book.status,
           pages: book.pages ?? undefined,
           series: book.series ?? undefined,
@@ -529,14 +537,24 @@ export const mutatorDefs = {
         });
       }
 
-      for (const { book_key, highlight_ids } of args.book_highlights) {
+      for (const { book_key, page_read_ids } of args.book_page_reads) {
         const book_id = await findBookId(book_key);
         if (!book_id) continue;
-        const kept = new Set(highlight_ids);
-        const existing = await tx.run(zql.highlights.where("user_id", user_id).where("book_id", book_id));
-        for (const highlight of existing) {
-          if (!kept.has(highlight.id)) await tx.mutate.highlights.delete({ id: highlight.id });
+        const kept = new Set(page_read_ids);
+        const existing = await tx.run(zql.page_reads.where("user_id", user_id).where("book_id", book_id));
+        for (const read of existing) {
+          if (!kept.has(read.id)) await tx.mutate.page_reads.delete({ id: read.id });
         }
+      }
+
+      for (const id of args.removed_highlight_ids) {
+        const highlight = await tx.run(zql.highlights.where("user_id", user_id).where("id", id).one());
+        if (highlight) await tx.mutate.highlights.delete({ id });
+      }
+
+      for (const id of args.removed_lookup_ids) {
+        const lookup = await tx.run(zql.lookups.where("user_id", user_id).where("id", id).one());
+        if (lookup) await tx.mutate.lookups.delete({ id });
       }
 
       for (const key of args.removed_book_keys) {

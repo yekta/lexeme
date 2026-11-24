@@ -1,0 +1,26 @@
+diff --git a/crengine/src/lvfntman.cpp b/crengine/src/lvfntman.cpp
+index 3384ef50..65dbcd33 100644
+--- a/crengine/src/lvfntman.cpp
++++ b/crengine/src/lvfntman.cpp
+@@ -1115,7 +1115,9 @@ static LVFontGlyphCacheItem * newItem( LVFontLocalGlyphCache * local_cache, lCha
+         } // else:
+         #endif
+         if (bitmap->buffer && w > 0 && h > 0) {
+-            memcpy( item->bmp, bitmap->buffer, w*h );
++            // Rows can be padded (bitmap->pitch > w), like with Amazon's FreeType on Kindles
++            for (int y = 0; y < h; y++)
++                memcpy(item->bmp + y * w, bitmap->buffer + y * bitmap->pitch, w);
+             // correct gamma
+             if ( gammaIndex!=GAMMA_NO_CORRECTION_INDEX )
+                 cr_correct_gamma_buf(item->bmp, w*h, gammaIndex);
+@@ -1166,7 +1168,9 @@ static LVFontGlyphCacheItem * newItem(LVFontLocalGlyphCache *local_cache, lUInt3
+     }
+     else {
+         if (bitmap->buffer && w > 0 && h > 0) {
+-            memcpy( item->bmp, bitmap->buffer, w*h );
++            // Rows can be padded (bitmap->pitch > w), like with Amazon's FreeType on Kindles
++            for (int y = 0; y < h; y++)
++                memcpy(item->bmp + y * w, bitmap->buffer + y * bitmap->pitch, w);
+             // correct gamma
+             if ( gammaIndex!=GAMMA_NO_CORRECTION_INDEX )
+                 cr_correct_gamma_buf(item->bmp, w*h, gammaIndex);

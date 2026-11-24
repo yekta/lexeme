@@ -8,16 +8,15 @@ cd "$(dirname "$0")/.."
 
 tar -cf - lexeme.koplugin | ssh "$HOST" "rm -rf $PLUGINS/lexeme.koplugin && tar -C $PLUGINS -xf -"
 
-# crengine and FreeType built with patches/ (scripts/build-engine.sh), only for the KOReader version
-# they were built from.
+# Amazon's reader draws text with the Kindle's own FreeType, which renders through Monotype's
+# iType; KOReader uses it too. crengine needs patches/ (scripts/build-engine.sh) to read its
+# padded glyph rows, so both are installed only when that build exists for this KOReader.
 VERSION=$(ssh "$HOST" cat /mnt/us/koreader/git-rev)
-if [ -d "build/$VERSION/libs" ]; then
-  for lib in build/"$VERSION"/libs/*; do
-    name=$(basename "$lib")
-    ssh "$HOST" "cat > /mnt/us/koreader/libs/$name.new && mv /mnt/us/koreader/libs/$name.new /mnt/us/koreader/libs/$name" < "$lib"
-  done
+if [ -f "build/$VERSION/libs/libkoreader-cre.so" ]; then
+  ssh "$HOST" "cat > /mnt/us/koreader/libs/libkoreader-cre.so.new && mv /mnt/us/koreader/libs/libkoreader-cre.so.new /mnt/us/koreader/libs/libkoreader-cre.so" < "build/$VERSION/libs/libkoreader-cre.so"
+  ssh "$HOST" 'cp /usr/lib/libfreetype.so.6 /mnt/us/koreader/libs/libfreetype.so.6.new && mv /mnt/us/koreader/libs/libfreetype.so.6.new /mnt/us/koreader/libs/libfreetype.so.6'
 else
-  echo "No engine build for KOReader $VERSION; text falls back to KOReader's own hinting. Run scripts/build-engine.sh." >&2
+  echo "No crengine build for KOReader $VERSION; text keeps KOReader's own FreeType. Run scripts/build-engine.sh." >&2
 fi
 
 ssh "$HOST" 'sh -s' <<'EOF'

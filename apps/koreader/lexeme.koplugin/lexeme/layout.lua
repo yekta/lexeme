@@ -50,9 +50,9 @@ Layout.MARGINS = { 82, 164, 246 }
 -- The text box's top and bottom: the first baseline lands at 106 px and 27 lines fit, as on the Kindle.
 Layout.TOP_MARGIN = 66
 Layout.BOTTOM_MARGIN = 70
--- Hinting 3 is our crengine's: stems keep their width and move onto the pixel grid, as in
--- Amazon's reader (patches/, built by scripts/build-engine.sh). Gamma 15 is neutral.
-local FONT_HINTING, FONT_GAMMA = 3, 15
+-- Autohinting is what goes through the Kindle's FreeType (installed by deploy.sh) the way
+-- Amazon's reader uses it; gamma 15 leaves its glyphs untouched.
+local FONT_HINTING, FONT_GAMMA = 2, 15
 -- crengine won't draw a font bigger than this, so bigger sizes are scaled up in CSS.
 local MAX_ENGINE_SIZE = 72
 

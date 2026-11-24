@@ -24,16 +24,16 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
 
 ### Text rendering
 
-Amazon's reader moves each stem of a letter onto the pixel grid without
-changing its width, which is why its text looks crisper. KOReader can't do
-that, so `patches/` adds it to crengine (hinting mode 3) and to FreeType's
-autohinter (the `keep-stem-widths` property). `scripts/build-engine.sh`
-builds both libraries for the KOReader version on the Kindle with Docker
-(it needs to run `linux/amd64` images; on Apple silicon use a Rosetta VM,
-e.g. `colima start --vm-type vz --vz-rosetta`), and `deploy.sh` installs
-them when they match that version. A KOReader update replaces them; build
-again for the new version. Without them, text falls back to KOReader's own
-hinting.
+Amazon's reader draws text with the Kindle's own FreeType
+(`/usr/lib/libfreetype.so.6`), which hands glyphs to Monotype's iType
+rasterizer. `deploy.sh` copies that library into KOReader, so book text comes
+out pixel for pixel as on Amazon's reader. iType pads glyph rows, which stock
+crengine doesn't handle, so `patches/` fixes that and
+`scripts/build-engine.sh` builds crengine for the KOReader version on the
+Kindle with Docker (it needs to run `linux/amd64` images; on Apple silicon use
+a Rosetta VM, e.g. `colima start --vm-type vz --vz-rosetta`). `deploy.sh`
+installs both only when that build matches the Kindle's KOReader. A KOReader
+update replaces them; build again for the new version.
 
 ### Rules that keep the Kindle alive
 

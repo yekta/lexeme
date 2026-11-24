@@ -492,8 +492,8 @@ end
 -- The reading below the covers lines up with the first cover's left edge, the same in from the right.
 local HOME_MARGIN = 34
 
--- The gray the covers and tiles are edged with, and the lighter one days short of the goal are filled with.
-local EDGE_GRAY, SHORT_DAY_GRAY = 102, 190
+-- The gray the covers and tiles are edged with, and the grays days that met and fell short of the goal are filled with.
+local EDGE_GRAY, GOAL_DAY_GRAY, SHORT_DAY_GRAY = 102, 32, 192
 
 -- Where a tile's label and value sit, from its top-left corner.
 local TILE = { inset = 24, label = 52, value = 99, gap = 18, height = 128, per_row = 3, count = 6 }
@@ -574,7 +574,7 @@ local function paintCalendar(bb, x, top, w, label, days, goal_minutes)
     for i, day in ipairs(days) do
         local slot = grid.lead + i - 1
         D.rect(bb, grid.columnX(math.floor(slot / 7)), grid_top + (slot % 7) * grid.pitch, grid.cell, grid.cell,
-            day.seconds >= goal and D.BLACK or D.gray(SHORT_DAY_GRAY))
+            day.seconds >= goal and D.gray(GOAL_DAY_GRAY) or D.gray(SHORT_DAY_GRAY))
     end
 end
 

@@ -57,7 +57,10 @@ function Status.paint(view, bb, x, y, w, on_handle)
     local clock_w = D.text(bb, x + D.s(32), y + D.s(59), D.face("regular", 28), Status.clock())
     -- Dev mode (scripts/dev-mode.sh) pauses syncing; it says so, so it isn't left on.
     if G_reader_settings:isTrue("lexeme_dev_mode") then
-        D.text(bb, x + D.s(32) + clock_w + D.s(20), y + D.s(59), D.face("bold", 28), "Dev")
+        local face = D.face("bold", 28)
+        local bx, bw = x + D.s(32) + clock_w + D.s(18), D.width(face, "Dev Mode") + D.s(16)
+        D.roundRect(bb, bx, y + D.s(29), bw, D.s(42), D.BLACK, D.s(8))
+        D.text(bb, bx + D.s(8), y + D.s(59), face, "Dev Mode", D.WHITE)
     end
 
     local hw, hh = D.s(130), D.s(22)

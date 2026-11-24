@@ -473,7 +473,7 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
             function() self:openBookMenu(book) end)
         self:hit(dx + dw - D.s(60), dy + dh - D.s(80), D.s(60), D.s(80), function() self:openBookMenu(book) end)
     end
-    return cover_top + row_h + D.s(55)
+    return cover_top + row_h + D.s(54)
 end
 
 -- "1 h 20 min", "2 h", "45 min", as Lexeme writes reading time.
@@ -545,22 +545,32 @@ local function calendarGrid(x, w, days)
     return { lead = lead, cell = cell, pitch = cell + gap, columnX = columnX, height = 7 * (cell + gap) - gap }
 end
 
--- How tall the calendar is: its label, laid out like a tile's, then the grid.
-local function calendarHeight(x, w, days)
-    return D.s(TILE.value - 27) + calendarGrid(x, w, days).height
-end
+local function calendarLabelFace() return D.face("regular", 28) end
+local CALENDAR_LABEL_TO_GRID = 20
 
--- The last year of days, like Lexeme's streak calendar, under a label laid out like a tile's
--- without its edge: the label where theirs is, the days where their values start.
-local function paintCalendar(bb, x, top, w, days, goal_minutes)
+local function calendarLabel(days, goal_minutes)
     local goal, reached = goal_minutes * 60, 0
     for _, day in ipairs(days) do
         if day.seconds >= goal then reached = reached + 1 end
     end
-    D.text(bb, x + D.s(HOME_MARGIN + TILE.inset), top + D.s(TILE.label), D.face("regular", 28),
-        string.format("%s with %d+ min of reading", count(reached, "day", "days"), goal_minutes))
+    return string.format("%s with %d+ min of reading", count(reached, "day", "days"), goal_minutes)
+end
+
+-- How tall the calendar is, from the top of its label's ink to the bottom of its days.
+local function calendarHeight(x, w, label, days)
+    local face = calendarLabelFace()
+    return D.inkTop(face, label) + D.s(CALENDAR_LABEL_TO_GRID) + calendarGrid(x, w, days).height
+end
+
+-- The last year of days, like Lexeme's streak calendar, under a label lined up with the tiles' text.
+-- `top` is where the label's ink starts.
+local function paintCalendar(bb, x, top, w, label, days, goal_minutes)
+    local face = calendarLabelFace()
+    local baseline = top + D.inkTop(face, label)
+    D.text(bb, x + D.s(HOME_MARGIN + TILE.inset), baseline, face, label)
     local grid = calendarGrid(x, w, days)
-    local grid_top = top + D.s(TILE.value - 27)
+    local grid_top = baseline + D.s(CALENDAR_LABEL_TO_GRID)
+    local goal = goal_minutes * 60
     for i, day in ipairs(days) do
         local slot = grid.lead + i - 1
         D.rect(bb, grid.columnX(math.floor(slot / 7)), grid_top + (slot % 7) * grid.pitch, grid.cell, grid.cell,
@@ -582,13 +592,14 @@ function Shell:paintHome(bb, x, y, w, h)
     local next_top = bottom + D.s(94 - 58)
     local reading = Sync.isConnected() and Streak.summary()
     if reading then
-        -- Tiles and calendar sit in the middle of the space between the covers' badges and the
-        -- cover of the book being read, which stands over the tab bar.
-        local space_top, space_bottom = bottom, y + h - D.s(111) - D.s(45)
-        local height = TILE.rows_height() + D.s(TILE.gap) + calendarHeight(x, w, reading.days)
-        local top = space_top + math.max(D.s(40), math.floor((space_bottom - space_top - height) / 2))
-        local tiles_bottom = paintTiles(bb, x, top, w, reading)
-        return paintCalendar(bb, x, tiles_bottom + D.s(TILE.gap), w, reading.days, reading.goal_minutes)
+        -- The badges, tiles, calendar and the cover of the book being read (standing over the tab
+        -- bar) are spaced evenly.
+        local space_top, space_bottom = bottom, y + h - D.s(111) - D.s(42 + 2)
+        local label = calendarLabel(reading.days, reading.goal_minutes)
+        local height = TILE.rows_height() + calendarHeight(x, w, label, reading.days)
+        local gap = math.max(D.s(40), math.floor((space_bottom - space_top - height) / 3))
+        local tiles_bottom = paintTiles(bb, x, space_top + gap, w, reading)
+        return paintCalendar(bb, x, tiles_bottom + gap, w, label, reading.days, reading.goal_minutes)
     end
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)
 end

@@ -75,6 +75,11 @@ function D.width(face, text)
     return face.lexeme_double and width + 1 or width
 end
 
+-- How far the text's ink reaches above its baseline.
+function D.inkTop(face, text)
+    return RenderText:sizeUtf8Text(0, Screen:getWidth() * 8, face, text, true, false).y_top
+end
+
 function D.fit(face, text, max_w)
     if not max_w or D.width(face, text) <= max_w then return text end
     return RenderText:truncateTextByWidth(text, face, max_w, true, false)

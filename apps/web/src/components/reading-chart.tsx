@@ -38,7 +38,7 @@ export function ReadingChart({ days, isPlaceholder }: { days: TReadingDay[]; isP
               tick={(props: XAxisTickContentProps) => <EdgeTick {...props} bars={bars} />}
             />
             <ChartTooltip
-              cursor={{ fill: "var(--foreground)", opacity: 0.1 }}
+              cursor={{ fill: "var(--border)" }}
               isAnimationActive={false}
               content={
                 <ChartTooltipContent

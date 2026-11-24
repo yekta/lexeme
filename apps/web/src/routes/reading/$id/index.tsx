@@ -134,7 +134,7 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
           </div>
         )}
         {facts.length > 0 && (
-          <dl className="flex flex-wrap gap-x-8 gap-y-3">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 md:flex md:flex-wrap md:gap-x-8">
             {facts.map((fact) => (
               <div key={fact.label} className="flex flex-col gap-0.5">
                 <dt className="text-xs text-muted-foreground">{fact.label}</dt>

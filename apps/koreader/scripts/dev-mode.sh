@@ -42,7 +42,7 @@ tracked() {
     mnt/us/koreader/history.lua mnt/us/koreader/settings.reader.lua mnt/us/koreader/docsettings; do
     [ -e "$f" ] && echo "$f"
   done
-  find mnt/us/documents -name "*.sdr" -type d
+  find mnt/us/documents -name "*.sdr" -type d -prune 2>/dev/null || true
 }
 
 case "$MODE" in
@@ -52,15 +52,18 @@ case "$MODE" in
   on)
     if [ -d "$SNAP" ]; then echo "Dev mode is already on"; exit 0; fi
     stop_koreader
-    mkdir -p "$SNAP"
-    tracked > "$SNAP/files"
-    (cd / && tar -cf "$SNAP/data.tar" -T "$SNAP/files")
+    rm -rf "$SNAP.partial"
+    mkdir -p "$SNAP.partial"
+    tracked > "$SNAP.partial/files"
+    (cd / && tar -cf "$SNAP.partial/data.tar" -T "$SNAP.partial/files")
+    mv "$SNAP.partial" "$SNAP"
     set_flag true
     start_koreader
     echo "Dev mode on: syncing paused, reading data saved"
     ;;
   off)
     if [ ! -d "$SNAP" ]; then echo "Dev mode is already off"; exit 0; fi
+    if [ ! -s "$SNAP/data.tar" ]; then echo "Snapshot is incomplete; not restoring" >&2; exit 1; fi
     stop_koreader
     (cd / && tracked | while read -r f; do rm -rf "/$f"; done)
     (cd / && tar -xf "$SNAP/data.tar")

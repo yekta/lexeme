@@ -60,9 +60,9 @@ export function StreakCalendar({
           {reached} {reached === 1 ? "day" : "days"} of {goalMinutes} min+
         </span>
       </div>
-      <div ref={scroller} className="overflow-x-auto -mx-4 px-4 pb-3.5">
+      <div ref={scroller} className="overflow-x-auto -mx-4 pr-4 pb-3.5">
         <div className="flex min-w-max sm:min-w-0">
-          <div className="sticky left-0 z-10 -ml-4 pl-4 pr-1.5 bg-card flex flex-col gap-0.5 sm:gap-0.75 text-[10px] leading-none text-muted-foreground">
+          <div className="sticky left-0 z-10 pl-4 pr-1.5 bg-card flex flex-col gap-0.5 sm:gap-0.75 text-[10px] leading-none text-muted-foreground">
             <span className="h-4" />
             {WEEKDAYS.map((day) => (
               <span key={day} className="flex-1 flex items-center">

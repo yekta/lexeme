@@ -55,7 +55,7 @@ end
 
 function Shell:refreshDecks()
     if self:currentTab() ~= "lexeme" then return end
-    if Study.refresh() then self:refresh() end
+    Study.refreshInBackground()
 end
 
 function Shell:onLexemeDecksChanged()

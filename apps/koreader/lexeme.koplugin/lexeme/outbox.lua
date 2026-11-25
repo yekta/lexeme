@@ -49,32 +49,44 @@ local PATHS = {
     review = function(body) return "/api/v1/cards/" .. body.card_id .. "/review" end,
 }
 
+local listeners = {}
+
+-- Calls `fn(entry, reply)` for each entry of `kind` the server accepts.
+function Outbox.listen(kind, fn)
+    listeners[kind] = fn
+end
+
+local function drop(id)
+    local kept = {}
+    for _, entry in ipairs(Outbox.entries()) do
+        if entry.id ~= id then table.insert(kept, entry) end
+    end
+    save(kept)
+end
+
 --[[
 Sends entries oldest first and drops each one the server accepts. Stops at the
 first network failure, so the rest wait for the next connection. An entry the
 server refuses for good (it will never accept it) is dropped and logged.
-`on_sent(entry, reply)` hears of each one sent. Returns the number sent and the
-error that stopped it, if any.
+Returns the number sent and the error that stopped it, if any.
 ]]
-function Outbox.flush(on_sent)
+function Outbox.flush()
     local sent = 0
-    local entries = Outbox.entries()
-    while #entries > 0 do
-        local entry = entries[1]
+    while true do
+        local entry = Outbox.entries()[1]
+        if not entry then return sent end
         local ok, result, status = Api.post(PATHS[entry.kind](entry.body), entry.body)
         if ok then
             sent = sent + 1
-            if on_sent then on_sent(entry, result) end
+            if listeners[entry.kind] then listeners[entry.kind](entry, result) end
         elseif Api.isPermanent(status) then
             if status == 401 then return sent, result end
             logger.warn("Lexeme: dropping", entry.kind, "the server refused:", result)
         else
             return sent, result
         end
-        table.remove(entries, 1)
-        save(entries)
+        drop(entry.id)
     end
-    return sent
 end
 
 return Outbox

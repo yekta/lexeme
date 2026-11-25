@@ -261,13 +261,11 @@ function Settings:lexemePage()
 end
 
 function Settings:decksPage()
-    local Api = require("lexeme/api")
-    local ok, body = Api.get("/api/v1/decks")
-    local decks = ok and (body.decks or body) or {}
+    local decks = require("lexeme/study").decks()
     local current = G_reader_settings:readSetting("lexeme_deck_id")
     return {
         title = "Deck for new words",
-        intro = ok and "Choose where words you add go." or "Couldn't load your decks. Check your Wi-Fi.",
+        intro = decks and "Choose where words you add go." or "Your decks show here once the Kindle has synced.",
         rows = function()
             local rows = {
                 {
@@ -281,7 +279,7 @@ function Settings:decksPage()
                     end,
                 },
             }
-            for _, deck in ipairs(type(decks) == "table" and decks or {}) do
+            for _, deck in ipairs(decks or {}) do
                 if deck.name ~= "Kindle" then
                     table.insert(rows, {
                         title = deck.name,

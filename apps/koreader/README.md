@@ -18,7 +18,10 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
   sleeping, since nobody is reading the screen and a sleeping Kindle drops off
   SSH. When you're done, go back to the Home screen, then
   `scripts/dev-mode.sh off` restores the snapshot, the brightness and sleep,
-  and resumes syncing; `status` says which is on.
+  and resumes syncing; `status` says which is on. To test what talks to
+  Lexeme (syncing, studying), run a dev stack and turn dev mode on with
+  `LEXEME_SERVER=http://<this machine>:<port> LEXEME_TOKEN=lx_…`: the Kindle
+  uses that server, with syncing on, until `off`.
 - `python3 scripts/kindle.py shot out.png` saves a framebuffer screenshot.
 - `python3 scripts/kindle.py tap X Y` / `hold X Y` / `swipe X1 Y1 X2 Y2`
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a

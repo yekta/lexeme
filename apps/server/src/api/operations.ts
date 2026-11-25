@@ -24,12 +24,14 @@ import {
   dayKeyAtOffset,
   daysEndingOn,
   dbRowToFSRSCard,
+  formatInterval,
   fsrsCardToDbRow,
   readingSessions,
   reviewLogToDbRow,
   secondsByDayAtOffset,
   streakEndingOn,
   type DeckExport,
+  type FSRS,
   type Grade,
   type TAccessRole,
 } from "@lexeme/shared";
@@ -141,7 +143,18 @@ async function studyBuckets(userId: string, deck: typeof decks.$inferSelect) {
     profile,
     now,
   });
-  return { buckets, total: deckCards.length };
+  return { buckets, profile, total: deckCards.length };
+}
+
+/** What each rating would schedule, as the app labels its rating buttons. */
+function ratingPreviews(scheduler: FSRS, card: typeof cards.$inferSelect, now: Date) {
+  const preview = scheduler.repeat(dbRowToFSRSCard(card), now);
+  return Object.fromEntries(
+    Object.entries(RATINGS).map(([name, grade]) => {
+      const due = preview[grade].card.due;
+      return [name, { interval: formatInterval(due, now), interval_ms: due.getTime() - now.getTime() }];
+    }),
+  );
 }
 
 export const operations: TOperation[] = [
@@ -977,7 +990,7 @@ export const operations: TOperation[] = [
     name: "get-study-queue",
     title: "Get study queue",
     description:
-      "The cards to study in a deck right now, in the order the app shows them, within the deck's daily limits. Show the front, let the user answer, then show the back and record the answer with review-card. Day boundaries are UTC.",
+      "The cards to study in a deck right now, in the order the app shows them, within the deck's daily limits. Show the front, let the user answer, then show the back and record the answer with review-card. Each card's `next` says when each rating would bring it back. Day boundaries are UTC.",
     role: "viewer",
     method: "GET",
     path: "/decks/:deck_id/study",
@@ -987,13 +1000,18 @@ export const operations: TOperation[] = [
     }),
     run: async (caller, input) => {
       const deck = await mustFindDeck(caller.userId, input.deck_id);
-      const { buckets } = await studyBuckets(caller.userId, deck);
+      const { buckets, profile } = await studyBuckets(caller.userId, deck);
       const queue = [...buckets.newCards, ...buckets.learningCards, ...buckets.reviewCards];
+      const scheduler = createUserScheduler(profile);
+      const now = new Date();
       return {
         new_count: buckets.newCards.length,
         learning_count: buckets.learningCards.length,
         due_count: buckets.reviewCards.length,
-        cards: queue.slice(0, input.limit).map((card) => presentCard(card.row)),
+        cards: queue.slice(0, input.limit).map((card) => ({
+          ...presentCard(card.row),
+          next: ratingPreviews(scheduler, card.row, now),
+        })),
       };
     },
   }),
@@ -1015,23 +1033,40 @@ export const operations: TOperation[] = [
         .min(0)
         .default(0)
         .describe("How long the user took to answer, if known."),
+      reviewed_at: isoTime
+        .optional()
+        .describe("When the answer was given, for answers recorded offline. Defaults to now."),
+      review_id: z
+        .uuid()
+        .optional()
+        .describe("An id for this answer, so sending it again records it once."),
     }),
     run: async (caller, input) => {
       const card = await mustFindCard(caller.userId, input.card_id);
       const deck = await mustFindDeck(caller.userId, card.deck_id);
       const profile = await mustFindProfile(caller.userId, deck.learning_profile_id);
+      const scheduler = createUserScheduler(profile);
 
-      const now = new Date();
-      const result = createUserScheduler(profile).next(
-        dbRowToFSRSCard(card),
-        now,
-        RATINGS[input.rating],
-      );
+      const reviewId = input.review_id ?? crypto.randomUUID();
+      const [recorded] = await db
+        .select({ id: reviewLogs.id })
+        .from(reviewLogs)
+        .where(and(eq(reviewLogs.id, reviewId), eq(reviewLogs.user_id, caller.userId)))
+        .limit(1);
+      if (recorded) {
+        return { card: presentCard(card), next: ratingPreviews(scheduler, card, new Date()) };
+      }
+
+      const now = new Date(Math.min(Date.now(), input.reviewed_at ? Date.parse(input.reviewed_at) : Date.now()));
+      if (card.last_review && card.last_review > now) {
+        throw new ApiError("PRECONDITION_FAILED", "This card was reviewed again after that answer.");
+      }
+      const result = scheduler.next(dbRowToFSRSCard(card), now, RATINGS[input.rating]);
       const cardPatch = fsrsCardToDbRow(result.card);
       const log = reviewLogToDbRow(result.log, card.id, input.duration_ms);
       await runMutator(caller.userId, serverMutators.card.rate, {
         card_id: card.id,
-        review_log_id: crypto.randomUUID(),
+        review_log_id: reviewId,
         duration_ms: input.duration_ms,
         card: cardPatch,
         log: {
@@ -1045,7 +1080,8 @@ export const operations: TOperation[] = [
           review: log.review,
         },
       });
-      return { card: presentCard(await mustFindCard(caller.userId, card.id)) };
+      const updated = await mustFindCard(caller.userId, card.id);
+      return { card: presentCard(updated), next: ratingPreviews(scheduler, updated, new Date()) };
     },
   }),
 

@@ -13,6 +13,10 @@ function Api.server()
     return (G_reader_settings:readSetting("lexeme_server") or DEFAULT_SERVER):gsub("/+$", "")
 end
 
+function Api.isDefaultServer()
+    return Api.server() == DEFAULT_SERVER
+end
+
 function Api.token()
     return G_reader_settings:readSetting("lexeme_token")
 end

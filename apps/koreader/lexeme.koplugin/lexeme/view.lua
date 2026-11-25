@@ -47,6 +47,35 @@ function View:hit(x, y, w, h, on_tap, on_hold)
     table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold })
 end
 
+-- A tap target that shows itself pressed when tapped, as on the Kindle. `pressed` ({ x, y, w, h },
+-- each defaulting to the target's) is inverted, with `radius` corners, or gets a black `outline`
+-- that thick, or is drawn by `paint(bb)`.
+function View:pressable(x, y, w, h, on_tap, pressed)
+    pressed = pressed or {}
+    self:hit(x, y, w, h, on_tap)
+    self.hits[#self.hits].pressed = {
+        x = pressed.x or x, y = pressed.y or y, w = pressed.w or w, h = pressed.h or h,
+        radius = pressed.radius, outline = pressed.outline, paint = pressed.paint,
+    }
+end
+
+local function paintPressed(bb, p)
+    if p.paint then return p.paint(bb) end
+    if p.outline then return D.border(bb, p.x, p.y, p.w, p.h, p.outline) end
+    D.invert(bb, p.x, p.y, p.w, p.h, p.radius)
+end
+
+-- As on the Kindle, the pressed look stays until the screen is next drawn, after the tap has done its work.
+function View:showPressed(p)
+    local region = Geom:new{ x = p.x, y = p.y, w = p.w, h = p.h }
+    -- Whatever was waiting to be drawn goes first, or it would draw over the pressed look.
+    UIManager:forceRePaint()
+    paintPressed(Screen.bb, p)
+    UIManager:setDirty(nil, "fast", region)
+    UIManager:forceRePaint()
+    UIManager:setDirty(self, "fast", region)
+end
+
 function View:findHit(pos)
     for i = #self.hits, 1, -1 do
         local t = self.hits[i]
@@ -65,6 +94,7 @@ function View:onLexemeTap(_, ges)
     self.last_tap = ges.pos
     local target = self:findHit(ges.pos)
     if target and target.tap then
+        if target.pressed then self:showPressed(target.pressed) end
         target.tap()
         return true
     end

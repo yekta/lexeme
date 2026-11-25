@@ -122,26 +122,26 @@ function Selection:paintPopup(bb, screen_w)
     if highlighted then D.rect(bb, px + D.s(26), py + D.s(26), D.s(43), D.s(43), D.WHITE) end
     D.rect(bb, px + D.s(30), py + D.s(30), D.s(35), D.s(35), D.gray(221))
     D.textCenter(bb, px + D.s(47), py + D.s(59), D.face("medium", 34), "A")
-    self:hit(px, py, D.s(92), h, function() self:highlight() end)
+    self:pressable(px, py, D.s(92), h, function() self:highlight() end)
 
     D.icon(bb, "kindle-note", px + D.s(115), py + D.s(29), D.s(37), D.s(37))
-    self:hit(px + D.s(92), py, D.s(86), h, function() self:note() end)
+    self:pressable(px + D.s(92), py, D.s(86), h, function() self:note() end)
 
     local lookup_enabled = self.results == nil
     D.text(bb, px + D.s(206), py + D.s(58), D.face("regular", 32), "Look up",
         lookup_enabled and D.BLACK or D.gray(119))
     if lookup_enabled then
-        self:hit(px + D.s(178), py, D.s(170), h, function()
+        self:pressable(px + D.s(178), py, D.s(170), h, function()
             self:closeKeepingSelection()
             self.ui.highlight:lookupDict()
         end)
     end
 
     D.icon(bb, "book-plus", px + D.s(376), py + D.s(30), D.s(34), D.s(34))
-    self:hit(px + D.s(348), py, D.s(90), h, function() self:addToLexeme() end)
+    self:pressable(px + D.s(348), py, D.s(90), h, function() self:addToLexeme() end)
 
     D.icon(bb, "ellipsis-vertical", px + D.s(458), py + D.s(25), D.s(45), D.s(45))
-    self:hit(px + D.s(438), py, w - D.s(438), h, function() self:openMore(px + w, py + h + D.s(8)) end)
+    self:pressable(px + D.s(438), py, w - D.s(438), h, function() self:openMore(px + w, py + h + D.s(8)) end)
 end
 
 function Selection:closeKeepingSelection()
@@ -282,13 +282,13 @@ function Selection:paintSheet(bb, x, w)
         local tx = x + D.s(TAB_X[i])
         local tw = D.text(bb, tx, block + D.s(172), D.face(active and "bold" or "regular", 32), label)
         if not active then
-            self:hit(tx - D.s(20), block + D.s(122), tw + D.s(40), D.s(90), function()
+            self:pressable(tx - D.s(20), block + D.s(122), tw + D.s(40), D.s(90), function()
                 local hl = self.ui.highlight
                 self:closeKeepingSelection()
                 if label == "Wikipedia" then hl:lookupWikipedia()
                 elseif label == "Translate" then hl:translate()
                 else hl:onHighlightSearch() end
-            end)
+            end, { x = tx - D.s(15), w = tw + D.s(30) })
         end
     end
     D.rect(bb, x + D.s(5), block + D.s(210), D.s(200), D.s(9))
@@ -309,15 +309,16 @@ function Selection:paintSheet(bb, x, w)
     local link_face = D.face("regular", 30)
     local lw = D.text(bb, x + D.s(72), footer, link_face, "Add to Lexeme")
     D.rect(bb, x + D.s(72), footer + D.s(7), lw, D.s(3))
-    self:hit(x + D.s(40), footer - D.s(50), lw + D.s(64), D.s(80), function() self:addToLexeme() end)
+    self:pressable(x + D.s(40), footer - D.s(50), lw + D.s(64), D.s(80), function() self:addToLexeme() end,
+        { x = x + D.s(72), y = footer - D.s(32), w = lw, h = D.s(42) })
     local dict = self.results[self.index] and self.results[self.index].dict
     if dict then
         D.textRight(bb, x + D.s(1183), footer, link_face, dict, D.BLACK)
         D.icon(bb, "ellipsis-vertical", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
         if #self.results > 1 then
-            self:hit(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
+            self:pressable(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
                 self:chooseDictionary(x + w - D.s(37), footer - D.s(60))
-            end)
+            end, D.around(x + D.s(1224), footer - D.s(8), D.s(86), D.s(86)))
         end
     end
 end
@@ -328,8 +329,10 @@ function Selection:paintScroll(bb, left, block, pages)
     local arrow_w, arrow_h = D.s(35), D.s(21)
     D.icon(bb, up and "triangle-up" or "triangle-up-gray", left, block + D.s(263), arrow_w, arrow_h)
     D.icon(bb, down and "triangle-down" or "triangle-down-gray", left, block + D.s(582), arrow_w, arrow_h)
-    self:hit(left - D.s(40), block + D.s(233), D.s(110), D.s(90), function() self:turn(-1) end)
-    self:hit(left - D.s(40), block + D.s(552), D.s(110), D.s(90), function() self:turn(1) end)
+    self:pressable(left - D.s(40), block + D.s(233), D.s(110), D.s(90), function() self:turn(-1) end,
+        D.around(left + D.s(17), block + D.s(273), D.s(101), D.s(101)))
+    self:pressable(left - D.s(40), block + D.s(552), D.s(110), D.s(90), function() self:turn(1) end,
+        D.around(left + D.s(17), block + D.s(592), D.s(101), D.s(101)))
     if pages <= 1 then return end
     local track_x, track_top, track_bottom = left + D.s(12), block + D.s(326), block + D.s(538)
     for ty = track_top, track_bottom do

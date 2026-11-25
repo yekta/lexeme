@@ -150,6 +150,24 @@ function Sync.beforeSleep()
     end)
 end
 
+-- Waking, the Kindle rejoins Wi-Fi on its own a few seconds later, without KOReader hearing of it.
+local WAKE_CHECKS, WAKE_INTERVAL = 20, 3
+local wake_checks = 0
+
+local function syncOnceOnline()
+    wake_checks = wake_checks + 1
+    if NetworkMgr:isConnected() and NetworkMgr:isOnline() then return Sync.run() end
+    if wake_checks < WAKE_CHECKS then UIManager:scheduleIn(WAKE_INTERVAL, syncOnceOnline) end
+end
+
+-- Syncs once the Kindle is back online after waking, picking up books sent to it while it slept.
+function Sync.afterWake()
+    if not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
+    UIManager:unschedule(syncOnceOnline)
+    wake_checks = 0
+    UIManager:scheduleIn(WAKE_INTERVAL, syncOnceOnline)
+end
+
 function Sync.disconnect()
     G_reader_settings:delSetting("lexeme_token")
     G_reader_settings:delSetting("lexeme_user_name")

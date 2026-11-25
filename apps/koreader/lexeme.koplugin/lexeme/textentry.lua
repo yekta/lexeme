@@ -38,7 +38,8 @@ function TextEntry:render(bb, x, y, w)
     Status.paint(self, bb, x, y, w)
     D.text(bb, x + D.s(66), y + D.s(168), D.face("bold", 34), self.title or "", D.BLACK, w - D.s(250))
     D.icon(bb, "x", x + D.s(1189), y + D.s(131), D.s(52), D.s(52))
-    self:hit(x + w - D.s(120), y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end)
+    self:pressable(x + w - D.s(120), y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end,
+        { x = x + D.s(1165), y = y + D.s(108), w = D.s(101), h = D.s(101) })
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
 
     local field_y = y + D.s(290)
@@ -51,10 +52,10 @@ function TextEntry:render(bb, x, y, w)
         local face = D.face("regular", 30)
         local lw = D.width(face, label)
         D.text(bb, x + w - D.s(96) - lw, field_y + D.s(62), face, label)
-        self:hit(x + w - D.s(140) - lw, field_y, lw + D.s(80), D.s(100), function()
+        self:pressable(x + w - D.s(140) - lw, field_y, lw + D.s(80), D.s(100), function()
             self.revealed = not self.revealed
             self:refresh()
-        end)
+        end, { x = x + w - D.s(96) - lw, y = field_y + D.s(62 - 32), w = lw, h = D.s(42) })
     end
 
     local button_y = field_y + D.s(150)
@@ -62,7 +63,8 @@ function TextEntry:render(bb, x, y, w)
     local bx = x + w - D.s(66) - bw
     D.roundRect(bb, bx, button_y, bw, D.s(98), D.BLACK, D.s(8))
     D.textCenter(bb, bx + bw / 2, button_y + D.s(61), D.face("regular", 32), "Done", D.WHITE)
-    self:hit(bx, button_y, bw, D.s(98), function() self:done() end)
+    self:pressable(bx, button_y, bw, D.s(98), function() self:done() end,
+        D.inset(bx, button_y, bw, D.s(98), D.s(3), { radius = D.s(5) }))
 
     self.keyboard:paint(self, bb, x, w)
 end

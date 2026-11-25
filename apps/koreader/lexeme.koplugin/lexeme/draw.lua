@@ -139,6 +139,32 @@ function D.roundRect(bb, x, y, w, h, color, radius)
     bb:paintRoundedRect(x, y, w, h, color or D.BLACK, radius)
 end
 
+-- A w x h area centred on cx, cy; `extra` fields are kept.
+function D.around(cx, cy, w, h, extra)
+    local area = extra or {}
+    area.x, area.y, area.w, area.h = cx - math.floor(w / 2), cy - math.floor(h / 2), w, h
+    return area
+end
+
+-- The area inside a border `by` thick; `extra` fields are kept.
+function D.inset(x, y, w, h, by, extra)
+    local area = extra or {}
+    area.x, area.y, area.w, area.h = x + by, y + by, w - 2 * by, h - 2 * by
+    return area
+end
+
+-- Inverts a rectangle with rounded corners.
+function D.invert(bb, x, y, w, h, radius)
+    local r = math.min(radius or 0, math.floor(w / 2), math.floor(h / 2))
+    for row = 0, r - 1 do
+        local dy = r - row - 0.5
+        local inset = r - math.floor(math.sqrt(r * r - dy * dy) + 0.5)
+        bb:invertRect(x + inset, y + row, w - 2 * inset, 1)
+        bb:invertRect(x + inset, y + h - 1 - row, w - 2 * inset, 1)
+    end
+    bb:invertRect(x, y + r, w, h - 2 * r)
+end
+
 local scrim_tile
 
 -- The checkerboard the Kindle lays over whatever is behind a sheet.

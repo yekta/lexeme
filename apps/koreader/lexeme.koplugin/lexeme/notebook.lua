@@ -69,7 +69,8 @@ end
 function Notebook:render(bb, x, y, w, h)
     Status.paint(self, bb, x, y, w)
     D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
-    self:hit(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end)
+    self:pressable(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end,
+        { x = x + D.s(7), y = y + D.s(108), w = D.s(101), h = D.s(101) })
     local title = self.ui.doc_props and self.ui.doc_props.display_title or ""
     D.text(bb, x + D.s(139), y + D.s(168), D.face("bold", 34), title, D.BLACK, w - D.s(180))
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
@@ -80,7 +81,8 @@ function Notebook:render(bb, x, y, w, h)
             if f.key == self.filter then D.text(bb, x + D.s(96), y + D.s(288), D.face("regular", 30), f.label) end
         end
     end
-    self:hit(x, y + D.s(220), D.s(500), D.s(115), function() self:openFilter() end)
+    self:pressable(x, y + D.s(220), D.s(500), D.s(115), function() self:openFilter() end,
+        { x = x + D.s(7), y = y + D.s(234), w = D.s(86), h = D.s(86) })
     D.rect(bb, x, y + D.s(336), w, D.s(4))
 
     local items = self:items()
@@ -114,9 +116,9 @@ function Notebook:render(bb, x, y, w, h)
         D.rect(bb, x + D.s(108), line_y + D.s(57), pw, D.s(2))
         D.text(bb, x + D.s(108) + pw, line_y + D.s(50), meta_face, " | " .. self:typeLabel(item))
         D.icon(bb, "ellipsis-vertical", x + w - D.s(100), line_y + D.s(16), D.s(40), D.s(40))
-        self:hit(x + w - D.s(140), line_y, D.s(140), D.s(80), function()
+        self:pressable(x + w - D.s(140), line_y, D.s(140), D.s(80), function()
             self:openItemMenu(entry, x + w - D.s(60), line_y + D.s(80))
-        end)
+        end, D.around(x + w - D.s(80), line_y + D.s(36), D.s(86), D.s(86)))
         line_y = line_y + D.s(70)
         if #lines > 0 then
             D.rect(bb, x + D.s(108), line_y + D.s(4), D.s(10), #lines * D.s(42) - D.s(8))

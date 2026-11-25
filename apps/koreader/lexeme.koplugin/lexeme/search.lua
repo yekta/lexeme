@@ -169,7 +169,8 @@ function Search:paintField(bb, x, y, w)
         if not self.results then
             D.rect(bb, x + D.s(162) + tw, y + D.s(138), D.s(2), D.s(42))
             D.icon(bb, "arrow-right", x + D.s(1060), y + D.s(136), D.s(46), D.s(46))
-            self:hit(x + D.s(1030), y + D.s(108), D.s(110), D.s(101), function() self:submit() end)
+            self:pressable(x + D.s(1030), y + D.s(108), D.s(110), D.s(101), function() self:submit() end,
+                D.around(x + D.s(1083), y + D.s(159), D.s(86), D.s(86)))
         end
     end
     -- Tapping the field after a search brings the keyboard back.
@@ -180,7 +181,8 @@ function Search:paintField(bb, x, y, w)
         end
     end)
     D.icon(bb, "x", x + D.s(1188), y + D.s(132), D.s(52), D.s(52))
-    self:hit(x + D.s(1160), y + D.s(100), w - D.s(1160), D.s(115), function() self:close("flashui") end)
+    self:pressable(x + D.s(1160), y + D.s(100), w - D.s(1160), D.s(115), function() self:close("flashui") end,
+        { x = x + D.s(1164), y = y + D.s(108), w = D.s(101), h = D.s(101) })
 end
 
 function Search:paintHistory(bb, x, y, w)
@@ -191,18 +193,18 @@ function Search:paintHistory(bb, x, y, w)
     local cw = D.width(clear_face, "Clear history")
     D.text(bb, x + w - D.s(120) - cw, y + D.s(310), clear_face, "Clear history")
     D.rect(bb, x + w - D.s(120) - cw, y + D.s(318), cw, D.s(2))
-    self:hit(x + w - D.s(140) - cw, y + D.s(260), cw + D.s(40), D.s(80), function()
+    self:pressable(x + w - D.s(140) - cw, y + D.s(260), cw + D.s(40), D.s(80), function()
         self:saveHistory({})
         self:refresh()
-    end)
+    end, { x = x + w - D.s(120) - cw, y = y + D.s(310 - 32), w = cw, h = D.s(42) })
     for i, query in ipairs(history) do
         local baseline = y + D.s(395 + (i - 1) * 76)
         D.icon(bb, "history", x + D.s(66), baseline - D.s(30), D.s(40), D.s(40))
         D.text(bb, x + D.s(152), baseline, D.face("regular", 32), query, D.BLACK, w - D.s(300))
-        self:hit(x, baseline - D.s(55), w, D.s(76), function()
+        self:pressable(x, baseline - D.s(55), w, D.s(76), function()
             self.query = query
             self:submit()
-        end)
+        end, { x = x + D.s(39), y = baseline - D.s(47), w = D.s(1138), h = D.s(72) })
     end
 end
 
@@ -247,7 +249,8 @@ function Search:paintSuggestions(bb, x, y, w)
     local cx = x + D.s(142)
     cx = cx + D.text(bb, cx, row, regular, "Search everywhere for ")
     D.text(bb, cx, row, bold, "\"" .. query .. "\"", D.BLACK, w - cx - D.s(60))
-    self:hit(x, top, w, D.s(100), function() self:submit() end)
+    self:pressable(x, top, w, D.s(100), function() self:submit() end,
+        { x = x + D.s(39), y = row - D.s(47), w = D.s(1138), h = D.s(72) })
 end
 
 function Search:paintLibraryResults(bb, x, y, w, h)
@@ -255,7 +258,8 @@ function Search:paintLibraryResults(bb, x, y, w, h)
     local heading = string.format("Results from your Library (%d)", #self.results)
     D.text(bb, x + D.s(57), y + D.s(312), D.face("bold", 34), heading)
     D.icon(bb, "chevron-right", x + D.s(1080), y + D.s(278), D.s(46), D.s(46))
-    self:hit(x, y + D.s(250), w, D.s(100), function() self:showInLibrary() end)
+    self:pressable(x, y + D.s(250), w, D.s(100), function() self:showInLibrary() end,
+        { x = x + D.s(56), y = y + D.s(312 - 64), w = D.s(1090), h = D.s(95) })
     local cover_w, cover_h = D.s(245), D.s(310)
     for i, book in ipairs(self.results) do
         local cx = x + D.s(57) + (i - 1) * D.s(276)
@@ -316,8 +320,10 @@ function Search:paintBookResults(bb, x, y, w, h)
         D.icon(bb, up, x + w - D.s(74), y + D.s(380), D.s(34), D.s(21))
         D.icon(bb, self.page < pages and "triangle-down" or "triangle-down-gray", x + w - D.s(74), y + h - D.s(80),
             D.s(34), D.s(21))
-        self:hit(x + w - D.s(110), y + D.s(340), D.s(110), D.s(110), function() self:turn(-1, pages) end)
-        self:hit(x + w - D.s(110), y + h - D.s(130), D.s(110), D.s(130), function() self:turn(1, pages) end)
+        self:pressable(x + w - D.s(110), y + D.s(340), D.s(110), D.s(110), function() self:turn(-1, pages) end,
+            D.around(x + w - D.s(57), y + D.s(390), D.s(101), D.s(101)))
+        self:pressable(x + w - D.s(110), y + h - D.s(130), D.s(110), D.s(130), function() self:turn(1, pages) end,
+            D.around(x + w - D.s(57), y + h - D.s(70), D.s(101), D.s(101)))
     end
 end
 

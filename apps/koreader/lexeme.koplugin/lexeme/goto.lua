@@ -20,6 +20,8 @@ local GoToPage = View:extend{
 local KEYPAD_TOP = 1193
 local KEYPAD_COLS = { 392, 629, 865 }
 local KEYPAD_ROWS = { 1270, 1387, 1502, 1617 }
+-- Where a pressed key's outline starts in the first row, and how far apart the rows' outlines are.
+local KEY_TOP, KEY_PITCH = 1218, 349 / 3
 
 function GoToPage:init()
     View.init(self)
@@ -70,12 +72,16 @@ function GoToPage:render(bb, x, y, w, h)
     local cancel_x, go_x, button_w = bx + D.s(563), bx + D.s(799), D.s(213)
     D.border(bb, cancel_x, button_y, button_w, D.s(98), D.s(3), D.BLACK, D.s(8))
     D.textCenter(bb, cancel_x + button_w / 2, button_y + D.s(61), D.face("regular", 32), "Cancel")
-    self:hit(cancel_x, button_y, button_w, D.s(98), function() self:close() end)
+    self:pressable(cancel_x, button_y, button_w, D.s(98), function() self:close() end,
+        D.inset(cancel_x, button_y, button_w, D.s(98), D.s(3), { radius = D.s(5) }))
     local valid = tonumber(self.digits) and tonumber(self.digits) >= 1 and tonumber(self.digits) <= count
     D.roundRect(bb, go_x, button_y, button_w, D.s(98), valid and D.BLACK or D.gray(220), D.s(8))
     D.textCenter(bb, go_x + button_w / 2, button_y + D.s(61), D.face("regular", 32), "Go",
         valid and D.WHITE or D.gray(136))
-    if valid then self:hit(go_x, button_y, button_w, D.s(98), function() self:go() end) end
+    if valid then
+        self:pressable(go_x, button_y, button_w, D.s(98), function() self:go() end,
+            D.inset(go_x, button_y, button_w, D.s(98), D.s(3), { radius = D.s(5) }))
+    end
 
     local top = y + h - D.s(1696 - KEYPAD_TOP)
     self:hit(x, top, w, h - (top - y), function() end)
@@ -94,7 +100,9 @@ function GoToPage:render(bb, x, y, w, h)
             else
                 D.textCenter(bb, cx, cy + D.s(16), face, key)
             end
-            self:hit(cx - D.s(118), cy - D.s(57), D.s(236), D.s(114), function() self:type(key) end)
+            self:pressable(cx - D.s(118), cy - D.s(57), D.s(236), D.s(114), function() self:type(key) end,
+                { x = cx - D.s(109), y = top + D.s(KEY_TOP + math.floor((r - 1) * KEY_PITCH + 0.5) - KEYPAD_TOP),
+                    w = D.s(220), h = D.s(104), outline = D.s(4) })
         end
     end
 end
@@ -136,7 +144,8 @@ function GoTo:render(bb, x, y, w, h)
     D.rect(bb, x, y + D.s(837 - PANEL_TOP), w, D.s(4))
     D.text(bb, x + D.s(36), y + D.s(905 - PANEL_TOP), D.face("regular", 34), "Go to page or location")
     D.icon(bb, "chevron-right", x + w - D.s(70), y + D.s(876 - PANEL_TOP), D.s(48), D.s(48))
-    self:hit(x, y + D.s(841 - PANEL_TOP), w, D.s(111), function() self:askPage() end)
+    self:pressable(x, y + D.s(841 - PANEL_TOP), w, D.s(111), function() self:askPage() end,
+        { x = x + D.s(5), y = y + D.s(846 - PANEL_TOP), w = w - D.s(11), h = D.s(101) })
     D.rect(bb, x, y + D.s(952 - PANEL_TOP), w, D.s(4))
 
     local list_top = y + D.s(956 - PANEL_TOP)

@@ -673,12 +673,14 @@ function Settings:render(bb, x, y, w, h)
     local title_x = x + D.s(66)
     if not is_root then
         D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
-        self:hit(x, y + D.s(100), D.s(120), D.s(112), function() self:pop() end)
+        self:pressable(x, y + D.s(100), D.s(120), D.s(112), function() self:pop() end,
+            { x = x + D.s(7), y = y + D.s(108), w = D.s(101), h = D.s(101) })
         title_x = x + D.s(139)
     end
     D.text(bb, title_x, y + D.s(168), D.face("bold", 34), page.title, D.BLACK, w - D.s(400))
     D.icon(bb, "x", x + D.s(1189), y + D.s(131), D.s(52), D.s(52))
-    self:hit(x + w - D.s(120), y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end)
+    self:pressable(x + w - D.s(120), y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end,
+        { x = x + D.s(1165), y = y + D.s(108), w = D.s(101), h = D.s(101) })
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
 
     local top = y + D.s(216)
@@ -767,10 +769,14 @@ function Settings:paintRow(bb, x, top, w, row_h, row, icons)
     D.rect(bb, x + D.s(36), top + row_h - D.s(2), w - D.s(icons and 72 or 128), D.s(2), D.gray(200))
 
     if not enabled then return end
+    -- Toggles and choices change in place; rows that open something show they were pressed.
+    local pressedRow = (row.toggle == nil and not row.check) and {
+        x = x + D.s(36), y = top + D.s(7), w = w - D.s(icons and 72 or 128), h = row_h - D.s(16),
+    } or nil
     if row.page then
-        self:hit(x, top, w, row_h, function() self:push(row.page()) end)
+        self:pressable(x, top, w, row_h, function() self:push(row.page()) end, pressedRow)
     elseif row.tap then
-        self:hit(x, top, w, row_h, row.tap)
+        self:pressable(x, top, w, row_h, row.tap, pressedRow)
     end
 end
 
@@ -778,8 +784,10 @@ function Settings:paintScroll(bb, right, top, bottom, last, total)
     local up, down = self.first_row > 1, last < total
     D.icon(bb, up and "triangle-up" or "triangle-up-gray", right - D.s(62), top + D.s(30), D.s(28), D.s(18))
     D.icon(bb, down and "triangle-down" or "triangle-down-gray", right - D.s(62), bottom - D.s(30), D.s(28), D.s(18))
-    self:hit(right - D.s(100), top, D.s(100), D.s(100), function() self:scroll(-1, last) end)
-    self:hit(right - D.s(100), bottom - D.s(100), D.s(100), D.s(100), function() self:scroll(1, last) end)
+    self:pressable(right - D.s(100), top, D.s(100), D.s(100), function() self:scroll(-1, last) end,
+        D.around(right - D.s(48), top + D.s(39), D.s(101), D.s(101)))
+    self:pressable(right - D.s(100), bottom - D.s(100), D.s(100), D.s(100), function() self:scroll(1, last) end,
+        D.around(right - D.s(48), bottom - D.s(21), D.s(101), D.s(101)))
 end
 
 function Settings:scroll(direction, last)

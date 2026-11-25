@@ -33,7 +33,8 @@ function Quick:button(bb, cx, cy, icon, label, on, on_tap)
         size, size)
     D.icon(bb, on and icon .. "-white" or icon, cx - D.s(26), cy - D.s(26), D.s(52), D.s(52))
     D.textCenter(bb, cx, cy + D.s(100), D.face("regular", 32), label)
-    self:hit(cx - D.s(150), cy - D.s(60), D.s(300), D.s(180), on_tap)
+    self:pressable(cx - D.s(150), cy - D.s(60), D.s(300), D.s(180), on_tap,
+        D.around(cx, cy, D.s(95), D.s(95), { radius = D.s(48) }))
 end
 
 function Quick:render(bb, x, y, w, h)

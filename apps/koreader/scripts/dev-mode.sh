@@ -5,12 +5,14 @@
 # nothing done in between counts, and syncing resumes. While it's on, the
 # frontlight is off and the Kindle doesn't sleep; `off` restores both.
 # `status` says which.
+# With LEXEME_SERVER and LEXEME_TOKEN set, `on` points the Kindle at that Lexeme
+# (a dev stack) instead, and syncing to it stays on.
 # KINDLE_HOST is an ssh host, `kindle` by default.
 set -e
 HOST="${KINDLE_HOST:-kindle}"
 case "$1" in on | off | status) ;; *) echo "usage: dev-mode.sh on|off|status" >&2; exit 1 ;; esac
 
-ssh "$HOST" "MODE=$1 sh -s" <<'EOF'
+ssh "$HOST" "MODE=$1 LEXEME_SERVER='${LEXEME_SERVER:-}' LEXEME_TOKEN='${LEXEME_TOKEN:-}' sh -s" <<'EOF'
 set -e
 KO=/mnt/us/koreader
 SNAP=/mnt/us/lexeme-dev/snapshot
@@ -36,11 +38,21 @@ set_flag() {
     settings:flush()" >/dev/null 2>&1
 }
 
+use_server() {
+  cd "$KO" && ./luajit -e "
+    require('setupkoenv')
+    local settings = require('luasettings'):open('settings.reader.lua')
+    settings:saveSetting('lexeme_server', '$LEXEME_SERVER')
+    settings:saveSetting('lexeme_token', '$LEXEME_TOKEN')
+    for _, key in ipairs({ 'lexeme_user_email', 'lexeme_deck_id', 'lexeme_deck_name' }) do settings:delSetting(key) end
+    settings:flush()" >/dev/null 2>&1
+}
+
 # Everything reading writes, relative to /.
 tracked() {
   cd /
   for f in mnt/us/koreader/settings/statistics.sqlite3 mnt/us/koreader/settings/vocabulary_builder.sqlite3 \
-    mnt/us/koreader/settings/lookup_history.lua mnt/us/koreader/settings/lexeme_outbox.lua \
+    mnt/us/koreader/settings/lookup_history.lua mnt/us/koreader/settings/lexeme_* \
     mnt/us/koreader/history.lua mnt/us/koreader/settings.reader.lua mnt/us/koreader/docsettings; do
     [ -e "$f" ] && echo "$f"
   done
@@ -63,6 +75,10 @@ case "$MODE" in
     lipc-set-prop com.lab126.powerd flIntensity 0
     lipc-set-prop com.lab126.powerd preventScreenSaver 1
     set_flag true
+    if [ -n "$LEXEME_SERVER" ] && [ -n "$LEXEME_TOKEN" ]; then
+      use_server
+      echo "Using Lexeme at $LEXEME_SERVER"
+    fi
     start_koreader
     echo "Dev mode on: syncing paused, reading data saved, frontlight off, sleep prevented"
     ;;

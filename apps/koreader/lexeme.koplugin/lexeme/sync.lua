@@ -32,6 +32,11 @@ function Sync.isConnected()
     return Api.token() ~= nil
 end
 
+-- Dev mode (scripts/dev-mode.sh) keeps everything from the owner's Lexeme; a dev server is fair game.
+function Sync.isPaused()
+    return G_reader_settings:isTrue("lexeme_dev_mode") and Api.isDefaultServer()
+end
+
 -- Remembers the account's email, which Settings shows; returns it.
 function Sync.fetchAccount()
     local ok, body = Api.get("/api/v1/me")
@@ -97,7 +102,7 @@ function Sync.run(on_done)
     on_done = on_done or function() end
     if running then return on_done(false, "A sync is already running.") end
     if not Sync.isConnected() then return on_done(false, "Connect to Lexeme first.") end
-    if G_reader_settings:isTrue("lexeme_dev_mode") then return on_done(false, "Syncing is paused in dev mode.") end
+    if Sync.isPaused() then return on_done(false, "Syncing is paused in dev mode.") end
     if not NetworkMgr:isOnline() then return on_done(false, "No internet connection.") end
     running = true
     local ok, err = pcall(function()
@@ -117,6 +122,9 @@ function Sync.run(on_done)
         if Streak.refresh() then
             UIManager:broadcastEvent(Event:new("LexemeStreakChanged"))
         end
+        if require("lexeme/study").refresh() then
+            UIManager:broadcastEvent(Event:new("LexemeDecksChanged"))
+        end
         local _, delivery_failure = require("lexeme/delivery").run()
         if delivery_failure then error(delivery_failure, 0) end
         G_reader_settings:saveSetting("lexeme_synced_at", started)
@@ -134,7 +142,7 @@ local scheduled = false
 
 -- Syncs a few seconds from now, quietly; repeated calls in the meantime are folded into one.
 function Sync.soon()
-    if scheduled or not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
+    if scheduled or not Sync.isConnected() or Sync.isPaused() then return end
     scheduled = true
     UIManager:scheduleIn(3, function()
         scheduled = false
@@ -144,7 +152,7 @@ end
 
 -- Syncs once the lock screen is drawn; the Kindle stays on Wi-Fi for a minute before it sleeps.
 function Sync.beforeSleep()
-    if not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
+    if not Sync.isConnected() or Sync.isPaused() then return end
     UIManager:tickAfterNext(function()
         if NetworkMgr:isOnline() then Sync.run() end
     end)
@@ -162,7 +170,7 @@ end
 
 -- Syncs once the Kindle is back online after waking, picking up books sent to it while it slept.
 function Sync.afterWake()
-    if not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
+    if not Sync.isConnected() or Sync.isPaused() then return end
     UIManager:unschedule(syncOnceOnline)
     wake_checks = 0
     UIManager:scheduleIn(WAKE_INTERVAL, syncOnceOnline)
@@ -175,6 +183,7 @@ function Sync.disconnect()
     G_reader_settings:delSetting("lexeme_synced_at")
     G_reader_settings:delSetting("lexeme_deck_id")
     G_reader_settings:delSetting("lexeme_deck_name")
+    require("lexeme/study").forget()
 end
 
 return Sync

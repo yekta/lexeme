@@ -8,6 +8,7 @@ local Menu = require("lexeme/menu")
 local Quick = require("lexeme/quick")
 local Status = require("lexeme/status")
 local Streak = require("lexeme/streak")
+local Study = require("lexeme/study")
 local Sync = require("lexeme/sync")
 local View = require("lexeme/view")
 
@@ -22,6 +23,7 @@ local Shell = View:extend{
 
 local GRID = { x = 109, pitch_x = 357, top = 361, pitch_y = 632, cover_w = 310, cover_h = 512, cols = 3 }
 local LIST = { top = 345, pitch = 265 }
+local DECKS = { top = 345, pitch = 170, per_page = 7 }
 
 local FILTERS = {
     { key = "in_progress", label = "In progress" },
@@ -38,6 +40,26 @@ function Shell:init()
     self.descending = G_reader_settings:nilOrTrue("lexeme_library_descending")
     self.layout = G_reader_settings:readSetting("lexeme_library_layout") or "grid"
     self:reload()
+    if self.tab == "lexeme" then UIManager:nextTick(function() self:refreshDecks() end) end
+end
+
+-- The Lexeme tab: studying the decks, while connected to Lexeme and unless turned off in Settings.
+function Shell:showsLexeme()
+    return Sync.isConnected() and G_reader_settings:nilOrTrue("lexeme_study_tab")
+end
+
+function Shell:currentTab()
+    if self.tab == "lexeme" and not self:showsLexeme() then return "home" end
+    return self.tab
+end
+
+function Shell:refreshDecks()
+    if self:currentTab() ~= "lexeme" then return end
+    if Study.refresh() then self:refresh() end
+end
+
+function Shell:onLexemeDecksChanged()
+    if self:currentTab() == "lexeme" then self:refresh() end
 end
 
 function Shell:reload()
@@ -77,7 +99,7 @@ function Shell:onLexemeLibraryChanged()
 end
 
 function Shell:onLexemeStreakChanged()
-    if self.tab == "home" then self:refresh() end
+    if self:currentTab() == "home" then self:refresh() end
 end
 
 function Shell:setSort(sort, descending)
@@ -141,6 +163,7 @@ function Shell:setTab(tab)
     G_reader_settings:saveSetting("lexeme_tab", tab)
     self.page = 1
     self:refresh("flashui")
+    if tab == "lexeme" then UIManager:nextTick(function() self:refreshDecks() end) end
 end
 
 function Shell:onShowingReader()
@@ -154,8 +177,11 @@ end
 function Shell:render(bb, x, y, w, h)
     Status.paint(self, bb, x, y, w, function() self:openQuick() end)
     self:paintSearchRow(bb, x, y, w)
-    if self.tab == "library" then
+    local tab = self:currentTab()
+    if tab == "library" then
         self:paintLibrary(bb, x, y, w, h)
+    elseif tab == "lexeme" then
+        self:paintLexeme(bb, x, y, w, h)
     else
         self:paintHome(bb, x, y, w, h)
     end
@@ -425,8 +451,8 @@ function Shell:onSwipe(direction, ges)
         self:openQuick()
         return true
     end
-    if self.tab == "home" then return self:scrollCarousel(direction, ges.pos.y) end
-    if self.tab ~= "library" then return end
+    local tab = self:currentTab()
+    if tab == "home" then return self:scrollCarousel(direction, ges.pos.y) end
     if direction == "north" or direction == "west" then
         self:turnPage(1, self:pageCount())
     elseif direction == "south" or direction == "east" then
@@ -436,8 +462,53 @@ function Shell:onSwipe(direction, ges)
 end
 
 function Shell:pageCount()
+    if self:currentTab() == "lexeme" then
+        return math.max(1, math.ceil(#(Study.decks() or {}) / DECKS.per_page))
+    end
     local per_page = self.layout == "grid" and GRID.cols * 2 or 4
     return math.max(1, math.ceil(#self.books / per_page))
+end
+
+-- Lexeme --------------------------------------------------------------------------
+
+local function deckSummary(deck)
+    if deck.card_count == 0 then return "No cards yet" end
+    local new, learning, review = Study.counts(deck.cards)
+    local parts = {}
+    if new > 0 then table.insert(parts, new .. " new") end
+    if learning > 0 then table.insert(parts, learning .. " learning") end
+    if review > 0 then table.insert(parts, review .. " due") end
+    if #parts == 0 then table.insert(parts, "All caught up") end
+    table.insert(parts, deck.card_count == 1 and "1 card" or deck.card_count .. " cards")
+    return table.concat(parts, " · ")
+end
+
+function Shell:paintLexeme(bb, x, y, w, h)
+    D.text(bb, x + D.s(57), y + D.s(301), D.face("display", 55), "Study")
+    local decks = Study.decks()
+    if not decks or #decks == 0 then
+        local message = decks and "No decks yet. Make one in Lexeme." or "Connect to Wi-Fi to get your decks."
+        D.textCenter(bb, x + w / 2, y + D.s(800), D.face("regular", 36), message)
+        return
+    end
+    local pages = self:pageCount()
+    self.page = math.min(self.page, pages)
+    local right = pages > 1 and w - D.s(122) or w - D.s(36)
+    local first = (self.page - 1) * DECKS.per_page
+    for i = 1, DECKS.per_page do
+        local deck = decks[first + i]
+        if not deck then break end
+        local top = y + D.s(DECKS.top + (i - 1) * DECKS.pitch)
+        local text_w = right - D.s(57 + 100)
+        D.text(bb, x + D.s(57), top + D.s(78), D.face("bold", 36), deck.name, D.BLACK, text_w)
+        D.text(bb, x + D.s(57), top + D.s(126), D.face("regular", 30), deckSummary(deck), D.BLACK, text_w)
+        D.icon(bb, "chevron-right", x + right - D.s(64), top + D.s(63), D.s(44), D.s(44))
+        D.rect(bb, x + D.s(36), top + D.s(DECKS.pitch) - D.s(2), right - D.s(36), D.s(2), D.gray(200))
+        self:pressable(x, top, right, D.s(DECKS.pitch), function()
+            require("lexeme/study_screen").open(deck, function() self:refresh() end)
+        end, { x = x + D.s(36), y = top + D.s(7), w = right - D.s(36), h = D.s(DECKS.pitch - 16) })
+    end
+    if pages > 1 then self:paintScrollbar(bb, x + w, y + D.s(DECKS.top), y + h - D.s(111), pages) end
 end
 
 -- Home ------------------------------------------------------------------------
@@ -623,17 +694,31 @@ function Shell:paintTabs(bb, x, y, w, h)
     local line_y = y + h - D.s(111)
     D.rect(bb, x, line_y, w, D.s(5))
     local face = D.face("bold", 36)
+    -- Amazon's two tabs sit either side of the book being read; with Lexeme's, the book moves to the end.
     local tabs = {
         { key = "home", label = "Home", center = 300 },
         { key = "library", label = "Library", center = 974 },
     }
+    local book_x = math.floor((w - D.s(95)) / 2)
+    if self:showsLexeme() then
+        book_x = w - D.s(48 + 95)
+        local slot = math.floor((w - D.s(190)) / 3)
+        tabs = {
+            { key = "home", label = "Home", center = math.floor(slot / 2) },
+            { key = "library", label = "Library", center = slot + math.floor(slot / 2) },
+            { key = "lexeme", label = "Lexeme", center = 2 * slot + math.floor(slot / 2) },
+        }
+    else
+        for _, tab in ipairs(tabs) do tab.center = D.s(tab.center) end
+    end
+    local current = self:currentTab()
     for _, tab in ipairs(tabs) do
-        local cx = x + D.s(tab.center)
+        local cx = x + tab.center
         D.textCenter(bb, cx, line_y + D.s(65), face, tab.label)
-        if self.tab == tab.key then
+        if current == tab.key then
             D.rect(bb, cx - D.s(43), line_y + D.s(80), D.s(86), D.s(5))
         end
-        self:hit(cx - D.s(200), line_y, D.s(400), D.s(111), function() self:setTab(tab.key) end)
+        self:hit(cx - D.s(170), line_y, D.s(340), D.s(111), function() self:setTab(tab.key) end)
     end
 
     local last = Books.lastOpened()
@@ -644,7 +729,7 @@ function Shell:paintTabs(bb, x, y, w, h)
         end
         if book then
             local mw, mh = D.s(95), D.s(130)
-            local mx, my = x + math.floor((w - mw) / 2), line_y - D.s(42)
+            local mx, my = x + book_x, line_y - D.s(42)
             D.rect(bb, mx - D.s(2), my - D.s(2), mw + D.s(4), mh + D.s(4), D.WHITE)
             local cover = Books.cover(book, mw, mh)
             if cover then

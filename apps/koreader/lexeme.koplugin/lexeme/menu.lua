@@ -1,7 +1,7 @@
 --[[
 The bordered dropdown used by every ⋮ button. Items are
 { text = ..., callback = ..., enabled = true, more = { items } }; `"-"` draws a separator.
-An item with `more` gets its own ⋮ that opens those items.
+An item with `more` gets its own ⋮ that opens those items as a submenu over the dropdown.
 ]]
 local Geom = require("ui/geometry")
 local UIManager = require("ui/uimanager")
@@ -15,6 +15,8 @@ local Menu = View:extend{
     left = nil,
     top = nil, -- top edge of the box, or:
     bottom = nil,
+    -- The dropdown this submenu opened from; picking an item closes both.
+    parent = nil,
 }
 
 -- Baselines and separator offsets from the top of the box, in reference pixels.
@@ -61,6 +63,7 @@ function Menu:render(bb, x, y, w, h)
             if enabled then
                 self:pressable(x, baseline - D.s(70), w, D.s(103), function()
                     self:close()
+                    if self.parent then self.parent:close() end
                     UIManager:nextTick(item.callback)
                 end, { x = x + D.s(34), y = baseline - D.s(62), w = w - D.s(68) })
                 if item.more then self:paintMore(bb, x + w, baseline, item.more) end
@@ -71,12 +74,9 @@ end
 
 function Menu:paintMore(bb, right, baseline, items)
     D.icon(bb, "ellipsis-vertical", right - D.s(86), baseline - D.s(34), D.s(40), D.s(40))
-    self:hit(right - D.s(126), baseline - D.s(70), D.s(126), D.s(103), function()
-        self:close()
-        UIManager:nextTick(function()
-            Menu:new{ items = items, right = right - D.s(40), top = baseline - D.s(20) }:show()
-        end)
-    end)
+    self:pressable(right - D.s(126), baseline - D.s(70), D.s(126), D.s(103), function()
+        Menu:new{ items = items, parent = self, right = right - D.s(40), top = baseline + D.s(40) }:show()
+    end, D.around(right - D.s(66), baseline - D.s(14), D.s(86), D.s(86)))
 end
 
 return Menu

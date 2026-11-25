@@ -4,11 +4,14 @@ study session work offline. Answers go through the outbox with the time they
 were given, so Lexeme schedules an answer given offline as of when it was given.
 ]]
 local DataStorage = require("datastorage")
+local Event = require("ui/event")
 local LuaSettings = require("luasettings")
 local NetworkMgr = require("ui/network/manager")
+local UIManager = require("ui/uimanager")
 local logger = require("logger")
 
 local Api = require("lexeme/api")
+local Background = require("lexeme/background")
 local Outbox = require("lexeme/outbox")
 
 local Study = {}
@@ -51,23 +54,23 @@ end
 
 local waiting = {}
 
-local function heard(entry, reply)
-    local on_next = entry.kind == "review" and waiting[entry.body.review_id]
+Outbox.listen("review", function(entry, reply)
+    local on_next = waiting[entry.body.review_id]
     if not on_next then return end
     waiting[entry.body.review_id] = nil
     if type(reply) == "table" then on_next(reply.next) end
-end
+end)
 
 -- Sends what waits in the outbox; false when some of it couldn't go.
 local function sendWaiting()
     if require("lexeme/sync").isPaused() then return true end
-    local _, failure = Outbox.flush(heard)
+    local _, failure = Outbox.flush()
     if failure then logger.warn("Lexeme: answers wait for the next sync:", failure) end
     return failure == nil
 end
 
 -- Fetches the decks and what's due in each, once answers given offline are in. Returns whether it got them.
-function Study.refresh()
+local function fetchDecks()
     if not NetworkMgr:isConnected() or not sendWaiting() then return false end
     local ok, body = Api.get("/api/v1/decks")
     if not ok or type(body) ~= "table" or type(body.decks) ~= "table" then return false end
@@ -84,8 +87,23 @@ function Study.refresh()
             cards = cards,
         })
     end
+    -- An answer given while fetching isn't in what came back; the session's own queue stays.
+    for _, entry in ipairs(Outbox.entries()) do
+        if entry.kind == "review" then return false end
+    end
     save(decks)
     return true
+end
+
+-- Inside a background task; tells the screens when the decks changed.
+function Study.refresh()
+    if not fetchDecks() then return false end
+    UIManager:broadcastEvent(Event:new("LexemeDecksChanged"))
+    return true
+end
+
+function Study.refreshInBackground()
+    Background.run(Study.refresh, "study_refresh")
 end
 
 -- Keeps what's left of a session, so leaving it (or the Kindle restarting) doesn't bring answered cards back.
@@ -126,7 +144,7 @@ function Study.answer(card, rating, duration_ms, on_next)
     }
     Outbox.push("review", body)
     waiting[body.review_id] = on_next
-    if NetworkMgr:isConnected() then sendWaiting() end
+    if NetworkMgr:isConnected() then Background.run(sendWaiting, "study_send") end
 end
 
 return Study

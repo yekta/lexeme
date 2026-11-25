@@ -18,7 +18,6 @@ Delivery.pending = {}
 
 local function changed()
     UIManager:broadcastEvent(Event:new("LexemeLibraryChanged"))
-    UIManager:forceRePaint()
 end
 
 -- A free path in Books for `file_name`: "Title.epub", then "Title (2).epub" and so on.

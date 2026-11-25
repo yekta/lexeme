@@ -7,6 +7,7 @@ local UIManager = require("ui/uimanager")
 local qrencode = require("ffi/qrencode")
 
 local Api = require("lexeme/api")
+local Background = require("lexeme/background")
 local D = require("lexeme/draw")
 local Status = require("lexeme/status")
 local View = require("lexeme/view")
@@ -19,13 +20,18 @@ local Pairing = View:extend{
 
 function Pairing:init()
     View.init(self)
-    UIManager:nextTick(function() self:start() end)
+    self:start()
 end
 
 function Pairing:start()
     self.state = "starting"
     self:refresh()
+    Background.run(function() self:request() end, "pairing")
+end
+
+function Pairing:request()
     local ok, body = Api.post("/api/devices/pair", { device_name = Status.deviceName() }, false)
+    if self.state == "closed" then return end
     if not ok then
         self.state, self.error = "failed", body
         return self:refresh()
@@ -40,13 +46,14 @@ function Pairing:start()
 end
 
 function Pairing:schedulePoll()
-    self.poll = function() self:check() end
+    self.poll = function() Background.run(function() self:check() end, "pairing") end
     UIManager:scheduleIn(self.interval, self.poll)
 end
 
 function Pairing:check()
     if self.state ~= "waiting" then return end
     local ok, body = Api.post("/api/devices/pair/poll", { poll_token = self.poll_token }, false)
+    if self.state ~= "waiting" then return end
     if not ok then return self:schedulePoll() end
     if body.status == "pending" then return self:schedulePoll() end
     if body.status == "expired" then

@@ -9,6 +9,7 @@ local UIManager = require("ui/uimanager")
 local logger = require("logger")
 
 local Api = require("lexeme/api")
+local Background = require("lexeme/background")
 local Outbox = require("lexeme/outbox")
 local Reading = require("lexeme/reading")
 local Sent = require("lexeme/sent")
@@ -92,50 +93,53 @@ local function changedSince(snapshot, since)
     }
 end
 
-local running = false
+local function isOnline()
+    return Background.await(function() return NetworkMgr:isOnline() end)
+end
+
+local function syncAll()
+    if not isOnline() then return false, "No internet connection." end
+    local started = os.time()
+    if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
+    local since = G_reader_settings:readSetting("lexeme_sync_version") == SYNC_VERSION
+        and Sync.lastSyncedAt() or 0
+    local everything = Reading.snapshot(since)
+    local snapshot = changedSince(everything, since)
+    local now = Sent.addDeleted(everything, snapshot)
+    Sync.queueReading(snapshot)
+    Reading.forget(snapshot.removed)
+    local _, failure = Outbox.flush()
+    if failure then error(failure, 0) end
+    Sent.remember(now)
+    -- With this Kindle's reading in, the streak Home shows is up to date.
+    if Streak.refresh() then
+        UIManager:broadcastEvent(Event:new("LexemeStreakChanged"))
+    end
+    require("lexeme/study").refresh()
+    local _, delivery_failure = require("lexeme/delivery").run()
+    if delivery_failure then error(delivery_failure, 0) end
+    G_reader_settings:saveSetting("lexeme_synced_at", started)
+    G_reader_settings:saveSetting("lexeme_sync_version", SYNC_VERSION)
+    return true, "Synced with Lexeme."
+end
 
 --[[
-Returns ok, message. Does nothing without a connection to Lexeme or the
+Syncs in the background. Does nothing without a connection to Lexeme or the
 network; `on_done(ok, message)` is called either way.
 ]]
 function Sync.run(on_done)
     on_done = on_done or function() end
-    if running then return on_done(false, "A sync is already running.") end
     if not Sync.isConnected() then return on_done(false, "Connect to Lexeme first.") end
     if Sync.isPaused() then return on_done(false, "Syncing is paused in dev mode.") end
-    if not NetworkMgr:isOnline() then return on_done(false, "No internet connection.") end
-    running = true
-    local ok, err = pcall(function()
-        local started = os.time()
-        if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
-        local since = G_reader_settings:readSetting("lexeme_sync_version") == SYNC_VERSION
-            and Sync.lastSyncedAt() or 0
-        local everything = Reading.snapshot(since)
-        local snapshot = changedSince(everything, since)
-        local now = Sent.addDeleted(everything, snapshot)
-        Sync.queueReading(snapshot)
-        Reading.forget(snapshot.removed)
-        local _, failure = Outbox.flush()
-        if failure then error(failure, 0) end
-        Sent.remember(now)
-        -- With this Kindle's reading in, the streak Home shows is up to date.
-        if Streak.refresh() then
-            UIManager:broadcastEvent(Event:new("LexemeStreakChanged"))
+    local started = Background.run(function()
+        local ok, synced, message = pcall(syncAll)
+        if not ok then
+            logger.warn("Lexeme: sync failed:", synced)
+            return on_done(false, tostring(synced))
         end
-        if require("lexeme/study").refresh() then
-            UIManager:broadcastEvent(Event:new("LexemeDecksChanged"))
-        end
-        local _, delivery_failure = require("lexeme/delivery").run()
-        if delivery_failure then error(delivery_failure, 0) end
-        G_reader_settings:saveSetting("lexeme_synced_at", started)
-        G_reader_settings:saveSetting("lexeme_sync_version", SYNC_VERSION)
-    end)
-    running = false
-    if not ok then
-        logger.warn("Lexeme: sync failed:", err)
-        return on_done(false, tostring(err))
-    end
-    on_done(true, "Synced with Lexeme.")
+        on_done(synced, message)
+    end, "sync")
+    if not started then on_done(false, "A sync is already running.") end
 end
 
 local scheduled = false
@@ -146,16 +150,14 @@ function Sync.soon()
     scheduled = true
     UIManager:scheduleIn(3, function()
         scheduled = false
-        if NetworkMgr:isOnline() then Sync.run() end
+        Sync.run()
     end)
 end
 
 -- Syncs once the lock screen is drawn; the Kindle stays on Wi-Fi for a minute before it sleeps.
 function Sync.beforeSleep()
     if not Sync.isConnected() or Sync.isPaused() then return end
-    UIManager:tickAfterNext(function()
-        if NetworkMgr:isOnline() then Sync.run() end
-    end)
+    UIManager:tickAfterNext(function() Sync.run() end)
 end
 
 -- Waking, the Kindle rejoins Wi-Fi on its own a few seconds later, without KOReader hearing of it.
@@ -164,8 +166,10 @@ local wake_checks = 0
 
 local function syncOnceOnline()
     wake_checks = wake_checks + 1
-    if NetworkMgr:isConnected() and NetworkMgr:isOnline() then return Sync.run() end
-    if wake_checks < WAKE_CHECKS then UIManager:scheduleIn(WAKE_INTERVAL, syncOnceOnline) end
+    Background.run(function()
+        if NetworkMgr:isConnected() and isOnline() then return Sync.run() end
+        if wake_checks < WAKE_CHECKS then UIManager:scheduleIn(WAKE_INTERVAL, syncOnceOnline) end
+    end, "wake_check")
 end
 
 -- Syncs once the Kindle is back online after waking, picking up books sent to it while it slept.

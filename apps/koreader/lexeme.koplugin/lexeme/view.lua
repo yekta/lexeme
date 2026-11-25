@@ -38,13 +38,29 @@ function View:paintTo(bb)
     local r = self.dimen
     if self.background then D.rect(bb, r.x, r.y, r.w, r.h, self.background) end
     self:render(bb, r.x, r.y, r.w, r.h)
+    if self.pressed then self.pressed(bb) end
 end
 
 function View:render() end
 
--- Registers a tap target; later registrations win when targets overlap.
-function View:hit(x, y, w, h, on_tap, on_hold)
-    table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold })
+-- Registers a tap target; later registrations win when targets overlap. `pressed(bb)`
+-- paints the target's pressed look, shown while its tap runs.
+function View:hit(x, y, w, h, on_tap, on_hold, pressed)
+    table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold, pressed = pressed })
+end
+
+-- Long enough for the e-ink screen to show the pressed look before the tap's result replaces it.
+local PRESS_SECONDS = 0.15
+
+function View:press(target)
+    self.pressed = target.pressed
+    UIManager:setDirty(self, "fast", self.dimen)
+    UIManager:forceRePaint()
+    UIManager:scheduleIn(PRESS_SECONDS, function()
+        self.pressed = nil
+        target.tap()
+        if UIManager:isWidgetShown(self) then UIManager:setDirty(self, "fast", self.dimen) end
+    end)
 end
 
 function View:findHit(pos)
@@ -65,7 +81,11 @@ function View:onLexemeTap(_, ges)
     self.last_tap = ges.pos
     local target = self:findHit(ges.pos)
     if target and target.tap then
-        target.tap()
+        if target.pressed then
+            self:press(target)
+        else
+            target.tap()
+        end
         return true
     end
     if not self:isInside(ges.pos) then

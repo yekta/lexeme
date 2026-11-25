@@ -94,7 +94,12 @@ function Lexeme:onCloseDocument()
 end
 
 function Lexeme:onSuspend()
+    require("lexeme/timer").pause()
     require("lexeme/sync").beforeSleep()
+end
+
+function Lexeme:onResume()
+    require("lexeme/timer").resume()
 end
 
 function Lexeme:onLexemeSync()

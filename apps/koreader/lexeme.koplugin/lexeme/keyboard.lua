@@ -25,6 +25,27 @@ local SYMBOLS = {
 }
 local PITCH = 118.5
 local ROW_Y = { 1278, 1392, 1505, 1621 }
+-- Amazon's key rows (from its keymap): each 116 tall; a pressed key is boxed 6 px inside its key.
+local KEY_TOP = { 1214, 1330, 1447, 1563 }
+local KEY_H = 116
+
+local KINDLE_KEYS = "/usr/share/keyboard/images/"
+Keyboard.DELETE = { file = "keyDeleteEnabled.png", w = 66, h = 37, icon = "delete" }
+Keyboard.RETURN = { file = "keyReturnEnabled.png", w = 56, h = 48, icon = "corner-down-left" }
+local SHIFT = { file = "keyShiftEnabled.png", w = 52, h = 48, icon = "arrow-big-up" }
+local SHIFT_ON = { file = "keyShiftLockEnabled.png", w = 43, h = 43, icon = "arrow-big-up" }
+
+-- Draws one of Amazon's key images centred in the key, or a look-alike icon off a Kindle.
+function Keyboard.paintKeyImage(bb, key, x, y, w, h)
+    if D.kindleImage(bb, KINDLE_KEYS .. key.file, key.w, key.h, x, y, w, h) then return end
+    local size = D.s(60)
+    D.icon(bb, key.icon, x + math.floor((w - size) / 2), y + math.floor((h - size) / 2), size, size)
+end
+
+-- The Kindle's pressed key: a black box just inside the key.
+function Keyboard.pressedBox(x, y, w, h)
+    return function(bb) D.border(bb, x + D.s(6), y + D.s(6), w - D.s(12), h - D.s(12), D.s(4)) end
+end
 
 function Keyboard.new(opts)
     return setmetatable({
@@ -45,6 +66,12 @@ end
 function Keyboard:paint(view, bb, x, w)
     local top = Keyboard.top()
     local function ry(ref) return top + D.s(ref - TOP) end
+    local key_h = D.s(KEY_H)
+    local function key(left, row, width, on_tap)
+        local kx, ky, kw = x + D.s(left), ry(KEY_TOP[row]), D.s(width)
+        view:hit(kx, ky, kw, key_h, on_tap, nil, Keyboard.pressedBox(kx, ky, kw, key_h))
+        return kx, ky, kw, key_h
+    end
     D.rect(bb, x, top, w, D.s(Keyboard.HEIGHT), D.WHITE)
     D.rect(bb, x, top, w, D.s(5))
     self:paintSuggestions(view, bb, x, w, ry)
@@ -57,9 +84,9 @@ function Keyboard:paint(view, bb, x, w)
         for i = 1, #row.keys do
             local char = row.keys:sub(i, i)
             if self.shift and not self.symbols then char = char:upper() end
-            local cx = x + D.s(row.x0 + (i - 1) * PITCH)
-            D.textCenter(bb, cx, cy + D.s(14), face, char)
-            view:hit(cx - D.s(PITCH / 2), cy - D.s(57), D.s(PITCH), D.s(114), function()
+            local center = row.x0 + (i - 1) * PITCH
+            D.textCenter(bb, x + D.s(center), cy + D.s(14), face, char)
+            key(center - PITCH / 2, r, PITCH, function()
                 self.on_input(char)
                 if self.shift then
                     self.shift = false
@@ -69,30 +96,26 @@ function Keyboard:paint(view, bb, x, w)
         end
     end
 
-    local cy3, cy4 = ry(ROW_Y[3]), ry(ROW_Y[4])
     if not self.symbols then
-        D.icon(bb, "arrow-big-up", x + D.s(98), cy3 - D.s(30), D.s(60), D.s(60))
-        if self.shift then D.rect(bb, x + D.s(103), cy3 + D.s(34), D.s(50), D.s(4)) end
-        view:hit(x, cy3 - D.s(57), D.s(200), D.s(114), function()
+        Keyboard.paintKeyImage(bb, self.shift and SHIFT_ON or SHIFT, key(40, 3, 177, function()
             self.shift = not self.shift
             view:refresh()
-        end)
+        end))
     end
-    D.icon(bb, "delete", x + D.s(1101), cy3 - D.s(33), D.s(66), D.s(66))
-    view:hit(x + D.s(1050), cy3 - D.s(57), w - D.s(1050), D.s(114), function() self.on_backspace() end)
+    Keyboard.paintKeyImage(bb, Keyboard.DELETE, key(1046, 3, 178, function() self.on_backspace() end))
 
+    local cy4 = ry(ROW_Y[4])
     D.textCenter(bb, x + D.s(129), cy4 + D.s(14), D.face("regular", 40), self.symbols and "ABC" or "123")
-    view:hit(x, cy4 - D.s(57), D.s(200), D.s(114), function()
+    key(40, 4, 177, function()
         self.symbols = not self.symbols
         view:refresh()
     end)
     D.border(bb, x + D.s(223), cy4 - D.s(24), D.s(698), D.s(49), D.s(2))
     D.textCenter(bb, x + D.s(572), cy4 + D.s(9), D.face("bold", 22), "SPACE")
-    view:hit(x + D.s(210), cy4 - D.s(57), D.s(724), D.s(114), function() self.on_input(" ") end)
+    key(217, 4, 710, function() self.on_input(" ") end)
     D.textCenter(bb, x + D.s(985), cy4 + D.s(14), face, ".")
-    view:hit(x + D.s(934), cy4 - D.s(57), D.s(110), D.s(114), function() self.on_input(".") end)
-    D.icon(bb, "corner-down-left", x + D.s(1100), cy4 - D.s(36), D.s(72), D.s(72))
-    view:hit(x + D.s(1050), cy4 - D.s(57), w - D.s(1050), D.s(114), function() self.on_enter() end)
+    key(927, 4, 118, function() self.on_input(".") end)
+    Keyboard.paintKeyImage(bb, Keyboard.RETURN, key(1046, 4, 178, function() self.on_enter() end))
 end
 
 function Keyboard:paintSuggestions(view, bb, x, w, ry)

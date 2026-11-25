@@ -30,6 +30,19 @@ local ROW_Y = { 1278, 1392, 1505, 1621 }
 local KEY_TOP = { 1220, 1336, 1453, 1569 }
 local KEY_H, KEY_OUTLINE = 104, 4
 
+local KINDLE_KEYS = "/usr/share/keyboard/images/"
+Keyboard.DELETE = { file = "keyDeleteEnabled.png", w = 66, h = 37, icon = "delete" }
+Keyboard.RETURN = { file = "keyReturnEnabled.png", w = 56, h = 48, icon = "corner-down-left" }
+local SHIFT = { file = "keyShiftEnabled.png", w = 52, h = 48, icon = "arrow-big-up" }
+local SHIFT_ON = { file = "keyShiftLockEnabled.png", w = 43, h = 43, icon = "arrow-big-up" }
+
+-- Draws one of Amazon's key images centred in `area`, or a look-alike icon off a Kindle.
+function Keyboard.paintKeyImage(bb, key, area)
+    if D.kindleImage(bb, KINDLE_KEYS .. key.file, key.w, key.h, area.x, area.y, area.w, area.h) then return end
+    local size = D.s(60)
+    D.icon(bb, key.icon, area.x + math.floor((area.w - size) / 2), area.y + math.floor((area.h - size) / 2), size, size)
+end
+
 function Keyboard.new(opts)
     return setmetatable({
         on_input = opts.on_input,
@@ -79,16 +92,17 @@ function Keyboard:paint(view, bb, x, w)
 
     local cy3, cy4 = ry(ROW_Y[3]), ry(ROW_Y[4])
     if not self.symbols then
-        D.icon(bb, "arrow-big-up", x + D.s(98), cy3 - D.s(30), D.s(60), D.s(60))
-        if self.shift then D.rect(bb, x + D.s(103), cy3 + D.s(34), D.s(50), D.s(4)) end
+        local shift = key(3, 46, 165)
+        Keyboard.paintKeyImage(bb, self.shift and SHIFT_ON or SHIFT, shift)
         view:pressable(x, cy3 - D.s(57), D.s(200), D.s(114), function()
             self.shift = not self.shift
             view:refresh()
-        end, key(3, 46, 165))
+        end, shift)
     end
-    D.icon(bb, "delete", x + D.s(1101), cy3 - D.s(33), D.s(66), D.s(66))
+    local delete = key(3, 1052, 166)
+    Keyboard.paintKeyImage(bb, Keyboard.DELETE, delete)
     view:pressable(x + D.s(1050), cy3 - D.s(57), w - D.s(1050), D.s(114), function() self.on_backspace() end,
-        key(3, 1052, 166))
+        delete)
 
     D.textCenter(bb, x + D.s(129), cy4 + D.s(14), D.face("regular", 40), self.symbols and "ABC" or "123")
     view:pressable(x, cy4 - D.s(57), D.s(200), D.s(114), function()
@@ -102,9 +116,10 @@ function Keyboard:paint(view, bb, x, w)
     D.textCenter(bb, x + D.s(985), cy4 + D.s(14), face, ".")
     view:pressable(x + D.s(934), cy4 - D.s(57), D.s(110), D.s(114), function() self.on_input(".") end,
         key(4, 933, 106))
-    D.icon(bb, "corner-down-left", x + D.s(1100), cy4 - D.s(36), D.s(72), D.s(72))
+    local enter = key(4, 1052, 166)
+    Keyboard.paintKeyImage(bb, Keyboard.RETURN, enter)
     view:pressable(x + D.s(1050), cy4 - D.s(57), w - D.s(1050), D.s(114), function() self.on_enter() end,
-        key(4, 1052, 166))
+        enter)
 end
 
 function Keyboard:paintSuggestions(view, bb, x, w, ry)

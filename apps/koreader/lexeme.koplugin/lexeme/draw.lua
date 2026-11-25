@@ -202,6 +202,21 @@ function D.icon(bb, name, x, y, w, h)
     bb:alphablitFrom(image, x, y, 0, 0, image:getWidth(), image:getHeight())
 end
 
+-- A PNG of the Kindle's own (`path`, w x h reference pixels), centred in the given box.
+function D.kindleImage(bb, path, w, h, box_x, box_y, box_w, box_h)
+    local key = path .. "|" .. w .. "|" .. h
+    local image = icon_cache[key]
+    if image == nil then
+        image = lfs.attributes(path, "mode") == "file" and RenderImage:renderImageFile(path, false, D.s(w), D.s(h))
+            or false
+        icon_cache[key] = image
+    end
+    if not image then return false end
+    local iw, ih = image:getWidth(), image:getHeight()
+    bb:blitFrom(image, box_x + math.floor((box_w - iw) / 2), box_y + math.floor((box_h - ih) / 2), 0, 0, iw, ih)
+    return true
+end
+
 -- Draws an image scaled to fit w x h, aligned to the bottom centre of that box.
 -- Returns the rectangle it covered.
 function D.image(bb, image, x, y, w, h)

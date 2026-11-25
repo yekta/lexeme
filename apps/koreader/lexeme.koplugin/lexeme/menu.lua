@@ -1,6 +1,7 @@
 --[[
 The bordered dropdown used by every ⋮ button. Items are
-{ text = ..., callback = ..., enabled = true }; `"-"` draws a separator.
+{ text = ..., callback = ..., enabled = true, more = { items } }; `"-"` draws a separator.
+An item with `more` gets its own ⋮ that opens those items.
 ]]
 local Geom = require("ui/geometry")
 local UIManager = require("ui/uimanager")
@@ -34,13 +35,14 @@ end
 
 function Menu:init()
     self.face = D.face("regular", 36)
-    local text_w = 0
+    local text_w, more_w = 0, 0
     for _, item in ipairs(self.items) do
         if item ~= "-" then text_w = math.max(text_w, D.width(self.face, item.text)) end
+        if item ~= "-" and item.more then more_w = D.s(80) end
     end
     local rows, height = layout(self.items)
     self.rows = rows
-    local w = math.max(text_w + D.s(132), D.s(440))
+    local w = math.max(text_w + more_w + D.s(132), D.s(440))
     local h = D.s(height)
     self.region = Geom:new{ x = self.left or (self.right - w), y = self.top or (self.bottom - h), w = w, h = h }
     View.init(self)
@@ -61,9 +63,20 @@ function Menu:render(bb, x, y, w, h)
                     self:close()
                     UIManager:nextTick(item.callback)
                 end, { x = x + D.s(34), y = baseline - D.s(62), w = w - D.s(68) })
+                if item.more then self:paintMore(bb, x + w, baseline, item.more) end
             end
         end
     end
+end
+
+function Menu:paintMore(bb, right, baseline, items)
+    D.icon(bb, "ellipsis-vertical", right - D.s(86), baseline - D.s(34), D.s(40), D.s(40))
+    self:hit(right - D.s(126), baseline - D.s(70), D.s(126), D.s(103), function()
+        self:close()
+        UIManager:nextTick(function()
+            Menu:new{ items = items, right = right - D.s(40), top = baseline - D.s(20) }:show()
+        end)
+    end)
 end
 
 return Menu

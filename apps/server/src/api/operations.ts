@@ -20,6 +20,7 @@ import {
   DEFAULT_DAY_STARTS_AT,
   Rating,
   computeStudyBuckets,
+  computeTrueRetention,
   createUserScheduler,
   dayKeyAtOffset,
   daysEndingOn,
@@ -180,14 +181,14 @@ export const operations: TOperation[] = [
     name: "list-decks",
     title: "List decks",
     description:
-      "Every deck with its card count and what is studyable now: new, learning and due review cards.",
+      "Every deck with its card count, its retention over the last 30 days, and what is studyable now: new, learning and due review cards.",
     role: "viewer",
     method: "GET",
     path: "/decks",
     input: z.object({}),
     run: async (caller) => {
       const now = Date.now();
-      const [deckRows, cardRows, logs, profiles] = await Promise.all([
+      const [deckRows, cardRows, logs, profiles, reviewAnswers] = await Promise.all([
         db
           .select()
           .from(decks)
@@ -199,7 +200,17 @@ export const operations: TOperation[] = [
           .where(eq(cards.user_id, caller.userId)),
         recentLogs(caller.userId, now),
         db.select().from(learningProfiles).where(eq(learningProfiles.user_id, caller.userId)),
+        db
+          .select({
+            card_id: reviewLogs.card_id,
+            rating: reviewLogs.rating,
+            state: reviewLogs.state,
+            review: reviewLogs.review,
+          })
+          .from(reviewLogs)
+          .where(and(eq(reviewLogs.user_id, caller.userId), eq(reviewLogs.state, "review"))),
       ]);
+      const answers = reviewAnswers.map((log) => ({ ...log, review: log.review.getTime() }));
       const profileById = new Map(profiles.map((p) => [p.id, p]));
 
       return {
@@ -216,6 +227,7 @@ export const operations: TOperation[] = [
           return {
             ...presentDeck(deck),
             card_count: deckCards.length,
+            retention: computeTrueRetention(answers, new Set(deckCards.map((card) => card.id)), now),
             new_count: buckets.newCards.length,
             learning_count: buckets.learningCards.length,
             due_count: buckets.reviewCards.length,

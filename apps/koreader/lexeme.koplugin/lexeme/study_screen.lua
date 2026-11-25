@@ -164,7 +164,7 @@ function StudyScreen:paintCard(bb, x, y, w, card)
     local text_top, text_bottom = cy + D.s(120), cy + ch - D.s(120)
     local face, lines, pitch
     if self.flipped then
-        face, lines, pitch = fitText("serif", { 44, 38, 32, 28 }, card.back, cw - D.s(160), text_bottom - text_top)
+        face, lines, pitch = fitText("serif", { 36, 32, 28, 26 }, card.back, cw - D.s(160), text_bottom - text_top)
     else
         face, lines, pitch = fitText("serif", { 64, 52, 44, 36, 30 }, card.front, cw - D.s(160), text_bottom - text_top)
     end

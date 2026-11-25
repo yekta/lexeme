@@ -22,7 +22,7 @@ local function store()
     return LuaSettings:open(DataStorage:getSettingsDir() .. "/lexeme_study.lua")
 end
 
--- Every deck as { id, name, card_count, cards }, or nil before the first fetch.
+-- Every deck as { id, name, card_count, retention, cards }, or nil before the first fetch.
 function Study.decks()
     return store():readSetting("decks")
 end
@@ -76,7 +76,13 @@ function Study.refresh()
         local due = (deck.new_count or 0) + (deck.learning_count or 0) + (deck.due_count or 0)
         local cards = due > 0 and fetchQueue(deck.id) or {}
         if not cards then return false end
-        table.insert(decks, { id = deck.id, name = deck.name, card_count = deck.card_count or 0, cards = cards })
+        table.insert(decks, {
+            id = deck.id,
+            name = deck.name,
+            card_count = deck.card_count or 0,
+            retention = type(deck.retention) == "number" and deck.retention or nil,
+            cards = cards,
+        })
     end
     save(decks)
     return true

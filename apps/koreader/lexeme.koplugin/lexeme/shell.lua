@@ -23,7 +23,7 @@ local Shell = View:extend{
 
 local GRID = { x = 109, pitch_x = 357, top = 361, pitch_y = 632, cover_w = 310, cover_h = 512, cols = 3 }
 local LIST = { top = 345, pitch = 265 }
-local DECKS = { top = 345, pitch = 170, per_page = 7 }
+local DECKS = { top = 345, pitch = 206, per_page = 6 }
 
 local FILTERS = {
     { key = "in_progress", label = "In progress" },
@@ -471,16 +471,20 @@ end
 
 -- Lexeme --------------------------------------------------------------------------
 
-local function deckSummary(deck)
-    if deck.card_count == 0 then return "No cards yet" end
+-- Text parts in a row, with the dots between them muted, as on Lexeme's deck cards.
+local function paintDotted(bb, x, baseline, face, parts)
+    local dot = " · "
+    for i, part in ipairs(parts) do
+        if i > 1 then x = x + D.text(bb, x, baseline, face, dot, D.gray(119)) end
+        x = x + D.text(bb, x, baseline, face, part)
+    end
+end
+
+local function deckLines(deck)
+    local totals = { deck.card_count == 1 and "1 card" or deck.card_count .. " cards" }
+    if deck.retention then table.insert(totals, math.floor(deck.retention * 100 + 0.5) .. "% retention") end
     local new, learning, review = Study.counts(deck.cards)
-    local parts = {}
-    if new > 0 then table.insert(parts, new .. " new") end
-    if learning > 0 then table.insert(parts, learning .. " learning") end
-    if review > 0 then table.insert(parts, review .. " due") end
-    if #parts == 0 then table.insert(parts, "All caught up") end
-    table.insert(parts, deck.card_count == 1 and "1 card" or deck.card_count .. " cards")
-    return table.concat(parts, " · ")
+    return totals, { new .. " new", learning .. " learn", review .. " due" }
 end
 
 function Shell:paintLexeme(bb, x, y, w, h)
@@ -500,9 +504,11 @@ function Shell:paintLexeme(bb, x, y, w, h)
         if not deck then break end
         local top = y + D.s(DECKS.top + (i - 1) * DECKS.pitch)
         local text_w = right - D.s(57 + 100)
-        D.text(bb, x + D.s(57), top + D.s(78), D.face("bold", 36), deck.name, D.BLACK, text_w)
-        D.text(bb, x + D.s(57), top + D.s(126), D.face("regular", 30), deckSummary(deck), D.BLACK, text_w)
-        D.icon(bb, "chevron-right", x + right - D.s(64), top + D.s(63), D.s(44), D.s(44))
+        D.text(bb, x + D.s(57), top + D.s(72), D.face("bold", 36), deck.name, D.BLACK, text_w)
+        local totals, counts = deckLines(deck)
+        paintDotted(bb, x + D.s(57), top + D.s(120), D.face("regular", 30), totals)
+        paintDotted(bb, x + D.s(57), top + D.s(164), D.face("regular", 30), counts)
+        D.icon(bb, "chevron-right", x + right - D.s(64), top + D.s(81), D.s(44), D.s(44))
         D.rect(bb, x + D.s(36), top + D.s(DECKS.pitch) - D.s(2), right - D.s(36), D.s(2), D.gray(200))
         self:pressable(x, top, right, D.s(DECKS.pitch), function()
             require("lexeme/study_screen").open(deck, function() self:refresh() end)

@@ -125,7 +125,6 @@ function Shell:deleteBook(book)
     local settings = require("docsettings"):open(book.path)
     local key = settings:readSetting("partial_md5_checksum")
     if key then
-        local Sync = require("lexeme/sync")
         Sync.queueReading{ removed_book_keys = { key } }
         Sync.soon()
     end
@@ -400,7 +399,8 @@ function Shell:scrollCarousel(direction, y)
         if y >= row.top and y <= row.bottom then
             local first = self.carousel_first[row.title] or 1
             local last_first = math.max(1, row.count - row.step + 1)
-            local moved = direction == "west" and math.min(first + row.step, last_first) or math.max(1, first - row.step)
+            local moved = direction == "west" and math.min(first + row.step, last_first)
+                or math.max(1, first - row.step)
             if moved ~= first then
                 self.carousel_first[row.title] = moved
                 self:refresh()
@@ -587,10 +587,8 @@ function Shell:paintHome(bb, x, y, w, h)
     end
     local bottom = paintCarousel(self, bb, x, y + D.s(243), w, "From Your Library", recent,
         function() self:setTab("library") end)
-    if not G_reader_settings:nilOrTrue("lexeme_home_recently_added") then return end
-    -- The next heading's baseline sits 94 px under the badges, as on the Kindle.
-    local next_top = bottom + D.s(94 - 58)
-    local reading = Sync.isConnected() and Streak.summary()
+    local connected = Sync.isConnected()
+    local reading = connected and G_reader_settings:nilOrTrue("lexeme_home_stats") and Streak.summary()
     if reading then
         -- The badges, tiles, calendar and the cover of the book being read (standing over the tab
         -- bar) are spaced evenly.
@@ -601,6 +599,9 @@ function Shell:paintHome(bb, x, y, w, h)
         local tiles_bottom = paintTiles(bb, x, space_top + gap, w, reading)
         return paintCalendar(bb, x, tiles_bottom + gap, w, label, reading.days, reading.goal_minutes)
     end
+    if not connected and not G_reader_settings:nilOrTrue("lexeme_home_recently_added") then return end
+    -- The next heading's baseline sits 94 px under the badges, as on the Kindle.
+    local next_top = bottom + D.s(94 - 58)
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)
 end
 

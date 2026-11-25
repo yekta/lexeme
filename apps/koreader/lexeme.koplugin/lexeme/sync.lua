@@ -142,6 +142,14 @@ function Sync.soon()
     end)
 end
 
+-- Syncs once the lock screen is drawn; the Kindle stays on Wi-Fi for a minute before it sleeps.
+function Sync.beforeSleep()
+    if not Sync.isConnected() or G_reader_settings:isTrue("lexeme_dev_mode") then return end
+    UIManager:tickAfterNext(function()
+        if NetworkMgr:isOnline() then Sync.run() end
+    end)
+end
+
 function Sync.disconnect()
     G_reader_settings:delSetting("lexeme_token")
     G_reader_settings:delSetting("lexeme_user_name")

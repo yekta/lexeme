@@ -66,14 +66,17 @@ function PageGrid:render(bb, x, y, w, h)
     end
 
     D.icon(bb, "x", x + w - D.s(90), y + D.s(40), D.s(56), D.s(56))
-    self:hit(x + w - D.s(120), y, D.s(120), D.s(120), function() self:close("flashui") end)
+    self:pressable(x + w - D.s(120), y, D.s(120), D.s(120), function() self:close("flashui") end,
+        { x = x + w - D.s(86), y = y + D.s(43), w = D.s(51), h = D.s(51), radius = D.s(5) })
     local mid = y + D.s(CELL_Y[2] + CELL_H / 2)
     local can_back, can_forward = self.first > 1, self.first + COLS * ROWS <= self.count
     D.icon(bb, can_back and "chevron-left" or "chevron-left-gray", x + D.s(22), mid - D.s(40), D.s(80), D.s(80))
     D.icon(bb, can_forward and "chevron-right" or "chevron-right-gray", x + w - D.s(102), mid - D.s(40), D.s(80),
         D.s(80))
-    self:hit(x, y + D.s(120), D.s(120), D.s(1350), function() self:turn(-1) end)
-    self:hit(x + w - D.s(120), y + D.s(120), D.s(120), D.s(1350), function() self:turn(1) end)
+    local function chevron(cx) return D.around(cx, mid, D.s(57), D.s(56), { radius = D.s(10) }) end
+    self:pressable(x, y + D.s(120), D.s(120), D.s(1350), function() self:turn(-1) end, chevron(x + D.s(59)))
+    self:pressable(x + w - D.s(120), y + D.s(120), D.s(120), D.s(1350), function() self:turn(1) end,
+        chevron(x + w - D.s(61)))
 
     local bottom = y + h - D.s(1696 - 1500)
     D.rect(bb, x, bottom, w, D.s(4))

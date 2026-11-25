@@ -42,15 +42,17 @@ function Toolbar:paintTop(bb, x, y, w)
     D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
     -- Back to the tab the book was opened from, named like on the Kindle.
     local label = G_reader_settings:readSetting("lexeme_tab") == "library" and "Library" or "Home"
-    D.text(bb, x + D.s(111), y + D.s(169), D.face("regular", 36), label)
-    self:hit(x, y + D.s(100), D.s(260), D.s(112), function() self:run("back") end)
+    local label_w = D.text(bb, x + D.s(111), y + D.s(169), D.face("regular", 36), label)
+    self:pressable(x, y + D.s(100), D.s(260), D.s(112), function() self:run("back") end,
+        { x = x + D.s(7), y = y + D.s(108), w = label_w + D.s(137), h = D.s(101) })
 
+    -- box and box_w: the square the Kindle shows pressed.
     local buttons = {
-        { action = "aa", x = 795 },
-        { action = "goto", icon = "list-toc", x = 891, size = 44 },
-        { action = "notebook", icon = "notebook", x = 992, size = 38 },
-        { action = "search", icon = "search", x = 1090, size = 48 },
-        { action = "more", icon = "ellipsis-vertical", x = 1195, size = 38 },
+        { action = "aa", x = 795, box = 762, box_w = 101 },
+        { action = "goto", icon = "list-toc", x = 891, size = 44, box = 863, box_w = 100 },
+        { action = "notebook", icon = "notebook", x = 992, size = 38, box = 963, box_w = 101 },
+        { action = "search", icon = "search", x = 1090, size = 48, box = 1063, box_w = 101 },
+        { action = "more", icon = "ellipsis-vertical", x = 1195, size = 38, box = 1164, box_w = 101 },
     }
     for _, b in ipairs(buttons) do
         if b.icon then
@@ -59,13 +61,13 @@ function Toolbar:paintTop(bb, x, y, w)
         else
             D.text(bb, x + D.s(b.x), y + D.s(170), D.face("regular", 36), "Aa")
         end
-        self:hit(x + D.s(b.x - 25), y + D.s(100), D.s(100), D.s(112), function()
+        self:pressable(x + D.s(b.x - 25), y + D.s(100), D.s(100), D.s(112), function()
             if b.action == "more" then
                 self:openMore(x + w)
             else
                 self:run(b.action)
             end
-        end)
+        end, { x = x + D.s(b.box), y = y + D.s(108), w = D.s(b.box_w), h = D.s(101) })
     end
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
 
@@ -107,14 +109,17 @@ function Toolbar:paintBottom(bb, x, y, w)
     D.icon(bb, next_chapter and "skip-forward" or "skip-forward-gray",
         x + w - D.s(1272 - 1188), y + D.s(1518 - 1473), D.s(40), D.s(40))
     if prev_chapter then
-        self:hit(x, y + D.s(20), D.s(130), D.s(100), function() self:jump(prev_chapter) end)
+        self:pressable(x, y + D.s(20), D.s(130), D.s(100), function() self:jump(prev_chapter) end,
+            D.around(x + D.s(65), y + D.s(65), D.s(101), D.s(101)))
     end
     if next_chapter then
-        self:hit(x + w - D.s(130), y + D.s(20), D.s(130), D.s(100), function() self:jump(next_chapter) end)
+        self:pressable(x + w - D.s(130), y + D.s(20), D.s(130), D.s(100), function() self:jump(next_chapter) end,
+            D.around(x + w - D.s(64), y + D.s(65), D.s(101), D.s(101)))
     end
 
     D.icon(bb, "layout-grid", x + D.s(39), y + D.s(1626 - 1473), D.s(52), D.s(52))
-    self:hit(x, y + D.s(130), D.s(140), D.s(93), function() self:run("pages") end)
+    self:pressable(x, y + D.s(130), D.s(140), D.s(93), function() self:run("pages") end,
+        { x = x + D.s(14), y = y + D.s(1592 - 1473), w = D.s(101), h = D.s(104) })
 
     C.slider(self, bb, {
         x0 = x + D.s(186), x1 = x + D.s(1086), cy = y + D.s(1643 - 1473),

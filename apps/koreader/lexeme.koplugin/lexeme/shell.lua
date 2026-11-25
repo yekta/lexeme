@@ -171,18 +171,18 @@ function Shell:paintSearchRow(bb, x, y, w)
 
     local more_x = x + w - D.s(77)
     D.icon(bb, "ellipsis-vertical", more_x, y + D.s(139), D.s(38), D.s(38))
-    self:hit(more_x - D.s(20), y + D.s(108), D.s(78), D.s(101), function()
+    self:pressable(more_x - D.s(20), y + D.s(108), D.s(78), D.s(101), function()
         Menu:new{ items = self.menu_items(), right = x + w - D.s(37), top = y + D.s(215) }:show()
-    end)
+    end, D.around(more_x + D.s(19), y + D.s(158), D.s(101), D.s(101)))
 end
 
 -- Library -------------------------------------------------------------------
 
 function Shell:paintLibrary(bb, x, y, w, h)
     D.icon(bb, "settings-2", x + D.s(25), y + D.s(253), D.s(52), D.s(52))
-    self:hit(x, y + D.s(240), D.s(90), D.s(80), function()
+    self:pressable(x, y + D.s(240), D.s(90), D.s(80), function()
         LibrarySheets.FilterSheet:new{ shell = self }:show()
-    end)
+    end, D.around(x + D.s(50), y + D.s(279), D.s(86), D.s(86)))
     local chip_x = x + D.s(93)
     local face = D.face("regular", 32)
     for _, filter in ipairs(FILTERS) do
@@ -200,16 +200,16 @@ function Shell:paintLibrary(bb, x, y, w, h)
 
     local layout_icon = self.layout == "grid" and "list" or "layout-grid"
     D.icon(bb, layout_icon, x + D.s(1112), y + D.s(257), D.s(47), D.s(47))
-    self:hit(x + D.s(1095), y + D.s(240), D.s(80), D.s(80), function()
+    self:pressable(x + D.s(1095), y + D.s(240), D.s(80), D.s(80), function()
         self.layout = self.layout == "grid" and "list" or "grid"
         G_reader_settings:saveSetting("lexeme_library_layout", self.layout)
         self.page = 1
         self:refresh("flashui")
-    end)
+    end, D.around(x + D.s(1135), y + D.s(279), D.s(86), D.s(86)))
     D.icon(bb, "arrow-down-up", x + D.s(1193), y + D.s(253), D.s(55), D.s(55))
-    self:hit(x + D.s(1180), y + D.s(240), D.s(85), D.s(80), function()
+    self:pressable(x + D.s(1180), y + D.s(240), D.s(85), D.s(80), function()
         LibrarySheets.SortSheet:new{ shell = self }:show()
-    end)
+    end, D.around(x + D.s(1220), y + D.s(279), D.s(86), D.s(86)))
 
     D.rect(bb, x, y + D.s(342), w, D.s(3), D.gray(119))
 
@@ -312,6 +312,12 @@ function Shell:paintBadge(area, ox, oy, book, bx, baseline)
     end
 end
 
+-- A cover's ⋮ pressed: its three dots filled in.
+local function pressedCoverMenu(dx, dy, dw, dh)
+    local x, y, w, h = dx + dw - D.s(29), dy + dh - D.s(60), D.s(13), D.s(49)
+    return { x = x, y = y, w = w, h = h, paint = function(bb) D.icon(bb, "cover-menu-pressed", x, y, w, h) end }
+end
+
 function Shell:paintGrid(area, ox, oy, first)
     for i = 0, GRID.cols * 3 - 1 do
         local book = self.books[first + i + 1]
@@ -319,15 +325,16 @@ function Shell:paintGrid(area, ox, oy, first)
         local col, row = i % GRID.cols, math.floor(i / GRID.cols)
         local cx = ox + D.s(GRID.x + col * GRID.pitch_x)
         local cy = oy + D.s(GRID.top - 345 + row * GRID.pitch_y)
-        self:paintCover(area, ox, oy, book, cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h), true)
+        local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h), true)
         self:paintBadge(area, ox, oy, book, cx, cy + D.s(GRID.cover_h + 41))
         if row < 2 then
             self:hit(cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h + 60),
                 function() self.open_book(book.path) end,
                 function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end)
             local menu_x = cx + D.s(GRID.cover_w - 50)
-            self:hit(menu_x, cy + D.s(GRID.cover_h - 80), D.s(60), D.s(80),
-                function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end)
+            self:pressable(menu_x, cy + D.s(GRID.cover_h - 80), D.s(60), D.s(80),
+                function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end,
+                pressedCoverMenu(dx, dy, dw, dh))
         end
     end
 end
@@ -357,8 +364,9 @@ function Shell:paintList(area, ox, oy, w, first)
             self:hit(ox, top, w - D.s(120), D.s(LIST.pitch),
                 function() self.open_book(book.path) end,
                 function() self:openBookMenu(book, ox + w - D.s(120), top + D.s(120)) end)
-            self:hit(ox + w - D.s(200), top, D.s(80), D.s(120),
-                function() self:openBookMenu(book, ox + w - D.s(120), top + D.s(120)) end)
+            self:pressable(ox + w - D.s(200), top, D.s(80), D.s(120),
+                function() self:openBookMenu(book, ox + w - D.s(120), top + D.s(120)) end,
+                D.around(ox + w - D.s(158), top + D.s(55), D.s(86), D.s(86)))
         end
     end
 end
@@ -377,8 +385,10 @@ function Shell:paintScrollbar(bb, right, top, bottom, pages)
     local thumb_h = math.max(D.s(40), math.floor(span / pages))
     local thumb_y = track_top + math.floor((span - thumb_h) * (self.page - 1) / math.max(1, pages - 1))
     D.roundRect(bb, track_x, thumb_y, D.s(10), thumb_h, D.BLACK, D.s(5))
-    self:hit(right - D.s(100), top, D.s(100), D.s(110), function() self:turnPage(-1, pages) end)
-    self:hit(right - D.s(100), bottom - D.s(110), D.s(100), D.s(110), function() self:turnPage(1, pages) end)
+    self:pressable(right - D.s(100), top, D.s(100), D.s(110), function() self:turnPage(-1, pages) end,
+        D.around(right - D.s(57), top + D.s(52), D.s(101), D.s(101)))
+    self:pressable(right - D.s(100), bottom - D.s(110), D.s(100), D.s(110), function() self:turnPage(1, pages) end,
+        D.around(right - D.s(58), bottom - D.s(57), D.s(101), D.s(101)))
 end
 
 function Shell:turnPage(delta, pages)
@@ -440,7 +450,8 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
     D.text(bb, x + D.s(57), top + D.s(58), D.face("display", 55), title)
     if on_more then
         D.icon(bb, "chevron-right-thin", x + D.s(1105), top - D.s(7), D.s(80), D.s(80))
-        self:hit(x, top - D.s(30), w, D.s(110), on_more)
+        self:pressable(x, top - D.s(30), w, D.s(110), on_more,
+            { x = x + D.s(36), y = top - D.s(8), w = D.s(1121), h = D.s(88) })
     end
     local cell_w, max_h = D.s(287), D.s(480)
     local visible, whole = {}, 0
@@ -471,7 +482,8 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
         self:hit(cx, cover_top, cell_w, row_h + D.s(60),
             function() self.open_book(book.path) end,
             function() self:openBookMenu(book) end)
-        self:hit(dx + dw - D.s(60), dy + dh - D.s(80), D.s(60), D.s(80), function() self:openBookMenu(book) end)
+        self:pressable(dx + dw - D.s(60), dy + dh - D.s(80), D.s(60), D.s(80), function() self:openBookMenu(book) end,
+            pressedCoverMenu(dx, dy, dw, dh))
     end
     return cover_top + row_h + D.s(54)
 end
@@ -640,7 +652,8 @@ function Shell:paintTabs(bb, x, y, w, h)
                     0, 0, cover:getWidth(), cover:getHeight())
             end
             D.border(bb, mx - D.s(2), my - D.s(2), mw + D.s(4), mh + D.s(4), D.s(2))
-            self:hit(mx, my, mw, mh + D.s(40), function() self.open_book(book.path) end)
+            self:pressable(mx, my, mw, mh + D.s(40), function() self.open_book(book.path) end,
+                { x = mx - D.s(5), y = my - D.s(5), w = mw + D.s(10), h = mh + D.s(10), outline = D.s(5) })
         end
     end
 end

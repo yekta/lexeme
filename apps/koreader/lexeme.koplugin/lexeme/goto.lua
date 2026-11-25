@@ -49,7 +49,8 @@ function GoTo:render(bb, x, y, w, h)
     D.rect(bb, x, y + D.s(837 - PANEL_TOP), w, D.s(4))
     D.text(bb, x + D.s(36), y + D.s(905 - PANEL_TOP), D.face("regular", 34), "Go to page or location")
     D.icon(bb, "chevron-right", x + w - D.s(70), y + D.s(876 - PANEL_TOP), D.s(48), D.s(48))
-    self:hit(x, y + D.s(841 - PANEL_TOP), w, D.s(111), function() self:askPage() end)
+    self:pressable(x, y + D.s(841 - PANEL_TOP), w, D.s(111), function() self:askPage() end,
+        { x = x + D.s(5), y = y + D.s(846 - PANEL_TOP), w = w - D.s(11), h = D.s(101) })
     D.rect(bb, x, y + D.s(952 - PANEL_TOP), w, D.s(4))
 
     local list_top = y + D.s(956 - PANEL_TOP)

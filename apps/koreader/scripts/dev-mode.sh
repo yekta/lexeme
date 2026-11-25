@@ -2,7 +2,9 @@
 # Dev mode for working on the plugin with someone's real Kindle: `on` snapshots
 # everything reading leaves behind (statistics, look-ups, highlights, positions,
 # history, the sync outbox) and pauses syncing; `off` puts the snapshot back, so
-# nothing done in between counts, and syncing resumes. `status` says which.
+# nothing done in between counts, and syncing resumes. While it's on, the
+# frontlight is off and the Kindle doesn't sleep; `off` restores both.
+# `status` says which.
 # KINDLE_HOST is an ssh host, `kindle` by default.
 set -e
 HOST="${KINDLE_HOST:-kindle}"
@@ -56,10 +58,13 @@ case "$MODE" in
     mkdir -p "$SNAP.partial"
     tracked > "$SNAP.partial/files"
     (cd / && tar -cf "$SNAP.partial/data.tar" -T "$SNAP.partial/files")
+    lipc-get-prop com.lab126.powerd flIntensity > "$SNAP.partial/brightness"
     mv "$SNAP.partial" "$SNAP"
+    lipc-set-prop com.lab126.powerd flIntensity 0
+    lipc-set-prop com.lab126.powerd preventScreenSaver 1
     set_flag true
     start_koreader
-    echo "Dev mode on: syncing paused, reading data saved"
+    echo "Dev mode on: syncing paused, reading data saved, frontlight off, sleep prevented"
     ;;
   off)
     if [ ! -d "$SNAP" ]; then echo "Dev mode is already off"; exit 0; fi
@@ -67,10 +72,12 @@ case "$MODE" in
     stop_koreader
     (cd / && tracked | while read -r f; do rm -rf "/$f"; done)
     (cd / && tar -xf "$SNAP/data.tar")
+    if [ -s "$SNAP/brightness" ]; then lipc-set-prop com.lab126.powerd flIntensity "$(cat "$SNAP/brightness")"; fi
+    lipc-set-prop com.lab126.powerd preventScreenSaver 0
     rm -rf "$SNAP"
     set_flag false
     start_koreader
-    echo "Dev mode off: reading data restored, syncing resumed"
+    echo "Dev mode off: reading data, frontlight and sleep restored, syncing resumed"
     ;;
 esac
 EOF

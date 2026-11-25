@@ -59,15 +59,10 @@ function Menu:render(bb, x, y, w, h)
             local baseline = y + D.s(row.baseline)
             D.text(bb, x + D.s(66), baseline, self.face, item.text, enabled and D.BLACK or D.gray(136))
             if enabled then
-                -- Pressed, the Kindle's row turns black inside the border.
-                local function pressed(target)
-                    D.rect(target, x + D.s(34), baseline - D.s(61), w - D.s(68), D.s(103))
-                    D.text(target, x + D.s(66), baseline, self.face, item.text, D.WHITE)
-                end
-                self:hit(x, baseline - D.s(70), w, D.s(103), function()
+                self:pressable(x, baseline - D.s(70), w, D.s(103), function()
                     self:close()
                     UIManager:nextTick(item.callback)
-                end, nil, pressed)
+                end, { x = x + D.s(34), y = baseline - D.s(62), w = w - D.s(68) })
                 if item.more then self:paintMore(bb, x + w, baseline, item.more) end
             end
         end

@@ -14,9 +14,11 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
 - `scripts/dev-mode.sh on` before testing on a Kindle someone reads on: it
   snapshots what reading leaves behind (statistics, look-ups, highlights,
   positions, history, the sync outbox) and pauses syncing, with "Dev Mode" shown by
-  the clock. When you're done, go back to the Home screen, then
-  `scripts/dev-mode.sh off` restores the snapshot and resumes syncing;
-  `status` says which is on.
+  the clock. It also turns the frontlight off and keeps the Kindle from
+  sleeping, since nobody is reading the screen and a sleeping Kindle drops off
+  SSH. When you're done, go back to the Home screen, then
+  `scripts/dev-mode.sh off` restores the snapshot, the brightness and sleep,
+  and resumes syncing; `status` says which is on.
 - `python3 scripts/kindle.py shot out.png` saves a framebuffer screenshot.
 - `python3 scripts/kindle.py tap X Y` / `hold X Y` / `swipe X1 Y1 X2 Y2`
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a

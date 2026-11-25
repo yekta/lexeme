@@ -73,11 +73,11 @@ function Aa:paintTabs(bb, x, y, w)
         if active then
             D.rect(bb, tx - D.s(13), y + D.s(778 - PANEL_TOP), tw + D.s(26), D.s(7))
         end
-        self:hit(tx - D.s(24), y, tw + D.s(48), D.s(108), function()
+        self:pressable(tx - D.s(24), y, tw + D.s(48), D.s(108), function()
             self.tab = tab.key
             G_reader_settings:saveSetting("lexeme_aa_tab", tab.key)
             self:refresh()
-        end)
+        end, { x = tx - D.s(15), y = y + D.s(700 - PANEL_TOP), w = tw + D.s(30), h = D.s(85) })
         tx = tx + tw + D.s(49)
     end
 end
@@ -161,7 +161,8 @@ function Aa:paintThemes(bb, x, top, w, bottom)
     D.textCenter(bb, x + w / 2, button_top + D.s(58), D.face("regular", 30), "Save current settings",
         can_save and D.BLACK or D.gray(136))
     if can_save then
-        self:hit(x + D.s(66), button_top, w - D.s(132), D.s(94), function() self:askThemeName() end)
+        self:pressable(x + D.s(66), button_top, w - D.s(132), D.s(94), function() self:askThemeName() end,
+            D.inset(x + D.s(66), button_top, w - D.s(132), D.s(94), D.s(2)))
     end
     local manage_top = bottom - D.s(1696 - 1580)
     D.rect(bb, x, manage_top, w, D.s(4))
@@ -205,7 +206,7 @@ function Aa:paintManageThemes(bb, x, top, w)
             end)
             if theme.saved then
                 D.icon(bb, "trash-2", x + w - D.s(250), cy - D.s(24), D.s(48), D.s(48))
-                self:hit(x + w - D.s(280), cy - D.s(55), D.s(100), D.s(110), function()
+                self:pressable(x + w - D.s(280), cy - D.s(55), D.s(100), D.s(110), function()
                     require("lexeme/dialog"):new{
                         title = "Delete theme?",
                         message = "“" .. theme.label .. "” will be removed.",
@@ -215,11 +216,11 @@ function Aa:paintManageThemes(bb, x, top, w)
                             self:refresh()
                         end,
                     }:show()
-                end)
+                end, D.around(x + w - D.s(226), cy, D.s(109), D.s(110)))
                 D.icon(bb, "pencil", x + w - D.s(350), cy - D.s(24), D.s(48), D.s(48))
-                self:hit(x + w - D.s(380), cy - D.s(55), D.s(100), D.s(110), function()
+                self:pressable(x + w - D.s(380), cy - D.s(55), D.s(100), D.s(110), function()
                     self:askThemeName(theme.saved)
-                end)
+                end, D.around(x + w - D.s(326), cy, D.s(109), D.s(110)))
             end
         end
     end
@@ -330,10 +331,10 @@ function Aa:paintSpacing(bb, x, top, w)
         local lx = x + D.s(580) - math.floor(label_w / 2)
         D.text(bb, lx, reset_baseline, face, label, gray)
         D.rect(bb, lx, reset_baseline + D.s(6), label_w, D.s(3), gray)
-        self:hit(lx - D.s(20), reset_baseline - D.s(45), label_w + D.s(40), D.s(70), function()
+        self:pressable(lx - D.s(20), reset_baseline - D.s(45), label_w + D.s(40), D.s(70), function()
             Layout.resetSpacing(self.ui)
             self:changed()
-        end)
+        end, { x = lx, y = reset_baseline - D.s(32), w = label_w, h = D.s(42) })
     end
 
     -- Scrollbar: a gray track with the visible part in black, between two arrows.
@@ -345,14 +346,14 @@ function Aa:paintSpacing(bb, x, top, w)
     local at_top, at_bottom = scroll == 0, scroll >= D.s(SPACING_SCROLL)
     triangle(bb, x + D.s(1210), top + D.s(42), D.s(14), true, at_top and D.gray(119) or D.BLACK)
     triangle(bb, x + D.s(1210), top + D.s(817), D.s(14), false, at_bottom and D.gray(119) or D.BLACK)
-    self:hit(x + D.s(1170), top + D.s(10), D.s(90), D.s(80), function()
+    self:pressable(x + D.s(1170), top + D.s(10), D.s(90), D.s(80), function()
         self.spacing_scroll = 0
         self:refresh()
-    end)
-    self:hit(x + D.s(1170), top + D.s(785), D.s(90), D.s(80), function()
+    end, D.around(x + D.s(1210), top + D.s(49), D.s(101), D.s(101)))
+    self:pressable(x + D.s(1170), top + D.s(785), D.s(90), D.s(80), function()
         self.spacing_scroll = SPACING_SCROLL
         self:refresh()
-    end)
+    end, D.around(x + D.s(1210), top + D.s(824), D.s(101), D.s(100)))
 end
 
 -- Layout ------------------------------------------------------------------------

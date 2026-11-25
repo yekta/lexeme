@@ -82,7 +82,8 @@ end
 function Pairing:render(bb, x, y, w, h)
     Status.paint(self, bb, x, y, w)
     D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
-    self:hit(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end)
+    self:pressable(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end,
+        { x = x + D.s(7), y = y + D.s(108), w = D.s(101), h = D.s(101) })
     D.text(bb, x + D.s(139), y + D.s(168), D.face("bold", 34), "Connect to Lexeme")
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
 
@@ -123,7 +124,8 @@ function Pairing:button(bb, cx, cy, label, on_tap)
     local bx = cx - math.floor(bw / 2)
     D.border(bb, bx, cy - math.floor(bh / 2), bw, bh, D.s(3), D.BLACK, D.s(12))
     D.textCenter(bb, cx, cy + D.s(11), face, label)
-    self:hit(bx, cy - math.floor(bh / 2), bw, bh, on_tap)
+    self:pressable(bx, cy - math.floor(bh / 2), bw, bh, on_tap,
+        D.inset(bx, cy - math.floor(bh / 2), bw, bh, D.s(3), { radius = D.s(9) }))
 end
 
 return Pairing

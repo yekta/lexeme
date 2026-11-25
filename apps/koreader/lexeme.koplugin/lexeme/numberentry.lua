@@ -17,7 +17,8 @@ local NumberEntry = View:extend{
 local KEYPAD_TOP = 1193
 local KEYPAD_COLS = { 392, 629, 865 }
 local KEYPAD_ROWS = { 1270, 1387, 1502, 1617 }
-local KEY_W, KEY_H = 232, 116 -- Amazon's keypad keys
+-- Where a pressed key's outline starts in the first row, and how far apart the rows' outlines are.
+local KEY_TOP, KEY_PITCH = 1218, 349 / 3
 
 function NumberEntry:init()
     View.init(self)
@@ -78,20 +79,20 @@ function NumberEntry:render(bb, x, y, w, h)
     D.rect(bb, x, top, w, D.s(4))
     local keys = { { "1", "2", "3" }, { "4", "5", "6" }, { "7", "8", "9" }, { "back", "0", "enter" } }
     local face = D.face("regular", 44)
-    local kw, kh = D.s(KEY_W), D.s(KEY_H)
     for r, row in ipairs(keys) do
         local cy = top + D.s(KEYPAD_ROWS[r] - KEYPAD_TOP)
         for c, key in ipairs(row) do
             local cx = x + D.s(KEYPAD_COLS[c])
-            local kx, ky = cx - math.floor(kw / 2), cy - math.floor(kh / 2)
+            local outline_y = top + D.s(KEY_TOP + math.floor((r - 1) * KEY_PITCH + 0.5) - KEYPAD_TOP)
+            local outline = { x = cx - D.s(109), y = outline_y, w = D.s(220), h = D.s(104), outline = D.s(4) }
             if key == "back" then
-                Keyboard.paintKeyImage(bb, Keyboard.DELETE, kx, ky, kw, kh)
+                Keyboard.paintKeyImage(bb, Keyboard.DELETE, outline)
             elseif key == "enter" then
-                Keyboard.paintKeyImage(bb, Keyboard.RETURN, kx, ky, kw, kh)
+                Keyboard.paintKeyImage(bb, Keyboard.RETURN, outline)
             else
                 D.textCenter(bb, cx, cy + D.s(16), face, key)
             end
-            self:hit(kx, ky, kw, kh, function() self:type(key) end, nil, Keyboard.pressedBox(kx, ky, kw, kh))
+            self:pressable(cx - D.s(118), cy - D.s(57), D.s(236), D.s(114), function() self:type(key) end, outline)
         end
     end
 end

@@ -100,10 +100,10 @@ function M.FilterSheet:renderContent(bb, x, top, w)
     local clear_x = x + w - D.s(76) - clear_w
     D.text(bb, clear_x, top + D.s(150), clear_face, "Clear all")
     D.rect(bb, clear_x, top + D.s(158), clear_w, D.s(2))
-    self:hit(clear_x - D.s(20), top + D.s(100), clear_w + D.s(40), D.s(80), function()
+    self:pressable(clear_x - D.s(20), top + D.s(100), clear_w + D.s(40), D.s(80), function()
         shell:clearFilters()
         self:refresh()
-    end)
+    end, { x = clear_x, y = top + D.s(150 - 32), w = clear_w, h = D.s(42) })
     D.rect(bb, x + D.s(5), top + D.s(205), w - D.s(12), D.s(3))
 
     local y = top + D.s(208)
@@ -200,10 +200,10 @@ function M.BookSheet:renderContent(bb, x, top, w)
     for _, item in ipairs(self:items()) do
         D.rect(bb, x + D.s(5), line_y, w - D.s(12), D.s(4))
         D.text(bb, x + D.s(43), line_y + D.s(72), D.face("regular", 34), item.text)
-        self:hit(x, line_y + D.s(4), w, D.s(ITEM_PITCH - 4), function()
+        self:pressable(x, line_y + D.s(4), w, D.s(ITEM_PITCH - 4), function()
             self:close()
             UIManager:nextTick(item.callback)
-        end)
+        end, { x = x + D.s(5), w = w - D.s(11) })
         line_y = line_y + D.s(ITEM_PITCH)
     end
 end

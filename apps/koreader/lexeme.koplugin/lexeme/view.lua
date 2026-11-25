@@ -38,29 +38,42 @@ function View:paintTo(bb)
     local r = self.dimen
     if self.background then D.rect(bb, r.x, r.y, r.w, r.h, self.background) end
     self:render(bb, r.x, r.y, r.w, r.h)
-    if self.pressed then self.pressed(bb) end
 end
 
 function View:render() end
 
--- Registers a tap target; later registrations win when targets overlap. `pressed(bb)`
--- paints the target's pressed look, shown while its tap runs.
-function View:hit(x, y, w, h, on_tap, on_hold, pressed)
-    table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold, pressed = pressed })
+-- Registers a tap target; later registrations win when targets overlap.
+function View:hit(x, y, w, h, on_tap, on_hold)
+    table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold })
 end
 
--- Long enough for the e-ink screen to show the pressed look before the tap's result replaces it.
-local PRESS_SECONDS = 0.15
+-- A tap target that shows itself pressed when tapped, as on the Kindle. `pressed` ({ x, y, w, h },
+-- each defaulting to the target's) is inverted, with `radius` corners, or gets a black `outline`
+-- that thick, or is drawn by `paint(bb)`.
+function View:pressable(x, y, w, h, on_tap, pressed)
+    pressed = pressed or {}
+    self:hit(x, y, w, h, on_tap)
+    self.hits[#self.hits].pressed = {
+        x = pressed.x or x, y = pressed.y or y, w = pressed.w or w, h = pressed.h or h,
+        radius = pressed.radius, outline = pressed.outline, paint = pressed.paint,
+    }
+end
 
-function View:press(target)
-    self.pressed = target.pressed
-    UIManager:setDirty(self, "fast", self.dimen)
+local function paintPressed(bb, p)
+    if p.paint then return p.paint(bb) end
+    if p.outline then return D.border(bb, p.x, p.y, p.w, p.h, p.outline) end
+    D.invert(bb, p.x, p.y, p.w, p.h, p.radius)
+end
+
+-- As on the Kindle, the pressed look stays until the screen is next drawn, after the tap has done its work.
+function View:showPressed(p)
+    local region = Geom:new{ x = p.x, y = p.y, w = p.w, h = p.h }
+    -- Whatever was waiting to be drawn goes first, or it would draw over the pressed look.
     UIManager:forceRePaint()
-    UIManager:scheduleIn(PRESS_SECONDS, function()
-        self.pressed = nil
-        target.tap()
-        if UIManager:isWidgetShown(self) then UIManager:setDirty(self, "fast", self.dimen) end
-    end)
+    paintPressed(Screen.bb, p)
+    UIManager:setDirty(nil, "fast", region)
+    UIManager:forceRePaint()
+    UIManager:setDirty(self, "fast", region)
 end
 
 function View:findHit(pos)
@@ -81,11 +94,8 @@ function View:onLexemeTap(_, ges)
     self.last_tap = ges.pos
     local target = self:findHit(ges.pos)
     if target and target.tap then
-        if target.pressed then
-            self:press(target)
-        else
-            target.tap()
-        end
+        if target.pressed then self:showPressed(target.pressed) end
+        target.tap()
         return true
     end
     if not self:isInside(ges.pos) then

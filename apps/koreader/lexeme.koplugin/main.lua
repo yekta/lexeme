@@ -77,7 +77,7 @@ function Lexeme:onReaderReady()
 end
 
 -- Lexeme gets what's new whenever the Kindle comes online, a book is put down,
--- the Kindle goes to sleep, or Sync is tapped in Quick Actions.
+-- the Kindle goes to sleep or wakes up, or Sync is tapped in Quick Actions.
 function Lexeme:onNetworkConnected()
     require("lexeme/sync").soon()
 end
@@ -100,6 +100,7 @@ end
 
 function Lexeme:onResume()
     require("lexeme/timer").resume()
+    require("lexeme/sync").afterWake()
 end
 
 function Lexeme:onLexemeSync()

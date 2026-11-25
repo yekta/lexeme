@@ -27,12 +27,12 @@ function C.slider(view, bb, opts)
         D.rect(bb, minus_x, cy - D.s(1), size, D.s(3))
         D.rect(bb, plus_x, cy - D.s(1), size, D.s(3))
         D.rect(bb, plus_x + D.s(15), cy - D.s(16), D.s(3), size)
-        view:hit(minus_x - D.s(30), cy - D.s(50), D.s(84), D.s(100), function()
+        view:pressable(minus_x - D.s(30), cy - D.s(50), D.s(84), D.s(100), function()
             if opts.value > opts.min then opts.on_change(opts.value - 1) end
-        end)
-        view:hit(plus_x - D.s(30), cy - D.s(50), D.s(84), D.s(100), function()
+        end, D.around(minus_x + D.s(16), cy, D.s(94), D.s(94)))
+        view:pressable(plus_x - D.s(30), cy - D.s(50), D.s(84), D.s(100), function()
             if opts.value < opts.max then opts.on_change(opts.value + 1) end
-        end)
+        end, D.around(plus_x + D.s(16), cy, D.s(94), D.s(94)))
     end
     view:hit(x0 - D.s(10), cy - D.s(45), x1 - x0 + D.s(20), D.s(90), nil)
     local target = view.hits[#view.hits]

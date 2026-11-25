@@ -18,7 +18,8 @@ end
 function About:render(bb, x, y, w, h)
     Status.paint(self, bb, x, y, w)
     D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
-    self:hit(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end)
+    self:pressable(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end,
+        { x = x + D.s(7), y = y + D.s(108), w = D.s(101), h = D.s(101) })
     D.text(bb, x + D.s(139), y + D.s(168), D.face("bold", 34), "About this book")
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
 

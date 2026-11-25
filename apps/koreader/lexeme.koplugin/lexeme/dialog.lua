@@ -24,26 +24,22 @@ function Dialog.frame(bb, x, y, w, h)
     D.border(bb, x, y, w, h, D.s(3), D.BLACK, D.s(12))
 end
 
--- A Kindle dialog button with its right edge at `right`; secondary buttons turn black while pressed,
--- and a primary one without `on_tap` is greyed out. Returns its left edge.
+-- A Kindle dialog button with its right edge at `right`; a primary one without `on_tap` is greyed out.
+-- Returns its left edge.
 function Dialog.button(view, bb, right, y, label, primary, on_tap)
     local face = D.face("regular", 32)
     local w, h = math.max(D.s(201), D.width(face, label) + D.s(80)), D.s(BUTTON_H)
     local x = right - w
-    local disabled = primary and not on_tap
-    local function paint(target, fill)
-        local color = D.BLACK
-        if fill then
-            D.roundRect(target, x, y, w, h, disabled and D.gray(220) or D.BLACK, D.s(6))
-            color = disabled and D.gray(136) or D.WHITE
-        else
-            D.rect(target, x, y, w, h, D.WHITE)
-            D.border(target, x, y, w, h, D.s(4), D.BLACK, D.s(6))
-        end
-        D.textCenter(target, x + w / 2, y + D.s(62), face, label, color)
+    if primary then
+        D.roundRect(bb, x, y, w, h, on_tap and D.BLACK or D.gray(220), D.s(6))
+        D.textCenter(bb, x + w / 2, y + D.s(62), face, label, on_tap and D.WHITE or D.gray(136))
+    else
+        D.border(bb, x, y, w, h, D.s(4), D.BLACK, D.s(6))
+        D.textCenter(bb, x + w / 2, y + D.s(62), face, label)
     end
-    paint(bb, primary)
-    if on_tap then view:hit(x, y, w, h, on_tap, nil, not primary and function(target) paint(target, true) end) end
+    if not on_tap then return x end
+    local pressed = primary and { radius = D.s(6) } or D.inset(x, y, w, h, D.s(4), { radius = D.s(3) })
+    view:pressable(x, y, w, h, on_tap, pressed)
     return x
 end
 

@@ -76,13 +76,18 @@ local function number(n)
     return (string.format("%.4f", n):gsub("0+$", ""):gsub("%.$", ""))
 end
 
+-- The reader's font replaces the book's, as on a Kindle with Publisher Font off; code stays monospace.
+local FONT_FAMILY_CSS = [[
+body, body * { font-family: inherit !important; }
+listing, plaintext, xmp, samp, tt, kbd, pre, code { font-family: monospace !important; }]]
+
 --[[
 `opts`: size_px (the body font size), scale (font-size multiple on body, for
 sizes past crengine's limit), line_height (pitch as a multiple of the font
 size), paragraph_em and letter_em (extra space), document.
 ]]
 function Typography.css(opts)
-    local out = {}
+    local out = { FONT_FAMILY_CSS }
     if opts.scale and opts.scale ~= 1 then
         table.insert(out, string.format("body { font-size: %sem !important; }", number(opts.scale)))
     end

@@ -52,20 +52,21 @@ end
 
 local face_cache = {}
 
--- `em` is the font size in reference pixels.
+-- `kind` is one of FACE_FILES or a font file of the Kindle's; `em` is the font size in reference pixels.
 function D.face(kind, em)
     local key = kind .. em
     if face_cache[key] then return face_cache[key] end
     local px = D.s(em)
     local size = (px - 0.5) / (Screen:scaleBySize(10000) / 10000)
+    local files = FACE_FILES[kind] or { kind }
     local face
-    for _, file in ipairs(FACE_FILES[kind]) do
+    for _, file in ipairs(files) do
         face = Font:getFace(fontName(file), size)
         if face then break end
     end
     face = face or Font:getFace("cfont", size)
     -- Faces are shared per font file and size; only Lexeme uses these files.
-    if FACE_FILES[kind].double_strike then face.lexeme_double = true end
+    if files.double_strike then face.lexeme_double = true end
     face_cache[key] = face
     return face
 end

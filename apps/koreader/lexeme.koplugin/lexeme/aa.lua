@@ -86,8 +86,8 @@ end
 function Aa:paintSubpageHeader(bb, x, y, w)
     local titles = { font_family = "Font family", spacing = "Spacing", manage_themes = "Manage themes" }
     local title = titles[self.page]
-    D.icon(bb, "arrow-left", x + D.s(32), y + D.s(732 - 26 - PANEL_TOP), D.s(44), D.s(44))
-    D.text(bb, x + D.s(105), y + D.s(752 - PANEL_TOP), D.face("bold", 32), title)
+    D.icon(bb, "arrow-left", x + D.s(44), y + D.s(713 - PANEL_TOP), D.s(44), D.s(44))
+    D.text(bb, x + D.s(108), y + D.s(745 - PANEL_TOP), D.face("bold", 32), title)
     self:hit(x, y, D.s(500), D.s(108), function()
         self.page = nil
         self:refresh()
@@ -227,7 +227,8 @@ function Aa:paintFont(bb, x, top, w)
     local label = D.face("bold", 32)
     local row_y = top + D.s(902 - 790)
     D.text(bb, x + D.s(65), row_y, label, "Font family")
-    D.textRight(bb, x + w - D.s(1272 - 1143), row_y, D.face("regular", 32), Layout.fontLabel(self.ui))
+    local font = Layout.currentFont(self.ui)
+    D.textRight(bb, x + w - D.s(1272 - 1143), row_y, D.face(font.file or "regular", 32), font.label)
     chevron(bb, x + w - D.s(1272 - 1205), row_y - D.s(12))
     self:hit(x, row_y - D.s(70), w, D.s(110), function()
         self.page = "font_family"
@@ -262,18 +263,34 @@ function Aa:paintFont(bb, x, top, w)
     end)
 end
 
+-- Like the Kindle's, the tapped font's radio fills at once; the page reflows after.
 function Aa:paintFontFamily(bb, x, top, w)
     local current = self.ui.font.font_face
-    for i, font in ipairs(Layout.availableFonts()) do
+    local fonts = Layout.availableFonts()
+    local function position(i)
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-        local fx = x + D.s(col == 0 and 70 or 660)
-        local cy = top + D.s(60 + row * 110)
-        C.radio(bb, fx, cy, font.name == current)
-        D.text(bb, fx + D.s(62), cy + D.s(12), D.face("regular", 32), font.label)
-        self:hit(fx - D.s(20), cy - D.s(55), D.s(570), D.s(110), function()
+        return x + D.s(col == 0 and 70 or 667), top + D.s(59 + row * 110)
+    end
+    local function paintRadios(target, selected)
+        local size = D.s(40)
+        for i, font in ipairs(fonts) do
+            local fx, cy = position(i)
+            D.rect(target, fx, cy - math.floor(size / 2), size, size, D.WHITE)
+            C.radio(target, fx, cy, font.name == selected)
+        end
+    end
+    paintRadios(bb, current)
+    local list_h = D.s(math.ceil(#fonts / 2) * 110)
+    for i, font in ipairs(fonts) do
+        local fx, cy = position(i)
+        D.text(bb, fx + D.s(63), cy + D.s(11), D.face(font.file or "regular", 32), font.label)
+        self:pressable(fx - D.s(20), cy - D.s(55), D.s(570), D.s(110), function()
+            if font.name == current then return end
             Layout.setFont(self.ui, font.name)
             self:changed()
-        end)
+        end, { x = x, y = top, w = w, h = list_h, paint = function(target)
+            if font.name ~= current then paintRadios(target, font.name) end
+        end })
     end
 end
 

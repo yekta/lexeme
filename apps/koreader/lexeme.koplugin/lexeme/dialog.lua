@@ -3,6 +3,7 @@ local Geom = require("ui/geometry")
 local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 
+local Button = require("lexeme/button")
 local D = require("lexeme/draw")
 local View = require("lexeme/view")
 
@@ -24,22 +25,20 @@ function Dialog.frame(bb, x, y, w, h)
     D.border(bb, x, y, w, h, D.s(3), D.BLACK, D.s(12))
 end
 
--- A Kindle dialog button with its right edge at `right`; a primary one without `on_tap` is greyed out.
+-- A Kindle dialog button with its right edge at `right`, greyed out without `on_tap`.
 -- Returns its left edge.
 function Dialog.button(view, bb, right, y, label, primary, on_tap)
-    local face = D.face("regular", 32)
-    local w, h = math.max(D.s(201), D.width(face, label) + D.s(80)), D.s(BUTTON_H)
-    local x = right - w
-    if primary then
-        D.roundRect(bb, x, y, w, h, on_tap and D.BLACK or D.gray(220), D.s(6))
-        D.textCenter(bb, x + w / 2, y + D.s(62), face, label, on_tap and D.WHITE or D.gray(136))
-    else
-        D.border(bb, x, y, w, h, D.s(4), D.BLACK, D.s(6))
-        D.textCenter(bb, x + w / 2, y + D.s(62), face, label)
+    local o = { label = label, size = 32, baseline = 62, pad = 80, h = BUTTON_H, border = 4, radius = 6 }
+    o.w = math.max(D.s(201), Button.width(o))
+    local x = right - o.w
+    if not primary then
+        Button.paint(view, bb, x, y, o, on_tap)
+        return x
     end
-    if not on_tap then return x end
-    local pressed = primary and { radius = D.s(6) } or D.inset(x, y, w, h, D.s(4), { radius = D.s(3) })
-    view:pressable(x, y, w, h, on_tap, pressed)
+    D.roundRect(bb, x, y, o.w, D.s(o.h), on_tap and D.BLACK or D.gray(220), D.s(o.radius))
+    D.textCenter(bb, x + o.w / 2, y + D.s(o.baseline), D.face("regular", o.size), label,
+        on_tap and D.WHITE or D.gray(136))
+    if on_tap then view:pressable(x, y, o.w, D.s(o.h), on_tap, { radius = D.s(o.radius) }) end
     return x
 end
 

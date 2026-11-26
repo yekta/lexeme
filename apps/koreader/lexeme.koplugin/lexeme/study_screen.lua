@@ -5,6 +5,7 @@ session is, a card that turns over when tapped, and the four ratings under its b
 local UIManager = require("ui/uimanager")
 local time = require("ui/time")
 
+local Button = require("lexeme/button")
 local D = require("lexeme/draw")
 local Status = require("lexeme/status")
 local Study = require("lexeme/study")
@@ -14,7 +15,7 @@ local StudyScreen = View:extend{
     deck = nil,
 }
 
-local CARD = { x = 36, top = 262, bottom = 1452, border = 3 }
+local CARD = { x = 36, top = 262, bottom = 1452, border = 3, padding = 128 }
 local BUTTONS = { top = 1480, h = 150, gap = 20 }
 local RATING_LABELS = { again = "Again", hard = "Hard", good = "Good", easy = "Easy" }
 
@@ -162,11 +163,12 @@ function StudyScreen:paintCard(bb, x, y, w, card)
     D.textCenter(bb, center, cy + D.s(78), D.face("bold", 26), self.flipped and "BACK" or "FRONT", D.gray(102))
 
     local text_top, text_bottom = cy + D.s(120), cy + ch - D.s(120)
+    local text_w, text_h = cw - 2 * D.s(CARD.padding), text_bottom - text_top
     local face, lines, pitch
     if self.flipped then
-        face, lines, pitch = fitText("serif", { 36, 32, 28, 26 }, card.back, cw - D.s(160), text_bottom - text_top)
+        face, lines, pitch = fitText("serif", { 36, 32, 28, 26 }, card.back, text_w, text_h)
     else
-        face, lines, pitch = fitText("serif", { 64, 52, 44, 36, 30 }, card.front, cw - D.s(160), text_bottom - text_top)
+        face, lines, pitch = fitText("serif", { 64, 52, 44, 36, 30 }, card.front, text_w, text_h)
     end
     local block = #lines * pitch
     local baseline = text_top + math.floor((text_bottom - text_top - block) / 2) + math.floor(pitch * 0.72)
@@ -187,7 +189,7 @@ end
 
 function StudyScreen:paintRatings(bb, x, y, w, card)
     local left, right = x + D.s(CARD.x), x + w - D.s(CARD.x)
-    local gap, top, bh = D.s(BUTTONS.gap), y + D.s(BUTTONS.top), D.s(BUTTONS.h)
+    local gap, top = D.s(BUTTONS.gap), y + D.s(BUTTONS.top)
     local count = #Study.RATINGS
     -- Whole-pixel widths leave pixels over; they go between buttons so the last ends at `right`.
     local function buttonX(i) return left + math.floor(i * (right - left + gap) / count + 0.5) end
@@ -195,7 +197,7 @@ function StudyScreen:paintRatings(bb, x, y, w, card)
     for i, rating in ipairs(Study.RATINGS) do
         local bx = buttonX(i - 1)
         local bw = buttonX(i) - gap - bx
-        D.border(bb, bx, top, bw, bh, D.s(3))
+        Button.paint(self, bb, bx, top, { w = bw, h = BUTTONS.h, border = 3 }, function() self:rate(rating) end)
         local center = bx + math.floor(bw / 2)
         local preview = card.next and card.next[rating]
         if preview then
@@ -205,7 +207,6 @@ function StudyScreen:paintRatings(bb, x, y, w, card)
         else
             D.textCenter(bb, center, top + D.s(87), name_face, RATING_LABELS[rating])
         end
-        self:pressable(bx, top, bw, bh, function() self:rate(rating) end, D.inset(bx, top, bw, bh, D.s(3)))
     end
 end
 
@@ -219,13 +220,8 @@ function StudyScreen:paintDone(bb, x, y, w)
     end
     D.textCenter(bb, center, y + D.s(760), D.face("bold", 40), title)
     D.textCenter(bb, center, y + D.s(830), D.face("regular", 32), message, D.BLACK, w - D.s(120))
-    local face = D.face("regular", 32)
-    local label = "Back to Lexeme"
-    local bw, bh = D.width(face, label) + D.s(120), D.s(101)
-    local bx, by = center - math.floor(bw / 2), y + D.s(920)
-    D.border(bb, bx, by, bw, bh, D.s(3))
-    D.textCenter(bb, center, by + D.s(62), face, label)
-    self:pressable(bx, by, bw, bh, function() self:close("flashui") end, D.inset(bx, by, bw, bh, D.s(3)))
+    local back = { label = "Back to Lexeme", size = 32, baseline = 62, pad = 120, h = 101, border = 3 }
+    Button.paint(self, bb, center - math.floor(Button.width(back) / 2), y + D.s(920), back, function() self:close() end)
 end
 
 function StudyScreen.open(deck, on_close)

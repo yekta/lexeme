@@ -149,7 +149,7 @@ function M.BookSheet:items()
         {
             text = "About this book",
             callback = function()
-                require("lexeme/about").show(book.path)
+                require("lexeme/about").open(book.path)
             end,
         },
         {

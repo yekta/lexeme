@@ -26,7 +26,7 @@ local function actions(ui)
         end,
         more_items = function()
             return {
-                { text = "About this book", callback = function() require("lexeme/about").show(ui.document.file) end },
+                { text = "About this book", callback = function() require("lexeme/about").open(ui.document.file) end },
                 { text = "Settings", callback = function() require("lexeme/settings").show() end },
             }
         end,

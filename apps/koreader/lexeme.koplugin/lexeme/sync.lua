@@ -97,8 +97,22 @@ local function isOnline()
     return Background.await(function() return NetworkMgr:isOnline() end)
 end
 
+local OFFLINE = "No internet connection."
+
+-- Why the last sync failed, as { message, detail, at }, until one succeeds.
+function Sync.lastFailure()
+    return G_reader_settings:readSetting("lexeme_sync_failure")
+end
+
+local function remember(ok, message, detail)
+    if ok then return G_reader_settings:delSetting("lexeme_sync_failure") end
+    if message == OFFLINE then return end
+    logger.warn("Lexeme: sync failed:", detail)
+    G_reader_settings:saveSetting("lexeme_sync_failure", { message = message, detail = detail, at = os.time() })
+end
+
 local function syncAll()
-    if not isOnline() then return false, "No internet connection." end
+    if not isOnline() then return false, OFFLINE end
     local started = os.time()
     if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
     local since = G_reader_settings:readSetting("lexeme_sync_version") == SYNC_VERSION
@@ -109,7 +123,7 @@ local function syncAll()
     Sync.queueReading(snapshot)
     Reading.forget(snapshot.removed)
     local _, failure = Outbox.flush()
-    if failure then error(failure, 0) end
+    if failure then return false, failure end
     Sent.remember(now)
     -- With this Kindle's reading in, the streak Home shows is up to date.
     if Streak.refresh() then
@@ -117,7 +131,7 @@ local function syncAll()
     end
     require("lexeme/study").refresh()
     local _, delivery_failure = require("lexeme/delivery").run()
-    if delivery_failure then error(delivery_failure, 0) end
+    if delivery_failure then return false, delivery_failure end
     G_reader_settings:saveSetting("lexeme_synced_at", started)
     G_reader_settings:saveSetting("lexeme_sync_version", SYNC_VERSION)
     return true, "Synced with Lexeme."
@@ -125,21 +139,25 @@ end
 
 --[[
 Syncs in the background. Does nothing without a connection to Lexeme or the
-network; `on_done(ok, message)` is called either way.
+network; `on_done(ok, message)` is called either way. Without `on_done`, a
+failure shows in a toast.
 ]]
 function Sync.run(on_done)
-    on_done = on_done or function() end
-    if not Sync.isConnected() then return on_done(false, "Connect to Lexeme first.") end
-    if Sync.isPaused() then return on_done(false, "Syncing is paused in dev mode.") end
+    local done = on_done or function() end
+    if not Sync.isConnected() then return done(false, "Connect to Lexeme first.") end
+    if Sync.isPaused() then return done(false, "Syncing is paused in dev mode.") end
     local started = Background.run(function()
         local ok, synced, message = pcall(syncAll)
+        local detail = message
         if not ok then
-            logger.warn("Lexeme: sync failed:", synced)
-            return on_done(false, tostring(synced))
+            synced, message, detail = false, "Couldn't sync with Lexeme.", tostring(synced)
         end
-        on_done(synced, message)
+        remember(synced, message, detail)
+        if not on_done and not synced and message ~= OFFLINE then require("lexeme/toast").show(message) end
+        UIManager:broadcastEvent(Event:new("LexemeSyncFinished"))
+        done(synced, message)
     end, "sync")
-    if not started then on_done(false, "A sync is already running.") end
+    if not started then done(false, "A sync is already running.") end
 end
 
 local scheduled = false
@@ -157,7 +175,7 @@ end
 -- Syncs once the lock screen is drawn; the Kindle stays on Wi-Fi for a minute before it sleeps.
 function Sync.beforeSleep()
     if not Sync.isConnected() or Sync.isPaused() then return end
-    UIManager:tickAfterNext(function() Sync.run() end)
+    UIManager:tickAfterNext(function() Sync.run(function() end) end)
 end
 
 -- Waking, the Kindle rejoins Wi-Fi on its own a few seconds later, without KOReader hearing of it.
@@ -185,6 +203,7 @@ function Sync.disconnect()
     G_reader_settings:delSetting("lexeme_user_name")
     G_reader_settings:delSetting("lexeme_user_email")
     G_reader_settings:delSetting("lexeme_synced_at")
+    G_reader_settings:delSetting("lexeme_sync_failure")
     G_reader_settings:delSetting("lexeme_deck_id")
     G_reader_settings:delSetting("lexeme_deck_name")
     require("lexeme/study").forget()

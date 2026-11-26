@@ -83,7 +83,7 @@ end
 local function lookups(books, used)
     local result = {}
     for _, row in ipairs(rows(VOCAB_DB, [[
-        SELECT l.id, w.word, l.usage, l.timestamp, b.asin
+        SELECT l.id, w.word, l.usage, l.timestamp, b.asin, w.stem
         FROM LOOKUPS l JOIN WORDS w ON w.id = l.word_key LEFT JOIN BOOK_INFO b ON b.id = l.book_key;]])) do
         local book = row[5] and books[row[5]]
         if book then used[row[5]] = true end
@@ -92,6 +92,7 @@ local function lookups(books, used)
             id = Reading.stableId("kindle-lookup:" .. row[1]),
             book_key = book and book.key or nil,
             word = row[2],
+            headword = row[6] ~= "" and row[6] or nil,
             context = context ~= "" and context or nil,
             looked_up_at = tonumber(row[4]) or 0,
         })

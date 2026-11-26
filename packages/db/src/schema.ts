@@ -341,6 +341,8 @@ export const lookups = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     book_id: uuid("book_id").references(() => books.id, { onDelete: "set null" }),
     word: text("word").notNull(),
+    /** The dictionary's entry for the word ("absorb" for "absorbed"), when the reader knows it. */
+    headword: text("headword"),
     context: text("context"),
     looked_up_at: timestamp("looked_up_at", { withTimezone: true }).notNull(),
     created_at: createdAt(),

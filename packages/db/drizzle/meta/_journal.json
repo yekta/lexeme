@@ -141,6 +141,13 @@
       "when": 1795523564852,
       "tag": "0019_reading_goals_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795607451719,
+      "tag": "0020_lookup_headword",
+      "breakpoints": true
     }
   ]
 }

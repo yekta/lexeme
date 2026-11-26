@@ -1,0 +1,1 @@
+ALTER TABLE "lookups" ADD COLUMN "headword" text;

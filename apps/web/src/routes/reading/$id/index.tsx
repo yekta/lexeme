@@ -15,7 +15,7 @@ import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
-import { useBookReading, useCardWords, type TBook } from "@/hooks/data/use-reading";
+import { useBookReading, useIsCard, type TBook } from "@/hooks/data/use-reading";
 import { formatRelativeDay } from "@/lib/relative-day";
 
 export const Route = createFileRoute("/reading/$id/")({
@@ -39,7 +39,7 @@ function BookRoute() {
 function BookPage() {
   const { id } = Route.useParams();
   const reading = useBookReading(id);
-  const cardWords = useCardWords();
+  const isCard = useIsCard();
   const { book, days, sessions, highlights, words } = reading;
   const totalSeconds = days.reduce((sum, d) => sum + d.seconds, 0);
 
@@ -90,7 +90,7 @@ function BookPage() {
             {words.length > 0 ? (
               <div className="rounded-xl border divide-y overflow-hidden">
                 {words.slice(0, RECENT_WORDS).map((lookup) => (
-                  <WordRow key={lookup.id} lookup={lookup} isCard={cardWords.has(lookup.word.trim().toLowerCase())} />
+                  <WordRow key={lookup.id} lookup={lookup} isCard={isCard(lookup)} />
                 ))}
                 {words.length > RECENT_WORDS && (
                   <SeeAllRow href={`/reading/${id}/words`} />

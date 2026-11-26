@@ -76,8 +76,6 @@ export const deckExportResponse = deckExportSchema;
 export const generateBackRequest = z.object({
   deckId: z.uuid(),
   front: z.string().trim().min(1),
-  /** The sentence a looked-up word was read in, so the back gives that sense of it. */
-  context: z.string().trim().max(5000).optional(),
 });
 
 export const generateBackResponse = z.object({ back: z.string().min(1) });

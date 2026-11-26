@@ -114,10 +114,14 @@ export function useReadingSummary(
   }, [books, days, goal.day_starts_at, goal.daily_minutes]);
 }
 
-/** The words that are cards already, lowercased, for marking looked-up words. */
-export function useCardWords() {
+/** Whether a looked-up word is a card already, by its dictionary headword or the word as read. */
+export function useIsCard() {
   const [cards] = useQuery(queries.cards());
-  return useMemo(() => new Set(cards.map((card) => card.front.trim().toLowerCase())), [cards]);
+  return useMemo(() => {
+    const fronts = new Set(cards.map((card) => card.front.trim().toLowerCase()));
+    return (lookup: TLookup) =>
+      [lookup.headword, lookup.word].some((word) => word && fronts.has(word.trim().toLowerCase()));
+  }, [cards]);
 }
 
 /** One book and everything recorded about it, newest first. */

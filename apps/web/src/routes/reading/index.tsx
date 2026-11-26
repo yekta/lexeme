@@ -27,7 +27,7 @@ import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import { WordRow } from "@/components/word-row";
-import { useCardWords, useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
+import { useIsCard, useReading, useReadingSummary, type TBook } from "@/hooks/data/use-reading";
 
 export const Route = createFileRoute("/reading/")({
   component: ReadingRoute,
@@ -49,7 +49,7 @@ function ReadingRoute() {
 
 function ReadingPage() {
   const reading = useReading();
-  const cardWords = useCardWords();
+  const isCard = useIsCard();
   const summary = useReadingSummary(reading.books, reading.days, reading.goal);
   const isPlaceholder = reading.isPending;
   const booksByRecent = useMemo(
@@ -120,7 +120,7 @@ function ReadingPage() {
                   <WordRow
                     key={lookup.id}
                     lookup={lookup}
-                    isCard={cardWords.has(lookup.word.trim().toLowerCase())}
+                    isCard={isCard(lookup)}
                     bookTitle={lookup.book_id ? titles.get(lookup.book_id) : undefined}
                   />
                 ))}

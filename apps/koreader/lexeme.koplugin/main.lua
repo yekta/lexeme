@@ -59,13 +59,18 @@ function Lexeme:init()
         Reader.install(self.ui)
         return
     end
+    self:useClassicFileBrowser()
     self:createShell()
     -- The file browser paints Home in its place, so its own screen never shows
     -- before Home opens on top of it.
+    local painted = false
     self.ui.paintTo = function(_, bb, x, y)
-        if self.shell then self.shell:paintTo(bb, x, y) end
+        if not self.shell then return end
+        self.shell:paintTo(bb, x, y)
+        painted = true
     end
-    UIManager:nextTick(function() UIManager:show(self.shell, "flashui") end)
+    -- Back from a book, the file browser has already flashed Home on; "ui" doesn't flash again.
+    UIManager:nextTick(function() UIManager:show(self.shell, painted and "ui" or "flashui") end)
 end
 
 function Lexeme:onPreRenderDocument()
@@ -91,6 +96,7 @@ function Lexeme:onAnnotationsModified()
 end
 
 function Lexeme:onCloseDocument()
+    require("lexeme/highlight_positions").save(self.ui)
     require("lexeme/sync").soon()
 end
 
@@ -117,6 +123,16 @@ function Lexeme:onLexemeSync()
             Toast.show(message)
         end)
     end)
+end
+
+-- The file browser under Home is never seen, but in coverbrowser's cover views it loads covers
+-- each time Home opens and forces two garbage collections as a book opens.
+function Lexeme:useClassicFileBrowser()
+    local coverbrowser = self.ui.coverbrowser
+    local ok, manager = pcall(require, "bookinfomanager")
+    if not (coverbrowser and coverbrowser.setupFileManagerDisplayMode and ok) then return end
+    if manager:getSetting("filemanager_display_mode") == nil then return end
+    coverbrowser:setupFileManagerDisplayMode(nil)
 end
 
 function Lexeme:createShell()

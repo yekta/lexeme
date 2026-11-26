@@ -3,6 +3,7 @@ local UIManager = require("ui/uimanager")
 local util = require("util")
 
 local Footer = require("lexeme/footer")
+local HighlightPositions = require("lexeme/highlight_positions")
 local Layout = require("lexeme/layout")
 local Marks = require("lexeme/marks")
 local Quick = require("lexeme/quick")
@@ -69,6 +70,7 @@ function Reader.install(ui)
         rect = { x = rect.x + 1, y = rect.y, w = math.max(1, rect.w - 2), h = rect.h }
         return draw_highlight_rect(view, bb, x, y, rect, drawer, color, draw_note_mark)
     end
+    HighlightPositions.install(ui)
     if ui.rolling then
         local get_text = ui.document.getTextFromPositions
         ui.document.getTextFromPositions = function(document, pos0, pos1)

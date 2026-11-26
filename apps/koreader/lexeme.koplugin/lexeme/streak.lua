@@ -151,7 +151,7 @@ Streak.MIN_DAY_SECONDS = 5 * 60
 
 local SOURCES = {
     { file = "statistics.sqlite3", table = "page_stat_data", start = "start_time", seconds = "duration" },
-    { file = "lexeme_history.sqlite3", table = "sessions", start = "started_at", seconds = "seconds" },
+    { file = "lexeme_history.sqlite3", table = "sessions", start = "started_at", seconds = "seconds", kept = true },
 }
 
 local function settingsFile(name)
@@ -166,17 +166,38 @@ local function columnsOf(path, sql)
     return ok and columns or nil
 end
 
+-- A file's modification time and size, which change whenever it's written.
+local function fileStamp(path)
+    local attr = lfs.attributes(path)
+    return attr and (attr.modification .. ":" .. attr.size) or "-"
+end
+
+-- The Amazon history holds thousands of sessions and only changes when it's reinstalled, so its
+-- days are kept until the file changes. KOReader's own statistics are small and read each time.
+local kept_days = {}
+
+local function daysOf(source)
+    local path = settingsFile(source.file)
+    local stamp = source.kept and (fileStamp(path) .. "/" .. utcOffsetMinutes())
+    local kept = kept_days[source.file]
+    if stamp and kept and kept.stamp == stamp then return kept.days end
+    local days = {}
+    local columns = columnsOf(path, string.format(
+        "SELECT date(%s, 'unixepoch', 'localtime'), SUM(%s) FROM %s GROUP BY 1;",
+        source.start, source.seconds, source.table))
+    for i = 1, columns and #columns[1] or 0 do
+        local key = columns[1][i]
+        days[key] = (days[key] or 0) + (tonumber(columns[2][i]) or 0)
+    end
+    if stamp then kept_days[source.file] = { stamp = stamp, days = days } end
+    return days
+end
+
 -- Seconds read on each day ("YYYY-MM-DD"), only the days that pass MIN_DAY_SECONDS.
 local function readingDays()
     local days = {}
     for _, source in ipairs(SOURCES) do
-        local columns = columnsOf(settingsFile(source.file), string.format(
-            "SELECT date(%s, 'unixepoch', 'localtime'), SUM(%s) FROM %s GROUP BY 1;",
-            source.start, source.seconds, source.table))
-        for i = 1, columns and #columns[1] or 0 do
-            local key = columns[1][i]
-            days[key] = (days[key] or 0) + (tonumber(columns[2][i]) or 0)
-        end
+        for key, seconds in pairs(daysOf(source)) do days[key] = (days[key] or 0) + seconds end
     end
     for key, seconds in pairs(days) do
         if seconds < Streak.MIN_DAY_SECONDS then days[key] = nil end
@@ -184,8 +205,25 @@ local function readingDays()
     return days
 end
 
+-- What the finished books depend on: the books in the history, their sidecars and the Amazon history.
+local function finishedStamp()
+    local DocSettings = require("docsettings")
+    local parts = { fileStamp(settingsFile("lexeme_history.sqlite3")) }
+    for _, entry in ipairs(require("readhistory").hist) do
+        local sidecar = entry.file and DocSettings:findSidecarFile(entry.file)
+        parts[#parts + 1] = string.format("%s@%s:%s", tostring(entry.file), tostring(entry.time),
+            sidecar and fileStamp(sidecar) or "-")
+    end
+    return table.concat(parts, "|")
+end
+
+local kept_finished
+
 -- When each finished book was finished, in epoch seconds: from KOReader and from Amazon.
+-- Kept until a book in the history or its sidecar changes: finding them reads every sidecar.
 local function finishedTimes()
+    local stamp = finishedStamp()
+    if kept_finished and kept_finished.stamp == stamp then return kept_finished.times end
     local times = {}
     for _, book in ipairs(require("lexeme/reading").books()) do
         if book.status == "finished" and book.finished_at then
@@ -195,6 +233,7 @@ local function finishedTimes()
     local columns = columnsOf(settingsFile("lexeme_history.sqlite3"),
         "SELECT finished_at FROM books WHERE finished_at IS NOT NULL;")
     for i = 1, columns and #columns[1] or 0 do table.insert(times, tonumber(columns[1][i])) end
+    kept_finished = { stamp = stamp, times = times }
     return times
 end
 

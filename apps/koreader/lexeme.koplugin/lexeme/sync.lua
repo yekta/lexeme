@@ -10,6 +10,7 @@ local logger = require("logger")
 
 local Api = require("lexeme/api")
 local Background = require("lexeme/background")
+local Network = require("lexeme/network")
 local Outbox = require("lexeme/outbox")
 local Reading = require("lexeme/reading")
 local Sent = require("lexeme/sent")
@@ -93,8 +94,9 @@ local function changedSince(snapshot, since)
     }
 end
 
+-- DNS can answer from the router before the Kindle routes anything past it.
 local function isOnline()
-    return Background.await(function() return NetworkMgr:isOnline() end)
+    return Network.hasRoute() and Background.await(function() return NetworkMgr:isOnline() end)
 end
 
 local OFFLINE = "No internet connection."

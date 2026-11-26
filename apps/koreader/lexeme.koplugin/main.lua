@@ -94,11 +94,13 @@ function Lexeme:onCloseDocument()
 end
 
 function Lexeme:onSuspend()
+    require("lexeme/network").beforeSleep()
     require("lexeme/timer").pause()
     require("lexeme/sync").beforeSleep()
 end
 
 function Lexeme:onResume()
+    require("lexeme/network").afterWake()
     require("lexeme/timer").resume()
     require("lexeme/sync").afterWake()
 end

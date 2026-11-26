@@ -1,4 +1,5 @@
 -- Home and Library: the screens shown instead of KOReader's file browser.
+local GestureRange = require("ui/gesturerange")
 local UIManager = require("ui/uimanager")
 
 local Books = require("lexeme/books")
@@ -39,6 +40,11 @@ function Shell:init()
     self.sort = G_reader_settings:readSetting("lexeme_library_sort") or "recent"
     self.descending = G_reader_settings:nilOrTrue("lexeme_library_descending")
     self.layout = G_reader_settings:readSetting("lexeme_library_layout") or "grid"
+    -- Dragging the scrollbar: a finger that moves at once makes a pan, one that rests first a hold.
+    for name, ges in pairs({ LexemePan = "pan", LexemePanRelease = "pan_release",
+            LexemeHoldPan = "hold_pan", LexemeHoldRelease = "hold_release" }) do
+        self.ges_events[name] = { GestureRange:new{ ges = ges, range = self.dimen } }
+    end
     self:reload()
     if self.tab == "lexeme" then UIManager:nextTick(function() self:refreshDecks() end) end
 end
@@ -182,6 +188,7 @@ function Shell:onCloseWidget()
 end
 
 function Shell:render(bb, x, y, w, h)
+    self.scrollbar = nil
     Status.paint(self, bb, x, y, w, function() self:openQuick() end)
     self:paintSearchRow(bb, x, y, w)
     local tab = self:currentTab()
@@ -418,10 +425,74 @@ function Shell:paintScrollbar(bb, right, top, bottom, pages)
     local thumb_h = math.max(D.s(40), math.floor(span / pages))
     local thumb_y = track_top + math.floor((span - thumb_h) * (self.page - 1) / math.max(1, pages - 1))
     D.roundRect(bb, track_x, thumb_y, D.s(10), thumb_h, D.BLACK, D.s(5))
+    if pages > 1 then
+        -- Between the arrows, a finger moves the thumb: dragged, or tapped where it should go.
+        self.scrollbar = { x = right - D.s(100), top = top + D.s(110), bottom = bottom - D.s(110),
+            track_top = track_top, travel = span - thumb_h, thumb_y = thumb_y, thumb_h = thumb_h, pages = pages }
+        self:hit(right - D.s(100), top + D.s(110), D.s(100), bottom - top - D.s(220), function()
+            self:scrollTo(self.last_tap.y, self:grabScrollbar(self.last_tap))
+        end)
+    end
     self:pressable(right - D.s(100), top, D.s(100), D.s(110), function() self:turnPage(-1, pages) end,
         D.around(right - D.s(57), top + D.s(52), D.s(101), D.s(101)))
     self:pressable(right - D.s(100), bottom - D.s(110), D.s(100), D.s(110), function() self:turnPage(1, pages) end,
         D.around(right - D.s(58), bottom - D.s(57), D.s(101), D.s(101)))
+end
+
+function Shell:onScrollbar(pos)
+    local bar = self.scrollbar
+    return bar ~= nil and pos.x >= bar.x and pos.y >= bar.top and pos.y < bar.bottom
+end
+
+-- How far below the thumb's top the finger holds it; a finger put down beside the thumb takes its middle.
+function Shell:grabScrollbar(pos)
+    local bar = self.scrollbar
+    if pos.y >= bar.thumb_y and pos.y < bar.thumb_y + bar.thumb_h then return pos.y - bar.thumb_y end
+    return math.floor(bar.thumb_h / 2)
+end
+
+-- Shows the page whose thumb sits where the finger, holding it `grab` below its top, is at `y`.
+function Shell:scrollTo(y, grab)
+    local bar = self.scrollbar
+    if not bar then return end
+    local page = 1 + math.floor((y - grab - bar.track_top) * (bar.pages - 1) / bar.travel + 0.5)
+    self:turnPage(math.max(1, math.min(bar.pages, page)) - self.page, bar.pages)
+end
+
+function Shell:onLexemePan(_, ges)
+    local start = ges.start_pos or ges.pos
+    if not self:onScrollbar(start) then
+        self.scroll_grab = nil
+        return
+    end
+    self.scroll_grab = self.scroll_grab or self:grabScrollbar(start)
+    self:scrollTo(ges.pos.y, self.scroll_grab)
+    return true
+end
+
+function Shell:onLexemePanRelease(_, ges)
+    if not self.scroll_grab then return end
+    self:scrollTo(ges.pos.y, self.scroll_grab)
+    self.scroll_grab = nil
+    return true
+end
+
+function Shell:onLexemeHold(arg, ges)
+    self.scroll_grab = nil
+    if not self:onScrollbar(ges.pos) then return View.onLexemeHold(self, arg, ges) end
+    self.scroll_grab = self:grabScrollbar(ges.pos)
+    self:scrollTo(ges.pos.y, self.scroll_grab)
+    return true
+end
+
+function Shell:onLexemeHoldPan(_, ges)
+    if not self.scroll_grab then return end
+    self:scrollTo(ges.pos.y, self.scroll_grab)
+    return true
+end
+
+function Shell:onLexemeHoldRelease(arg, ges)
+    return self:onLexemePanRelease(arg, ges)
 end
 
 function Shell:turnPage(delta, pages)
@@ -454,6 +525,12 @@ function Shell:scrollCarousel(direction, y)
 end
 
 function Shell:onSwipe(direction, ges)
+    -- A quick drag on the scrollbar ends as a swipe, starting where the finger went down.
+    if self:onScrollbar(ges.pos) then
+        self:scrollTo(ges.end_pos.y, self.scroll_grab or self:grabScrollbar(ges.pos))
+        self.scroll_grab = nil
+        return true
+    end
     if direction == "south" and ges.pos.y < D.s(200) then
         self:openQuick()
         return true
@@ -589,14 +666,7 @@ local function paintCarousel(self, bb, x, top, w, title, books, on_more)
     return cover_top + row_h + D.s(54)
 end
 
--- "1 h 20 min", "2 h", "45 min", as Lexeme writes reading time.
-local function readingTime(seconds)
-    local minutes = math.floor(seconds / 60 + 0.5)
-    local hours, rest = math.floor(minutes / 60), minutes % 60
-    if hours == 0 then return string.format("%d min", minutes) end
-    if rest == 0 then return string.format("%d h", hours) end
-    return string.format("%d h %d min", hours, rest)
-end
+local readingTime = Streak.readingTime
 
 local function count(n, one, many)
     return string.format("%d %s", n, n == 1 and one or many)
@@ -605,8 +675,20 @@ end
 -- The reading below the covers lines up with the first cover's left edge, the same in from the right.
 local HOME_MARGIN = 34
 
--- The gray the covers and tiles are edged with, and the grays days that met and fell short of the goal are filled with.
-local EDGE_GRAY, GOAL_DAY_GRAY, SHORT_DAY_GRAY = 102, 32, 192
+-- The gray the covers and tiles are edged with.
+local EDGE_GRAY = 102
+
+-- The reading calendar's grays: a day without reading, then darker the longer a day's reading.
+local NO_READING_GRAY = 208
+local HEAT = { { minutes = 60, gray = 16 }, { minutes = 30, gray = 64 }, { minutes = 15, gray = 112 },
+    { minutes = 0, gray = 160 } }
+
+local function heatGray(seconds)
+    if seconds <= 0 then return NO_READING_GRAY end
+    for _, level in ipairs(HEAT) do
+        if seconds >= level.minutes * 60 then return level.gray end
+    end
+end
 
 -- Where a tile's label and value sit, from its top-left corner.
 local TILE = { inset = 24, label = 52, value = 99, gap = 18, height = 128, per_row = 3, count = 6 }
@@ -664,12 +746,12 @@ end
 local function calendarLabelFace() return D.face("regular", 28) end
 local CALENDAR_LABEL_TO_GRID = 20
 
-local function calendarLabel(days, goal_minutes)
-    local goal, reached = goal_minutes * 60, 0
+local function calendarLabel(days)
+    local read = 0
     for _, day in ipairs(days) do
-        if day.seconds >= goal then reached = reached + 1 end
+        if day.seconds > 0 then read = read + 1 end
     end
-    return string.format("%s with %d+ min of reading", count(reached, "day", "days"), goal_minutes)
+    return count(read, "reading day", "reading days") .. " in the last year"
 end
 
 -- How tall the calendar is, from the top of its label's ink to the bottom of its days.
@@ -678,20 +760,34 @@ local function calendarHeight(x, w, label, days)
     return D.inkTop(face, label) + D.s(CALENDAR_LABEL_TO_GRID) + calendarGrid(x, w, days).height
 end
 
--- The last year of days, like Lexeme's streak calendar, under a label lined up with the tiles' text.
+-- "Less", the calendar's grays, "More", ending at `right` on the label's baseline.
+local function paintHeatLegend(bb, right, baseline, cell, gap)
+    local face = calendarLabelFace()
+    local grays = { NO_READING_GRAY }
+    for i = #HEAT, 1, -1 do table.insert(grays, HEAT[i].gray) end
+    local more_x = right - D.width(face, "More")
+    D.text(bb, more_x, baseline, face, "More")
+    local first_x = more_x - D.s(12) - #grays * (cell + gap) + gap
+    for i, gray in ipairs(grays) do
+        D.rect(bb, first_x + (i - 1) * (cell + gap), baseline - cell, cell, cell, D.gray(gray))
+    end
+    D.textRight(bb, first_x - D.s(12), baseline, face, "Less")
+end
+
+-- The last year of days, shaded by how long each was read, under a label lined up with the tiles' text.
 -- `top` is where the label's ink starts.
-local function paintCalendar(bb, x, top, w, label, days, goal_minutes, sync_failed)
+local function paintCalendar(bb, x, top, w, label, days, sync_failed)
     local face = calendarLabelFace()
     local baseline = top + D.inkTop(face, label)
     local label_w = D.text(bb, x + D.s(HOME_MARGIN + TILE.inset), baseline, face, label)
     if sync_failed then paintSyncWarning(bb, x + D.s(HOME_MARGIN + TILE.inset) + label_w, baseline, D.s(32)) end
     local grid = calendarGrid(x, w, days)
+    paintHeatLegend(bb, x + w - D.s(HOME_MARGIN), baseline, grid.cell, grid.pitch - grid.cell)
     local grid_top = baseline + D.s(CALENDAR_LABEL_TO_GRID)
-    local goal = goal_minutes * 60
     for i, day in ipairs(days) do
         local slot = grid.lead + i - 1
         D.rect(bb, grid.columnX(math.floor(slot / 7)), grid_top + (slot % 7) * grid.pitch, grid.cell, grid.cell,
-            day.seconds >= goal and D.gray(GOAL_DAY_GRAY) or D.gray(SHORT_DAY_GRAY))
+            D.gray(heatGray(day.seconds)))
     end
 end
 
@@ -704,21 +800,23 @@ function Shell:paintHome(bb, x, y, w, h)
     end
     local bottom = paintCarousel(self, bb, x, y + D.s(243), w, "From Your Library", recent,
         function() self:setTab("library") end)
-    local connected = Sync.isConnected()
-    local reading = connected and G_reader_settings:nilOrTrue("lexeme_home_stats") and Streak.summary()
-    local sync_failed = Sync.lastFailure() ~= nil
+    local reading = G_reader_settings:nilOrTrue("lexeme_home_stats") and Streak.localSummary()
+    local sync_failed = Sync.isConnected() and Sync.lastFailure() ~= nil
     self.shows_sync_warning = sync_failed
     if reading then
         -- The badges, tiles, calendar and the cover of the book being read (standing over the tab
         -- bar) are spaced evenly.
         local space_top, space_bottom = bottom, y + h - D.s(111) - D.s(42 + 2)
-        local label = calendarLabel(reading.days, reading.goal_minutes)
-        local height = TILE.rows_height() + calendarHeight(x, w, label, reading.days)
-        local gap = math.max(D.s(40), math.floor((space_bottom - space_top - height) / 3))
-        local tiles_bottom = paintTiles(bb, x, space_top + gap, w, reading, sync_failed)
-        return paintCalendar(bb, x, tiles_bottom + gap, w, label, reading.days, reading.goal_minutes, sync_failed)
+        local label = calendarLabel(reading.days)
+        local calendar_h = calendarHeight(x, w, label, reading.days)
+        local gap = math.max(D.s(40), math.floor((space_bottom - space_top - TILE.rows_height() - calendar_h) / 3))
+        local tiles_top = space_top + gap
+        local tiles_bottom = paintTiles(bb, x, tiles_top, w, reading, sync_failed)
+        paintCalendar(bb, x, tiles_bottom + gap, w, label, reading.days, sync_failed)
+        self:hit(x, tiles_top, w, tiles_bottom + gap + calendar_h - tiles_top,
+            function() require("lexeme/stats_screen").open() end)
+        return
     end
-    if not connected and not G_reader_settings:nilOrTrue("lexeme_home_recently_added") then return end
     -- The next heading's baseline sits 94 px under the badges, as on the Kindle.
     local next_top = bottom + D.s(94 - 58)
     paintCarousel(self, bb, x, next_top, w, "Recently Added", Books.query(self.all, nil, "added", true), nil)

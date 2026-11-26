@@ -90,6 +90,19 @@ end
 function GoTo:askPage()
     self:close()
     local ui = self.ui
+    local Locations = require("lexeme/locations")
+    local _, locations = Locations.current(ui)
+    if locations then
+        UIManager:show(NumberEntry:new{
+            title = "Go to location",
+            intro = string.format("Enter a location (from 1 to %d).", locations),
+            legend = "Location",
+            ok_text = "Go",
+            max = locations,
+            on_ok = function(location) Locations.goTo(ui, location) end,
+        }, "ui")
+        return
+    end
     local count = Progress.pageCount(ui)
     UIManager:show(NumberEntry:new{
         title = "Go to page",

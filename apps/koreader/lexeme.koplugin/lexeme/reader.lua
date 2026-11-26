@@ -39,6 +39,7 @@ function Reader.install(ui)
     footer.reclaim_height = true
     ui:unRegisterTouchZones({ { id = "readerfooter_tap" }, { id = "readerfooter_hold" } })
     ui.view:registerViewModule("lexeme_footer", Footer:new{ ui = ui })
+    Footer.registerTap(ui)
     -- The Kindle never marks the corner while it relays out a book.
     ui.view.flipping.paintTo = function() end
 
@@ -183,6 +184,8 @@ function Reader.onReaderReady(ui)
     UIManager:nextTick(function()
         if ui.document then ui.document:enablePartialRerendering(false) end
     end)
+    require("lexeme/locations").setup(ui)
+    require("lexeme/amazon_import").apply(ui)
 end
 
 return Reader

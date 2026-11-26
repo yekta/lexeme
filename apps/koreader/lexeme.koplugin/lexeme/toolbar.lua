@@ -91,6 +91,24 @@ function Toolbar:openMore(right)
     Menu:new{ items = items, right = right - D.s(37), top = D.s(223) }:show()
 end
 
+-- The progress under the chapter title follows the reading progress chosen under the page (a tap
+-- on it there cycles it): Location or Page with the time left in the chapter, or a time on its own.
+local function progressLine(ui)
+    local mode = require("lexeme/footer").mode()
+    local percent = Progress.percent(ui) .. "%"
+    local chapter = Progress.chapterTimeLeft(ui) .. " left in chapter"
+    if mode == "chapter_time" then return chapter .. " | " .. percent end
+    if mode == "book_time" then return Progress.bookTimeLeft(ui) .. " left in book | " .. percent end
+    local location, locations = require("lexeme/locations").current(ui)
+    local where
+    if mode == "page" or not location then
+        where = string.format("Page %s of %s", Progress.pageLabel(ui), Progress.pageCountLabel(ui))
+    else
+        where = string.format("Location %d of %d", location, locations or location)
+    end
+    return where .. " | " .. chapter .. " | " .. percent
+end
+
 function Toolbar:paintBottom(bb, x, y, w)
     local ui = self.ui
     D.rect(bb, x, y, w, D.s(BOTTOM_HEIGHT), D.WHITE)
@@ -99,9 +117,8 @@ function Toolbar:paintBottom(bb, x, y, w)
     D.textCenter(bb, x + w / 2, y + D.s(1526 - 1473), D.face("regular", 36), Progress.chapter(ui), D.BLACK,
         w - D.s(260))
     local page, count = Progress.page(ui), Progress.pageCount(ui)
-    local info = string.format("Page %s of %s | %s left in chapter | %d%%",
-        Progress.pageLabel(ui), Progress.pageCountLabel(ui), Progress.chapterTimeLeft(ui), Progress.percent(ui))
-    D.textCenter(bb, x + w / 2, y + D.s(1573 - 1473), D.face("regular", 32), info, D.BLACK, w - D.s(260))
+    D.textCenter(bb, x + w / 2, y + D.s(1573 - 1473), D.face("regular", 32), progressLine(ui), D.BLACK,
+        w - D.s(260))
 
     local prev_chapter = ui.toc:getPreviousChapter(page)
     local next_chapter = ui.toc:getNextChapter(page)

@@ -178,10 +178,11 @@ end
 
 -- Queues everything; returns the counts.
 function Import.queue()
+    local Sync = require("lexeme/sync")
     local books = amazonBooks()
     local used = {}
     local words = lookups(books, used)
-    local highlights = clippings(books, used)
+    local highlights = Sync.sendsHighlights() and clippings(books, used) or {}
     local book_rows = {}
     for cde, book in pairs(books) do
         if book.opened or used[cde] then
@@ -189,7 +190,7 @@ function Import.queue()
             table.insert(book_rows, book)
         end
     end
-    require("lexeme/sync").queueReading{ books = book_rows, highlights = highlights, lookups = words }
+    Sync.queueReading{ books = book_rows, highlights = highlights, lookups = words }
     G_reader_settings:saveSetting("lexeme_kindle_imported_at", os.time())
     return { books = #book_rows, highlights = #highlights, lookups = #words }
 end

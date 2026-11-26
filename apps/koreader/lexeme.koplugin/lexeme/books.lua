@@ -9,6 +9,8 @@ local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 
+local AmazonLibrary = require("lexeme/amazon_library")
+
 local Books = {}
 
 -- What the library calls each file type it lists.
@@ -59,6 +61,18 @@ local function describe(path, file, mtime, read_times, manager)
     book.percent = info.percent_finished
     book.status = info.been_opened and (info.status or "reading") or "new"
     book.last_read = read_times[path] or 0
+    -- What the Kindle's own reader did with the book: its progress until KOReader opens the
+    -- book, and its last open for the "recent" order.
+    local amazon = AmazonLibrary.forPath(path)
+    if amazon then
+        book.last_read = math.max(book.last_read, amazon.last_access)
+        if not info.been_opened and (amazon.percent > 0 or amazon.read) then
+            book.percent = amazon.percent
+            book.status = amazon.read and "complete" or "reading"
+        end
+        -- A converted copy isn't a new book: it takes the original's place in "recent".
+        if path:find("/Converted/", 1, true) then book.recent = book.last_read end
+    end
     return book
 end
 
@@ -100,7 +114,8 @@ end
 -- Each sort in ascending order: oldest, A to Z.
 local SORTS = {
     recent = function(a, b)
-        local ta, tb = math.max(a.last_read, a.added), math.max(b.last_read, b.added)
+        local ta = a.recent or math.max(a.last_read, a.added)
+        local tb = b.recent or math.max(b.last_read, b.added)
         if ta ~= tb then return ta < tb end
         return a.title > b.title
     end,

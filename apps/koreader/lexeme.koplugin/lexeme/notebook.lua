@@ -44,6 +44,8 @@ function Notebook:items()
 end
 
 function Notebook:pageLabel(item)
+    local location = self.ui.rolling and require("lexeme/locations").at(self.ui, item.page)
+    if location then return "Location " .. location end
     return "Page " .. self.ui.bookmark:getBookmarkPageString(item.page)
 end
 

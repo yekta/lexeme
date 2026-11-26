@@ -2,6 +2,7 @@
 What a long-press on text shows: the selection toolbar above the selection
 and, for a single word, the dictionary sheet at the bottom.
 ]]
+local Event = require("ui/event")
 local Geom = require("ui/geometry")
 local GestureRange = require("ui/gesturerange")
 local HtmlBoxWidget = require("ui/widget/htmlboxwidget")
@@ -15,6 +16,7 @@ local Definition = require("lexeme/definition")
 local Headwords = require("lexeme/headwords")
 local Menu = require("lexeme/menu")
 local Toast = require("lexeme/toast")
+local Translation = require("lexeme/translation")
 local View = require("lexeme/view")
 local Words = require("lexeme/words")
 
@@ -35,6 +37,9 @@ local Selection = View:extend{
 local SHEET_TOP, SHEET_H, TOP_SHIFT = 938, 758, 1042
 local TAB_X = { 27, 227, 413, 589 }
 local POPUP_W, POPUP_H, POPUP_GAP = 525, 93, 33
+-- Without the Add to Lexeme button (Settings > Dictionaries > Show Add to Lexeme).
+local SHORT_POPUP_W, ADD_W = 435, 90
+local DICTIONARY, TRANSLATE = 1, 3
 
 local CSS = [[
 @page { margin: 0; font-family: 'Noto Sans'; }
@@ -50,8 +55,12 @@ function Selection:init()
     View.init(self)
     self.covers_fullscreen = false
     self.entry = Words.fromSelection(self.ui)
+    -- Kept apart from the highlight's selection, which a cancelled lookup clears.
+    local selected = self.ui.highlight.selected_text
+    self.text = selected and selected.text and util.cleanupSelectedText(selected.text) or nil
     self.index = 1
     self.page = 1
+    self.tab = DICTIONARY
     local full = Geom:new{ x = 0, y = 0, w = Screen:getWidth(), h = Screen:getHeight() }
     self.ges_events.LexemePan = { GestureRange:new{ ges = "pan", range = full } }
     self.ges_events.LexemePanRelease = { GestureRange:new{ ges = "pan_release", range = full } }
@@ -65,6 +74,7 @@ function Selection:stopSearching()
     local cancel = self.dismiss_callback
     self.dismiss_callback = nil
     if cancel then cancel() end
+    self:stopTranslating()
 end
 
 function Selection:close(refresh)
@@ -98,7 +108,7 @@ function Selection:render(bb, x, y, w, h)
     self:hit(x, y, w, h, function() self:close() end)
     -- While a handle is dragged, the Kindle shows only the marks.
     if self.dragging then return end
-    if self.results or self.searching then self:paintSheet(bb, x, w) end
+    if self:hasSheet() then self:paintSheet(bb, x, w) end
     self:paintPopup(bb, w)
 end
 
@@ -106,8 +116,16 @@ end
 
 -- Centred on the selection, above it while the dictionary takes the bottom of the screen and
 -- below it otherwise, as on a Kindle; on the other side when it doesn't fit.
+local function showsAddButton()
+    return G_reader_settings:isTrue("lexeme_dictionary_add_button")
+end
+
+local function popupWidth()
+    return D.s(showsAddButton() and POPUP_W or SHORT_POPUP_W)
+end
+
 function Selection:popupPosition(screen_w)
-    local w, h, gap = D.s(POPUP_W), D.s(POPUP_H), D.s(POPUP_GAP)
+    local w, h, gap = popupWidth(), D.s(POPUP_H), D.s(POPUP_GAP)
     local boxes = self.boxes or {}
     if #boxes == 0 then return math.floor((screen_w - w) / 2), D.s(400) end
     local left, right, top, bottom = math.huge, -math.huge, math.huge, -math.huge
@@ -118,7 +136,7 @@ function Selection:popupPosition(screen_w)
     local px = math.floor((left + right - w) / 2)
     px = math.max(D.s(20), math.min(screen_w - w - D.s(20), px))
     local floor, limit = 0, Screen:getHeight()
-    local sheet = self.results or self.searching
+    local sheet = self:hasSheet()
     if sheet then
         local sheet_top, sheet_bottom = self:sheetSpan()
         if sheet_top == 0 then floor = sheet_bottom else limit = sheet_top end
@@ -133,11 +151,13 @@ end
 
 function Selection:paintPopup(bb, screen_w)
     local px, py = self:popupPosition(screen_w)
-    local w, h = D.s(POPUP_W), D.s(POPUP_H)
+    local w, h = popupWidth(), D.s(POPUP_H)
+    local add = showsAddButton()
     self:hit(px, py, w, h, function() end)
     -- A highlight already: the A sits on black, and tapping it removes the highlight.
     local highlighted = self.highlight_index ~= nil
-    D.icon(bb, highlighted and "selection-toolbar-highlighted" or "selection-toolbar", px, py, w, h)
+    local frame = add and "selection-toolbar" or "selection-toolbar-short"
+    D.icon(bb, highlighted and frame .. "-highlighted" or frame, px, py, w, h)
     if highlighted then D.rect(bb, px + D.s(26), py + D.s(26), D.s(43), D.s(43), D.WHITE) end
     D.rect(bb, px + D.s(30), py + D.s(30), D.s(35), D.s(35), D.gray(221))
     D.textCenter(bb, px + D.s(47), py + D.s(59), D.face("medium", 34), "A")
@@ -146,27 +166,51 @@ function Selection:paintPopup(bb, screen_w)
     D.icon(bb, "kindle-note", px + D.s(115), py + D.s(29), D.s(37), D.s(37))
     self:pressable(px + D.s(92), py, D.s(86), h, function() self:note() end)
 
-    local lookup_enabled = self.results == nil and not self.searching
+    -- Look up opens the sheet on Translate; the Dictionary tab is a tap away.
+    local lookup_enabled = not self:hasSheet()
     D.text(bb, px + D.s(206), py + D.s(58), D.face("regular", 32), "Look up",
         lookup_enabled and D.BLACK or D.gray(119))
     if lookup_enabled then
-        self:pressable(px + D.s(178), py, D.s(170), h, function()
-            self:closeKeepingSelection()
-            self.ui.highlight:lookupDict()
-        end)
+        self:pressable(px + D.s(178), py, D.s(170), h, function() self:showTab(TRANSLATE) end)
     end
 
-    D.icon(bb, "book-plus", px + D.s(376), py + D.s(30), D.s(34), D.s(34))
-    self:pressable(px + D.s(348), py, D.s(90), h, function() self:addToLexeme() end)
+    local more_x = 438
+    if add then
+        D.icon(bb, "book-plus", px + D.s(376), py + D.s(30), D.s(34), D.s(34))
+        self:pressable(px + D.s(348), py, D.s(ADD_W), h, function() self:addToLexeme() end)
+    else
+        more_x = more_x - ADD_W
+    end
 
-    D.icon(bb, "ellipsis-vertical", px + D.s(458), py + D.s(25), D.s(45), D.s(45))
-    self:pressable(px + D.s(438), py, w - D.s(438), h, function() self:openMore(px + w, py + h + D.s(8)) end)
+    D.icon(bb, "ellipsis-vertical", px + D.s(more_x + 20), py + D.s(25), D.s(45), D.s(45))
+    self:pressable(px + D.s(more_x), py, w - D.s(more_x), h, function() self:openMore(px + w, py + h + D.s(8)) end)
 end
 
 function Selection:closeKeepingSelection()
     if self.html then self.html:free() end
     View.close(self)
     self:stopSearching()
+end
+
+-- The selected text, or the word looked up.
+function Selection:selectedText()
+    local selected = self.ui.highlight.selected_text
+    local text = selected and selected.text and util.cleanupSelectedText(selected.text)
+    if text and text ~= "" then return text end
+    if self.text and self.text ~= "" then return self.text end
+    return self.word
+end
+
+function Selection:lookupWikipedia()
+    local text = self:selectedText()
+    self:closeKeepingSelection()
+    if text then self.ui:handleEvent(Event:new("LookupWikipedia", text)) end
+end
+
+function Selection:searchInBook()
+    local text = self:selectedText()
+    self:closeKeepingSelection()
+    if text then self.ui.search:searchText(text) end
 end
 
 --[[
@@ -250,9 +294,9 @@ function Selection:openMore(right, top)
                 self:close()
             end,
         },
-        { text = "Translate", callback = function() self:closeKeepingSelection() hl:translate() end },
-        { text = "Wikipedia", callback = function() self:closeKeepingSelection() hl:lookupWikipedia() end },
-        { text = "Search in book", callback = function() self:closeKeepingSelection() hl:onHighlightSearch() end },
+        { text = "Translate", callback = function() self:showTab(TRANSLATE) end },
+        { text = "Wikipedia", callback = function() self:lookupWikipedia() end },
+        { text = "Search in book", callback = function() self:searchInBook() end },
     }
     Menu:new{ items = items, right = math.min(right, Screen:getWidth() - D.s(20)), top = top }:show()
 end
@@ -285,23 +329,29 @@ function Selection:paintSheet(bb, x, w)
     D.icon(bb, "sheet-handle", x + math.floor((w - D.s(111)) / 2) + D.s(1), handle_y, D.s(111), D.s(7))
 
     for i, label in ipairs(TABS) do
-        local active = i == 1
+        local active = i == self.tab
         local tx = x + D.s(TAB_X[i])
         local tw = D.text(bb, tx, block + D.s(172), D.face(active and "bold" or "regular", 32), label)
-        if not active then
+        if active then
+            -- The underline sits under the active tab.
+            local ux, uw = tx - D.s(15), tw + D.s(30)
+            if i == 1 then ux, uw = x + D.s(5), D.s(200) end
+            D.rect(bb, ux, block + D.s(210), uw, D.s(9))
+        else
             self:pressable(tx - D.s(20), block + D.s(122), tw + D.s(40), D.s(90), function()
-                local hl = self.ui.highlight
-                self:closeKeepingSelection()
-                if label == "Wikipedia" then hl:lookupWikipedia()
-                elseif label == "Translate" then hl:translate()
-                else hl:onHighlightSearch() end
+                if label == "Wikipedia" then self:lookupWikipedia()
+                elseif label == "Search" then self:searchInBook()
+                else self:showTab(i) end
             end, { x = tx - D.s(15), w = tw + D.s(30) })
         end
     end
-    D.rect(bb, x + D.s(5), block + D.s(210), D.s(200), D.s(9))
     D.rect(bb, x + D.s(5), block + D.s(219), w - D.s(11), D.s(4))
 
     local content_top, content_h, content_w = block + D.s(257), D.s(350), D.s(1096)
+    if self.tab == TRANSLATE then
+        return self:paintTranslation(bb, x, w, block, content_top, content_w, content_h, at_top)
+    end
+    self.shown_html, self.page_count = nil, nil
     if self.searching then
         D.text(bb, x + D.s(40), content_top + D.s(36), D.face("regular", 32), "Searching Dictionary…")
     elseif #self.results == 0 then
@@ -311,14 +361,18 @@ function Selection:paintSheet(bb, x, w)
         local html = self:htmlWidget(content_w, content_h)
         html:setPageNumber(self.page)
         html:paintTo(bb, x + D.s(40), content_top)
+        self.shown_html, self.page_count = html, html.page_count
         self:paintScroll(bb, x + D.s(1192), block, html.page_count)
     end
 
     local footer = block + D.s(702)
     local link_face = D.face("regular", 30)
-    Button.paint(self, bb, x + D.s(40), footer - D.s(55),
-        { label = "Add to Lexeme", size = 30, baseline = 55, pad = 72, h = 86, border = 2 },
-        function() self:addToLexeme() end)
+    -- Settings > Dictionaries > Show Add to Lexeme; off unless turned on.
+    if showsAddButton() then
+        Button.paint(self, bb, x + D.s(40), footer - D.s(55),
+            { label = "Add to Lexeme", size = 30, baseline = 55, pad = 72, h = 86, border = 2 },
+            function() self:addToLexeme() end)
+    end
     if self.searching then
         D.icon(bb, "ellipsis-vertical-gray", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
         return
@@ -330,6 +384,159 @@ function Selection:paintSheet(bb, x, w)
     self:pressable(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
         self:openDictionaryMenu(x + w - D.s(7), footer, at_top)
     end, D.around(x + D.s(1224), footer - D.s(8), D.s(86), D.s(86)))
+end
+
+-- Translate tab ------------------------------------------------------------------
+
+function Selection:hasSheet()
+    return self.results ~= nil or self.searching or self.tab == TRANSLATE
+end
+
+function Selection:showTab(i)
+    if i ~= TRANSLATE and not self.results and not self.searching then
+        -- Nothing looked up yet: the Dictionary tab looks the selection up.
+        local text = self:selectedText()
+        local boxes = self.boxes
+        self:closeKeepingSelection()
+        if self.ui.highlight.selected_text then
+            self.ui.highlight:lookupDict()
+        elseif text then
+            self.ui.dictionary:onLookupWord(text, false, boxes)
+        end
+        return
+    end
+    self.tab = i
+    self.page = 1
+    if i == TRANSLATE and not self.translation and not self.translating then self:translate() end
+    UIManager:setDirty(self.ui.dialog, "ui")
+    self:refresh()
+end
+
+function Selection:stopTranslating()
+    local trap = self.translation_trap
+    self.translation_trap = nil
+    self.translating = false
+    if trap and trap.dismiss_callback then trap.dismiss_callback() end
+end
+
+function Selection:resetTranslation()
+    self:stopTranslating()
+    self.translation, self.translation_error, self.translation_pages = nil, nil, nil
+    self.tab = DICTIONARY
+end
+
+-- Asks the translation service in a subprocess, so the sheet stays responsive; closing the
+-- sheet cancels it.
+function Selection:translate()
+    local text = self:selectedText()
+    self.translation, self.translation_error = nil, nil
+    if not text or text == "" then
+        self.translation_error = "failed"
+        return
+    end
+    local NetworkMgr = require("ui/network/manager")
+    local rerun = function()
+        if self.closed or self.tab ~= TRANSLATE then return end
+        self:translate()
+        self:refresh()
+    end
+    if NetworkMgr:willRerunWhenOnline(rerun) then
+        self.translation_error = "offline"
+        return
+    end
+    local source, target = Translation.languages()
+    self.translation_source, self.translation_target = source, target
+    self.translating = true
+    local trap = {}
+    self.translation_trap = trap
+    local Trapper = require("ui/trapper")
+    Trapper:wrap(function()
+        local completed, result = Trapper:dismissableRunInSubprocess(function()
+            return Translation.fetch(text, source, target)
+        end, trap)
+        trap.dismiss_callback = nil
+        if self.translation_trap ~= trap or self.closed then return end
+        self.translation_trap = nil
+        self.translating = false
+        if not completed then return end
+        if type(result) == "table" and not result.error then
+            self.translation = result
+        else
+            self.translation_error = type(result) == "table" and result.error or "failed"
+        end
+        self.translation_pages = nil
+        self:refresh()
+    end)
+end
+
+function Selection:translationPages(w, h)
+    if not self.translation_pages then
+        local paragraphs = Translation.paragraphs(self.translation, self.translation_source, self.translation_target)
+        self.translation_pages = Translation.pages(paragraphs, w, h)
+    end
+    return self.translation_pages
+end
+
+local TRANSLATION_MESSAGES = {
+    offline = "Translation needs a Wi-Fi connection.",
+    failed = "Translation isn't available right now. Try again later.",
+}
+
+function Selection:paintTranslation(bb, x, w, block, content_top, content_w, content_h, at_top)
+    local face = D.face("regular", 32)
+    self.shown_html, self.page_count = nil, nil
+    if self.translating then
+        D.text(bb, x + D.s(40), content_top + D.s(36), face, "Translating…")
+    elseif not self.translation then
+        D.text(bb, x + D.s(40), content_top + D.s(36), face,
+            TRANSLATION_MESSAGES[self.translation_error] or TRANSLATION_MESSAGES.failed, D.BLACK, content_w)
+    else
+        local pages = self:translationPages(content_w, content_h)
+        self.page = math.min(self.page, #pages)
+        local left = x + D.s(40)
+        for _, line in ipairs(pages[self.page]) do
+            local top = content_top + line.y
+            if line.rule then
+                D.rect(bb, left, top + D.s(6), content_w, D.s(2), D.gray(153))
+            else
+                local baseline = top + math.floor(line.h * 0.75)
+                for _, word in ipairs(line.words) do
+                    if word.style ~= "hidden" then
+                        D.text(bb, left + word.x, baseline, word.face, word.text,
+                            word.style == "gray" and D.gray(85) or D.BLACK)
+                    end
+                end
+            end
+        end
+        self.page_count = #pages
+        self:paintScroll(bb, x + D.s(1192), block, #pages)
+    end
+
+    local footer = block + D.s(702)
+    D.textRight(bb, x + D.s(1183), footer, D.face("regular", 30), "Google Translate", D.BLACK)
+    D.icon(bb, "ellipsis-vertical", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
+    self:pressable(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
+        self:openTranslationMenu(x + w - D.s(7), footer, at_top)
+    end, D.around(x + D.s(1224), footer - D.s(8), D.s(86), D.s(86)))
+end
+
+function Selection:openTranslationMenu(right, footer, below)
+    local current = self.translation_target or Translation.languages()
+    local items = {}
+    for _, lang in ipairs(Translation.TARGETS) do
+        if lang ~= current then
+            table.insert(items, { text = "Translate into " .. Translation.languageName(lang), callback = function()
+                G_reader_settings:saveSetting("translator_to_language", lang)
+                self:resetTranslation()
+                self:showTab(TRANSLATE)
+            end })
+        end
+    end
+    if below then
+        Menu:new{ items = items, right = right, top = footer + D.s(34) }:show()
+    else
+        Menu:new{ items = items, right = right, bottom = footer - D.s(60) }:show()
+    end
 end
 
 -- The arrows and the Kindle's hatched scrollbar beside the definition.
@@ -356,11 +563,11 @@ function Selection:paintScroll(bb, left, block, pages)
 end
 
 function Selection:turn(delta)
-    if not self.html then return end
-    local page = math.max(1, math.min(self.html.page_count, self.page + delta))
+    if not self.page_count then return end
+    local page = math.max(1, math.min(self.page_count, self.page + delta))
     if page == self.page then return end
     self.page = page
-    self.html:freeBb()
+    if self.shown_html then self.shown_html:freeBb() end
     self:refresh()
 end
 
@@ -410,6 +617,13 @@ function Selection:endDrag()
     local selected = self.ui.highlight.selected_text
     if not (selected and selected.text) then return end
     local text = util.cleanupSelectedText(selected.text)
+    -- On the Translate tab the new selection is translated in its place.
+    if self.tab == TRANSLATE and text ~= "" then
+        self.text = text
+        self:resetTranslation()
+        self:showTab(TRANSLATE)
+        return
+    end
     if text ~= "" and not text:find("%s") then
         self:closeKeepingSelection()
         self.ui.highlight:lookupDict()
@@ -419,6 +633,8 @@ function Selection:endDrag()
     self.html = nil
     self.results = nil
     self.word = nil
+    self.text = text
+    self:resetTranslation()
     self.entry = Words.fromSelection(self.ui)
     self:refresh()
 end
@@ -466,7 +682,7 @@ function Selection:onSwipe(direction, ges)
         return true
     end
     local sheet_top, sheet_bottom = self:sheetSpan()
-    if not self.results or ges.pos.y < sheet_top or ges.pos.y > sheet_bottom then return end
+    if not self:hasSheet() or ges.pos.y < sheet_top or ges.pos.y > sheet_bottom then return end
     if direction == "north" then self:turn(1) elseif direction == "south" then self:turn(-1) end
     return true
 end

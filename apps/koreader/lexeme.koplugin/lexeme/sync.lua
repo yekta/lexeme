@@ -51,12 +51,34 @@ function Sync.lastSyncedAt()
     return G_reader_settings:readSetting("lexeme_synced_at")
 end
 
+-- Off until turned on in Settings: highlights, notes, bookmarks and book reviews stay on this Kindle.
+function Sync.sendsHighlights()
+    return G_reader_settings:isTrue("lexeme_sync_highlights")
+end
+
+local function withoutHighlights(snapshot)
+    if Sync.sendsHighlights() then return snapshot end
+    local stripped = {}
+    for kind, rows in pairs(snapshot) do stripped[kind] = rows end
+    stripped.books = {}
+    for i, book in ipairs(snapshot.books or {}) do
+        local copy = {}
+        for field, value in pairs(book) do copy[field] = value end
+        copy.review = nil
+        stripped.books[i] = copy
+    end
+    stripped.highlights = {}
+    stripped.removed_highlight_ids = {}
+    return stripped
+end
+
 --[[
 Queues `snapshot` as sync-reading bodies of at most CHUNK rows of one kind,
 books first. Each body carries only its own kind: an empty Lua table would be
 sent as a JSON object, which the server refuses.
 ]]
 function Sync.queueReading(snapshot)
+    snapshot = withoutHighlights(snapshot)
     local queued = false
     for _, kind in ipairs(KINDS) do
         local rows = snapshot[kind] or {}

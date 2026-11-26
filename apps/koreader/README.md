@@ -25,7 +25,7 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
 - `python3 scripts/kindle.py shot out.png` saves a framebuffer screenshot.
 - `python3 scripts/kindle.py tap X Y` / `hold X Y` / `swipe X1 Y1 X2 Y2`
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a
-  Paperwhite).
+  Paperwhite 12, 1236 × 1648 on a Paperwhite 5).
 
 ### Text rendering
 
@@ -34,13 +34,17 @@ Amazon's reader draws text with the Kindle's own FreeType
 rasterizer. `deploy.sh` copies that library into KOReader, so book text comes
 out pixel for pixel as on Amazon's reader. iType pads glyph rows, which stock
 crengine doesn't handle, and reports glyph widths differently from FreeType's
-own drivers, which breaks MuPDF's layout of dictionary entries. `patches/`
-fixes both and `scripts/build-engine.sh` builds crengine and MuPDF for the
-KOReader version on the Kindle with Docker (it needs to run `linux/amd64`
-images; on Apple silicon use a Rosetta VM, e.g.
-`colima start --vm-type vz --vz-rosetta`). `deploy.sh` installs them and the
-FreeType only when that build matches the Kindle's KOReader. A KOReader
-update replaces them; build again for the new version.
+own drivers, which breaks MuPDF's layout of dictionary entries. Some Kindles'
+FreeType (a Paperwhite 5 on 5.19.2, FreeType 2.9) is also older than
+KOReader's. It lacks `FT_Error_String`, which crengine calls when logging an
+error, and `FT_Get_Transform`, which HarfBuzz calls when sizing glyphs of a
+transformed font, so neither would load at all. `patches/` fixes all four, and
+`scripts/build-engine.sh` builds crengine, MuPDF and HarfBuzz for the KOReader
+version on the Kindle with Docker (it needs to run `linux/amd64` images; on
+Apple silicon use a Rosetta VM, e.g. `colima start --vm-type vz --vz-rosetta`).
+`deploy.sh` installs them and the FreeType only when that build matches the
+Kindle's KOReader. A KOReader update replaces them; build again for the new
+version.
 
 ### Rules that keep the Kindle alive
 

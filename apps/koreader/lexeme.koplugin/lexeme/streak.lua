@@ -1,8 +1,7 @@
 --[[
-The reading Home shows, as Lexeme counts it across every reader: the last year of
-days, the streak, all the time read and the books finished. It's fetched when a sync
-has sent this Kindle's reading and kept on the device, so Home has it offline; what
-was read here since it was fetched is added on top.
+The reading Home shows: the last year of days, the streak, all the time read and the
+books finished. `summary` is Lexeme's count across every reader, fetched at each sync;
+`localSummary` and `hours` count this Kindle alone and need no account.
 ]]
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
@@ -132,6 +131,145 @@ function Streak.summary()
         -- Counted for the year it was fetched in; a new year starts at none.
         finished_this_year = saved.year == year and saved.finished_this_year or 0,
     }
+end
+
+-- "1 h 20 min", "2 h", "45 min", as Lexeme writes reading time.
+function Streak.readingTime(seconds)
+    local minutes = math.floor(seconds / 60 + 0.5)
+    local hours, rest = math.floor(minutes / 60), minutes % 60
+    if hours == 0 then return string.format("%d min", minutes) end
+    if rest == 0 then return string.format("%d h", hours) end
+    return string.format("%d h %d min", hours, rest)
+end
+
+-- Local stats ------------------------------------------------------------------
+-- KOReader's page visits plus, when it's there, the Amazon reader's history
+-- (lexeme_history.sqlite3, from scripts/amazon_history.py). A day counts once its reading
+-- passes MIN_DAY_SECONDS, all of it, so opening a book to try a font isn't a reading day.
+
+Streak.MIN_DAY_SECONDS = 5 * 60
+
+local SOURCES = {
+    { file = "statistics.sqlite3", table = "page_stat_data", start = "start_time", seconds = "duration" },
+    { file = "lexeme_history.sqlite3", table = "sessions", start = "started_at", seconds = "seconds" },
+}
+
+local function settingsFile(name)
+    return DataStorage:getSettingsDir() .. "/" .. name
+end
+
+local function columnsOf(path, sql)
+    if lfs.attributes(path, "mode") ~= "file" then return nil end
+    local conn = require("lua-ljsqlite3/init").open(path, "ro")
+    local ok, columns = pcall(conn.exec, conn, sql)
+    conn:close()
+    return ok and columns or nil
+end
+
+-- Seconds read on each day ("YYYY-MM-DD"), only the days that pass MIN_DAY_SECONDS.
+local function readingDays()
+    local days = {}
+    for _, source in ipairs(SOURCES) do
+        local columns = columnsOf(settingsFile(source.file), string.format(
+            "SELECT date(%s, 'unixepoch', 'localtime'), SUM(%s) FROM %s GROUP BY 1;",
+            source.start, source.seconds, source.table))
+        for i = 1, columns and #columns[1] or 0 do
+            local key = columns[1][i]
+            days[key] = (days[key] or 0) + (tonumber(columns[2][i]) or 0)
+        end
+    end
+    for key, seconds in pairs(days) do
+        if seconds < Streak.MIN_DAY_SECONDS then days[key] = nil end
+    end
+    return days
+end
+
+-- When each finished book was finished, in epoch seconds: from KOReader and from Amazon.
+local function finishedTimes()
+    local times = {}
+    for _, book in ipairs(require("lexeme/reading").books()) do
+        if book.status == "finished" and book.finished_at then
+            table.insert(times, math.floor(book.finished_at / 1000))
+        end
+    end
+    local columns = columnsOf(settingsFile("lexeme_history.sqlite3"),
+        "SELECT finished_at FROM books WHERE finished_at IS NOT NULL;")
+    for i = 1, columns and #columns[1] or 0 do table.insert(times, tonumber(columns[1][i])) end
+    return times
+end
+
+local cached
+
+-- Streak.summary's fields, counted on this Kindle; `streak` is the days read in a row up to today.
+function Streak.localSummary()
+    local now = os.time()
+    local stamp = table.concat({ dayKey(now, 0),
+        lfs.attributes(settingsFile("statistics.sqlite3"), "modification") or 0,
+        lfs.attributes(settingsFile("lexeme_history.sqlite3"), "modification") or 0 }, "/")
+    if cached and cached.stamp == stamp and now - cached.at < 60 then return cached.summary end
+    local read = readingDays()
+    local total = 0
+    for _, seconds in pairs(read) do total = total + seconds end
+    local today = noonOf(dayKey(now, 0))
+    local days = {}
+    for i = DAYS - 1, 0, -1 do
+        local key = os.date("%Y-%m-%d", today - i * 86400)
+        table.insert(days, { day = key, seconds = read[key] or 0 })
+    end
+    local week = 0
+    for i = #days - 6, #days do week = week + days[i].seconds end
+    local year, finished, finished_this_year = os.date("%Y", now), 0, 0
+    for _, at in ipairs(finishedTimes()) do
+        finished = finished + 1
+        if os.date("%Y", at) == year then finished_this_year = finished_this_year + 1 end
+    end
+    local summary = {
+        days = days,
+        today = days[#days].seconds,
+        week = week,
+        total = total,
+        streak = (streakOf(days, 1)),
+        finished = finished,
+        finished_this_year = finished_this_year,
+    }
+    cached = { stamp = stamp, at = now, summary = summary }
+    return summary
+end
+
+--[[
+Reading by hour of the day over the last `days` days, or all time when nil: `hours[1]`
+is midnight to 1 AM, in seconds; `total` and `days` are the time and the reading days in
+the range. A stretch running past the hour is split between the hours, and days that
+don't pass MIN_DAY_SECONDS are left out, as on Home.
+]]
+function Streak.hours(days)
+    local since = 0
+    if days then since = noonOf(dayKey(os.time(), 0)) - (days - 1) * 86400 - 12 * 3600 end
+    local read = readingDays()
+    local result = { hours = {}, total = 0, days = 0 }
+    for h = 1, 24 do result.hours[h] = 0 end
+    for key, seconds in pairs(read) do
+        if noonOf(key) >= since then
+            result.total = result.total + seconds
+            result.days = result.days + 1
+        end
+    end
+    for _, source in ipairs(SOURCES) do
+        local columns = columnsOf(settingsFile(source.file), string.format("SELECT %s, %s FROM %s WHERE %s >= %d;",
+            source.start, source.seconds, source.table, source.start, since))
+        for i = 1, columns and #columns[1] or 0 do
+            local at, left = tonumber(columns[1][i]), tonumber(columns[2][i]) or 0
+            if at and read[dayKey(at, 0)] then
+                while left > 0 do
+                    local t = os.date("*t", at)
+                    local part = math.min(left, 3600 - t.min * 60 - t.sec)
+                    result.hours[t.hour + 1] = result.hours[t.hour + 1] + part
+                    at, left = at + part, left - part
+                end
+            end
+        end
+    end
+    return result
 end
 
 return Streak

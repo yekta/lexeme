@@ -54,6 +54,7 @@ local Lexeme = WidgetContainer:extend{
 }
 
 function Lexeme:init()
+    require("lexeme/devrestart").watch()
     if self.ui.document then
         Reader.install(self.ui)
         return

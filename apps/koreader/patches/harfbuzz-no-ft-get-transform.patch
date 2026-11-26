@@ -1,0 +1,13 @@
+--- a/src/hb-ft.cc
++++ b/src/hb-ft.cc
+@@ -28,6 +28,10 @@
+  */
+ 
+ #include "hb.hh"
++
++/* FT_Get_Transform is missing from older FreeTypes, like a Paperwhite 5's (2.9). Without it, HarfBuzz
++ * takes the same path it takes when built against FreeType < 2.11. */
++#undef HAVE_FT_GET_TRANSFORM
+ 
+ #ifdef HAVE_FREETYPE
+ 

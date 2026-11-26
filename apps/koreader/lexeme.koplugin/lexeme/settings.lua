@@ -181,12 +181,11 @@ local function syncedLabel()
 end
 
 local function syncSubtitle()
-    local failure = require("lexeme/sync").lastFailure()
-    if not failure then
-        return "Send words, highlights and reading time to Lexeme. This also happens on its own whenever "
-            .. "Wi-Fi connects."
-    end
-    return "The last sync failed: " .. failure.detail
+    local Sync = require("lexeme/sync")
+    local failure = Sync.lastFailure()
+    if failure then return "The last sync failed: " .. failure.detail end
+    local what = Sync.sendsHighlights() and "words, highlights and reading time" or "words and reading time"
+    return "Send " .. what .. " to Lexeme. This also happens on its own whenever Wi-Fi connects."
 end
 
 function Settings:syncNow()
@@ -213,6 +212,19 @@ function Settings:connectLexeme()
     }:show()
 end
 
+function Settings:highlightsRow()
+    local Sync = require("lexeme/sync")
+    return {
+        title = "Sync highlights and notes",
+        subtitle = "Send highlights, notes, bookmarks and book reviews to Lexeme. When off, they stay on this Kindle.",
+        toggle = Sync.sendsHighlights(),
+        tap = function()
+            G_reader_settings:saveSetting("lexeme_sync_highlights", not Sync.sendsHighlights())
+            self:refresh()
+        end,
+    }
+end
+
 function Settings:lexemePage()
     local Sync = require("lexeme/sync")
     return {
@@ -231,6 +243,7 @@ function Settings:lexemePage()
                         subtitle = "Words you add while reading wait here until this Kindle is connected.",
                         value = tostring(#Words.pending()),
                     },
+                    self:highlightsRow(),
                 }
             end
             return {
@@ -251,10 +264,12 @@ function Settings:lexemePage()
                     title = "Words waiting to sync",
                     value = tostring(#Words.pending()),
                 },
+                self:highlightsRow(),
                 {
                     title = "Import Kindle history",
-                    subtitle = "Send the words you looked up, your highlights and the books you read in "
-                        .. "Amazon's reader.",
+                    subtitle = Sync.sendsHighlights()
+                        and "Send the words you looked up, your highlights and the books you read in Amazon's reader."
+                        or "Send the words you looked up and the books you read in Amazon's reader.",
                     tap = function() self:importHistory() end,
                     chevron = true,
                 },
@@ -315,8 +330,12 @@ function Settings:importHistory()
             Toast.show("Couldn't read the Kindle's history.")
             return
         end
-        Toast.show(string.format("Found %d words, %d highlights and %d books. Sending…",
-            result.lookups, result.highlights, result.books))
+        if require("lexeme/sync").sendsHighlights() then
+            Toast.show(string.format("Found %d words, %d highlights and %d books. Sending…",
+                result.lookups, result.highlights, result.books))
+        else
+            Toast.show(string.format("Found %d words and %d books. Sending…", result.lookups, result.books))
+        end
         self:syncNow()
     end)
 end
@@ -334,13 +353,42 @@ function Settings:confirmDisconnect()
     }:show()
 end
 
+-- KOReader's SSH server, from whichever of the reader and the file manager is open; nil when
+-- the plugin is turned off.
+local function sshServer()
+    for _, module in ipairs({ "apps/reader/readerui", "apps/filemanager/filemanager" }) do
+        local ok, app = pcall(require, module)
+        if ok and app.instance and app.instance.SSH then return app.instance.SSH end
+    end
+end
+
+-- This Kindle's address on the network, or nil.
+local function ipAddress()
+    local ok, ifaces = pcall(function() return require("ffi/netinfo"):new():retrieve() end)
+    if not ok then return nil end
+    for _, iface in ipairs(ifaces or {}) do
+        if iface.ipv4 and iface.wireless then return iface.ipv4 end
+    end
+end
+
+-- Starts or stops the SSH server without KOReader's own pop-ups; the row shows the result.
+local function toggleSsh(ssh)
+    local show = UIManager.show
+    UIManager.show = function() end
+    local ok, err = pcall(function()
+        if ssh:isRunning() then ssh:stop() else ssh:start() end
+    end)
+    UIManager.show = show
+    if not ok then error(err) end
+end
+
 function Settings:wifiPage()
     return {
         title = "Wi-Fi",
         rows = function()
             local on = NetworkMgr:isWifiOn()
             local current = on and NetworkMgr:isConnected() and NetworkMgr:getCurrentNetwork()
-            return {
+            local rows = {
                 {
                     title = "Airplane mode",
                     subtitle = "Disable all network connections.",
@@ -368,6 +416,33 @@ function Settings:wifiPage()
                     enabled = on,
                 },
             }
+            local ssh = sshServer()
+            if ssh then
+                local running = ssh:isRunning()
+                local address = running and ipAddress()
+                table.insert(rows, {
+                    title = "SSH server",
+                    subtitle = address
+                        and ("Running at " .. address .. ", port " .. ssh.SSH_port .. ".")
+                        or "Log in to this Kindle from a computer on the same network.",
+                    toggle = running,
+                    tap = function()
+                        toggleSsh(ssh)
+                        UIManager:scheduleIn(1, function() self:refresh() end)
+                    end,
+                })
+                table.insert(rows, {
+                    title = "Start SSH with KOReader",
+                    subtitle = "Turn the SSH server on every time KOReader opens.",
+                    toggle = G_reader_settings:isTrue("SSH_autostart"),
+                    tap = function()
+                        G_reader_settings:flipNilOrFalse("SSH_autostart")
+                        ssh.autostart = G_reader_settings:isTrue("SSH_autostart")
+                        self:refresh()
+                    end,
+                })
+            end
+            return rows
         end,
         note = "You can also toggle airplane mode in Quick Actions by tapping or swiping on the arrow at the top of "
             .. "your screen.",
@@ -598,19 +673,17 @@ end
 
 function Settings:libraryPage()
     local connected = require("lexeme/sync").isConnected()
-    local setting = connected and "lexeme_home_stats" or "lexeme_home_recently_added"
     return {
         title = "Home and Library",
         rows = function()
             return {
                 {
-                    title = connected and "Show Stats" or "Show Recently Added",
-                    subtitle = connected
-                        and "Show your reading time, streak and finished books on Home in place of Recently Added."
-                        or "Show the books you added most recently on Home.",
-                    toggle = G_reader_settings:nilOrTrue(setting),
+                    title = "Show Stats",
+                    subtitle = "Show your reading time, streak, finished books and reading calendar on Home in place "
+                        .. "of Recently Added. Counted on this Kindle.",
+                    toggle = G_reader_settings:nilOrTrue("lexeme_home_stats"),
                     tap = function()
-                        G_reader_settings:flipNilOrTrue(setting)
+                        G_reader_settings:flipNilOrTrue("lexeme_home_stats")
                         self:refresh()
                     end,
                 },
@@ -661,7 +734,18 @@ function Settings:dictionariesPage()
         title = "Dictionaries",
         rows = function()
             local disabled = G_reader_settings:readSetting("dicts_disabled") or {}
-            local rows = {}
+            local rows = {
+                {
+                    title = "Show Add to Lexeme",
+                    subtitle = "Show Add to Lexeme in the selection toolbar and under each definition. "
+                        .. "It's always in the toolbar's menu.",
+                    toggle = G_reader_settings:isTrue("lexeme_dictionary_add_button"),
+                    tap = function()
+                        G_reader_settings:flipNilOrFalse("lexeme_dictionary_add_button")
+                        self:refresh()
+                    end,
+                },
+            }
             for _, dict in ipairs(installedDictionaries()) do
                 table.insert(rows, {
                     title = dict.name,

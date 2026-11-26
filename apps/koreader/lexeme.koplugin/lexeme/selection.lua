@@ -21,6 +21,7 @@ local Selection = View:extend{
     ui = nil,
     word = nil,
     results = nil, -- dictionary results; nil when no lookup was made
+    searching = false, -- the dictionary is still looking the word up
     boxes = nil,
     -- Set when an existing highlight was tapped: the toolbar acts on it.
     highlight_index = nil,
@@ -53,11 +54,22 @@ function Selection:init()
     local full = Geom:new{ x = 0, y = 0, w = Screen:getWidth(), h = Screen:getHeight() }
     self.ges_events.LexemePan = { GestureRange:new{ ges = "pan", range = full } }
     self.ges_events.LexemePanRelease = { GestureRange:new{ ges = "pan_release", range = full } }
+    self.ges_events.LexemeHoldPan = { GestureRange:new{ ges = "hold_pan", range = full } }
+    self.ges_events.LexemeHoldRelease = { GestureRange:new{ ges = "hold_release", range = full } }
+end
+
+-- A lookup still running is cancelled with its sheet.
+function Selection:stopSearching()
+    self.closed = true
+    local cancel = self.dismiss_callback
+    self.dismiss_callback = nil
+    if cancel then cancel() end
 end
 
 function Selection:close(refresh)
     if self.html then self.html:free() end
     View.close(self, refresh)
+    self:stopSearching()
     self.ui.highlight:clear()
     self.ui.highlight.selected_text = nil
     UIManager:setDirty(self.ui.dialog, "ui")
@@ -83,7 +95,9 @@ end
 function Selection:render(bb, x, y, w, h)
     -- Taps anywhere but the toolbar and the sheet dismiss the selection.
     self:hit(x, y, w, h, function() self:close() end)
-    if self.results then self:paintSheet(bb, x, w) end
+    -- While a handle is dragged, the Kindle shows only the marks.
+    if self.dragging then return end
+    if self.results or self.searching then self:paintSheet(bb, x, w) end
     self:paintPopup(bb, w)
 end
 
@@ -103,13 +117,14 @@ function Selection:popupPosition(screen_w)
     local px = math.floor((left + right - w) / 2)
     px = math.max(D.s(20), math.min(screen_w - w - D.s(20), px))
     local floor, limit = 0, Screen:getHeight()
-    if self.results then
+    local sheet = self.results or self.searching
+    if sheet then
         local sheet_top, sheet_bottom = self:sheetSpan()
         if sheet_top == 0 then floor = sheet_bottom else limit = sheet_top end
     end
     local above, below = top - h - gap, bottom + gap
     local fits_above, fits_below = above >= floor + D.s(20), below + h <= limit - D.s(20)
-    if self.results then
+    if sheet then
         return px, (fits_above or not fits_below) and above or below
     end
     return px, (fits_below or not fits_above) and below or above
@@ -130,7 +145,7 @@ function Selection:paintPopup(bb, screen_w)
     D.icon(bb, "kindle-note", px + D.s(115), py + D.s(29), D.s(37), D.s(37))
     self:pressable(px + D.s(92), py, D.s(86), h, function() self:note() end)
 
-    local lookup_enabled = self.results == nil
+    local lookup_enabled = self.results == nil and not self.searching
     D.text(bb, px + D.s(206), py + D.s(58), D.face("regular", 32), "Look up",
         lookup_enabled and D.BLACK or D.gray(119))
     if lookup_enabled then
@@ -150,6 +165,7 @@ end
 function Selection:closeKeepingSelection()
     if self.html then self.html:free() end
     View.close(self)
+    self:stopSearching()
 end
 
 --[[
@@ -285,7 +301,9 @@ function Selection:paintSheet(bb, x, w)
     D.rect(bb, x + D.s(5), block + D.s(219), w - D.s(11), D.s(4))
 
     local content_top, content_h, content_w = block + D.s(257), D.s(350), D.s(1096)
-    if #self.results == 0 then
+    if self.searching then
+        D.text(bb, x + D.s(40), content_top + D.s(36), D.face("regular", 32), "Searching Dictionary…")
+    elseif #self.results == 0 then
         D.text(bb, x + D.s(40), content_top + D.s(40), D.face("regular", 32), "No definition found for “" ..
             (self.word or "") .. "”.", D.BLACK, content_w)
     else
@@ -297,20 +315,23 @@ function Selection:paintSheet(bb, x, w)
 
     local footer = block + D.s(702)
     local link_face = D.face("regular", 30)
-    local lw = D.text(bb, x + D.s(72), footer, link_face, "Add to Lexeme")
-    D.rect(bb, x + D.s(72), footer + D.s(7), lw, D.s(3))
-    self:pressable(x + D.s(40), footer - D.s(50), lw + D.s(64), D.s(80), function() self:addToLexeme() end,
-        { x = x + D.s(72), y = footer - D.s(32), w = lw, h = D.s(42) })
-    local dict = self.results[self.index] and self.results[self.index].dict
-    if dict then
-        D.textRight(bb, x + D.s(1183), footer, link_face, dict, D.BLACK)
-        D.icon(bb, "ellipsis-vertical", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
-        if #self.results > 1 then
-            self:pressable(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
-                self:chooseDictionary(x + w - D.s(37), footer - D.s(60))
-            end, D.around(x + D.s(1224), footer - D.s(8), D.s(86), D.s(86)))
-        end
+    local label = "Add to Lexeme"
+    local bx, by = x + D.s(40), footer - D.s(55)
+    local bw, bh = D.width(link_face, label) + D.s(72), D.s(86)
+    D.border(bb, bx, by, bw, bh, D.s(2))
+    D.textCenter(bb, bx + bw / 2, footer, link_face, label)
+    self:pressable(bx, by, bw, bh, function() self:addToLexeme() end, D.inset(bx, by, bw, bh, D.s(2)))
+    if self.searching then
+        D.icon(bb, "ellipsis-vertical-gray", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
+        return
     end
+    local dict = self.results[self.index] and self.results[self.index].dict
+    if not dict then return end
+    D.textRight(bb, x + D.s(1183), footer, link_face, dict, D.BLACK)
+    D.icon(bb, "ellipsis-vertical", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
+    self:pressable(x + w - D.s(500), footer - D.s(50), D.s(500), D.s(80), function()
+        self:openDictionaryMenu(x + w - D.s(7), footer, at_top)
+    end, D.around(x + D.s(1224), footer - D.s(8), D.s(86), D.s(86)))
 end
 
 -- The arrows and the Kindle's hatched scrollbar beside the definition.
@@ -425,6 +446,21 @@ function Selection:onLexemePanRelease(_, ges)
     return true
 end
 
+-- A finger that rests on a handle before moving it makes a hold.
+function Selection:onLexemeHold(arg, ges)
+    if self:startDrag(ges.pos) then return true end
+    return View.onLexemeHold(self, arg, ges)
+end
+
+function Selection:onLexemeHoldPan(_, ges)
+    if self.dragging then self:dragTo(ges.pos) end
+    return true
+end
+
+function Selection:onLexemeHoldRelease(_, ges)
+    return self:onLexemePanRelease(_, ges)
+end
+
 function Selection:onSwipe(direction, ges)
     if self.dragging or self:startDrag(ges.pos) then
         self:dragTo(ges.end_pos)
@@ -437,6 +473,22 @@ function Selection:onSwipe(direction, ges)
     return true
 end
 
+-- Below the ⋮ on a sheet at the top, above it on one at the bottom.
+function Selection:openDictionaryMenu(right, footer, below)
+    local items = {
+        {
+            text = "Change dictionary",
+            enabled = #self.results > 1,
+            callback = function() self:chooseDictionary(right, footer - D.s(60)) end,
+        },
+    }
+    if below then
+        Menu:new{ items = items, right = right, top = footer + D.s(34) }:show()
+    else
+        Menu:new{ items = items, right = right, bottom = footer - D.s(60) }:show()
+    end
+end
+
 function Selection:chooseDictionary(right, bottom)
     local items = {}
     for i, result in ipairs(self.results) do
@@ -447,6 +499,42 @@ function Selection:chooseDictionary(right, bottom)
         end })
     end
     Menu:new{ items = items, right = right, bottom = bottom }:show()
+end
+
+-- The selection's boxes on screen, from the highlight still being made.
+local function selectedBoxes(ui)
+    local selected = ui.highlight.selected_text
+    if not (selected and selected.sboxes) then return {} end
+    if not ui.paging then return selected.sboxes end
+    local page = selected.pos0 and selected.pos0.page or ui.view.state.page
+    local boxes = {}
+    for i, box in ipairs(selected.sboxes) do boxes[i] = ui.view:pageToScreenTransform(page, box) end
+    return boxes
+end
+
+-- The sheet as the Kindle opens it while it looks the word up; `found` fills it in.
+function Selection.showSearching(ui, word)
+    local selection = Selection:new{
+        ui = ui,
+        word = word,
+        searching = true,
+        boxes = selectedBoxes(ui),
+        highlight_index = ui.highlight.lexeme_tapped_index,
+    }
+    UIManager:show(selection, "ui")
+    return selection
+end
+
+function Selection:found(opts)
+    if self.closed then return end
+    self.dismiss_callback = nil
+    self.searching = false
+    self.word, self.results, self.close_cb = opts.word, opts.results, opts.close_cb
+    self.boxes = opts.boxes or self.boxes
+    self.highlight_index = opts.highlight_index
+    if self.results[1] then Headwords.remember(self.word, self.results[1].word) end
+    UIManager:setDirty(self.ui.dialog, "ui")
+    self:refresh()
 end
 
 function Selection.show(ui, opts)

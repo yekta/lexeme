@@ -83,19 +83,42 @@ function Reader.install(ui)
         end
     end
 
-    ui.dictionary.showDict = function(dict, word, results, boxes, _, close_cb)
-        dict:dismissLookupInfo()
-        local highlight_index = ui.highlight.lexeme_tapped_index
+    -- As on a Kindle: a held word is only underlined, and its handles come with the release.
+    local on_hold, on_hold_release = ui.highlight.onHold, ui.highlight.onHoldRelease
+    ui.highlight.onHold = function(self, arg, ges)
+        self.lexeme_holding = true
+        local handled = on_hold(self, arg, ges)
+        Marks.refresh(ui)
+        return handled
+    end
+    ui.highlight.onHoldRelease = function(self)
+        if self.lexeme_holding then
+            self.lexeme_holding = nil
+            Marks.refresh(ui)
+            UIManager:forceRePaint()
+        end
+        return on_hold_release(self)
+    end
+
+    -- The sheet opens saying it's searching, and is the lookup's cancel target meanwhile.
+    ui.dictionary.showLookupInfo = function(dict, word)
+        dict.lookup_progress_msg = Selection.showSearching(ui, word)
+    end
+    local function showResults(dict, word, results, boxes, close_cb)
+        local searching = dict.lookup_progress_msg
+        dict.lookup_progress_msg = nil
+        local opts = { word = word, results = results, boxes = boxes, close_cb = close_cb,
+            highlight_index = ui.highlight.lexeme_tapped_index }
         ui.highlight.lexeme_tapped_index = nil
-        Selection.show(ui, { word = word, results = results or {}, boxes = boxes, close_cb = close_cb,
-            highlight_index = highlight_index })
+        if searching then return searching:found(opts) end
+        Selection.show(ui, opts)
+    end
+    ui.dictionary.showDict = function(dict, word, results, boxes, _, close_cb)
+        showResults(dict, word, results or {}, boxes, close_cb)
     end
     ui.dictionary.showNoResultsDialog = function(dict, word, _, _, boxes, _, close_cb)
-        dict:dismissLookupInfo()
-        local highlight_index = ui.highlight.lexeme_tapped_index
-        ui.highlight.lexeme_tapped_index = nil
-        Selection.show(ui, { word = word, results = {}, boxes = boxes, close_cb = close_cb,
-            highlight_index = highlight_index })
+        showResults(dict, word, {}, boxes, close_cb)
+        return true
     end
     local show_highlight_menu = ui.highlight.onShowHighlightMenu
     ui.highlight.onShowHighlightMenu = function(highlight, index)

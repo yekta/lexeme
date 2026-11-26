@@ -55,7 +55,7 @@ function About:render(bb, x, y, w, h)
     end
 end
 
-function About.show(path)
+function About.open(path)
     About:new{ path = path }:show("flashui")
 end
 

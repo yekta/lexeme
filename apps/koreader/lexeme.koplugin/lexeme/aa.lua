@@ -4,6 +4,7 @@ local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 
 local C = require("lexeme/controls")
+local Button = require("lexeme/button")
 local D = require("lexeme/draw")
 local Footer = require("lexeme/footer")
 local Layout = require("lexeme/layout")
@@ -156,14 +157,8 @@ function Aa:paintThemes(bb, x, top, w, bottom)
     end
 
     local button_top = bottom - D.s(1696 - 1453)
-    local can_save = current == nil
-    D.border(bb, x + D.s(66), button_top, w - D.s(132), D.s(94), D.s(2), can_save and D.BLACK or D.gray(170))
-    D.textCenter(bb, x + w / 2, button_top + D.s(58), D.face("regular", 30), "Save current settings",
-        can_save and D.BLACK or D.gray(136))
-    if can_save then
-        self:pressable(x + D.s(66), button_top, w - D.s(132), D.s(94), function() self:askThemeName() end,
-            D.inset(x + D.s(66), button_top, w - D.s(132), D.s(94), D.s(2)))
-    end
+    local save = { label = "Save current settings", size = 30, baseline = 58, w = w - D.s(132), h = 94, border = 2 }
+    Button.paint(self, bb, x + D.s(66), button_top, save, current == nil and function() self:askThemeName() end or nil)
     local manage_top = bottom - D.s(1696 - 1580)
     D.rect(bb, x, manage_top, w, D.s(4))
     D.text(bb, x + D.s(66), manage_top + D.s(70), D.face("regular", 32), "Manage themes")

@@ -8,6 +8,7 @@ local qrencode = require("ffi/qrencode")
 
 local Api = require("lexeme/api")
 local Background = require("lexeme/background")
+local Button = require("lexeme/button")
 local D = require("lexeme/draw")
 local Status = require("lexeme/status")
 local View = require("lexeme/view")
@@ -125,14 +126,8 @@ function Pairing:render(bb, x, y, w, h)
 end
 
 function Pairing:button(bb, cx, cy, label, on_tap)
-    local face = D.face("bold", 32)
-    local bw = D.width(face, label) + D.s(120)
-    local bh = D.s(96)
-    local bx = cx - math.floor(bw / 2)
-    D.border(bb, bx, cy - math.floor(bh / 2), bw, bh, D.s(3), D.BLACK, D.s(12))
-    D.textCenter(bb, cx, cy + D.s(11), face, label)
-    self:pressable(bx, cy - math.floor(bh / 2), bw, bh, on_tap,
-        D.inset(bx, cy - math.floor(bh / 2), bw, bh, D.s(3), { radius = D.s(9) }))
+    local o = { label = label, bold = true, size = 32, baseline = 59, pad = 120, h = 96, border = 3, radius = 12 }
+    Button.paint(self, bb, cx - math.floor(Button.width(o) / 2), cy - math.floor(D.s(o.h) / 2), o, on_tap)
 end
 
 return Pairing

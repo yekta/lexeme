@@ -9,6 +9,7 @@ local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 local util = require("util")
 
+local Button = require("lexeme/button")
 local D = require("lexeme/draw")
 local Definition = require("lexeme/definition")
 local Headwords = require("lexeme/headwords")
@@ -315,12 +316,9 @@ function Selection:paintSheet(bb, x, w)
 
     local footer = block + D.s(702)
     local link_face = D.face("regular", 30)
-    local label = "Add to Lexeme"
-    local bx, by = x + D.s(40), footer - D.s(55)
-    local bw, bh = D.width(link_face, label) + D.s(72), D.s(86)
-    D.border(bb, bx, by, bw, bh, D.s(2))
-    D.textCenter(bb, bx + bw / 2, footer, link_face, label)
-    self:pressable(bx, by, bw, bh, function() self:addToLexeme() end, D.inset(bx, by, bw, bh, D.s(2)))
+    Button.paint(self, bb, x + D.s(40), footer - D.s(55),
+        { label = "Add to Lexeme", size = 30, baseline = 55, pad = 72, h = 86, border = 2 },
+        function() self:addToLexeme() end)
     if self.searching then
         D.icon(bb, "ellipsis-vertical-gray", x + D.s(1201), footer - D.s(31), D.s(45), D.s(45))
         return

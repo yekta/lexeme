@@ -212,9 +212,48 @@ function Reading.pageReadsUpTo(key, last)
     return rows[1] and tonumber(rows[1][1]) or 0
 end
 
+local CLOSERS = { '"', "'", ")", "”", "’", "»" }
+
+local function endsSentence(token)
+    local stripped = true
+    while stripped do
+        stripped = false
+        for _, closer in ipairs(CLOSERS) do
+            if #token > #closer and token:sub(-#closer) == closer then
+                token = token:sub(1, -#closer - 1)
+                stripped = true
+            end
+        end
+    end
+    return token:find("[%.%?!]$") ~= nil or token:sub(-3) == "…"
+end
+
+-- Cuts the words around a word down to the sentence that contains it.
+local function sentenceOf(before, word, after)
+    local head = {}
+    for token in (before or ""):gmatch("%S+") do table.insert(head, token) end
+    local first = 1
+    for i = #head, 1, -1 do
+        if endsSentence(head[i]) then
+            first = i + 1
+            break
+        end
+    end
+    local tail = {}
+    for token in (after or ""):gmatch("%S+") do
+        table.insert(tail, token)
+        if endsSentence(token) then break end
+    end
+    local prefix = table.concat(head, " ", first)
+    local suffix = table.concat(tail, " ")
+    local glued = after and not after:find("^%s")
+    local text = (prefix ~= "" and prefix .. " " or "") .. word .. (glued and "" or " ") .. suffix
+    return (text:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
 -- The sentence a word was read in, from the text Vocabulary Builder kept around it.
 local function contextOf(before, word, after)
-    local text = require("lexeme/words").sentence(before, word, after):gsub("%s+", " ")
+    local text = sentenceOf(before, word, after):gsub("%s+", " ")
     return text ~= word and text or nil
 end
 

@@ -58,6 +58,13 @@ function Shell:refreshDecks()
     Study.refreshInBackground()
 end
 
+-- Home and Lexeme show a warning while the last sync failed; a sync can set or clear it.
+function Shell:onLexemeSyncFinished()
+    if (Sync.lastFailure() ~= nil) == self.shows_sync_warning then return end
+    local tab = self:currentTab()
+    if tab == "home" or tab == "lexeme" then self:refresh() end
+end
+
 function Shell:onLexemeDecksChanged()
     if self:currentTab() == "lexeme" then self:refresh() end
 end
@@ -471,6 +478,18 @@ end
 
 -- Lexeme --------------------------------------------------------------------------
 
+local SYNC_WARNING_GAP = 14
+
+-- Room a sync warning takes after text, so the text can be cut short to leave it.
+local function syncWarningWidth(size)
+    return D.s(SYNC_WARNING_GAP) + size
+end
+
+-- Marks a figure from Lexeme as possibly out of date: drawn after text ending at `x`.
+local function paintSyncWarning(bb, x, baseline, size)
+    D.icon(bb, "triangle-alert", x + D.s(SYNC_WARNING_GAP), baseline - math.floor(size * 0.85), size, size)
+end
+
 -- Text parts in a row, with the dots between them muted, as on Lexeme's deck cards.
 local function paintDotted(bb, x, baseline, face, parts)
     local dot = " · "
@@ -489,6 +508,8 @@ end
 
 function Shell:paintLexeme(bb, x, y, w, h)
     D.text(bb, x + D.s(57), y + D.s(301), D.face("display", 55), "Study")
+    local sync_failed = Sync.lastFailure() ~= nil
+    self.shows_sync_warning = sync_failed
     local decks = Study.decks()
     if not decks or #decks == 0 then
         local message = decks and "No decks yet. Make one in Lexeme." or "Connect to Wi-Fi to get your decks."
@@ -504,7 +525,10 @@ function Shell:paintLexeme(bb, x, y, w, h)
         if not deck then break end
         local top = y + D.s(DECKS.top + (i - 1) * DECKS.pitch)
         local text_w = right - D.s(57 + 100)
-        D.text(bb, x + D.s(57), top + D.s(72), D.face("bold", 36), deck.name, D.BLACK, text_w)
+        local warning = D.s(36)
+        local name_w = D.text(bb, x + D.s(57), top + D.s(72), D.face("bold", 36), deck.name, D.BLACK,
+            sync_failed and text_w - syncWarningWidth(warning) or text_w)
+        if sync_failed then paintSyncWarning(bb, x + D.s(57) + name_w, top + D.s(72), warning) end
         local totals, counts = deckLines(deck)
         paintDotted(bb, x + D.s(57), top + D.s(120), D.face("regular", 30), totals)
         paintDotted(bb, x + D.s(57), top + D.s(164), D.face("regular", 30), counts)
@@ -592,7 +616,7 @@ function TILE.rows_height()
 end
 
 -- The same six figures as Lexeme's reading page, three to a row. Returns the y where they end.
-local function paintTiles(bb, x, top, w, reading)
+local function paintTiles(bb, x, top, w, reading, sync_failed)
     local tiles = {
         { "Today", readingTime(reading.today) },
         { "This week", readingTime(reading.week) },
@@ -613,7 +637,10 @@ local function paintTiles(bb, x, top, w, reading)
         D.border(bb, tx, ty, tile_w, h, D.s(2), D.gray(EDGE_GRAY))
         local text_w = tile_w - 2 * D.s(TILE.inset)
         D.text(bb, tx + D.s(TILE.inset), ty + D.s(TILE.label), D.face("regular", 28), tile[1], D.BLACK, text_w)
-        D.text(bb, tx + D.s(TILE.inset), ty + D.s(TILE.value), D.face("bold", 36), tile[2], D.BLACK, text_w)
+        local warning = D.s(38)
+        local value_w = D.text(bb, tx + D.s(TILE.inset), ty + D.s(TILE.value), D.face("bold", 36), tile[2], D.BLACK,
+            sync_failed and text_w - syncWarningWidth(warning) or text_w)
+        if sync_failed then paintSyncWarning(bb, tx + D.s(TILE.inset) + value_w, ty + D.s(TILE.value), warning) end
     end
     return top + TILE.rows_height()
 end
@@ -653,10 +680,11 @@ end
 
 -- The last year of days, like Lexeme's streak calendar, under a label lined up with the tiles' text.
 -- `top` is where the label's ink starts.
-local function paintCalendar(bb, x, top, w, label, days, goal_minutes)
+local function paintCalendar(bb, x, top, w, label, days, goal_minutes, sync_failed)
     local face = calendarLabelFace()
     local baseline = top + D.inkTop(face, label)
-    D.text(bb, x + D.s(HOME_MARGIN + TILE.inset), baseline, face, label)
+    local label_w = D.text(bb, x + D.s(HOME_MARGIN + TILE.inset), baseline, face, label)
+    if sync_failed then paintSyncWarning(bb, x + D.s(HOME_MARGIN + TILE.inset) + label_w, baseline, D.s(32)) end
     local grid = calendarGrid(x, w, days)
     local grid_top = baseline + D.s(CALENDAR_LABEL_TO_GRID)
     local goal = goal_minutes * 60
@@ -678,6 +706,8 @@ function Shell:paintHome(bb, x, y, w, h)
         function() self:setTab("library") end)
     local connected = Sync.isConnected()
     local reading = connected and G_reader_settings:nilOrTrue("lexeme_home_stats") and Streak.summary()
+    local sync_failed = Sync.lastFailure() ~= nil
+    self.shows_sync_warning = sync_failed
     if reading then
         -- The badges, tiles, calendar and the cover of the book being read (standing over the tab
         -- bar) are spaced evenly.
@@ -685,8 +715,8 @@ function Shell:paintHome(bb, x, y, w, h)
         local label = calendarLabel(reading.days, reading.goal_minutes)
         local height = TILE.rows_height() + calendarHeight(x, w, label, reading.days)
         local gap = math.max(D.s(40), math.floor((space_bottom - space_top - height) / 3))
-        local tiles_bottom = paintTiles(bb, x, space_top + gap, w, reading)
-        return paintCalendar(bb, x, tiles_bottom + gap, w, label, reading.days, reading.goal_minutes)
+        local tiles_bottom = paintTiles(bb, x, space_top + gap, w, reading, sync_failed)
+        return paintCalendar(bb, x, tiles_bottom + gap, w, label, reading.days, reading.goal_minutes, sync_failed)
     end
     if not connected and not G_reader_settings:nilOrTrue("lexeme_home_recently_added") then return end
     -- The next heading's baseline sits 94 px under the badges, as on the Kindle.

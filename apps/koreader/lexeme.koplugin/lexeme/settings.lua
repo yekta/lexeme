@@ -180,6 +180,15 @@ local function syncedLabel()
     return os.date("%b ", at) .. tonumber(os.date("%d", at))
 end
 
+local function syncSubtitle()
+    local failure = require("lexeme/sync").lastFailure()
+    if not failure then
+        return "Send words, highlights and reading time to Lexeme. This also happens on its own whenever "
+            .. "Wi-Fi connects."
+    end
+    return "The last sync failed: " .. failure.detail
+end
+
 function Settings:syncNow()
     local Toast = require("lexeme/toast")
     local done = Toast.busy("Syncing with Lexeme…")
@@ -234,8 +243,7 @@ function Settings:lexemePage()
                 },
                 {
                     title = "Sync now",
-                    subtitle = "Send words, highlights and reading time to Lexeme. This also happens on its "
-                        .. "own whenever Wi-Fi connects.",
+                    subtitle = syncSubtitle(),
                     value = syncedLabel(),
                     tap = function() self:syncNow() end,
                 },

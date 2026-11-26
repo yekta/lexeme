@@ -19,15 +19,20 @@ function Layout.setStylesheet(path)
     G_reader_settings:saveSetting("copt_css", path)
 end
 
+-- `file` is the font the Aa panel draws its name in, as the Kindle does.
 Layout.FONTS = {
-    { label = "Amazon Ember", names = { "Amazon Ember" } },
-    { label = "Baskerville", names = { "Baskerville" } },
-    { label = "Bookerly", names = { "Bookerly" } },
-    { label = "Caecilia", names = { "PMN Caecilia LT" } },
-    { label = "Futura", names = { "Futura Medium", "Futura" } },
-    { label = "Helvetica", names = { "Helvetica Neue LT 65 Kindle Medium", "Helvetica" } },
-    { label = "OpenDyslexic", names = { "OpenDyslexic" } },
-    { label = "Palatino", names = { "Palatino" } },
+    { label = "Amazon Ember", names = { "Amazon Ember" }, file = "Amazon-Ember-Regular.ttf" },
+    { label = "Baskerville", names = { "Baskerville" }, file = "Baskerville-Regular.ttf" },
+    { label = "Bookerly", names = { "Bookerly" }, file = "Bookerly-Regular.ttf" },
+    { label = "Caecilia", names = { "PMN Caecilia LT" }, file = "Caecilia_LT_65_Medium.ttf" },
+    { label = "Futura", names = { "Futura Medium", "Futura" }, file = "Futura-Medium.ttf" },
+    {
+        label = "Helvetica",
+        names = { "Helvetica Neue LT 65 Kindle Medium", "Helvetica" },
+        file = "Helvetica_LT_65_Medium.ttf",
+    },
+    { label = "OpenDyslexic", names = { "OpenDyslexic" }, file = "OpenDyslexic-Regular.otf" },
+    { label = "Palatino", names = { "Palatino" }, file = "Palatino-Regular.ttf" },
 }
 
 -- Measured on a Paperwhite (1272 px wide, 300 dpi) against the Kindle's own reader.
@@ -91,7 +96,7 @@ function Layout.availableFonts()
     for _, font in ipairs(Layout.FONTS) do
         for _, name in ipairs(font.names) do
             if installed[name] then
-                table.insert(fonts, { label = font.label, name = name })
+                table.insert(fonts, { label = font.label, name = name, file = font.file })
                 break
             end
         end
@@ -99,12 +104,13 @@ function Layout.availableFonts()
     return fonts
 end
 
-function Layout.fontLabel(ui)
+-- The font being read in, or just its name when it isn't one of the Kindle's.
+function Layout.currentFont(ui)
     local current = ui.font.font_face
     for _, font in ipairs(Layout.availableFonts()) do
-        if font.name == current then return font.label end
+        if font.name == current then return font end
     end
-    return current or ""
+    return { label = current or "", name = current }
 end
 
 function Layout.setFont(ui, name)
@@ -268,6 +274,9 @@ function Layout.applyBeforeRender(ui)
     local font = Layout.get("lexeme_font")
     ui.font.font_face = font
     document:setFontFace(font)
+    document.configurable.embedded_fonts = 0
+    document:setEmbeddedFonts(0)
+    G_reader_settings:saveSetting("copt_embedded_fonts", 0)
     applySize(ui)
     applyBold(ui)
     document.configurable.line_spacing = 100

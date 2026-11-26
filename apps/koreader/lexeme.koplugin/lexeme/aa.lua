@@ -235,10 +235,10 @@ function Aa:paintFont(bb, x, top, w)
         self:refresh()
     end)
 
-    local function sliderRow(name, cy, value, min, max, on_change)
+    local function sliderRow(name, cy, value, min, max, on_change, step)
         D.text(bb, x + D.s(61), cy + D.s(11), label, name)
         C.slider(self, bb, {
-            x0 = x + D.s(567), x1 = x + D.s(1072), cy = cy, min = min, max = max, value = value,
+            x0 = x + D.s(567), x1 = x + D.s(1072), cy = cy, min = min, max = max, value = value, step = step,
             knob = D.s(69), thick = D.s(10), thin = D.s(4), label = true, buttons = true, extend = true,
             on_change = on_change,
         })
@@ -250,7 +250,7 @@ function Aa:paintFont(bb, x, top, w)
     sliderRow("Size", top + D.s(1293 - 790), Layout.get("lexeme_size"), 1, #Layout.SIZES, function(v)
         Layout.setSize(self.ui, v)
         self:changed()
-    end)
+    end, Layout.SIZE_STEP)
 
     local spacing_y = top + D.s(1500 - 790)
     D.text(bb, x + D.s(63), spacing_y, label, "Spacing")

@@ -36,8 +36,10 @@ Layout.FONTS = {
 }
 
 -- Measured on a Paperwhite (1272 px wide, 300 dpi) against the Kindle's own reader.
--- Font sizes 1..14 as em in reference pixels.
+-- Font sizes 1..14 as em in reference pixels. Half levels (3.5) fall halfway between two of
+-- them, for a size the Kindle doesn't have.
 Layout.SIZES = { 29, 33, 35, 39, 44, 48, 52, 58, 64, 71, 80, 92, 105, 122 }
+Layout.SIZE_STEP = 0.5
 -- Bold 0..5 as KOReader font weights (100 = one weight step).
 Layout.WEIGHTS = { [0] = 0, 1.1, 2.5, 3.2, 4, 4.3 }
 -- Line spacing 0..4 as the line pitch over the font size.
@@ -83,6 +85,14 @@ local function set(key, value)
     G_reader_settings:saveSetting(key, value)
 end
 
+-- The font size at a level, whole or half, in reference pixels.
+function Layout.sizeAt(level)
+    level = math.max(1, math.min(#Layout.SIZES, tonumber(level) or DEFAULTS.lexeme_size))
+    local low = math.floor(level)
+    local high = math.min(low + 1, #Layout.SIZES)
+    return Layout.SIZES[low] + (Layout.SIZES[high] - Layout.SIZES[low]) * (level - low)
+end
+
 local function updatePos(ui)
     ui:handleEvent(Event:new("UpdatePos"))
 end
@@ -121,7 +131,7 @@ end
 
 -- The font size crengine gets and the CSS multiple that brings it to the Kindle's size.
 local function engineSize()
-    local px = D.s(Layout.SIZES[Layout.get("lexeme_size")])
+    local px = D.s(Layout.sizeAt(Layout.get("lexeme_size")))
     local scale = math.ceil(px / MAX_ENGINE_SIZE)
     return math.floor(px / scale + 0.5), scale, px
 end

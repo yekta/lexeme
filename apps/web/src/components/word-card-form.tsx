@@ -27,7 +27,7 @@ export function WordCardForm({ lookup, onDone }: { lookup: TLookup; onDone: () =
   const { data: decks, isPending: isPendingDecks } = useDecks();
   const [chosenDeckId, setChosenDeckId] = useState(() => localStorage.getItem(LAST_DECK_KEY) ?? "");
   const deck = decks.find((d) => d.id === chosenDeckId) ?? decks[0];
-  const [front, setFront] = useState(lookup.word);
+  const [front, setFront] = useState(lookup.headword ?? lookup.word);
   const [back, setBack] = useState("");
   const generateBack = useGenerateBack();
   const createCard = useCreateCard();
@@ -38,10 +38,7 @@ export function WordCardForm({ lookup, onDone }: { lookup: TLookup; onDone: () =
   const suggestBack = (deckId: string) => {
     const trimmed = front.trim();
     if (!trimmed) return;
-    generateBack.mutate(
-      { deckId, front: trimmed, context: lookup.context ?? undefined },
-      { onSuccess: (result) => setBack(result.back) },
-    );
+    generateBack.mutate({ deckId, front: trimmed }, { onSuccess: (result) => setBack(result.back) });
   };
 
   const canSubmit = Boolean(deck) && front.trim() !== "" && back.trim() !== "";

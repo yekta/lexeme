@@ -9,6 +9,7 @@ local DataStorage = require("datastorage")
 local DocSettings = require("docsettings")
 local ReadHistory = require("readhistory")
 local Books = require("lexeme/books")
+local Headwords = require("lexeme/headwords")
 local lfs = require("libs/libkoreader-lfs")
 local md5 = require("ffi/sha2").md5
 local util = require("util")
@@ -251,6 +252,7 @@ function Reading.lookups(since, key_by_title)
                 id = Reading.stableId("koreader-lookup:" .. entry.word .. ":" .. tostring(entry.time)),
                 book_key = entry.book_title and key_by_title[entry.book_title] or nil,
                 word = entry.word,
+                headword = Headwords.of(entry.word),
                 context = same and saved.context or nil,
                 looked_up_at = entry.time * 1000,
             })
@@ -262,6 +264,7 @@ function Reading.lookups(since, key_by_title)
                 id = Reading.stableId("koreader-vocabulary:" .. word),
                 book_key = saved.title and key_by_title[saved.title] or nil,
                 word = word,
+                headword = Headwords.of(word),
                 context = saved.context,
                 looked_up_at = saved.at * 1000,
             })

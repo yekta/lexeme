@@ -183,6 +183,7 @@ const lookups = table("lookups")
     user_id: string(),
     book_id: string().optional(),
     word: string(),
+    headword: string().optional(),
     context: string().optional(),
     looked_up_at: number(),
     created_at: number(),

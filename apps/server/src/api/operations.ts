@@ -506,19 +506,18 @@ export const operations: TOperation[] = [
     name: "generate-back",
     title: "Generate back",
     description:
-      "Write the back for a front, following the style of the deck's existing cards. Nothing is saved. The deck needs at least one other card. For a word read in a book, pass the sentence as context so the back gives the sense it had there.",
+      "Write the back for a front, following the style of the deck's existing cards. Nothing is saved. The deck needs at least one other card.",
     role: "editor",
     method: "POST",
     path: "/decks/:deck_id/generate-back",
     input: z.object({
       deck_id: deckId,
       front: cardContent.shape.front,
-      context: z.string().trim().max(5000).optional().describe("The sentence the word was read in."),
     }),
     run: async (caller, input) => {
       await mustFindDeck(caller.userId, input.deck_id);
       return {
-        back: await generateBackForDeck({ deckId: input.deck_id, front: input.front, context: input.context }),
+        back: await generateBackForDeck({ deckId: input.deck_id, front: input.front }),
       };
     },
   }),
@@ -527,14 +526,13 @@ export const operations: TOperation[] = [
     name: "add-word",
     title: "Add word",
     description:
-      "Add a word met while reading as a card. The back is written for the sense the word has in `context`, in the deck's style. A word already in the deck isn't added again, so retrying is safe. Without a deck, the word goes to a deck named \"Kindle\", created if needed.",
+      "Add a word met while reading as a card. The back is written in the deck's style. A word already in the deck isn't added again, so retrying is safe. Without a deck, the word goes to a deck named \"Kindle\", created if needed.",
     role: "editor",
     method: "POST",
     path: "/words",
     input: z.object({
       deck_id: deckId.optional(),
       word: z.string().trim().min(1).max(200),
-      context: z.string().trim().max(5000).optional().describe("The sentence the word was read in."),
     }),
     run: async (caller, input) => {
       const deck = input.deck_id ? await mustFindDeck(caller.userId, input.deck_id) : await deviceDeck(caller.userId);
@@ -551,7 +549,7 @@ export const operations: TOperation[] = [
           .where(eq(cards.deck_id, deck.id))
           .orderBy(desc(cards.created_at))
           .limit(20);
-        const back = await generateBack({ front: input.word, recentCards: examples, context: input.context });
+        const back = await generateBack({ front: input.word, recentCards: examples });
         const id = crypto.randomUUID();
         await runMutator(caller.userId, serverMutators.card.insert, {
           deck_id: deck.id,
@@ -861,6 +859,7 @@ export const operations: TOperation[] = [
           id: lookup.id,
           book_id: lookup.book_id,
           word: lookup.word,
+          headword: lookup.headword,
           context: lookup.context,
           looked_up_at: lookup.looked_up_at.toISOString(),
         })),

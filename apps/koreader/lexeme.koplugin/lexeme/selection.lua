@@ -10,6 +10,8 @@ local UIManager = require("ui/uimanager")
 local util = require("util")
 
 local D = require("lexeme/draw")
+local Definition = require("lexeme/definition")
+local Headwords = require("lexeme/headwords")
 local Menu = require("lexeme/menu")
 local Toast = require("lexeme/toast")
 local View = require("lexeme/view")
@@ -37,6 +39,7 @@ local CSS = [[
 body { margin: 0; line-height: 1.3; }
 .lexeme-hw { font-weight: bold; font-size: 1.1em; margin-bottom: 0.2em; }
 .lexeme-ipa { font-weight: normal; font-size: 0.8em; }
+.lexeme-label { font-style: italic; }
 ol, ul { margin: 0; padding: 0 0 0 1.4em; }
 blockquote, dd { margin: 0 1em; }
 ]]
@@ -198,10 +201,16 @@ function Selection:note()
     if item then self.ui.highlight:editNote(index, item.note == nil) end
 end
 
+-- Adds the headword the dictionary shows: "absorb" for "absorbed".
 function Selection:addToLexeme()
     local entry = self.entry or (self.word and { word = self.word })
+    local shown = self.results and self.results[self.index]
     self:close()
     if not entry then return end
+    if shown and shown.word and shown.word ~= "" then
+        Headwords.remember(self.word, shown.word)
+        entry.word = shown.word
+    end
     if Words.add(entry) then
         require("lexeme/sync").soon()
         Toast.show("Added to Lexeme")
@@ -235,31 +244,12 @@ end
 
 local TABS = { "Dictionary", "Wikipedia", "Translate", "Search" }
 
--- The entry as a Kindle dictionary shows it: the headword with its pronunciation, then
--- the senses, without Wiktionary's regional pronunciations and inflections line.
-local function definitionHtml(result)
-    local body = result.definition or ""
-    local ipa
-    if result.is_html then
-        body = body:gsub("<ul>(.-)</ul>", function(list)
-            if not list:find("IPA") then return nil end
-            ipa = ipa or list:match('<span class="IPA[^"]*">(.-)</span>')
-            return ""
-        end)
-        body = body:gsub('<p><span class="headword%-line">.-</p>', "")
-    else
-        body = util.htmlEscape(body):gsub("\n", "<br/>")
-    end
-    local pronunciation = ipa and (' <span class="lexeme-ipa">' .. ipa .. "</span>") or ""
-    return '<div class="lexeme-hw">' .. util.htmlEscape(result.word or "") .. pronunciation .. "</div>" .. body
-end
-
 function Selection:htmlWidget(w, h)
     if self.html and self.html_index == self.index then return self.html end
     if self.html then self.html:free() end
     local result = self.results[self.index]
     self.html = HtmlBoxWidget:new{ dimen = Geom:new{ w = w, h = h } }
-    self.html:setContent(definitionHtml(result), (result.css or "") .. CSS, D.s(30), false, nil,
+    self.html:setContent(Definition.html(result), (result.css or "") .. CSS, D.s(30), false, nil,
         result.dictionary_resource_directory)
     self.html_index = self.index
     return self.html
@@ -450,7 +440,7 @@ end
 function Selection:chooseDictionary(right, bottom)
     local items = {}
     for i, result in ipairs(self.results) do
-        table.insert(items, { text = result.dict, callback = function()
+        table.insert(items, { text = result.word .. "  ·  " .. result.dict, callback = function()
             self.index = i
             self.page = 1
             self:refresh()
@@ -468,6 +458,7 @@ function Selection.show(ui, opts)
         highlight_index = opts.highlight_index,
         close_cb = opts.close_cb,
     }
+    if opts.results and opts.results[1] then Headwords.remember(opts.word, opts.results[1].word) end
     UIManager:show(selection, "ui")
     return selection
 end

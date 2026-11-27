@@ -4,8 +4,9 @@ What the Kindle's own reader knows about each book on the device, from its catal
 as read, and when it was last opened. The library shows that progress for books KOReader hasn't
 opened, and sorts by the later of the two readers' last opens, as the Kindle's library would.
 
-A book converted from a Kindle document (documents/Converted/<name>.epub) shares its last open
-with the original, Downloads/Items01/<name>_<key>.kfx.
+A book converted from a Kindle book (documents/Converted/<name>.epub) shares its last open with
+the original: Downloads/Items01/<name>_<key>.kfx, or for a store purchase copied over from an
+earlier Kindle, documents/<name>_<ASIN>.kfx. When both exist, the one opened last counts.
 ]]
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -41,7 +42,11 @@ local function load()
             read = tonumber(columns[4][i]) == READ_STATE_READ,
         }
         by_path[path] = entry
-        if path:find("/Downloads/Items01/", 1, true) then by_stem[stem(path)] = entry end
+        if path:find("/Downloads/Items01/", 1, true) or path:match("^/mnt/us/documents/[^/]+%.kfx$") then
+            local key = stem(path)
+            local seen = by_stem[key]
+            if not seen or entry.last_access > seen.last_access then by_stem[key] = entry end
+        end
     end
     return by_path, by_stem
 end

@@ -106,6 +106,34 @@ function Books.description(path)
     return (text:gsub("\n%s*\n%s*\n+", "\n\n"):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+-- Whether a MOBI-family file (.mobi, .azw, .azw3, .prc) is locked to a Kindle: its first record's
+-- encryption field isn't 0. KOReader can't open those, so the library leaves them out; an
+-- unlocked copy, if there is one, lives in Converted. Kept per path while the file is unchanged.
+local MOBI_KINDS = { mobi = true, azw = true, azw3 = true, prc = true }
+local locked_files = {}
+
+local function mobiLocked(path, mtime)
+    local known = locked_files[path]
+    if known and known.mtime == mtime then return known.locked end
+    local locked = false
+    local f = io.open(path, "rb")
+    if f then
+        local head = f:read(86)
+        if head and #head == 86 and head:sub(61, 68) == "BOOKMOBI" then
+            local a, b, c, d = head:byte(79, 82)
+            f:seek("set", ((a * 256 + b) * 256 + c) * 256 + d)
+            local record = f:read(14)
+            if record and #record == 14 then
+                local hi, lo = record:byte(13, 14)
+                locked = hi * 256 + lo ~= 0
+            end
+        end
+        f:close()
+    end
+    locked_files[path] = { mtime = mtime, locked = locked }
+    return locked
+end
+
 -- Folders the library never lists from; they hold most of a Kindle's files.
 local function skipsFolder(path, name)
     return name:sub(1, 1) == "." or name:find("%.sdr$") or name == "dictionaries"
@@ -142,6 +170,7 @@ function Books.scan()
         local ext = file:match("%.([^.]+)$")
         if not ext or not KINDS[ext:lower()] then return end
         if not DocumentRegistry:hasProvider(path) then return end
+        if MOBI_KINDS[ext:lower()] and mobiLocked(path, attr.modification) then return end
         table.insert(list, describe(path, file, attr.modification, read_times, manager))
     end)
     return list

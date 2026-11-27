@@ -55,12 +55,13 @@ end
 
 -- Builds a synthetic page map, if the book hasn't got that one, and returns its last label.
 -- Where the Kindle's own reader left a MOBI book: a byte offset in the text, the first number of
--- "lpr" in the book's .sdr/*.mbs (a KRDS file: typed values, a field named after 0xFE).
+-- "lpr" in the book's .sdr/*.mbs, or *.azw3f for an AZW3 (KRDS files: typed values, a field
+-- named after 0xFE).
 function Locations.amazonOffset(file)
     local sdr = file:gsub("%.[^.]+$", "") .. ".sdr"
     if lfs.attributes(sdr, "mode") ~= "directory" then return nil end
     for entry in lfs.dir(sdr) do
-        if entry:match("%.mbs$") then
+        if entry:match("%.mbs$") or entry:match("%.azw3f$") then
             local f = io.open(sdr .. "/" .. entry, "rb")
             local data = f and f:read("*a")
             if f then f:close() end

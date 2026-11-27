@@ -8,6 +8,10 @@ from /mnt/base-us. They're the same files, so the cache stays where USB shows it
 
 A long book's cache is tens of MB, and KOReader keeps 64 MB of them, two or three long books;
 Lexeme keeps 1 GB unless it's been set otherwise.
+
+Two costs of opening a book are moved to while Home sits idle: the engine's start-up (fonts,
+hyphenation, the cache; 1.6 s on the first book after KOReader starts), and the two full garbage
+collections KOReader runs before every book opens (a quarter of a second).
 ]]
 local lfs = require("libs/libkoreader-lfs")
 
@@ -28,6 +32,32 @@ local function direct(dir)
     return same
 end
 
+-- Whether garbage was collected while Home sat idle, since the last book opened.
+local collected = false
+
+-- Done once Home has sat idle a few seconds.
+function Engine.whileIdle()
+    require("document/credocument"):engineInit()
+    collectgarbage()
+    collectgarbage()
+    collected = true
+end
+
+-- KOReader's opening, without its collections when Home has just done them.
+local function openWithoutCollecting(open, ...)
+    if not collected then return open(...) end
+    collected = false
+    local collect = collectgarbage
+    rawset(_G, "collectgarbage", function(what, ...)
+        if what == nil or what == "collect" then return 0 end
+        return collect(what, ...)
+    end)
+    local ok, document = pcall(open, ...)
+    rawset(_G, "collectgarbage", collect)
+    if not ok then error(document, 0) end
+    return document
+end
+
 function Engine.install()
     if G_reader_settings:hasNot("cre_disk_cache_max_size") then
         G_reader_settings:saveSetting("cre_disk_cache_max_size", CACHE_MB)
@@ -35,6 +65,9 @@ function Engine.install()
     local CreDocument = require("document/credocument")
     if CreDocument.lexeme_cache then return end
     CreDocument.lexeme_cache = true
+    local DocumentRegistry = require("document/documentregistry")
+    local open = DocumentRegistry.openDocument
+    DocumentRegistry.openDocument = function(...) return openWithoutCollecting(open, ...) end
     local DataStorage = require("datastorage")
     local init = CreDocument.cacheInit
     -- KOReader sets the cache up in DataStorage:getDataDir() .. "/cache/cr3cache".

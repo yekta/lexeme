@@ -44,6 +44,23 @@ local function rules(css)
     return result
 end
 
+-- The OPF's stylesheets. Found by their media type rather than by going through every item: a
+-- long book lists thousands (Woolf's complete works took half a second at each open).
+local function cssHrefs(opf)
+    local hrefs, from = {}, 1
+    while true do
+        local at = opf:find('media-type="text/css"', from, true)
+        if not at then return hrefs end
+        local open = at
+        while open > 1 and opf:byte(open) ~= 60 do open = open - 1 end -- back to its "<"
+        local close = opf:find(">", at, true) or #opf
+        local item = opf:sub(open, close)
+        local href = item:find("^<item%s") and item:match('href="([^"]+)"')
+        if href then table.insert(hrefs, href) end
+        from = close + 1
+    end
+end
+
 -- The book's own stylesheets, as listed in its OPF.
 local function bookCss(document)
     if not document.getDocumentFileContent then return "" end
@@ -53,9 +70,8 @@ local function bookCss(document)
     if not opf then return "" end
     local base = opf_path:match("^(.*/)") or ""
     local parts = {}
-    for item in opf:gmatch("<item%s[^>]*>") do
-        local href = item:find('media%-type="text/css"') and item:match('href="([^"]+)"')
-        local css = href and document:getDocumentFileContent(base .. href)
+    for _, href in ipairs(cssHrefs(opf)) do
+        local css = document:getDocumentFileContent(base .. href)
         if css then table.insert(parts, css) end
     end
     return table.concat(parts, "\n")

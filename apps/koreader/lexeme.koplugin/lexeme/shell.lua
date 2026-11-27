@@ -25,6 +25,8 @@ local Shell = View:extend{
 local GRID = { x = 109, pitch_x = 357, top = 361, pitch_y = 632, cover_w = 310, cover_h = 512, cols = 3 }
 local LIST = { top = 345, pitch = 265 }
 local DECKS = { top = 345, pitch = 206, per_page = 6 }
+-- Seconds after a book closes before the library is scanned again.
+local RESCAN_AFTER = 2
 
 local FILTERS = {
     { key = "in_progress", label = "In progress" },
@@ -40,7 +42,8 @@ function Shell:init()
     self.sort = G_reader_settings:readSetting("lexeme_library_sort") or "recent"
     self.descending = G_reader_settings:nilOrTrue("lexeme_library_descending")
     self.layout = G_reader_settings:readSetting("lexeme_library_layout") or "grid"
-    self:reload()
+    -- Back from a book, the library shows as it was, and is scanned again once Home is up.
+    self:reload(Books.scanned())
     if self.tab == "lexeme" then UIManager:nextTick(function() self:refreshDecks() end) end
 end
 
@@ -70,10 +73,21 @@ function Shell:onLexemeDecksChanged()
     if self:currentTab() == "lexeme" then self:refresh() end
 end
 
-function Shell:reload()
+-- `quick`: back from a book, show the last scan at once and scan again once Home is up.
+function Shell:reload(quick)
     self.carousel_first, self.carousel_h = {}, {}
-    self.all = Books.scan()
+    self.all = quick and Books.lastScan() or Books.scan()
     self:query()
+    if quick then
+        UIManager:unschedule(self.rescan)
+        self.rescan = function()
+            local shown = Books.signature(self.all)
+            self:reload()
+            if Books.signature(self.all) ~= shown then self:refresh() end
+        end
+        UIManager:scheduleIn(RESCAN_AFTER, self.rescan)
+        return
+    end
     Books.extractMissing(self.all, function()
         self.all = Books.scan()
         self:query()
@@ -179,11 +193,13 @@ function Shell:onShowingReader()
 end
 
 function Shell:onCloseWidget()
-    Books.clearCovers()
+    UIManager:unschedule(self.rescan)
+    Books.clearCovers(true)
 end
 
 function Shell:render(bb, x, y, w, h)
     self.scrollbar = nil
+    Books.nextPaint()
     Status.paint(self, bb, x, y, w, function() self:openQuick() end)
     self:paintSearchRow(bb, x, y, w)
     local tab = self:currentTab()

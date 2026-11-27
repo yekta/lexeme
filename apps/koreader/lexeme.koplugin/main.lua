@@ -3,6 +3,7 @@ local plugin_root = debug.getinfo(1, "S").source:match("^@(.*)/[^/]*$")
 -- our modules are required later too.
 package.path = plugin_root .. "/?.lua;" .. package.path
 
+local DocSettings = require("docsettings")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local lfs = require("libs/libkoreader-lfs")
@@ -78,10 +79,15 @@ function Lexeme:init()
         self.shell:paintTo(bb, x, y)
         painted = true
     end
-    -- Back from a book, the file browser has already flashed Home on; "ui" doesn't flash again.
-    UIManager:nextTick(function() UIManager:show(self.shell, painted and "ui" or "flashui") end)
-    -- The spinner's frames, drawn while Home sits idle rather than as a book opens.
-    UIManager:scheduleIn(3, function() require("lexeme/loading").prepare() end)
+    -- Back from a book, the file browser has already put Home on the screen: no second refresh.
+    UIManager:nextTick(function() UIManager:show(self.shell, not painted and "flashui" or nil) end)
+    -- The spinner's frames and the engine's start-up, done while Home sits idle rather than as a
+    -- book opens.
+    UIManager:scheduleIn(3, function()
+        if not self.shell then return end
+        require("lexeme/loading").prepare()
+        require("lexeme/engine").whileIdle()
+    end)
 end
 
 function Lexeme:onPreRenderDocument()
@@ -166,7 +172,15 @@ function Lexeme:openSettings()
     require("lexeme/settings").show()
 end
 
--- Like the Kindle: the cover says "Opening", then a spinner holds the screen until the book is ready.
+-- Whether the book opens in about a second: it isn't big and its layout is cached from last time.
+local function opensQuickly(path)
+    if (lfs.attributes(path, "size") or 0) > BIG_BOOK_BYTES then return false end
+    local cache = DocSettings:open(path):readSetting("cache_file_path")
+    return cache ~= nil and lfs.attributes(cache, "mode") == "file"
+end
+
+-- Like the Kindle: the cover says "Opening" until the book shows. A book that takes longer, being
+-- laid out, gets the loading screen, a spinner holding the screen until the book is ready.
 function Lexeme:openBook(path)
     if path:find("^lexeme%-delivery:") then return end
     if self.shell then
@@ -175,11 +189,12 @@ function Lexeme:openBook(path)
         UIManager:setDirty(self.shell, "fast")
         UIManager:forceRePaint()
     end
+    local quick = opensQuickly(path)
     -- Turning the spinner keeps a copy of KOReader's memory while the book is laid out; a book
     -- this big needs it more than the spinner does.
     local still = (lfs.attributes(path, "size") or 0) > BIG_BOOK_BYTES
-    UIManager:scheduleIn(0.5, function()
-        require("lexeme/loading").show(nil, still)
+    UIManager:nextTick(function()
+        if not quick then require("lexeme/loading").show(nil, still) end
         UIManager:nextTick(function()
             require("apps/reader/readerui"):showReader(path, nil, true)
         end)

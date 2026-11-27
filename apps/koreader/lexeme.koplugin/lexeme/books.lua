@@ -157,6 +157,13 @@ local function findFiles(dir, callback)
     end
 end
 
+-- The library as last scanned.
+local last_scan
+
+function Books.scanned()
+    return last_scan ~= nil
+end
+
 function Books.scan()
     local manager = infoManager()
     local read_times = lastReadTimes()
@@ -173,7 +180,31 @@ function Books.scan()
         if MOBI_KINDS[ext:lower()] and mobiLocked(path, attr.modification) then return end
         table.insert(list, describe(path, file, attr.modification, read_times, manager))
     end)
+    last_scan = list
     return list
+end
+
+-- The last scan, with the book read last described again: all that closing a book changes. Shown
+-- while the library is scanned again in case files came or went. nil before the first scan.
+function Books.lastScan()
+    if not last_scan then return nil end
+    local recent = ReadHistory.hist[1] and ReadHistory.hist[1].file
+    local list = {}
+    for i, book in ipairs(last_scan) do
+        list[i] = book.path == recent and Books.forPath(book.path) or book
+    end
+    last_scan = list
+    return list
+end
+
+-- What the library shows of each book, to tell whether a new scan changed anything.
+function Books.signature(list)
+    local parts = {}
+    for i, book in ipairs(list) do
+        parts[i] = table.concat({ book.path, book.title, book.authors or "", book.added, book.last_read,
+            book.recent or "", book.status, book.percent or "" }, "\1")
+    end
+    return table.concat(parts, "\2")
 end
 
 -- Each sort in ascending order: oldest, A to Z.
@@ -238,10 +269,13 @@ function Books.query(list, filters, sort, descending)
 end
 
 local cover_cache = {}
+-- The paint each cover was last drawn in, counted by Books.nextPaint.
+local cover_paint, paint = {}, 0
 
 -- Returns the cover scaled to fit w x h, or nil when there is none (yet).
 function Books.cover(book, w, h)
     local key = book.path .. "|" .. w .. "|" .. h
+    cover_paint[key] = paint
     local cached = cover_cache[key]
     if cached ~= nil then return cached or nil end
     local manager = infoManager()
@@ -278,11 +312,21 @@ function Books.fill(image, w, h)
     return cropped
 end
 
-function Books.clearCovers()
-    for _, bb in pairs(cover_cache) do
-        if bb then bb:free() end
+-- Home starts painting its covers.
+function Books.nextPaint()
+    paint = paint + 1
+end
+
+-- Frees the covers; with `keep_shown`, all but the ones Home painted last, which it shows again
+-- when a book closes (scaling them anew took most of its first paint).
+function Books.clearCovers(keep_shown)
+    for key, bb in pairs(cover_cache) do
+        if not (keep_shown and cover_paint[key] == paint) then
+            if bb then bb:free() end
+            cover_cache[key] = nil
+            cover_paint[key] = nil
+        end
     end
-    cover_cache = {}
 end
 
 local extracting = false

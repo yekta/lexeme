@@ -15,8 +15,10 @@ them. Each book gets them one of three ways, set up when it opens:
   otherwise a location per 110 characters, estimated from a few pages) spread over the book's
   height. A MOBI set up before this keeps the synthetic page map it was given then.
 
-A book with its own (print) page list keeps it, and has no locations.
+A book with its own (print) page list keeps it, and has no locations. A converted book's print
+pages, if it has any, are in lexeme_print_pages.tsv beside its sidecar.
 ]]
+local DocSettings = require("docsettings")
 local Event = require("ui/event")
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
@@ -27,6 +29,8 @@ local Locations = {}
 local CHARS_PER_LOCATION = 110
 local MOBI_BYTES_PER_LOCATION = 150
 local INDEX_FILE = "META-INF/lexeme-locations.txt"
+-- A line per print page: its label, a tab, and the id of the anchor where it starts.
+local PRINT_FILE = "lexeme_print_pages.tsv"
 
 -- What each open document's locations come from, by document.
 local books = setmetatable({}, { __mode = "k" })
@@ -268,11 +272,57 @@ local function record(ui, kind, count, labels)
     UIManager:broadcastEvent(Event:new("UsePageLabelsUpdated"))
 end
 
+-- Print pages ------------------------------------------------------------------------
+-- Kept out of the sidecar, which KOReader rewrites whole at every close, sleep and periodic save
+-- (4 s for Woolf's 16,000 print pages) and which Home reads for every book in the history.
+
+local function printFile(ui)
+    return DocSettings:getSidecarDir(ui.document.file) .. "/" .. PRINT_FILE
+end
+
+-- Books converted before the file existed have their print pages in the sidecar: they move out.
+local function moveOutPrintPages(ui)
+    local settings = ui.doc_settings
+    local pages = settings:readSetting("lexeme_print_page_map")
+    if type(pages) ~= "table" then return end
+    local lines = {}
+    for i, page in ipairs(pages) do
+        lines[i] = tostring(page.label):gsub("[\t\n]", " ") .. "\t" .. tostring(page.target) .. "\n"
+    end
+    local path = printFile(ui)
+    local file = io.open(path .. ".part", "wb")
+    local written = file and file:write(table.concat(lines)) and file:close()
+    if not (written and os.rename(path .. ".part", path)) then
+        logger.warn("Lexeme: couldn't write", path)
+        return
+    end
+    settings:delSetting("lexeme_print_page_map")
+    logger.info("Lexeme: moved", #pages, "print pages out of the sidecar")
+end
+
+-- The book's print pages as { label, target } in order, read once; nil without any.
+local function printPages(ui, book)
+    if book.print_pages == nil then
+        local pages = {}
+        local file = io.open(printFile(ui), "rb")
+        if file then
+            for line in file:lines() do
+                local label, target = line:match("^([^\t]*)\t(.+)$")
+                if label then pages[#pages + 1] = { label = label, target = target } end
+            end
+            file:close()
+        end
+        book.print_pages = #pages > 0 and pages or false
+    end
+    return book.print_pages or ui.doc_settings:readSetting("lexeme_print_page_map")
+end
+
 -- Setup -----------------------------------------------------------------------------
 
 -- Gives the book its locations when it opens.
 function Locations.setup(ui)
     if not (ui.rolling and ui.doc_settings) then return end
+    moveOutPrintPages(ui)
     local document, settings = ui.document, ui.doc_settings
     local kind = settings:readSetting("lexeme_locations")
     local index = readIndex(document)
@@ -407,15 +457,15 @@ function Locations.replacesPages(ui)
     return book ~= nil and book.how ~= "height"
 end
 
--- The print edition's page at the current page, from a converted book's lexeme_print_page_map
--- (label and position of each print page), and the last one; nil without one. A binary search
--- places only the few entries it compares.
+-- The print edition's page at the current page, from a converted book's print pages (label and
+-- position of each), and the last one; nil without any. A binary search places only the few
+-- entries it compares.
 function Locations.printPage(ui)
-    local map = ui.doc_settings and ui.doc_settings:readSetting("lexeme_print_page_map")
-    if type(map) ~= "table" or #map == 0 then return nil end
     local document = ui.document
-    local book = books[document]
+    local book = document and ui.doc_settings and books[document]
     if not book then return nil end
+    local map = printPages(ui, book)
+    if type(map) ~= "table" or #map == 0 then return nil end
     local page = document:getCurrentPage()
     local layout = document:getPageCount()
     if not (book.print and book.print.layout == layout) then

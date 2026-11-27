@@ -46,6 +46,15 @@ Apple silicon use a Rosetta VM, e.g. `colima start --vm-type vz --vz-rosetta`).
 Kindle's KOReader. A KOReader update replaces them; build again for the new
 version.
 
+### Verb forms in the dictionary
+
+The dictionary sheet says which conjugation a French word is, in French
+grammar's terms ("oblique is a form of obliquer: présent de l'indicatif et du
+subjonctif (je, il/elle); impératif (tu)"), from `lexeme_forms.sqlite3` in
+`koreader/settings/`. `scripts/french_forms.py` builds it from kaikki.org's
+French Wiktionary data (about 60 MB to download, 7.8 MB built); without it the
+sheet just leaves the line out.
+
 ### Rules that keep the Kindle alive
 
 - Touches must look like a finger: tracking id 0, a growing

@@ -13,6 +13,7 @@ local util = require("util")
 local Button = require("lexeme/button")
 local D = require("lexeme/draw")
 local Definition = require("lexeme/definition")
+local Forms = require("lexeme/forms")
 local Headwords = require("lexeme/headwords")
 local Menu = require("lexeme/menu")
 local Toast = require("lexeme/toast")
@@ -47,6 +48,8 @@ body { margin: 0; line-height: 1.3; }
 .lexeme-hw { font-weight: bold; font-size: 1.1em; margin-bottom: 0.2em; }
 .lexeme-ipa { font-weight: normal; font-size: 0.8em; }
 .lexeme-label { font-style: italic; }
+.lexeme-entry { margin-top: 1em; }
+.lexeme-form { margin-bottom: 0.4em; }
 ol, ul { margin: 0; padding: 0 0 0 1.4em; }
 blockquote, dd { margin: 0 1em; }
 ]]
@@ -305,12 +308,35 @@ end
 
 local TABS = { "Dictionary", "Wikipedia", "Translate", "Search" }
 
+-- "oblique is a form of obliquer: présent de l'indicatif et du subjonctif (je, il/elle); impératif (tu).",
+-- or "".
+local function formLine(word, headword)
+    local form, text = Forms.describe(word, headword)
+    if not form then return "" end
+    return string.format('<div class="lexeme-form"><b>%s</b> is a form of <b>%s</b>: %s.</div>',
+        util.htmlEscape(form), util.htmlEscape(headword), util.htmlEscape(text))
+end
+
+-- Every entry the shown dictionary has for the word ("oblique", then the verb "obliquer"), one
+-- under the other; `index` is the first of them.
+function Selection:entriesHtml()
+    local dict = self.results[self.index].dict
+    local parts = {}
+    for _, result in ipairs(self.results) do
+        if result.dict == dict then
+            local html = formLine(self.word, result.word) .. Definition.html(result)
+            table.insert(parts, #parts == 0 and html or '<div class="lexeme-entry">' .. html .. "</div>")
+        end
+    end
+    return table.concat(parts)
+end
+
 function Selection:htmlWidget(w, h)
     if self.html and self.html_index == self.index then return self.html end
     if self.html then self.html:free() end
     local result = self.results[self.index]
     self.html = HtmlBoxWidget:new{ dimen = Geom:new{ w = w, h = h } }
-    self.html:setContent(Definition.html(result), (result.css or "") .. CSS, D.s(30), false, nil,
+    self.html:setContent(self:entriesHtml(), (result.css or "") .. CSS, D.s(30), false, nil,
         result.dictionary_resource_directory)
     self.html_index = self.index
     return self.html
@@ -688,14 +714,20 @@ function Selection:onSwipe(direction, ges)
 end
 
 -- Below the ⋮ on a sheet at the top, above it on one at the bottom.
-function Selection:openDictionaryMenu(right, footer, below)
-    local items = {
-        {
-            text = "Change dictionary",
-            enabled = #self.results > 1,
-            callback = function() self:chooseDictionary(right, footer - D.s(60)) end,
-        },
-    }
+-- Each dictionary with an entry for the word, and where its entries start in the results.
+function Selection:dictionaries()
+    local seen, list = {}, {}
+    for i, result in ipairs(self.results) do
+        if result.dict and not seen[result.dict] then
+            seen[result.dict] = true
+            table.insert(list, { name = result.dict, index = i })
+        end
+    end
+    return list
+end
+
+-- A menu that opens from the footer: below it on a sheet at the top, above it on one at the bottom.
+local function footerMenu(items, right, footer, below)
     if below then
         Menu:new{ items = items, right = right, top = footer + D.s(34) }:show()
     else
@@ -703,16 +735,39 @@ function Selection:openDictionaryMenu(right, footer, below)
     end
 end
 
-function Selection:chooseDictionary(right, bottom)
+function Selection:openDictionaryMenu(right, footer, below)
+    footerMenu({
+        {
+            text = "Change dictionary",
+            enabled = #self:dictionaries() > 1,
+            callback = function() self:chooseDictionary(right, footer, below) end,
+        },
+    }, right, footer, below)
+end
+
+-- A dictionary picked for a word stays the book's first from then on, as on a Kindle.
+local function preferDictionary(ui, name)
+    local dictionary = ui.dictionary
+    if not (dictionary and dictionary.preferred_dictionaries and name) then return end
+    local preferred = dictionary.preferred_dictionaries
+    for i = #preferred, 1, -1 do
+        if preferred[i] == name then table.remove(preferred, i) end
+    end
+    table.insert(preferred, 1, name)
+    dictionary:updateSdcvDictNamesOptions()
+end
+
+function Selection:chooseDictionary(right, footer, below)
     local items = {}
-    for i, result in ipairs(self.results) do
-        table.insert(items, { text = result.word .. "  ·  " .. result.dict, callback = function()
-            self.index = i
+    for _, dict in ipairs(self:dictionaries()) do
+        table.insert(items, { text = dict.name, callback = function()
+            self.index = dict.index
             self.page = 1
+            preferDictionary(self.ui, dict.name)
             self:refresh()
         end })
     end
-    Menu:new{ items = items, right = right, bottom = bottom }:show()
+    footerMenu(items, right, footer, below)
 end
 
 -- The selection's boxes on screen, from the highlight still being made.

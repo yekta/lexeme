@@ -1,6 +1,7 @@
 -- Puts the Kindle reading chrome on KOReader's reader.
 local UIManager = require("ui/uimanager")
 local util = require("util")
+local lfs = require("libs/libkoreader-lfs")
 
 local Footer = require("lexeme/footer")
 local HighlightPositions = require("lexeme/highlight_positions")
@@ -171,6 +172,18 @@ function Reader.install(ui)
         Selection.show(ui, { boxes = boxes, highlight_index = index })
         return true
     end
+end
+
+-- The reading settings go in before the book loads too, after KOReader's own: crengine styles the
+-- book as it loads it, and anything that differs by the time it's laid out (the stylesheet, a
+-- margin a pixel off from KOReader's rounding) has it style the whole book again.
+function Reader.beforeLoad(ui)
+    if not ui.rolling then return end
+    -- A book laid out before loads its styles with it from crengine's cache: nothing to gain, and
+    -- reading the stylesheets out of the EPUB would only slow its opening down.
+    local cache = ui.doc_settings:readSetting("cache_file_path")
+    if cache and lfs.attributes(cache, "mode") == "file" then return end
+    Layout.applyBeforeRender(ui)
 end
 
 function Reader.beforeRender(ui)

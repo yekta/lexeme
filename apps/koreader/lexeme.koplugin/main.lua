@@ -90,6 +90,11 @@ function Lexeme:init()
     end)
 end
 
+-- Plugins read their settings after KOReader's own reader modules, and before the book loads.
+function Lexeme:onReadSettings()
+    if self.ui.document then Reader.beforeLoad(self.ui) end
+end
+
 function Lexeme:onPreRenderDocument()
     Reader.beforeRender(self.ui)
 end

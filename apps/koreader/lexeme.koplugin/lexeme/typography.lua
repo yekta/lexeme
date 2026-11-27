@@ -3,6 +3,11 @@ The stylesheet that makes KOReader set a page the way the Kindle does. crengine
 floors lengths where the Kindle rounds, so line heights get half a pixel added.
 Books converted from KFX keep vertical margins in line heights, which KFX Input
 writes as em × 1.2; they're scaled back so they follow the line spacing.
+
+It's set before the book loads as well as after: crengine styles every element as it loads, and
+a stylesheet that changes once it has loaded makes it style them all again (a quarter of the time
+a first opening takes, and twice the memory). Before loading, the engine can't read the book's
+files, so its stylesheets are read from the EPUB itself; after, the engine's copy decides.
 ]]
 local Typography = {}
 
@@ -77,15 +82,45 @@ local function bookCss(document)
     return table.concat(parts, "\n")
 end
 
+-- The book's container.xml, OPF and stylesheets read from the EPUB file, as a document whose
+-- getDocumentFileContent serves them; nil when it isn't an EPUB or can't be read.
+local function epubFiles(path)
+    if not (path and path:lower():match("%.epub$")) then return nil end
+    local ok, Archiver = pcall(require, "ffi/archiver")
+    if not ok then return nil end
+    local reader = Archiver.Reader:new()
+    if not reader:open(path) then return nil end
+    local files = {}
+    for entry in reader:iterate() do
+        local name = entry.path
+        if name == "META-INF/container.xml" or name:match("%.[Oo][Pp][Ff]$") or name:match("%.[Cc][Ss][Ss]$") then
+            files[name] = reader:extractToMemory(name)
+        end
+    end
+    reader:close()
+    local function decoded(name)
+        return (name:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
+    end
+    return { getDocumentFileContent = function(_, name) return files[name] or files[decoded(name)] end }
+end
+
+-- Parsed rules by document: "early" from the file before the engine has loaded it, "loaded" after.
 local cache = setmetatable({}, { __mode = "k" })
 
 local function bookRules(document)
-    if cache[document] then return cache[document] end
-    local ok, css = pcall(bookCss, document)
-    local parsed = { rules = rules(ok and css or "") }
-    parsed.kfx = (ok and css or ""):find("%.class_s%w+%s*{") ~= nil
-    cache[document] = parsed
-    return parsed
+    -- Only KOReader's documents say whether they're loaded; anything else can read its files.
+    local loaded = document._loaded ~= false
+    local kept = cache[document] or {}
+    cache[document] = kept
+    local key = loaded and "loaded" or "early"
+    if kept[key] then return kept[key] end
+    local source = document
+    if not loaded then source = epubFiles(document.file) end
+    local ok, css = false, ""
+    if source then ok, css = pcall(bookCss, source) end
+    css = ok and css or ""
+    kept[key] = { rules = rules(css), kfx = css:find("%.class_s%w+%s*{") ~= nil }
+    return kept[key]
 end
 
 local function number(n)

@@ -4,6 +4,7 @@ export * from "./card-state.ts";
 export * from "./constants.ts";
 export * from "./deck-export.ts";
 export * from "./page-estimate.ts";
+export * from "./position-unit.ts";
 export * from "./reading-stats.ts";
 export * from "./study-buckets.ts";
 export * from "./fsrs/fsrs.ts";

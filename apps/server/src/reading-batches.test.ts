@@ -26,3 +26,11 @@ test("books go first, rows in batches of 2000, deletions last, and nothing is lo
   assert.deepEqual(batches.at(-1)?.removed_book_keys, ["gone"]);
   assert.deepEqual(batches[0]?.removed_book_keys, []);
 });
+
+test("the device's position unit is applied once, with the books", () => {
+  const batches = readingBatches({ ...empty, position_unit: "location" });
+  assert.deepEqual(
+    batches.map((batch) => batch.position_unit),
+    ["location", undefined],
+  );
+});

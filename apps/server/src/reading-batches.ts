@@ -24,7 +24,7 @@ export function readingBatches(args: TSyncReading): TSyncReading[] {
     removed_book_keys: [],
   };
   return [
-    { ...empty, books: args.books },
+    { ...empty, books: args.books, position_unit: args.position_unit },
     ...chunks(args.page_reads).map((page_reads) => ({ ...empty, page_reads })),
     ...chunks(args.highlights).map((highlights) => ({ ...empty, highlights })),
     ...chunks(args.lookups).map((lookups) => ({ ...empty, lookups })),

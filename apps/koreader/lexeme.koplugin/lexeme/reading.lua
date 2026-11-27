@@ -71,6 +71,7 @@ local function highlightsOf(key, settings)
                 note = item.note,
                 chapter = item.chapter,
                 page = item.pageno and tostring(item.pageno) or nil,
+                location = item.lexeme_location,
                 highlighted_at = parseDatetime(item.datetime) or os.time() * 1000,
             })
         end
@@ -115,6 +116,7 @@ function Reading.books()
                     progress = progress,
                     status = finished and "finished" or status(summary.status),
                     pages = settings:readSetting("doc_pages"),
+                    locations = settings:readSetting("lexeme_locations"),
                     last_read_at = (entry.time or 0) * 1000,
                     finished_at = finished and (parseDatetime(summary.modified) or (entry.time or 0) * 1000) or nil,
                 })

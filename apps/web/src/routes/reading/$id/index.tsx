@@ -1,4 +1,4 @@
-import { formatReadingTime } from "@lexeme/shared";
+import { formatLocation, formatReadingTime } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
 
@@ -15,7 +15,7 @@ import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
-import { useBookReading, useIsCard, type TBook } from "@/hooks/data/use-reading";
+import { useBookReading, useIsCard, usePositionUnit, type TBook } from "@/hooks/data/use-reading";
 import { formatRelativeDay } from "@/lib/relative-day";
 
 export const Route = createFileRoute("/reading/$id/")({
@@ -107,6 +107,7 @@ function BookPage() {
 }
 
 function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSeconds: number; daysRead: number }) {
+  const { unit } = usePositionUnit();
   const percent = Math.round((book.progress ?? 0) * 100);
   const finished = book.status === "finished";
   const description = book.description ? plainText(book.description) : null;
@@ -115,7 +116,9 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
     !finished && book.last_read_at && { label: "Last read", value: formatRelativeDay(book.last_read_at) },
     totalSeconds > 0 && { label: "Time read", value: formatReadingTime(totalSeconds) },
     daysRead > 0 && { label: daysRead === 1 ? "Day" : "Days", value: String(daysRead) },
-    book.pages && { label: "Pages", value: String(book.pages) },
+    unit === "location" && book.locations
+      ? { label: "Locations", value: formatLocation(book.locations) }
+      : book.pages && { label: "Pages", value: String(book.pages) },
   ].filter((fact) => !!fact);
 
   return (

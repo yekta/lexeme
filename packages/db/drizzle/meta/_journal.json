@@ -148,6 +148,13 @@
       "when": 1795607451719,
       "tag": "0020_lookup_headword",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795782824654,
+      "tag": "0021_kindle_locations",
+      "breakpoints": true
     }
   ]
 }

@@ -53,6 +53,8 @@ function Aa:render(bb, x, y, w, h)
         self:paintSpacing(bb, x, top, w)
     elseif self.page == "manage_themes" then
         self:paintManageThemes(bb, x, top, w)
+    elseif self.page == "reading_progress" then
+        self:paintReadingProgress(bb, x, top)
     elseif self.tab == "themes" then
         self:paintThemes(bb, x, top, w, y + h)
     elseif self.tab == "font" then
@@ -84,7 +86,12 @@ function Aa:paintTabs(bb, x, y, w)
 end
 
 function Aa:paintSubpageHeader(bb, x, y, w)
-    local titles = { font_family = "Font family", spacing = "Spacing", manage_themes = "Manage themes" }
+    local titles = {
+        font_family = "Font family",
+        spacing = "Spacing",
+        manage_themes = "Manage themes",
+        reading_progress = "Reading progress",
+    }
     local title = titles[self.page]
     D.icon(bb, "arrow-left", x + D.s(44), y + D.s(713 - PANEL_TOP), D.s(44), D.s(44))
     D.text(bb, x + D.s(108), y + D.s(745 - PANEL_TOP), D.face("bold", 32), title)
@@ -440,19 +447,12 @@ local function modeLabel()
     end
 end
 
-local function nextMode()
-    local mode = Footer.mode()
-    for i, m in ipairs(Footer.MODES) do
-        if m.key == mode then return Footer.MODES[i % #Footer.MODES + 1].key end
-    end
-end
-
 function Aa:paintMore(bb, x, top, w)
     local rows = {
         {
             title = "Reading progress",
             value = modeLabel(),
-            tap = function() G_reader_settings:saveSetting("lexeme_progress_mode", nextMode()) end,
+            page = "reading_progress",
         },
         {
             title = "Show clock while reading",
@@ -486,12 +486,33 @@ function Aa:paintMore(bb, x, top, w)
             C.toggle(bb, x + w - D.s(80), row_top + math.floor(h / 2), row.toggle)
         end
         self:hit(x, row_top, w, h, function()
-            row.tap()
-            UIManager:setDirty(self.ui.dialog, "ui")
+            if row.page then
+                self.page = row.page
+            else
+                row.tap()
+                UIManager:setDirty(self.ui.dialog, "ui")
+            end
             self:refresh()
         end)
         row_top = row_top + h
         D.rect(bb, x + D.s(36), row_top - D.s(2), w - D.s(150), D.s(2))
+    end
+end
+
+function Aa:paintReadingProgress(bb, x, top)
+    local mode = Footer.mode()
+    for i, m in ipairs(Footer.MODES) do
+        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+        local rx, cy = x + D.s(col == 0 and 89 or 661), top + D.s(110 + row * 117)
+        local size = D.s(37)
+        D.icon(bb, m.key == mode and "radio-on-small" or "radio", rx, cy - math.floor(size / 2), size, size)
+        D.text(bb, rx + D.s(76), cy + D.s(12), D.face("regular", 32), m.label)
+        self:hit(rx - D.s(20), cy - D.s(55), D.s(550), D.s(110), function()
+            if m.key == mode then return end
+            G_reader_settings:saveSetting("lexeme_progress_mode", m.key)
+            UIManager:setDirty(self.ui.dialog, "ui")
+            self:refresh()
+        end)
     end
 end
 

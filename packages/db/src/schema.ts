@@ -264,6 +264,8 @@ export const books = pgTable(
     /** "reading" | "finished" | "abandoned" */
     status: text("status").notNull(),
     pages: integer("pages"),
+    /** How many Kindle locations the book has. */
+    locations: integer("locations"),
     series: text("series"),
     language: text("language"),
     description: text("description"),
@@ -324,6 +326,8 @@ export const highlights = pgTable(
     note: text("note"),
     chapter: text("chapter"),
     page: text("page"),
+    /** The Kindle location the highlight starts in; unlike the page, layout doesn't move it. */
+    location: integer("location"),
     highlighted_at: timestamp("highlighted_at", { withTimezone: true }).notNull(),
     created_at: createdAt(),
     updated_at: updatedAt(),
@@ -350,13 +354,19 @@ export const lookups = pgTable(
   (t) => [index("lookups_user_id_idx").on(t.user_id)],
 );
 
-/** What counts as a day read: minutes read, in a day that starts at `day_starts_at` minutes past midnight. */
+/**
+ * How the user reads: what counts as a day read (minutes read, in a day that
+ * starts at `day_starts_at` minutes past midnight), and whether places in a
+ * book are given as pages or Kindle locations.
+ */
 export const readingGoals = pgTable("reading_goals", {
   user_id: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   daily_minutes: integer("daily_minutes").notNull().default(15),
   day_starts_at: integer("day_starts_at").notNull().default(0),
+  /** "page" | "location" */
+  position_unit: text("position_unit").notNull().default("page"),
   created_at: createdAt(),
   updated_at: updatedAt(),
 });

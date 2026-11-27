@@ -93,6 +93,11 @@ function Lexeme:onCloseDocument()
     require("lexeme/sync").soon()
 end
 
+-- Saved with the book's settings, so highlights reach Lexeme with their Kindle locations.
+function Lexeme:onSaveSettings()
+    if self.ui.document then require("lexeme/locations").record(self.ui) end
+end
+
 function Lexeme:onSuspend()
     require("lexeme/network").beforeSleep()
     require("lexeme/timer").pause()

@@ -55,6 +55,15 @@ subjonctif (je, il/elle); impératif (tu)"), from `lexeme_forms.sqlite3` in
 French Wiktionary data (about 60 MB to download, 7.8 MB built); without it the
 sheet just leaves the line out.
 
+### Dictionaries
+
+KOReader looks words up with sdcv, which needs a dictionary's `.idx` and
+`.syn` sorted with only A–Z folded to lowercase. xxyzz's Wiktionary
+dictionaries sort "É" beside "é", so sdcv misses words like "école" or
+"égout" and shows unrelated fuzzy matches instead.
+`scripts/sort_stardict.py <dictionary.ifo> <out dir>` re-sorts both files;
+copy them over the dictionary's and delete its `.oft` caches.
+
 ### Vocabulary Builder
 
 Lexeme keeps every word looked up while reading in

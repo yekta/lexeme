@@ -142,8 +142,8 @@ function Settings:readingPage()
                 },
                 {
                     title = "Precise text shaping",
-                    subtitle = "Shape text with HarfBuzz, as KOReader's Best kerning. "
-                        .. "Laying out a book takes about three times as long.",
+                    subtitle = "Kerning and ligatures from the font, as KOReader's Best kerning. "
+                        .. "Off, books lay out faster, but Bookerly isn't kerned at all.",
                     toggle = require("lexeme/layout").kerning() == require("lexeme/layout").KERNING_BEST,
                     tap = function()
                         local Layout = require("lexeme/layout")

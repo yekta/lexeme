@@ -62,9 +62,10 @@ Layout.BOTTOM_MARGIN = 70
 local FONT_HINTING, FONT_GAMMA = 2, 15
 -- crengine won't draw a font bigger than this, so bigger sizes are scaled up in CSS.
 local MAX_ENGINE_SIZE = 72
--- Kerning, as crengine's font.kerning.mode: 1 kerns letter pairs from the font; 3 shapes text with
--- HarfBuzz (KOReader's Best), which lays a book out about three times slower and looks the same
--- in Latin text.
+-- Kerning, as crengine's font.kerning.mode: 3 shapes text with HarfBuzz (KOReader's Best and its
+-- default), which applies the font's OpenType kerning and ligatures. 1 lays a book out about three
+-- times faster but reads only a legacy 'kern' table, which Bookerly and most recent fonts don't
+-- have, so they aren't kerned at all.
 Layout.KERNING_FAST, Layout.KERNING_BEST = 1, 3
 
 local DEFAULTS = {
@@ -77,7 +78,7 @@ local DEFAULTS = {
     lexeme_character_spacing = 0,
     lexeme_margins = 1,
     lexeme_align = "justify",
-    lexeme_kerning = Layout.KERNING_FAST,
+    lexeme_kerning = Layout.KERNING_BEST,
 }
 
 function Layout.get(key)

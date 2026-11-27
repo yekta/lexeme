@@ -123,4 +123,38 @@ function Definition.html(result)
     return '<div class="lexeme-hw">' .. util.htmlEscape(result.word or "") .. pronunciation .. "</div>" .. body
 end
 
+-- "oblique is a form of obliquer: présent de l'indicatif et du subjonctif (je, il/elle); impératif (tu).",
+-- or "".
+local function formLine(word, headword)
+    local form, text = require("lexeme/forms").describe(word, headword)
+    if not form then return "" end
+    return string.format('<div class="lexeme-form"><b>%s</b> is a form of <b>%s</b>: %s.</div>',
+        util.htmlEscape(form), util.htmlEscape(headword), util.htmlEscape(text))
+end
+
+-- Every entry `dict` has for the word ("oblique", then the verb "obliquer"), one under the other.
+function Definition.entries(word, results, dict)
+    local parts = {}
+    for _, result in ipairs(results) do
+        if result.dict == dict then
+            local html = formLine(word, result.word) .. Definition.html(result)
+            table.insert(parts, #parts == 0 and html or '<div class="lexeme-entry">' .. html .. "</div>")
+        end
+    end
+    return table.concat(parts)
+end
+
+-- The style the entries are shown in, after the dictionary's own.
+Definition.CSS = [[
+@page { margin: 0; font-family: 'Noto Sans'; }
+body { margin: 0; line-height: 1.3; }
+.lexeme-hw { font-weight: bold; font-size: 1.1em; margin-bottom: 0.2em; }
+.lexeme-ipa { font-weight: normal; font-size: 0.8em; }
+.lexeme-label { font-style: italic; }
+.lexeme-entry { margin-top: 1em; }
+.lexeme-form { margin-bottom: 0.4em; }
+ol, ul { margin: 0; padding: 0 0 0 1.4em; }
+blockquote, dd { margin: 0 1em; }
+]]
+
 return Definition

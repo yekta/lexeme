@@ -257,6 +257,8 @@ local function contextOf(before, word, after)
     return text ~= word and text or nil
 end
 
+Reading.sentence = contextOf
+
 --[[
 Words looked up in KOReader since `since`. The dictionary's lookup history has
 every look-up; Vocabulary Builder keeps one row per word with the sentence it

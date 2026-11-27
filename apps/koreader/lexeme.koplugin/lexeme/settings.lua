@@ -166,6 +166,15 @@ function Settings:readingPage()
                     end,
                 },
                 {
+                    title = "Vocabulary Builder",
+                    subtitle = "Keep the words you look up, with the sentence you read them in.",
+                    toggle = G_reader_settings:nilOrTrue("lexeme_vocabulary_builder"),
+                    tap = function()
+                        G_reader_settings:flipNilOrTrue("lexeme_vocabulary_builder")
+                        self:refresh()
+                    end,
+                },
+                {
                     title = "Hold to select",
                     subtitle = "Set how long to hold a word before it's selected.",
                     value = secondsLabel(holdMs()),

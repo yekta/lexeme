@@ -7,8 +7,10 @@ local HighlightPositions = require("lexeme/highlight_positions")
 local Layout = require("lexeme/layout")
 local Marks = require("lexeme/marks")
 local Quick = require("lexeme/quick")
+local Reading = require("lexeme/reading")
 local Selection = require("lexeme/selection")
 local Toolbar = require("lexeme/toolbar")
+local Vocabulary = require("lexeme/vocabulary")
 
 local Reader = {}
 
@@ -27,6 +29,7 @@ local function actions(ui)
         end,
         more_items = function()
             return {
+                { text = "Vocabulary Builder", callback = function() require("lexeme/vocabulary_screen").show(ui) end },
                 { text = "About this book", callback = function() require("lexeme/about").open(ui.document.file) end },
                 { text = "Settings", callback = function() require("lexeme/settings").show() end },
             }
@@ -114,7 +117,18 @@ function Reader.install(ui)
     ui.dictionary.showLookupInfo = function(dict, word)
         dict.lookup_progress_msg = Selection.showSearching(ui, word)
     end
+    -- Vocabulary Builder keeps the word with the sentence it was read in, once the sheet is up.
+    local function record(word, results)
+        local ok, sentence, pos = pcall(function()
+            local before, after = ui.highlight:getSelectedWordContext(15)
+            local selected = ui.highlight.selected_text
+            return before and Reading.sentence(before, word, after) or nil, selected and selected.pos0
+        end)
+        if not ok then sentence, pos = nil, nil end
+        UIManager:nextTick(function() Vocabulary.record(ui, word, results, sentence, pos) end)
+    end
     local function showResults(dict, word, results, boxes, close_cb)
+        record(word, results)
         local searching = dict.lookup_progress_msg
         dict.lookup_progress_msg = nil
         local opts = { word = word, results = results, boxes = boxes, close_cb = close_cb,

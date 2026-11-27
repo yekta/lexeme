@@ -55,6 +55,18 @@ subjonctif (je, il/elle); impératif (tu)"), from `lexeme_forms.sqlite3` in
 French Wiktionary data (about 60 MB to download, 7.8 MB built); without it the
 sheet just leaves the line out.
 
+### Vocabulary Builder
+
+Lexeme keeps every word looked up while reading in
+`koreader/settings/lexeme_vocabulary.sqlite3`, with the sentence it was read
+in, the book and its language. The language comes from the dictionary that
+had the word, the sentence around it, then the book's metadata. The first time
+Vocabulary Builder opens, it brings in Amazon's own list
+(`system/vocabulary/vocab.db`, which Amazon trims to 2,000 words; a full copy
+saved as `koreader/settings/lexeme_amazon_vocab.db` is read too) and
+KOReader's lookup history. It's on the reader's and Home's ⋮ menus, and
+Settings > Reading options turns the recording off.
+
 ### Rules that keep the Kindle alive
 
 - Touches must look like a finger: tracking id 0, a growing

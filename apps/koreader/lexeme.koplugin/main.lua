@@ -179,6 +179,7 @@ end
 
 function Lexeme:homeMenuItems()
     return {
+        { text = "Vocabulary Builder", callback = function() require("lexeme/vocabulary_screen").show(self.ui) end },
         { text = "Settings", callback = function() self:openSettings() end },
         "-",
         {

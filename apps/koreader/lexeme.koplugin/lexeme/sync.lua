@@ -20,7 +20,7 @@ local Streak = require("lexeme/streak")
 local Sync = {}
 
 -- Bumped when a sync starts sending something new, so the next one sends it all.
-local SYNC_VERSION = 7
+local SYNC_VERSION = 8
 
 local CHUNK = {
     books = 200, page_reads = 2000, highlights = 500, lookups = 500,
@@ -126,8 +126,9 @@ local function syncAll()
     local snapshot = changedSince(everything, since)
     local now = Sent.addDeleted(everything, snapshot)
     -- Lexeme shows places as this Kindle does: in locations when its progress line shows them, pages otherwise.
+    -- Sent when it changes, and again with everything else when all is resent.
     local position_unit = G_reader_settings:readSetting("lexeme_progress_mode") == "location" and "location" or "page"
-    local unit_changed = position_unit ~= G_reader_settings:readSetting("lexeme_sent_position_unit")
+    local unit_changed = since == 0 or position_unit ~= G_reader_settings:readSetting("lexeme_sent_position_unit")
     if unit_changed then Outbox.push("reading", { position_unit = position_unit }) end
     Sync.queueReading(snapshot)
     Reading.forget(snapshot.removed)

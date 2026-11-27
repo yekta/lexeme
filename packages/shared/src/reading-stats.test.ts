@@ -119,8 +119,25 @@ test("a pause longer than ten minutes starts a new session", () => {
     ended_at: at(9, 2),
     seconds: 120,
     pages: 2,
+    locations: null,
   });
   assert.equal(sessions[0].started_at, at(9, 30));
+});
+
+test("a session counts the distinct locations its pages covered, once each", () => {
+  const located = (page: number, minute: number, location: number, end_location: number) => ({
+    ...read(page, 9, minute, 60),
+    location,
+    end_location,
+  });
+  const [session] = readingSessions([located(1, 0, 100, 112), located(2, 1, 112, 125), located(1, 2, 100, 112)]);
+  assert.equal(session?.pages, 2);
+  assert.equal(session?.locations, 25);
+});
+
+test("a session with a page of unknown locations has no location count", () => {
+  const [session] = readingSessions([{ ...read(1, 9, 0, 60), location: 100, end_location: 112 }, read(2, 9, 1, 60)]);
+  assert.equal(session?.locations, null);
 });
 
 test("sessions never mix books", () => {

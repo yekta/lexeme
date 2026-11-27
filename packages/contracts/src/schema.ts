@@ -154,6 +154,8 @@ const pageReads = table("page_reads")
     book_id: string(),
     page: number(),
     total_pages: number(),
+    location: number().optional(),
+    end_location: number().optional(),
     started_at: number(),
     seconds: number(),
     imported: boolean(),

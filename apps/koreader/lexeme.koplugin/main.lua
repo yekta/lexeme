@@ -93,7 +93,12 @@ function Lexeme:onCloseDocument()
     require("lexeme/sync").soon()
 end
 
--- Saved with the book's settings, so highlights reach Lexeme with their Kindle locations.
+-- Each page read reaches Lexeme with the locations it covered.
+function Lexeme:onPageUpdate(page)
+    if self.ui.document then require("lexeme/locations").notePage(self.ui, page) end
+end
+
+-- Saved with the book's settings, so highlights and pages read reach Lexeme with their Kindle locations.
 function Lexeme:onSaveSettings()
     if self.ui.document then require("lexeme/locations").record(self.ui) end
 end

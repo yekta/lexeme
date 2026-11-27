@@ -297,6 +297,9 @@ export const pageReads = pgTable(
     page: integer("page").notNull(),
     /** The book's page count when the page was read; it changes with the layout. */
     total_pages: integer("total_pages").notNull(),
+    /** The Kindle locations the page covered: from `location` up to, not including, `end_location`. */
+    location: integer("location"),
+    end_location: integer("end_location"),
     started_at: timestamp("started_at", { withTimezone: true }).notNull(),
     seconds: integer("seconds").notNull(),
     /** Brought in from another reader's history; the device's own deletions leave it alone. */

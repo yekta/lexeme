@@ -10,6 +10,7 @@ local logger = require("logger")
 
 local Api = require("lexeme/api")
 local Background = require("lexeme/background")
+local Locations = require("lexeme/locations")
 local Network = require("lexeme/network")
 local Outbox = require("lexeme/outbox")
 local Reading = require("lexeme/reading")
@@ -19,7 +20,7 @@ local Streak = require("lexeme/streak")
 local Sync = {}
 
 -- Bumped when a sync starts sending something new, so the next one sends it all.
-local SYNC_VERSION = 6
+local SYNC_VERSION = 7
 
 local CHUNK = {
     books = 200, page_reads = 2000, highlights = 500, lookups = 500,
@@ -119,6 +120,8 @@ local function syncAll()
     if not G_reader_settings:readSetting("lexeme_user_email") then Sync.fetchAccount() end
     local since = G_reader_settings:readSetting("lexeme_sync_version") == SYNC_VERSION
         and Sync.lastSyncedAt() or 0
+    local reader = require("apps/reader/readerui").instance
+    Locations.recordClosedBooks(reader and reader.document and reader.document.file)
     local everything = Reading.snapshot(since)
     local snapshot = changedSince(everything, since)
     local now = Sent.addDeleted(everything, snapshot)

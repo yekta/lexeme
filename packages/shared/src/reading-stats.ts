@@ -1,5 +1,15 @@
-/** One visit to a page, as KOReader records it: when it started and how long it stayed open. */
-export type TPageRead = { book_id: string; page: number; started_at: number; seconds: number };
+/**
+ * One visit to a page, as KOReader records it: when it started and how long it
+ * stayed open, and the Kindle locations the page covered when the device knows them.
+ */
+export type TPageRead = {
+  book_id: string;
+  page: number;
+  started_at: number;
+  seconds: number;
+  location?: number | null;
+  end_location?: number | null;
+};
 
 /** Reading time on one local calendar day. */
 export type TReadingDay = { day: string; seconds: number };
@@ -13,13 +23,15 @@ export const DEFAULT_DAY_STARTS_AT = 0;
 /** A pause between page turns longer than this ends a reading session. */
 export const SESSION_GAP_SECONDS = 10 * 60;
 
-/** One sitting with a book: first page turn to last, with time spent and pages seen. */
+/** One sitting with a book: first page turn to last, with time spent, and pages and locations seen. */
 export type TReadingSession = {
   book_id: string;
   started_at: number;
   ended_at: number;
   seconds: number;
   pages: number;
+  /** Null when some page's locations aren't known. */
+  locations: number | null;
 };
 
 /** YYYY-MM-DD for a local date. */
@@ -56,21 +68,36 @@ export function bookDays(reads: readonly TPageRead[], dayStartsAt = DEFAULT_DAY_
 export function readingSessions(reads: readonly TPageRead[], gapSeconds = SESSION_GAP_SECONDS): TReadingSession[] {
   const sorted = [...reads].sort((a, b) => a.book_id.localeCompare(b.book_id) || a.started_at - b.started_at);
   const sessions: TReadingSession[] = [];
-  let current: (TReadingSession & { pageSet: Set<number> }) | undefined;
+  type TCurrent = Omit<TReadingSession, "pages" | "locations"> & { pageSet: Set<number>; locationSet: Set<number> | null };
+  let current: TCurrent | undefined;
   const finish = () => {
     if (!current) return;
-    const { pageSet, ...session } = current;
-    sessions.push({ ...session, pages: pageSet.size });
+    const { pageSet, locationSet, ...session } = current;
+    sessions.push({ ...session, pages: pageSet.size, locations: locationSet?.size ?? null });
   };
   for (const read of sorted) {
     const end = read.started_at + read.seconds * 1000;
     if (!current || current.book_id !== read.book_id || read.started_at - current.ended_at > gapSeconds * 1000) {
       finish();
-      current = { book_id: read.book_id, started_at: read.started_at, ended_at: end, seconds: 0, pages: 0, pageSet: new Set() };
+      current = {
+        book_id: read.book_id,
+        started_at: read.started_at,
+        ended_at: end,
+        seconds: 0,
+        pageSet: new Set(),
+        locationSet: new Set(),
+      };
     }
     current.ended_at = Math.max(current.ended_at, end);
     current.seconds += read.seconds;
     current.pageSet.add(read.page);
+    if (read.location == null || read.end_location == null) {
+      current.locationSet = null;
+    } else if (current.locationSet) {
+      for (let location = read.location; location < Math.max(read.end_location, read.location + 1); location++) {
+        current.locationSet.add(location);
+      }
+    }
   }
   finish();
   return sessions.sort((a, b) => b.started_at - a.started_at);

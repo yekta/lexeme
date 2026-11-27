@@ -688,7 +688,7 @@ export const operations: TOperation[] = [
     name: "list-reading-sessions",
     title: "List reading sessions",
     description:
-      "Reading sessions, newest first: one book's page turns with no pause longer than ten minutes. Pass a session's book_id, started_at and ended_at to delete-reading-session to delete it.",
+      "Reading sessions, newest first: one book's page turns with no pause longer than ten minutes, with the distinct pages seen and, when the device sent them, the distinct Kindle locations those pages covered. Pass a session's book_id, started_at and ended_at to delete-reading-session to delete it.",
     role: "viewer",
     method: "GET",
     path: "/reading/sessions",
@@ -703,6 +703,8 @@ export const operations: TOperation[] = [
         .select({
           book_id: pageReads.book_id,
           page: pageReads.page,
+          location: pageReads.location,
+          end_location: pageReads.end_location,
           started_at: pageReads.started_at,
           seconds: pageReads.seconds,
         })
@@ -730,6 +732,7 @@ export const operations: TOperation[] = [
           ended_at: new Date(session.ended_at).toISOString(),
           seconds: session.seconds,
           pages: session.pages,
+          locations: session.locations,
         })),
       };
     },

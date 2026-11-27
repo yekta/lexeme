@@ -10,6 +10,7 @@ local DocSettings = require("docsettings")
 local ReadHistory = require("readhistory")
 local Books = require("lexeme/books")
 local Headwords = require("lexeme/headwords")
+local Locations = require("lexeme/locations")
 local lfs = require("libs/libkoreader-lfs")
 local md5 = require("ffi/sha2").md5
 local util = require("util")
@@ -80,10 +81,10 @@ local function highlightsOf(key, settings)
 end
 
 -- Books in the reading history, with their highlights. Also returns each book's key by
--- the file name it may have been known by before it had a title, and when each book's
--- settings (highlights included) last changed, in seconds.
+-- the file name it may have been known by before it had a title, when each book's
+-- settings (highlights included) last changed, in seconds, and what's known of where its pages lie in locations.
 function Reading.books()
-    local books, highlights, seen, aliases, changed_at = {}, {}, {}, {}, {}
+    local books, highlights, seen, aliases, changed_at, located = {}, {}, {}, {}, {}, {}
     for _, entry in ipairs(ReadHistory.hist) do
         local file = entry.file
         if file and lfs.attributes(file, "mode") == "file" and DocSettings:hasSidecarFile(file) then
@@ -116,15 +117,19 @@ function Reading.books()
                     progress = progress,
                     status = finished and "finished" or status(summary.status),
                     pages = settings:readSetting("doc_pages"),
-                    locations = settings:readSetting("lexeme_locations"),
+                    locations = tonumber(settings:readSetting("lexeme_locations")),
                     last_read_at = (entry.time or 0) * 1000,
                     finished_at = finished and (parseDatetime(summary.modified) or (entry.time or 0) * 1000) or nil,
                 })
                 for _, h in ipairs(highlightsOf(key, settings)) do table.insert(highlights, h) end
+                located[key] = {
+                    total = tonumber(settings:readSetting("lexeme_locations")),
+                    pages = settings:readSetting("lexeme_page_locations"),
+                }
             end
         end
     end
-    return books, highlights, aliases, changed_at
+    return books, highlights, aliases, changed_at, located
 end
 
 --[[
@@ -170,8 +175,9 @@ end
 
 --[[
 Every page visit the statistics plugin recorded since `since` (epoch seconds),
-for books in `known_keys`: which page, when, for how long, and the book's page
-count at the time.
+for books in `known_keys`: which page, when, for how long, the book's page
+count at the time, and the locations the page covered when the book's entry
+in `known_keys` says where its pages lie.
 ]]
 function Reading.pageReads(since, known_keys)
     local reads = {}
@@ -180,12 +186,20 @@ function Reading.pageReads(since, known_keys)
         FROM page_stat_data p JOIN book b ON b.id = p.id_book
         WHERE p.start_time >= %d AND b.md5 IS NOT NULL;]], math.floor(since)))) do
         local key, page, start = row[1], tonumber(row[2]) or 0, tonumber(row[3]) or 0
-        if known_keys[key] then
+        local book = known_keys[key]
+        if book then
+            local total_pages = tonumber(row[5]) or 0
+            local location, end_location
+            if type(book) == "table" then
+                location, end_location = Locations.ofPageRead(book.pages, book.total, page, total_pages)
+            end
             table.insert(reads, {
                 id = Reading.stableId("page:" .. key .. ":" .. page .. ":" .. start),
                 book_key = key,
                 page = page,
-                total_pages = tonumber(row[5]) or 0,
+                total_pages = total_pages,
+                location = location,
+                end_location = end_location,
                 started_at = start * 1000,
                 seconds = tonumber(row[4]) or 0,
             })
@@ -320,10 +334,10 @@ resolves. A page still open at the last sync keeps counting, so the last few
 hours are always resent.
 ]]
 function Reading.snapshot(since)
-    local books, highlights, aliases, changed_at = Reading.books()
+    local books, highlights, aliases, changed_at, located = Reading.books()
     local keys, key_by_title = {}, aliases
     for _, book in ipairs(books) do
-        keys[book.key] = true
+        keys[book.key] = located[book.key] or true
         key_by_title[book.title] = book.key
     end
     local recent = math.max(0, since - 6 * 3600)

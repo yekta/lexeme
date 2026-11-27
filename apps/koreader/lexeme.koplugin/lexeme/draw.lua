@@ -216,7 +216,8 @@ function D.kindleImage(bb, path, w, h, box_x, box_y, box_w, box_h)
     end
     if not image then return false end
     local iw, ih = image:getWidth(), image:getHeight()
-    bb:blitFrom(image, box_x + math.floor((box_w - iw) / 2), box_y + math.floor((box_h - ih) / 2), 0, 0, iw, ih)
+    -- Some Kindles' images are gray with alpha; copied as they are, their transparent pixels come out black.
+    bb:alphablitFrom(image, box_x + math.floor((box_w - iw) / 2), box_y + math.floor((box_h - ih) / 2), 0, 0, iw, ih)
     return true
 end
 

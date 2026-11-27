@@ -68,7 +68,7 @@ export function LCardStudy(props: TLCardStudyProps) {
     <div
       data-placeholder={isPlaceholder ? "true" : undefined}
       data-is-back={isBack ? "true" : undefined}
-      className="w-full flex-1 min-h-0 group perspective-distant md:perspective-[1600px] cursor-pointer data-is-back:cursor-default data-placeholder:cursor-default"
+      className="w-full flex-1 min-h-0 group perspective-distant md:perspective-[1600px]"
       onClick={onClick}
     >
       <motion.div

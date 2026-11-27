@@ -115,7 +115,7 @@ export function ImportCardsForm({
             <div className="max-w-full pt-5 pb-1 flex items-center gap-2">
               <Label
                 htmlFor="import-duplicates"
-                className="cursor-pointer text-warning flex shrink min-w-0 hover:bg-warning/10 active:bg-warning/10 px-2 py-2 rounded-md -mx-2 -my-2 max-w-[calc(100%+1rem)]"
+                className="text-warning flex shrink min-w-0 hover:bg-warning/10 active:bg-warning/10 px-2 py-2 rounded-md -mx-2 -my-2 max-w-[calc(100%+1rem)]"
               >
                 <Checkbox
                   id="import-duplicates"

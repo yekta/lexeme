@@ -303,7 +303,7 @@ function Selection:paintSheet(bb, x, w)
 
     local content_top, content_h, content_w = block + D.s(257), D.s(350), D.s(1096)
     if self.searching then
-        D.text(bb, x + D.s(40), content_top + D.s(36), D.face("regular", 32), "Searching Dictionary…")
+        D.text(bb, x + D.s(40), content_top + D.s(36), D.face("regular", 32), "Searching dictionary…")
     elseif #self.results == 0 then
         D.text(bb, x + D.s(40), content_top + D.s(40), D.face("regular", 32), "No definition found for “" ..
             (self.word or "") .. "”.", D.BLACK, content_w)

@@ -52,7 +52,7 @@ function Settings:rootPage()
                 { icon = "tablet", title = "Device options", page = function() return self:devicePage() end },
                 { icon = "sun", title = "Screen and brightness", page = function() return self:screenPage() end },
                 { icon = "book-open-text", title = "Reading options", page = function() return self:readingPage() end },
-                { icon = "book-open", title = "Home and Library", page = function() return self:libraryPage() end },
+                { icon = "book-open", title = "Home and library", page = function() return self:libraryPage() end },
                 { icon = "languages", title = "Dictionaries", page = function() return self:dictionariesPage() end },
                 { icon = "blocks", title = "Integrations", page = function() return self:integrationsPage() end },
             }
@@ -615,11 +615,11 @@ function Settings:libraryPage()
     local connected = require("lexeme/sync").isConnected()
     local setting = connected and "lexeme_home_stats" or "lexeme_home_recently_added"
     return {
-        title = "Home and Library",
+        title = "Home and library",
         rows = function()
             return {
                 {
-                    title = connected and "Show Stats" or "Show Recently Added",
+                    title = connected and "Show stats" or "Show recently added",
                     subtitle = connected
                         and "Show your reading time, streak and finished books on Home in place of Recently Added."
                         or "Show the books you added most recently on Home.",
@@ -630,7 +630,7 @@ function Settings:libraryPage()
                     end,
                 },
                 connected and {
-                    title = "Show Lexeme Tab",
+                    title = "Show Lexeme tab",
                     subtitle = "Show a Lexeme tab beside Home and Library for studying your decks.",
                     toggle = G_reader_settings:nilOrTrue("lexeme_study_tab"),
                     tap = function()

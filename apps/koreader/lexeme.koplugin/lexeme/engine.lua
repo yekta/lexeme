@@ -37,7 +37,9 @@ local collected = false
 
 -- Done once Home has sat idle a few seconds.
 function Engine.whileIdle()
-    require("document/credocument"):engineInit()
+    -- An engine that can't load is KOReader's to report when a book opens, not Home's.
+    local ok, err = pcall(function() require("document/credocument"):engineInit() end)
+    if not ok then require("logger").warn("Lexeme: engine start-up failed:", err) end
     collectgarbage()
     collectgarbage()
     collected = true

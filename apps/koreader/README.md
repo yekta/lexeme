@@ -38,7 +38,8 @@ own drivers, which breaks MuPDF's layout of dictionary entries. Some Kindles'
 FreeType (a Paperwhite 5 on 5.19.2, FreeType 2.9) is also older than
 KOReader's. It lacks `FT_Error_String`, which crengine calls when logging an
 error, and `FT_Get_Transform`, which HarfBuzz calls when sizing glyphs of a
-transformed font, so neither would load at all. `patches/` fixes all four, and
+transformed font, so neither would load at all. `patches/` fixes these (and
+speeds up crengine's styling, see below), and
 `scripts/build-engine.sh` builds crengine, MuPDF and HarfBuzz for the KOReader
 version on the Kindle with Docker (it needs to run `linux/amd64` images; on
 Apple silicon use a Rosetta VM, e.g. `colima start --vm-type vz --vz-rosetta`).
@@ -90,6 +91,20 @@ partition under Amazon's FUSE layer at `/mnt/us`, where long books' caches
 load a second sooner; Lexeme keeps 1 GB of them. The spinner shown while a
 book opens turns at four frames a second from frames drawn beforehand, and
 stays still for book files over 8 MB, whose layout needs the memory.
+
+A book with a layout cache opens without the loading screen: the cover says
+"Opening" until the book shows. The engine's start-up and the two garbage
+collections KOReader runs before every opening are done while Home sits idle.
+
+crengine styles each element as it loads a book, so Lexeme sets its stylesheet
+and margins before loading, reading the book's own stylesheets from the EPUB:
+set afterwards, they made crengine style the whole book again.
+`patches/crengine-css-class-index.patch` indexes a stylesheet's selectors by
+the class they require, so each element is checked only against the selectors
+it can match. Books converted from KFX carry a thousand class selectors, and
+checking them all against every element took half of a long book's loading.
+Pages come out the same; Virginia Woolf's complete works (23.6 million
+characters) first opened in 77 seconds and now in 47.
 
 ### Vocabulary Builder
 

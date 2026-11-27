@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds KOReader's crengine and MuPDF libraries for the Kindle with patches/ applied.
+# Builds KOReader's crengine, MuPDF and HarfBuzz libraries for the Kindle with patches/ applied.
 # Usage: build-engine.sh [KOREADER_VERSION], e.g. v2026.07.1; defaults to the version on the Kindle.
 # Needs Docker able to run linux/amd64 images (Rosetta on Apple silicon). The libraries land in
 # build/<version>/libs/, where deploy.sh picks it up.
@@ -20,7 +20,12 @@ docker run --rm --platform linux/amd64 -v "$PWD/patches:/patches:ro" -v "$OUT:/o
       cp \"\$p\" thirdparty/mupdf/
       sed -i \"/^list(APPEND PATCH_FILES/,/^)/ s|^)|    \$(basename \"\$p\")\\n)|\" thirdparty/mupdf/CMakeLists.txt
     done
+    for p in /patches/harfbuzz-*.patch; do
+      cp \"\$p\" thirdparty/harfbuzz/
+      sed -i \"/^external_project(/i list(APPEND PATCH_FILES \$(basename \"\$p\"))\" thirdparty/harfbuzz/CMakeLists.txt
+    done
     make TARGET=kindlehf -j\$(nproc) koreader-cre wrap-mupdf >/dev/null
-    cp build/arm-kindlehf-linux-gnueabihf/libs/libkoreader-cre.so build/arm-kindlehf-linux-gnueabihf/libs/libwrap-mupdf.so /out/
+    cd build/arm-kindlehf-linux-gnueabihf/libs
+    cp libkoreader-cre.so libwrap-mupdf.so libharfbuzz.so.0 /out/
   "
 echo "Built $OUT"

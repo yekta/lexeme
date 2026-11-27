@@ -1,0 +1,13 @@
+diff --git a/crengine/src/lvfntman.cpp b/crengine/src/lvfntman.cpp
+index 3384ef5..980c831 100644
+--- a/crengine/src/lvfntman.cpp
++++ b/crengine/src/lvfntman.cpp
+@@ -91,7 +91,7 @@ typedef void hb_draw_state_t;
+ #endif
+ 
+ static void ft_error_trace(const char *where, const char *call, FT_Error error) {
+-    const char *errstr = FT_Error_String(error);
++    const char *errstr = NULL; // FT_Error_String is missing from older FreeTypes, like a Paperwhite 5's
+     if (!errstr) {
+         static char hex[17];
+         snprintf(hex, sizeof (hex), "%#x", error);

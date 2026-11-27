@@ -22,18 +22,27 @@ TOUCH = "/dev/input/event1"
 # Scratch space on the Kindle; its /tmp is RAM and filling it crashes the Kindle UI.
 SCRATCH = "/mnt/us/lexeme-dev"
 PLAYER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "touch.lua")
-W, H = 1272, 1696
+
+
+def screen():
+    """The visible width and height, and the bytes per framebuffer row, which can be wider than the screen."""
+    out = subprocess.run(SSH + ["cat /sys/class/graphics/fb0/modes /sys/class/graphics/fb0/stride"],
+                         capture_output=True, text=True, check=True).stdout.split()
+    # modes can list the same mode more than once; the stride comes last.
+    width, height = out[0].split(":")[1].split("p")[0].split("x")
+    return int(width), int(height), int(out[-1])
 
 
 def shot(path):
-    raw = subprocess.run(SSH + [f"dd if=/dev/fb0 bs={W} count={H} 2>/dev/null"], capture_output=True,
+    w, h, stride = screen()
+    raw = subprocess.run(SSH + [f"dd if=/dev/fb0 bs={stride} count={h} 2>/dev/null"], capture_output=True,
                          check=True).stdout
-    rows = b"".join(b"\x00" + raw[y * W:(y + 1) * W] for y in range(H))
+    rows = b"".join(b"\x00" + raw[y * stride:y * stride + w] for y in range(h))
 
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
 
-    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 0, 0, 0, 0))
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0))
            + chunk(b"IDAT", zlib.compress(rows, 6)) + chunk(b"IEND", b""))
     with open(path, "wb") as f:
         f.write(png)
@@ -61,7 +70,9 @@ def up():
 def press(x, y, frames):
     steps = [(lambda: down(x, y), 0.012)]
     for i in range(1, frames + 1):
-        steps.append((lambda i=i: move(x + i // 3, y + i // 3, min(93 + 12 * i, 234)), 0.012))
+        # A finger drifts a little, but more than a few pixels turns a hold into a pan.
+        drift = min(i // 3, 3)
+        steps.append((lambda i=i, drift=drift: move(x + drift, y + drift, min(93 + 12 * i, 234)), 0.012))
     return steps + [(up, 0)]
 
 

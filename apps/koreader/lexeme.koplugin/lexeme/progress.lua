@@ -57,7 +57,8 @@ end
 
 function Progress.chapterTimeLeft(ui)
     local page = Progress.page(ui)
-    local left = ui.toc:getChapterPagesLeft(page) or (Progress.pageCount(ui) - page)
+    -- In screen pages: with a page map (Kindle locations, print pages) KOReader counts its entries.
+    local left = ui.toc:getChapterPagesLeft(page, true) or (Progress.pageCount(ui) - page)
     return Progress.duration(left * pageSeconds(ui))
 end
 

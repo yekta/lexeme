@@ -15,14 +15,19 @@ local Shell = require("lexeme/shell")
 D.setIconDir(plugin_root .. "/icons")
 Layout.setStylesheet(plugin_root .. "/kindle.css")
 Lockscreen.setup()
--- KOReader would otherwise ask in its own dialog before turning Wi-Fi on or off.
 local DEFAULT_SETTINGS = {
+    -- KOReader would otherwise ask in its own dialog before turning Wi-Fi on or off.
     wifi_enable_action = "turn_on",
     wifi_disable_action = "leave_on",
+    -- A hold selects a word a little sooner than KOReader's 500 ms.
+    ges_hold_interval_ms = 400,
 }
 for key, value in pairs(DEFAULT_SETTINGS) do
     if G_reader_settings:hasNot(key) then G_reader_settings:saveSetting(key, value) end
 end
+-- The gesture detector read its hold interval before plugins load.
+require("device/gesturedetector").ges_hold_interval =
+    require("ui/time").ms(G_reader_settings:readSetting("ges_hold_interval_ms"))
 -- Each book's progress lives in KOReader's own folder: a .sdr folder beside the
 -- book is claimed (and emptied) by Amazon's indexer when the book is a PDF.
 G_reader_settings:saveSetting("document_metadata_folder", "dir")
@@ -54,17 +59,23 @@ local Lexeme = WidgetContainer:extend{
 }
 
 function Lexeme:init()
+    require("lexeme/devrestart").watch()
     if self.ui.document then
         Reader.install(self.ui)
         return
     end
+    self:useClassicFileBrowser()
     self:createShell()
     -- The file browser paints Home in its place, so its own screen never shows
     -- before Home opens on top of it.
+    local painted = false
     self.ui.paintTo = function(_, bb, x, y)
-        if self.shell then self.shell:paintTo(bb, x, y) end
+        if not self.shell then return end
+        self.shell:paintTo(bb, x, y)
+        painted = true
     end
-    UIManager:nextTick(function() UIManager:show(self.shell, "flashui") end)
+    -- Back from a book, the file browser has already flashed Home on; "ui" doesn't flash again.
+    UIManager:nextTick(function() UIManager:show(self.shell, painted and "ui" or "flashui") end)
 end
 
 function Lexeme:onPreRenderDocument()
@@ -90,6 +101,7 @@ function Lexeme:onAnnotationsModified()
 end
 
 function Lexeme:onCloseDocument()
+    require("lexeme/highlight_positions").save(self.ui)
     require("lexeme/sync").soon()
 end
 
@@ -128,6 +140,16 @@ function Lexeme:onLexemeSync()
     end)
 end
 
+-- The file browser under Home is never seen, but in coverbrowser's cover views it loads covers
+-- each time Home opens and forces two garbage collections as a book opens.
+function Lexeme:useClassicFileBrowser()
+    local coverbrowser = self.ui.coverbrowser
+    local ok, manager = pcall(require, "bookinfomanager")
+    if not (coverbrowser and coverbrowser.setupFileManagerDisplayMode and ok) then return end
+    if manager:getSetting("filemanager_display_mode") == nil then return end
+    coverbrowser:setupFileManagerDisplayMode(nil)
+end
+
 function Lexeme:createShell()
     self.shell = Shell:new{
         open_book = function(path) self:openBook(path) end,
@@ -138,6 +160,10 @@ end
 
 -- Home lives in its own window over the file browser; it has to go with it,
 -- or KOReader keeps running when the file browser exits.
+function Lexeme:onLexemeShowTab(tab)
+    if self.shell then self.shell:setTab(tab) end
+end
+
 function Lexeme:onCloseWidget()
     if not self.shell then return end
     UIManager:close(self.shell)
@@ -167,6 +193,7 @@ end
 
 function Lexeme:homeMenuItems()
     return {
+        { text = "Vocabulary Builder", callback = function() require("lexeme/vocabulary_screen").show(self.ui) end },
         { text = "Settings", callback = function() self:openSettings() end },
         "-",
         {

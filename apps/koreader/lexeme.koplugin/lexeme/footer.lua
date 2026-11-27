@@ -77,7 +77,7 @@ function Footer:paintTo(bb)
     self:recordProgress()
     local w, h = Screen:getWidth(), Screen:getHeight()
     if G_reader_settings:isTrue("lexeme_show_clock") then
-        D.textCenter(bb, w / 2, D.s(48), D.face("regular", 26), Status.clock())
+        D.textCenter(bb, w / 2, D.s(42), face(), Status.clock())
     end
     local text = leftText(self.ui)
     if not text then return end

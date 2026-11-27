@@ -10,6 +10,7 @@ local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 
 local AmazonLibrary = require("lexeme/amazon_library")
+local LibraryCache = require("lexeme/library_cache")
 
 local Books = {}
 
@@ -159,12 +160,62 @@ end
 
 -- The library as last scanned.
 local last_scan
+-- What the library cache file held when it was read (on the first scan), and each listed book's
+-- settings file key from the last scan.
+local stored
+local sidecar_keys = {}
+
+-- The first scan starts from the library cache file: titles, authors and locks are the in-memory
+-- caches' starting points (each checked against the file's time as usual), reading states are
+-- handed to KOReader's book list for books whose settings file hasn't changed.
+local function loadStored()
+    stored = LibraryCache.load()
+    for path, known in pairs(stored.metadata or {}) do
+        if metadata[path] == nil then metadata[path] = known end
+    end
+    for path, known in pairs(stored.locked or {}) do
+        if locked_files[path] == nil then locked_files[path] = known end
+    end
+end
+
+local function primeInfo(path)
+    local key = LibraryCache.sidecarKey(path)
+    local previous = sidecar_keys[path]
+    sidecar_keys[path] = key
+    if BookList.hasBookInfoCache(path) then
+        -- Known since a scan that saw the settings file as it is now; otherwise it's read again,
+        -- as KOReader only updates parts of it when a book closes.
+        if previous == key then return end
+        BookList.resetBookInfoCache(path)
+    end
+    local entry = stored.info and stored.info[path]
+    if entry and entry.sidecar == key then BookList.book_info_cache[path] = entry.info end
+end
+
+-- What the next first scan starts from. A reading state is kept only if it can be checked: it came
+-- from a settings file where KOReader keeps them, or the book has none.
+local function storeScan(list)
+    local data = { metadata = {}, locked = {}, info = {} }
+    for _, book in ipairs(list) do
+        local path = book.path
+        local known = metadata[path]
+        if known and known.meta then data.metadata[path] = known end
+        local info = BookList.book_info_cache[path]
+        local key = sidecar_keys[path]
+        if info and key ~= nil and (key or not info.been_opened) then
+            data.info[path] = { sidecar = key, info = info }
+        end
+    end
+    for path, known in pairs(locked_files) do data.locked[path] = known end
+    LibraryCache.save(data)
+end
 
 function Books.scanned()
     return last_scan ~= nil
 end
 
 function Books.scan()
+    if not stored then loadStored() end
     local manager = infoManager()
     local read_times = lastReadTimes()
     local list = {}
@@ -178,9 +229,11 @@ function Books.scan()
         if not ext or not KINDS[ext:lower()] then return end
         if not DocumentRegistry:hasProvider(path) then return end
         if MOBI_KINDS[ext:lower()] and mobiLocked(path, attr.modification) then return end
+        primeInfo(path)
         table.insert(list, describe(path, file, attr.modification, read_times, manager))
     end)
     last_scan = list
+    storeScan(list)
     return list
 end
 

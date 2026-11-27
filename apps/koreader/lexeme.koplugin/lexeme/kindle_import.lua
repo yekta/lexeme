@@ -4,8 +4,10 @@ progress (cc.db), words looked up (vocab.db) and highlights and notes (My
 Clippings.txt). A book that was converted for KOReader takes that copy's key,
 so its Amazon history and KOReader reading land on the same book.
 ]]
+local DocSettings = require("docsettings")
 local JSON = require("json")
 local lfs = require("libs/libkoreader-lfs")
+local utf8proc = require("ffi/utf8proc")
 
 local Books = require("lexeme/books")
 local Reading = require("lexeme/reading")
@@ -31,8 +33,10 @@ local function rows(path, sql)
     return result
 end
 
--- The file name the KOReader copy of an Amazon book was given.
+-- The file name the KOReader copy of an Amazon book was given. Amazon keeps titles in decomposed Unicode.
 local function convertedPath(title)
+    local ok, composed = pcall(utf8proc.normalize_NFC, title)
+    title = ok and composed or title
     local name = title:gsub('[\\/:*?"<>|]+', ""):gsub("^%s+", ""):gsub("[%s%.]+$", ""):sub(1, 150)
     local path = Books.homeDir() .. "/Books/" .. name .. ".epub"
     if lfs.attributes(path, "mode") == "file" then return path end
@@ -61,7 +65,9 @@ local function amazonBooks()
         local opened = (tonumber(row[5]) or 0) > 0 and (percent or 0) > 0
         if not books[cde] or opened then
             local path = convertedPath(title)
-            local key = path and Reading.bookKey(path) or "kindle:" .. cde
+            -- The key KOReader keeps for the copy, as syncing sends it; the file's checksum can since differ.
+            local settings = path and DocSettings:hasSidecarFile(path) and DocSettings:open(path) or nil
+            local key = path and Reading.bookKey(path, settings) or "kindle:" .. cde
             local finished = tonumber(row[6]) == 2 or (percent or 0) >= 100
             local last_read = (tonumber(row[5]) or 0) * 1000
             books[cde] = {
@@ -170,11 +176,15 @@ local function clippings(books, used)
             text = h.text,
             note = h.note,
             page = h.page,
+            location = h.location > 0 and h.location or nil,
             highlighted_at = h.at,
         })
     end
     return result
 end
+
+-- Bumped when the import starts sending something new; an earlier import is then run again once.
+Import.VERSION = 2
 
 -- Queues everything; returns the counts.
 function Import.queue()
@@ -191,7 +201,26 @@ function Import.queue()
     end
     require("lexeme/sync").queueReading{ books = book_rows, highlights = highlights, lookups = words }
     G_reader_settings:saveSetting("lexeme_kindle_imported_at", os.time())
+    G_reader_settings:saveSetting("lexeme_kindle_import_version", Import.VERSION)
     return { books = #book_rows, highlights = #highlights, lookups = #words }
+end
+
+--[[
+Sends the highlights an earlier import sent without their Amazon locations once
+more, with them; the ids are the same, so Lexeme's copies are updated. Only for
+books Lexeme already has from this Kindle, and only highlights: what Amazon
+says of the books themselves, like how far they were read, isn't sent again.
+]]
+function Import.catchUp()
+    if G_reader_settings:readSetting("lexeme_kindle_import_version") == Import.VERSION then return end
+    local synced = {}
+    for _, book in ipairs((Reading.books())) do synced[book.key] = true end
+    local highlights = {}
+    for _, highlight in ipairs(clippings(amazonBooks(), {})) do
+        if synced[highlight.book_key] then table.insert(highlights, highlight) end
+    end
+    require("lexeme/sync").queueReading{ highlights = highlights }
+    G_reader_settings:saveSetting("lexeme_kindle_import_version", Import.VERSION)
 end
 
 return Import

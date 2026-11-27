@@ -65,6 +65,17 @@ export function bookDays(reads: readonly TPageRead[], dayStartsAt = DEFAULT_DAY_
 }
 
 /** Page reads grouped into sittings per book, newest first. */
+/**
+ * The Kindle locations a page likely covered, from its place in the book, for a
+ * visit recorded without them: what the device works out for visits it recorded
+ * before it noted locations.
+ */
+export function estimatedPageLocations(page: number, totalPages: number, locations: number) {
+  if (totalPages <= 0 || page < 1 || locations <= 0) return null;
+  const location = Math.floor(((page - 1) / totalPages) * locations) + 1;
+  return { location, end_location: Math.max(location + 1, Math.floor((page / totalPages) * locations) + 1) };
+}
+
 export function readingSessions(reads: readonly TPageRead[], gapSeconds = SESSION_GAP_SECONDS): TReadingSession[] {
   const sorted = [...reads].sort((a, b) => a.book_id.localeCompare(b.book_id) || a.started_at - b.started_at);
   const sessions: TReadingSession[] = [];

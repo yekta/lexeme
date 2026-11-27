@@ -253,7 +253,7 @@ const readingGoals = table("reading_goals")
     daily_minutes: number(),
     /** Minutes past midnight. */
     day_starts_at: number(),
-    /** "page" | "location" */
+    /** "location" | "page" */
     position_unit: string(),
     created_at: number(),
     updated_at: number(),

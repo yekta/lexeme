@@ -368,8 +368,8 @@ export const readingGoals = pgTable("reading_goals", {
     .references(() => user.id, { onDelete: "cascade" }),
   daily_minutes: integer("daily_minutes").notNull().default(15),
   day_starts_at: integer("day_starts_at").notNull().default(0),
-  /** "page" | "location" */
-  position_unit: text("position_unit").notNull().default("page"),
+  /** "location" | "page" */
+  position_unit: text("position_unit").notNull().default("location"),
   created_at: createdAt(),
   updated_at: updatedAt(),
 });

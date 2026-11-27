@@ -49,11 +49,11 @@ export function useUpdateReadingGoal() {
   };
 }
 
-/** Whether places in a book show as pages or Kindle locations: as the Kindle shows them, until switched here. */
+/** Whether places in a book show as Kindle locations or pages: as set on the Kindle, until switched here. */
 export function usePositionUnit() {
   const zero = useZero();
   const [row] = useQuery(queries.readingGoal());
-  const unit: TPositionUnit = row?.position_unit === "location" ? "location" : "page";
+  const unit: TPositionUnit = row?.position_unit === "page" ? "page" : "location";
   const toggle = () =>
     commit(zero.mutate(mutators.readingGoal.setPositionUnit({ position_unit: unit === "page" ? "location" : "page" })), {
       kind: "reading_goals",

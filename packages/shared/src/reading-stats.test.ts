@@ -11,6 +11,7 @@ import {
   formatReadingTime,
   lastDays,
   readingDate,
+  estimatedPageLocations,
   readingSessions,
   readingStreak,
   secondsByDay,
@@ -180,4 +181,11 @@ test("a streak ending on a day counts back across months, and today unread keeps
   assert.equal(streakEndingOn(totals, "2026-11-01", 900), 3);
   assert.equal(streakEndingOn(totals, "2026-11-02", 900), 3);
   assert.equal(streakEndingOn(totals, "2026-11-04", 900), 0);
+});
+
+test("a page's estimated locations split the book's locations evenly across its pages, end to end", () => {
+  assert.deepEqual(estimatedPageLocations(1, 200, 2000), { location: 1, end_location: 11 });
+  assert.deepEqual(estimatedPageLocations(200, 200, 2000), { location: 1991, end_location: 2001 });
+  assert.deepEqual(estimatedPageLocations(3, 1000, 100), { location: 1, end_location: 2 });
+  assert.equal(estimatedPageLocations(1, 0, 2000), null);
 });

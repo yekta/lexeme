@@ -596,6 +596,44 @@ function Settings:screenPage()
     }
 end
 
+local PROGRESS_UNITS = {
+    { key = "location", label = "Locations" },
+    { key = "page", label = "Pages" },
+}
+
+local function progressUnit()
+    return G_reader_settings:readSetting("lexeme_position_unit") == "page" and "page" or "location"
+end
+
+local function progressUnitLabel()
+    for _, unit in ipairs(PROGRESS_UNITS) do
+        if unit.key == progressUnit() then return unit.label end
+    end
+end
+
+function Settings:progressUnitsPage()
+    return {
+        title = "Progress units",
+        intro = "Show where you are in a book as locations or pages in Lexeme.",
+        rows = function()
+            local rows = {}
+            for _, unit in ipairs(PROGRESS_UNITS) do
+                table.insert(rows, {
+                    title = unit.label,
+                    plain = true,
+                    check = unit.key == progressUnit(),
+                    tap = function()
+                        G_reader_settings:saveSetting("lexeme_position_unit", unit.key)
+                        require("lexeme/sync").soon()
+                        self:refresh()
+                    end,
+                })
+            end
+            return rows
+        end,
+    }
+end
+
 function Settings:libraryPage()
     local connected = require("lexeme/sync").isConnected()
     local setting = connected and "lexeme_home_stats" or "lexeme_home_recently_added"
@@ -622,6 +660,12 @@ function Settings:libraryPage()
                         G_reader_settings:flipNilOrTrue("lexeme_study_tab")
                         self:refresh()
                     end,
+                } or nil,
+                connected and {
+                    title = "Progress units",
+                    subtitle = "Show where you are in a book as locations or pages in Lexeme.",
+                    value = progressUnitLabel(),
+                    page = function() return self:progressUnitsPage() end,
                 } or nil,
             }
         end,

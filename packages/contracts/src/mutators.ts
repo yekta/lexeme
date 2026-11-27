@@ -16,6 +16,7 @@ import {
   FSRS_DEFAULT_W,
   DEFAULT_DAILY_GOAL_MINUTES,
   DEFAULT_DAY_STARTS_AT,
+  estimatedPageLocations,
   POSITION_UNITS,
   type TPositionUnit,
 } from "@lexeme/shared";
@@ -229,7 +230,7 @@ export const syncReadingArgs = z.object({
   removed_lookup_ids: z.array(uuidArg).max(5000).default([]),
   /** Books deleted from the device; removed here with what was recorded about them. */
   removed_book_keys: z.array(bookKey).max(2000).default([]),
-  /** Whether the device shows places as pages or locations, sent when that changes there. */
+  /** Whether Lexeme shows places as locations or pages, as set on the device. */
   position_unit: z.enum(POSITION_UNITS).nullish(),
 });
 
@@ -258,7 +259,7 @@ async function saveReadingSettings(
     user_id,
     daily_minutes: existing?.daily_minutes ?? DEFAULT_DAILY_GOAL_MINUTES,
     day_starts_at: existing?.day_starts_at ?? DEFAULT_DAY_STARTS_AT,
-    position_unit: existing?.position_unit ?? "page",
+    position_unit: existing?.position_unit ?? "location",
     ...changes,
     created_at: existing?.created_at ?? now,
     updated_at: now,
@@ -523,20 +524,41 @@ export const mutatorDefs = {
           await tx.mutate.books.insert({ id: book.id, user_id, key: book.key, created_at: now, ...fields });
           bookIds.set(book.key, book.id);
         }
+
+        // Page visits recorded without locations, like those imported from another reader, get them once the book has a count.
+        if (book.locations) {
+          const unlocated = await tx.run(
+            zql.page_reads.where("book_id", existing?.id ?? book.id).where("location", "IS", null),
+          );
+          for (const read of unlocated) {
+            const estimate = estimatedPageLocations(read.page, read.total_pages, book.locations);
+            if (estimate) await tx.mutate.page_reads.update({ id: read.id, ...estimate, updated_at: now });
+          }
+        }
+      }
+
+      const locationCounts = new Map<string, number | null | undefined>();
+      async function locationsOf(book_id: string) {
+        if (!locationCounts.has(book_id)) {
+          locationCounts.set(book_id, (await tx.run(zql.books.where("id", book_id).one()))?.locations);
+        }
+        return locationCounts.get(book_id);
       }
 
       for (const read of args.page_reads) {
         const book_id = await bookId(read.book_key);
         const existing = await tx.run(zql.page_reads.where("id", read.id).one());
         mustBeMineOrNew(existing);
+        const locations = await locationsOf(book_id);
+        const estimate = locations ? estimatedPageLocations(read.page, read.total_pages, locations) : null;
         await tx.mutate.page_reads.upsert({
           id: read.id,
           user_id,
           book_id,
           page: read.page,
           total_pages: read.total_pages,
-          location: read.location ?? existing?.location ?? undefined,
-          end_location: read.end_location ?? existing?.end_location ?? undefined,
+          location: read.location ?? existing?.location ?? estimate?.location,
+          end_location: read.end_location ?? existing?.end_location ?? estimate?.end_location,
           started_at: read.started_at,
           seconds: read.seconds,
           imported: read.imported,

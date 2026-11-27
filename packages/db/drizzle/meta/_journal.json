@@ -162,6 +162,13 @@
       "when": 1795785444734,
       "tag": "0022_page_read_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795787187075,
+      "tag": "0023_position_unit_default_location",
+      "breakpoints": true
     }
   ]
 }

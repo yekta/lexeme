@@ -1,0 +1,1 @@
+ALTER TABLE "reading_goals" ALTER COLUMN "position_unit" SET DEFAULT 'location';

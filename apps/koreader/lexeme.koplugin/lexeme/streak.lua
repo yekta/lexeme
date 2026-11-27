@@ -147,7 +147,7 @@ end
 -- (lexeme_history.sqlite3, from scripts/amazon_history.py). A day counts once its reading
 -- passes MIN_DAY_SECONDS, all of it, so opening a book to try a font isn't a reading day.
 
-Streak.MIN_DAY_SECONDS = 5 * 60
+Streak.MIN_DAY_SECONDS = 2 * 60
 
 local SOURCES = {
     { file = "statistics.sqlite3", table = "page_stat_data", start = "start_time", seconds = "duration" },

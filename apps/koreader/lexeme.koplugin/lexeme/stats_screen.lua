@@ -19,8 +19,8 @@ local RANGES = {
 }
 local CHIPS = { top = 252, h = 78, pad = 33, gap = 15, baseline = 50 }
 local CHART = { top = 700, bottom = 1420, gap = 10 }
-local NOTE = "Counted on this Kindle, with your Amazon history if it's imported. A day counts once you've read "
-    .. "5 minutes in it."
+local NOTE = string.format("Counted on this Kindle, with your Amazon history if it's imported. A day counts once "
+    .. "you've read %d minutes in it.", math.floor(Streak.MIN_DAY_SECONDS / 60))
 
 local selected = 2
 

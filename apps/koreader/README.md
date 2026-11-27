@@ -72,6 +72,25 @@ dictionaries sort "É" beside "é", so sdcv misses words like "école" or
 `scripts/sort_stardict.py <dictionary.ifo> <out dir>` re-sorts both files;
 copy them over the dictionary's and delete its `.oft` caches.
 
+### Kindle locations and opening long books
+
+A book converted from a Kindle file marks each of the Kindle's location
+labels in its text (`<span id="lexeme_loc_N"/>`, or where a file or an
+element with an id starts) and lists them in `META-INF/lexeme-locations.txt`,
+by spine item. Lexeme finds the location at a page with a binary search among
+the labels of that spine item. The labels used to be an EPUB page list, but
+crengine places every page-list entry by laying out its paragraph again,
+whenever a book is laid out or its cache saved: minutes on a Kindle for a
+book with 20,000 labels. Other books spread the Kindle's count (a MOBI's from
+its header, otherwise estimated at 110 characters a location) over the book's
+height.
+
+crengine's cache of laid-out books is read through `/mnt/base-us`, the FAT
+partition under Amazon's FUSE layer at `/mnt/us`, where long books' caches
+load a second sooner; Lexeme keeps 1 GB of them. The spinner shown while a
+book opens turns at four frames a second from frames drawn beforehand, and
+stays still for book files over 8 MB, whose layout needs the memory.
+
 ### Vocabulary Builder
 
 Lexeme keeps every word looked up while reading in

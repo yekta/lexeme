@@ -5,6 +5,7 @@ package.path = plugin_root .. "/?.lua;" .. package.path
 
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local lfs = require("libs/libkoreader-lfs")
 
 local D = require("lexeme/draw")
 local Layout = require("lexeme/layout")
@@ -41,6 +42,9 @@ G_reader_settings:saveSetting("vocabulary_builder", { enabled = true, with_conte
 local plugins_disabled = G_reader_settings:readSetting("plugins_disabled") or {}
 plugins_disabled.externalkeyboard = true
 G_reader_settings:saveSetting("plugins_disabled", plugins_disabled)
+require("lexeme/engine").install()
+-- A book file this big opens without the spinner turning (see Lexeme:openBook).
+local BIG_BOOK_BYTES = 8 * 1024 * 1024
 -- The Kindle's FreeType never kerns, and errors when asked before a font has drawn a glyph,
 -- which KOReader's text drawing treats as fatal. Its UI text isn't kerned anyway.
 local RenderText = require("ui/rendertext")
@@ -76,6 +80,8 @@ function Lexeme:init()
     end
     -- Back from a book, the file browser has already flashed Home on; "ui" doesn't flash again.
     UIManager:nextTick(function() UIManager:show(self.shell, painted and "ui" or "flashui") end)
+    -- The spinner's frames, drawn while Home sits idle rather than as a book opens.
+    UIManager:scheduleIn(3, function() require("lexeme/loading").prepare() end)
 end
 
 function Lexeme:onPreRenderDocument()
@@ -169,8 +175,11 @@ function Lexeme:openBook(path)
         UIManager:setDirty(self.shell, "fast")
         UIManager:forceRePaint()
     end
+    -- Turning the spinner keeps a copy of KOReader's memory while the book is laid out; a book
+    -- this big needs it more than the spinner does.
+    local still = (lfs.attributes(path, "size") or 0) > BIG_BOOK_BYTES
     UIManager:scheduleIn(0.5, function()
-        require("lexeme/loading").show()
+        require("lexeme/loading").show(nil, still)
         UIManager:nextTick(function()
             require("apps/reader/readerui"):showReader(path, nil, true)
         end)

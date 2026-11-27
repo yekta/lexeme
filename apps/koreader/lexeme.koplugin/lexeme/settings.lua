@@ -141,6 +141,18 @@ function Settings:readingPage()
                     end,
                 },
                 {
+                    title = "Precise text shaping",
+                    subtitle = "Shape text with HarfBuzz, as KOReader's Best kerning. "
+                        .. "Laying out a book takes about three times as long.",
+                    toggle = require("lexeme/layout").kerning() == require("lexeme/layout").KERNING_BEST,
+                    tap = function()
+                        local Layout = require("lexeme/layout")
+                        local best = Layout.kerning() == Layout.KERNING_BEST
+                        Layout.setKerning(ui, best and Layout.KERNING_FAST or Layout.KERNING_BEST)
+                        self:refresh()
+                    end,
+                },
+                {
                     title = "Publisher font",
                     subtitle = "Use the fonts that come with a book.",
                     toggle = (G_reader_settings:readSetting("copt_embedded_fonts") or 1) == 1,

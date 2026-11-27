@@ -62,6 +62,10 @@ Layout.BOTTOM_MARGIN = 70
 local FONT_HINTING, FONT_GAMMA = 2, 15
 -- crengine won't draw a font bigger than this, so bigger sizes are scaled up in CSS.
 local MAX_ENGINE_SIZE = 72
+-- Kerning, as crengine's font.kerning.mode: 1 kerns letter pairs from the font; 3 shapes text with
+-- HarfBuzz (KOReader's Best), which lays a book out about three times slower and looks the same
+-- in Latin text.
+Layout.KERNING_FAST, Layout.KERNING_BEST = 1, 3
 
 local DEFAULTS = {
     lexeme_font = "Bookerly",
@@ -73,6 +77,7 @@ local DEFAULTS = {
     lexeme_character_spacing = 0,
     lexeme_margins = 1,
     lexeme_align = "justify",
+    lexeme_kerning = Layout.KERNING_FAST,
 }
 
 function Layout.get(key)
@@ -175,6 +180,26 @@ local function applyBold(ui)
     ui.document.configurable.font_base_weight = weight
     ui.document:setFontBaseWeight(weight)
     G_reader_settings:saveSetting("copt_font_base_weight", weight)
+end
+
+function Layout.kerning()
+    return Layout.get("lexeme_kerning")
+end
+
+local function applyKerning(ui)
+    local mode = Layout.kerning()
+    ui.document.configurable.font_kerning = mode
+    ui.document:setFontKerning(mode)
+    G_reader_settings:saveSetting("copt_font_kerning", mode)
+end
+
+-- Lays the open book out again, as every book will be.
+function Layout.setKerning(ui, mode)
+    set("lexeme_kerning", mode)
+    if ui and ui.document and ui.rolling then
+        applyKerning(ui)
+        updatePos(ui)
+    end
 end
 
 function Layout.setBold(ui, level)
@@ -293,6 +318,7 @@ function Layout.applyBeforeRender(ui)
     document:setInterlineSpacePercent(100)
     G_reader_settings:saveSetting("copt_line_spacing", 100)
     applyWordSpacing(ui)
+    applyKerning(ui)
     Layout.applyMargins(ui)
     -- Edges as sharp as the Kindle's at its weight: native hinting, contrast a step under 1.45.
     document.configurable.font_hinting = FONT_HINTING

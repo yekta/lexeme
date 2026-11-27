@@ -35,14 +35,12 @@ export function CopyField({
   };
 
   return (
-    <div
-      className={cn(
-        "flex items-start gap-1 rounded-lg border bg-muted/50 pl-3 pr-0.5 py-0.5",
-        className,
-      )}
-    >
+    <div className={cn("relative", className)}>
       <code
-        className={cn("flex-1 min-w-0 py-1.5 font-mono text-sm", LAYOUT_CLASS[layout])}
+        className={cn(
+          "block rounded-lg border bg-muted/50 pl-3 pr-9.5 py-2 font-mono text-sm",
+          LAYOUT_CLASS[layout],
+        )}
       >
         {value}
       </code>
@@ -52,7 +50,7 @@ export function CopyField({
         size="icon"
         onClick={copy}
         aria-label="Copy"
-        className="shrink-0 rounded-[calc(var(--radius-lg)-3px)] hover:bg-border active:bg-border"
+        className="absolute top-[3px] right-[3px] rounded-[calc(var(--radius-lg)-3px)] hover:bg-border active:bg-border"
       >
         {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
       </Button>

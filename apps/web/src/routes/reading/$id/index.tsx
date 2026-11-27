@@ -1,4 +1,4 @@
-import { formatLocation, formatReadingTime } from "@lexeme/shared";
+import { formatLocation, formatReadingTime, readingSpeed, type TPositionUnit } from "@lexeme/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { ClockIcon, HighlighterIcon, LanguagesIcon } from "lucide-react";
 
@@ -15,7 +15,13 @@ import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { Progress } from "@/components/ui/progress";
 import { WordRow } from "@/components/word-row";
-import { useBookReading, useIsCard, usePositionUnit, type TBook } from "@/hooks/data/use-reading";
+import {
+  useBookReading,
+  useIsCard,
+  usePositionUnit,
+  type TBook,
+  type TReadingSession,
+} from "@/hooks/data/use-reading";
 import { formatRelativeDay } from "@/lib/relative-day";
 
 export const Route = createFileRoute("/reading/$id/")({
@@ -51,7 +57,7 @@ function BookPage() {
         !reading.isPending && <p className="text-muted-foreground">This book isn't in your reading data.</p>
       ) : (
         <>
-          <BookHeader book={book} totalSeconds={totalSeconds} daysRead={days.length} />
+          <BookHeader book={book} totalSeconds={totalSeconds} daysRead={days.length} sessions={sessions} />
 
           <section className="flex flex-col gap-3">
             <SectionTitle title="Sessions" count={sessions.length} />
@@ -106,8 +112,19 @@ function BookPage() {
   );
 }
 
-function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSeconds: number; daysRead: number }) {
+function BookHeader({
+  book,
+  totalSeconds,
+  daysRead,
+  sessions,
+}: {
+  book: TBook;
+  totalSeconds: number;
+  daysRead: number;
+  sessions: readonly TReadingSession[];
+}) {
   const { unit } = usePositionUnit();
+  const speed = formatSpeed(sessions, unit);
   const percent = Math.round((book.progress ?? 0) * 100);
   const finished = book.status === "finished";
   const description = book.description ? plainText(book.description) : null;
@@ -119,6 +136,7 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
     unit === "location" && book.locations
       ? { label: "Locations", value: formatLocation(book.locations) }
       : book.pages && { label: "Pages", value: String(book.pages) },
+    speed && { label: "Speed", value: speed },
   ].filter((fact) => !!fact);
 
   return (
@@ -154,6 +172,14 @@ function BookHeader({ book, totalSeconds, daysRead }: { book: TBook; totalSecond
       </div>
     </section>
   );
+}
+
+function formatSpeed(sessions: readonly TReadingSession[], unit: TPositionUnit) {
+  const locationsPerHour = unit === "location" ? readingSpeed(sessions, "location") : null;
+  if (locationsPerHour != null) return `${formatLocation(locationsPerHour)} loc/h`;
+  const pagesPerHour = readingSpeed(sessions, "page");
+  if (pagesPerHour == null) return null;
+  return `${pagesPerHour} page/h`;
 }
 
 /** Book descriptions come as HTML from the book's metadata. */

@@ -1,3 +1,5 @@
+import type { TPositionUnit } from "./position-unit.ts";
+
 /**
  * One visit to a page, as KOReader records it: when it started and how long it
  * stayed open, and the Kindle locations the page covered when the device knows them.
@@ -112,6 +114,23 @@ export function readingSessions(reads: readonly TPageRead[], gapSeconds = SESSIO
   }
   finish();
   return sessions.sort((a, b) => b.started_at - a.started_at);
+}
+
+/** Less reading than this gives a speed too noisy to show. */
+export const MIN_SPEED_SECONDS = 10 * 60;
+
+/** Locations or pages read per hour across sessions, counting only sessions that know that unit. */
+export function readingSpeed(sessions: readonly TReadingSession[], unit: TPositionUnit): number | null {
+  let amount = 0;
+  let seconds = 0;
+  for (const session of sessions) {
+    const read = unit === "location" ? session.locations : session.pages;
+    if (read == null) continue;
+    amount += read;
+    seconds += session.seconds;
+  }
+  if (seconds < MIN_SPEED_SECONDS) return null;
+  return Math.round((amount / seconds) * 3600);
 }
 
 /** Seconds read per day, across all books. */

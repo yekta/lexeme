@@ -13,6 +13,7 @@ import {
   readingDate,
   estimatedPageLocations,
   readingSessions,
+  readingSpeed,
   readingStreak,
   secondsByDay,
   type TPageRead,
@@ -139,6 +140,25 @@ test("a session counts the distinct locations its pages covered, once each", () 
 test("a session with a page of unknown locations has no location count", () => {
   const [session] = readingSessions([{ ...read(1, 9, 0, 60), location: 100, end_location: 112 }, read(2, 9, 1, 60)]);
   assert.equal(session?.locations, null);
+});
+
+test("speed is locations per hour across the sessions that know their locations", () => {
+  const session = (seconds: number, pages: number, locations: number | null) => ({
+    book_id: "a",
+    started_at: 0,
+    ended_at: seconds * 1000,
+    seconds,
+    pages,
+    locations,
+  });
+  const sessions = [session(1800, 10, 150), session(1800, 12, 210), session(600, 4, null)];
+  assert.equal(readingSpeed(sessions, "location"), 360);
+  assert.equal(readingSpeed(sessions, "page"), 22);
+});
+
+test("too little reading has no speed", () => {
+  const sessions = [{ book_id: "a", started_at: 0, ended_at: 60_000, seconds: 60, pages: 2, locations: 30 }];
+  assert.equal(readingSpeed(sessions, "location"), null);
 });
 
 test("sessions never mix books", () => {

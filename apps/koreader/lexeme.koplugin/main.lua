@@ -107,13 +107,13 @@ end
 
 function Lexeme:onSuspend()
     require("lexeme/network").beforeSleep()
-    require("lexeme/timer").pause()
+    require("lexeme/timer").sleep()
     require("lexeme/sync").beforeSleep()
 end
 
 function Lexeme:onResume()
     require("lexeme/network").afterWake()
-    require("lexeme/timer").resume()
+    require("lexeme/timer").wake()
     require("lexeme/sync").afterWake()
 end
 

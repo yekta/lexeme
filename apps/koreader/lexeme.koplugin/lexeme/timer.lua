@@ -1,4 +1,5 @@
 -- The reading timer: counts down while the Kindle is awake and says when the time is up.
+-- It stops counting while the Kindle sleeps, and while you've paused it.
 local UIManager = require("ui/uimanager")
 
 local Dialog = require("lexeme/dialog")
@@ -9,7 +10,8 @@ local PRESETS = { 10, 15, 25, 30, 45, 60 }
 local LAST_USED = "lexeme_reading_timer_minutes"
 local CUSTOM = "lexeme_reading_timer_custom"
 
-local minutes, ends_at, paused_left
+-- ends_at while counting; paused_left while the Kindle sleeps or you've paused it (`held`).
+local minutes, ends_at, paused_left, held
 
 function Timer.label(m)
     if m < 60 then return m == 1 and "1 minute" or m .. " minutes" end
@@ -27,7 +29,7 @@ end
 
 local function finish()
     local read = minutes
-    minutes, ends_at, paused_left = nil, nil, nil
+    minutes, ends_at, paused_left, held = nil, nil, nil, nil
     Dialog:new{
         title = "Time's Up",
         message = "You've read for " .. Timer.label(read) .. ".",
@@ -90,11 +92,16 @@ end
 
 function Timer.stop()
     UIManager:unschedule(finish)
-    minutes, ends_at, paused_left = nil, nil, nil
+    minutes, ends_at, paused_left, held = nil, nil, nil, nil
 end
 
+-- Whether a timer is set, counting or paused.
 function Timer.isRunning()
     return minutes ~= nil
+end
+
+function Timer.isPaused()
+    return held == true
 end
 
 function Timer.minutesLeft()
@@ -110,18 +117,57 @@ function Timer.progress()
     return math.min(1, math.max(0, 1 - left / (minutes * 60)))
 end
 
-function Timer.pause()
+-- "12 min left", or "Paused · 12 min left" ("Paused · 12 min" when short).
+function Timer.statusLabel(short)
+    local left = Timer.shortLabel(Timer.minutesLeft())
+    if not held then return left .. " left" end
+    return short and "Paused · " .. left or "Paused · " .. left .. " left"
+end
+
+-- Stops the clock, keeping the time left.
+local function hold()
     if not ends_at then return end
     paused_left = math.max(0, ends_at - os.time())
     ends_at = nil
     UIManager:unschedule(finish)
 end
 
-function Timer.resume()
+local function release()
     if not paused_left then return end
     ends_at = os.time() + paused_left
     UIManager:scheduleIn(paused_left, finish)
     paused_left = nil
+end
+
+-- You pausing and resuming the timer.
+function Timer.pause()
+    if not ends_at then return end
+    hold()
+    held = true
+end
+
+function Timer.resume()
+    if not held then return end
+    held = nil
+    release()
+end
+
+-- The Kindle going to sleep and waking up. A timer you paused stays paused.
+function Timer.sleep()
+    hold()
+end
+
+function Timer.wake()
+    if not held then release() end
+end
+
+-- Pause or Resume, and Stop: the items of the menus that control a set timer.
+-- `changed` runs after each, to repaint what shows the timer.
+function Timer.controlItems(changed)
+    local toggle = held
+        and { text = "Resume timer", callback = function() Timer.resume(); changed() end }
+        or { text = "Pause timer", callback = function() Timer.pause(); changed() end }
+    return { toggle, { text = "Stop timer", callback = function() Timer.stop(); changed() end } }
 end
 
 return Timer

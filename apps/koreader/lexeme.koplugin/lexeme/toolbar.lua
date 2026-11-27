@@ -78,12 +78,13 @@ function Toolbar:paintTop(bb, x, y, w)
     D.rect(bb, x, y + D.s(334), w, D.s(4))
 end
 
--- A running reading timer shows in the gap between Home and the buttons: the time left, and a
--- line under it that fills as the time passes.
+-- A set reading timer shows in the gap between Home and the buttons: the time left (or that
+-- it's paused), and a line under it that fills as the time passes. Tapping it opens Pause or
+-- Resume, and Stop.
 function Toolbar:paintTimer(bb, x, y)
     if not Timer.isRunning() then return end
     local face = D.face("regular", 32)
-    local label = Timer.shortLabel(Timer.minutesLeft()) .. " left"
+    local label = Timer.statusLabel()
     local icon, gap = D.s(40), D.s(12)
     local group_w = icon + gap + D.width(face, label)
     local left = x + D.s(511) - math.floor(group_w / 2)
@@ -93,6 +94,14 @@ function Toolbar:paintTimer(bb, x, y)
     D.rect(bb, left, line_y, group_w, D.s(2), D.gray(170))
     local passed = math.floor(group_w * Timer.progress() + 0.5)
     if passed > 0 then D.rect(bb, left, line_y - D.s(1), passed, D.s(4)) end
+
+    local box = { x = left - D.s(20), y = y + D.s(108), w = group_w + D.s(40), h = D.s(101) }
+    self:pressable(box.x, box.y, box.w, box.h, function()
+        Menu:new{
+            items = Timer.controlItems(function() self:refresh() end),
+            left = box.x, top = y + D.s(223),
+        }:show()
+    end, box)
 end
 
 function Toolbar:openMore(right)

@@ -101,7 +101,7 @@ function Quick:render(bb, x, y, w, h)
         UIManager:broadcastEvent(Event:new("LexemeSync"))
     end)
     local running = Timer.isRunning()
-    local timer_label = running and Timer.shortLabel(Timer.minutesLeft()) .. " left" or "Timer"
+    local timer_label = running and Timer.statusLabel(true) or "Timer"
     local tx, ty = spot()
     self:button(bb, tx, ty, "timer", timer_label, running, function()
         self:chooseTimer(x + w - D.s(37), y + D.s(400) + shift)
@@ -155,10 +155,7 @@ end
 function Quick:chooseTimer(right, top)
     local items = {}
     if Timer.isRunning() then
-        table.insert(items, { text = "Stop timer", callback = function()
-            Timer.stop()
-            self:refresh()
-        end })
+        for _, item in ipairs(Timer.controlItems(function() self:refresh() end)) do table.insert(items, item) end
         table.insert(items, "-")
     end
     for _, m in ipairs(Timer.choices()) do

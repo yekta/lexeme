@@ -5,7 +5,7 @@ local Dialog = require("lexeme/dialog")
 
 local Timer = {}
 
-local PRESETS = { 10, 15, 20, 30, 45, 60 }
+local PRESETS = { 10, 15, 25, 30, 45, 60 }
 local LAST_USED = "lexeme_reading_timer_minutes"
 local CUSTOM = "lexeme_reading_timer_custom"
 

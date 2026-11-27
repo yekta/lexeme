@@ -76,6 +76,41 @@ local function refreshRateIsEveryPage()
     return UIManager:getRefreshRate() == 1
 end
 
+local HOLD_CHOICES_MS = { 200, 250, 300, 350, 400, 450, 500 }
+
+local function holdMs()
+    return G_reader_settings:readSetting("ges_hold_interval_ms") or 500
+end
+
+-- "0.35 seconds", "0.4 seconds".
+local function secondsLabel(ms)
+    return (string.format("%.2f", ms / 1000):gsub("0$", "")) .. " seconds"
+end
+
+function Settings:holdPage()
+    return {
+        title = "Hold to select",
+        intro = "Set how long to hold a word before it's selected. Shorter is quicker, longer avoids selecting "
+            .. "by accident.",
+        rows = function()
+            local rows = {}
+            for _, ms in ipairs(HOLD_CHOICES_MS) do
+                table.insert(rows, {
+                    title = secondsLabel(ms),
+                    plain = true,
+                    check = ms == holdMs(),
+                    tap = function()
+                        G_reader_settings:saveSetting("ges_hold_interval_ms", ms)
+                        require("device/gesturedetector").ges_hold_interval = require("ui/time").ms(ms)
+                        self:refresh()
+                    end,
+                })
+            end
+            return rows
+        end,
+    }
+end
+
 function Settings:readingPage()
     return {
         title = "Reading options",
@@ -129,6 +164,12 @@ function Settings:readingPage()
                         G_reader_settings:flipNilOrFalse("footnote_link_in_popup")
                         self:refresh()
                     end,
+                },
+                {
+                    title = "Hold to select",
+                    subtitle = "Set how long to hold a word before it's selected.",
+                    value = secondsLabel(holdMs()),
+                    page = function() return self:holdPage() end,
                 },
                 {
                     title = "Page refresh",

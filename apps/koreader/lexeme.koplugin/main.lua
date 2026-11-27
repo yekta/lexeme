@@ -15,14 +15,19 @@ local Shell = require("lexeme/shell")
 D.setIconDir(plugin_root .. "/icons")
 Layout.setStylesheet(plugin_root .. "/kindle.css")
 Lockscreen.setup()
--- KOReader would otherwise ask in its own dialog before turning Wi-Fi on or off.
 local DEFAULT_SETTINGS = {
+    -- KOReader would otherwise ask in its own dialog before turning Wi-Fi on or off.
     wifi_enable_action = "turn_on",
     wifi_disable_action = "leave_on",
+    -- A hold selects a word a little sooner than KOReader's 500 ms.
+    ges_hold_interval_ms = 400,
 }
 for key, value in pairs(DEFAULT_SETTINGS) do
     if G_reader_settings:hasNot(key) then G_reader_settings:saveSetting(key, value) end
 end
+-- The gesture detector read its hold interval before plugins load.
+require("device/gesturedetector").ges_hold_interval =
+    require("ui/time").ms(G_reader_settings:readSetting("ges_hold_interval_ms"))
 -- Each book's progress lives in KOReader's own folder: a .sdr folder beside the
 -- book is claimed (and emptied) by Amazon's indexer when the book is a PDF.
 G_reader_settings:saveSetting("document_metadata_folder", "dir")

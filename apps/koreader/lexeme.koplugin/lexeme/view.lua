@@ -25,16 +25,23 @@ function View:init()
     self.dimen = self.region or full
     self.covers_fullscreen = self.region == nil
     self.hits = {}
+    self.drags = {}
     local range = self.takes_all_taps and full or self.dimen
     self.ges_events = {
         LexemeTap = { GestureRange:new{ ges = "tap", range = range } },
         LexemeHold = { GestureRange:new{ ges = "hold", range = range } },
         LexemeSwipe = { GestureRange:new{ ges = "swipe", range = range } },
+        -- Dragging (see draggable()): a finger that moves at once makes a pan, one that rests first a hold.
+        LexemePan = { GestureRange:new{ ges = "pan", range = range } },
+        LexemePanRelease = { GestureRange:new{ ges = "pan_release", range = range } },
+        LexemeHoldPan = { GestureRange:new{ ges = "hold_pan", range = range } },
+        LexemeHoldRelease = { GestureRange:new{ ges = "hold_release", range = range } },
     }
 end
 
 function View:paintTo(bb)
     self.hits = {}
+    self.drags = {}
     local r = self.dimen
     if self.background then D.rect(bb, r.x, r.y, r.w, r.h, self.background) end
     self:render(bb, r.x, r.y, r.w, r.h)
@@ -45,6 +52,12 @@ function View:render() end
 -- Registers a tap target; later registrations win when targets overlap.
 function View:hit(x, y, w, h, on_tap, on_hold)
     table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold })
+end
+
+-- Registers a drag target: a finger put down in it and moved calls on_drag(pos, done) as it moves,
+-- `done` once it lifts. Painted like tap targets, so what's on screen is what can be dragged.
+function View:draggable(x, y, w, h, on_drag)
+    table.insert(self.drags, { x = x, y = y, w = w, h = h, drag = on_drag })
 end
 
 -- A tap target that shows itself pressed when tapped, as on the Kindle. `pressed` ({ x, y, w, h },
@@ -110,10 +123,61 @@ function View:onLexemeHold(_, ges)
         target.hold()
         return true
     end
+    -- A finger resting on a drag target before it moves.
+    local drag = self:findDrag(ges.pos)
+    if drag then
+        self.dragging, self.drag_start = drag, nil
+        drag.drag(ges.pos, false)
+        return true
+    end
     return self.takes_all_taps
 end
 
+function View:findDrag(pos)
+    for i = #self.drags, 1, -1 do
+        local t = self.drags[i]
+        if pos.x >= t.x and pos.x < t.x + t.w and pos.y >= t.y and pos.y < t.y + t.h then return t end
+    end
+end
+
+-- Moves the drag under way to `pos`; whether there was one.
+function View:dragTo(pos, done)
+    local drag = self.dragging
+    if not drag then return false end
+    if done then self.dragging, self.drag_start = nil, nil end
+    drag.drag(pos, done)
+    return true
+end
+
+function View:onLexemePan(_, ges)
+    local start = ges.start_pos or ges.pos
+    local same = self.drag_start and self.drag_start.x == start.x and self.drag_start.y == start.y
+    if not (self.dragging and same) then
+        self.dragging, self.drag_start = self:findDrag(start), start
+    end
+    if self:dragTo(ges.pos, false) then return true end
+end
+
+function View:onLexemePanRelease(_, ges)
+    if self:dragTo(ges.pos, true) then return true end
+end
+
+function View:onLexemeHoldPan(_, ges)
+    if self:dragTo(ges.pos, false) then return true end
+end
+
+function View:onLexemeHoldRelease(_, ges)
+    if self:dragTo(ges.pos, true) then return true end
+end
+
 function View:onLexemeSwipe(_, ges)
+    -- A quick drag ends as a swipe, from where the finger went down to where it lifted.
+    local drag = self.dragging or self:findDrag(ges.pos)
+    if drag then
+        self.dragging = drag
+        self:dragTo(ges.end_pos or ges.pos, true)
+        return true
+    end
     if not self:isInside(ges.pos) then return self.takes_all_taps end
     local handled = self:onSwipe(ges.direction, ges)
     return handled or self.takes_all_taps

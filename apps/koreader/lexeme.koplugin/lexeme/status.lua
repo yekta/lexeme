@@ -1,11 +1,25 @@
 -- The status line at the top of every screen: clock, pull-down handle, Wi-Fi and battery.
 local Device = require("device")
 local NetworkMgr = require("ui/network/manager")
+local lfs = require("libs/libkoreader-lfs")
 
 local Bluetooth = require("lexeme/bluetooth")
 local D = require("lexeme/draw")
 
 local Status = { HEIGHT = 90 }
+
+-- Amazon's own status bar icons, used where the Kindle has them.
+local KINDLE_ICONS = "/app/KPPMainApp/res/core/systemStatus/"
+local CONNECTED = 2
+local kindle_icons = {}
+
+local function kindleIcon(name)
+    if kindle_icons[name] == nil then
+        local path = KINDLE_ICONS .. name .. ".svg"
+        kindle_icons[name] = lfs.attributes(path, "mode") == "file" and path or false
+    end
+    return kindle_icons[name] or nil
+end
 
 -- The name the Kindle was registered with ("Y's Kindle"), or "Kindle".
 function Status.deviceName()
@@ -73,8 +87,19 @@ function Status.paint(view, bb, x, y, w, on_handle)
     local level = power:getCapacity()
     Status.paintBattery(bb, x + w - D.s(86), y + D.s(37), level, power:isCharging())
     D.textRight(bb, x + w - D.s(93), y + D.s(60), D.face("regular", 28), level .. "%")
-    -- Amazon keeps the Wi-Fi icon in place however wide the percentage is, and Bluetooth beside it.
-    if Bluetooth.isOnCached() then D.icon(bb, "bluetooth", x + w - D.s(282), y + D.s(31), D.s(38), D.s(38)) end
+    -- Amazon keeps the Wi-Fi icon in place however wide the percentage is, Bluetooth beside it, and a
+    -- speaker beside that while a Bluetooth audio device is connected.
+    local bluetooth = Bluetooth.stateCached()
+    if bluetooth > 0 then
+        local icon = kindleIcon("Bluetooth")
+        if icon then
+            D.icon(bb, icon, x + w - D.s(268.5), y + D.s(35), D.s(19.5), D.s(33))
+        else
+            D.icon(bb, "bluetooth", x + w - D.s(282), y + D.s(31), D.s(38), D.s(38))
+        end
+    end
+    local speaker = bluetooth == CONNECTED and kindleIcon("Volume")
+    if speaker then D.icon(bb, speaker, x + w - D.s(337.5), y + D.s(33), D.s(37), D.s(37)) end
     if NetworkMgr:isConnected() then
         D.icon(bb, "status-wifi", x + w - D.s(216), y + D.s(33), D.s(44), D.s(34))
     elseif NetworkMgr:isWifiOn() then

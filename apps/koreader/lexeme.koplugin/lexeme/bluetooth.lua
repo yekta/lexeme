@@ -56,14 +56,14 @@ function Bluetooth.isOn()
     return Bluetooth.state() > 0
 end
 
--- For the status bar, which paints often: read at most every few seconds.
-function Bluetooth.isOnCached()
-    if not Bluetooth.available() then return false end
+-- For the status bar, which paints often: the state read at most every few seconds.
+function Bluetooth.stateCached()
+    if not Bluetooth.available() then return 0 end
     local now = os.time()
     if not cached_at or now - cached_at >= CACHE_SECONDS or (settling_until and now < settling_until) then
         Bluetooth.state()
     end
-    return (cached_state or 0) > 0
+    return cached_state or 0
 end
 
 function Bluetooth.setOn(on)

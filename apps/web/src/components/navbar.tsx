@@ -154,7 +154,6 @@ export function Navbar({ backHref, title, titleActions, rightActions }: TNavbarP
                     setIsLoggingOut(true);
                     logout().finally(() => setIsLoggingOut(false));
                   }}
-                  className="cursor-pointer"
                 >
                   {isLoggingOut ? (
                     <LoaderIcon className="size-5 shrink-0 animate-spin" />

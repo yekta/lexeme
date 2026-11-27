@@ -85,7 +85,6 @@ export function CalibrationMenuItem({
   return (
     <DropdownMenuItem
       variant="destructive"
-      className="cursor-pointer"
       disabled={!isProfileCalibrated}
       onClick={onReset}
     >

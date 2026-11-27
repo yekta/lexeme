@@ -62,7 +62,6 @@ export function AddOrImportCardsButton({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-40">
             <DropdownMenuItem
-              className="cursor-pointer"
               onClick={() => {
                 setIsDropdownOpen(false);
                 openFilePicker();

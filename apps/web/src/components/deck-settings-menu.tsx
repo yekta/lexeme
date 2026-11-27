@@ -109,14 +109,12 @@ export function DeckSettingsMenu({
         ></DropdownMenuTrigger>
         <DropdownMenuContent align={align} className="min-w-52">
           <DropdownMenuItem
-            className="cursor-pointer"
             onClick={() => setIsSettingsFormOpen(true)}
           >
             <Settings className="size-5 shrink-0" />
             <DropdownMenuItemText>Settings</DropdownMenuItemText>
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="cursor-pointer"
             closeOnClick={false}
             onClick={() => {
               setIsDropdownOpen(false);
@@ -127,7 +125,6 @@ export function DeckSettingsMenu({
             <DropdownMenuItemText>Import Cards</DropdownMenuItemText>
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="cursor-pointer"
             disabled={isExporting}
             closeOnClick={false}
             onClick={() => {
@@ -151,7 +148,6 @@ export function DeckSettingsMenu({
           />
           <DropdownMenuItem
             variant="destructive"
-            className="cursor-pointer"
             onClick={() => setIsDeleteOpen(true)}
           >
             <Trash2 className="size-5 shrink-0" />

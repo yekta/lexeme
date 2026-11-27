@@ -95,7 +95,6 @@ export function CreateOrImportDeckButton({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-40">
             <DropdownMenuItem
-              className="cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
               closeOnClick={false}
             >

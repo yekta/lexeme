@@ -62,14 +62,13 @@ export function ReadingSettingsMenu() {
         />
         <DropdownMenuContent align="start" className="min-w-56">
           <DropdownMenuItem
-            className="cursor-pointer"
             closeOnClick={false}
             onClick={() => setUnit(unit === "location" ? "page" : "location")}
           >
             <UnitIcon className="size-5 shrink-0" />
             <DropdownMenuItemText>Progress Units: {label}</DropdownMenuItemText>
           </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer" onClick={() => setIsStreakOpen(true)}>
+          <DropdownMenuItem onClick={() => setIsStreakOpen(true)}>
             <FlameIcon className="size-5 shrink-0" />
             <DropdownMenuItemText>Streak Settings</DropdownMenuItemText>
           </DropdownMenuItem>
@@ -104,7 +103,7 @@ function ReadingGoalForm({ goal, isPending, onDone }: { goal: TReadingGoal; isPe
     >
       <DialogHeader>
         <DialogTitle>Streak Settings</DialogTitle>
-        <DialogDescription>A day counts toward your streak once you've read for the goal that day.</DialogDescription>
+        <DialogDescription>Read for your daily goal to keep your streak going.</DialogDescription>
       </DialogHeader>
       <FormWrapper>
         <form.Field name="daily_minutes">

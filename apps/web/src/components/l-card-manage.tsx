@@ -89,7 +89,6 @@ export function LCardManage(props: TLCardManageProps) {
             ></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-40">
               <DropdownMenuItem
-                className="cursor-pointer"
                 onClick={() => setEditOpen(true)}
               >
                 <Pencil className="h-4 w-4" />
@@ -97,7 +96,6 @@ export function LCardManage(props: TLCardManageProps) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
-                className="cursor-pointer"
                 onClick={() => setDeleteOpen(true)}
               >
                 <Trash2 className="h-4 w-4" />

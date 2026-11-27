@@ -44,16 +44,18 @@ export function CopyField({
       >
         {value}
       </code>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={copy}
-        aria-label="Copy"
-        className="absolute top-[3px] right-[3px] rounded-[calc(var(--radius-lg)-3px)] hover:bg-border active:bg-border"
-      >
-        {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
-      </Button>
+      <div className="absolute top-px right-px rounded-[calc(var(--radius-lg)-1px)] bg-[color-mix(in_srgb,var(--muted)_50%,var(--background))] p-0.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={copy}
+          aria-label="Copy"
+          className="rounded-[calc(var(--radius-lg)-3px)] hover:bg-border active:bg-border"
+        >
+          {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+        </Button>
+      </div>
     </div>
   );
 }

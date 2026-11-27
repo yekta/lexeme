@@ -105,7 +105,7 @@ function Footer:paintTo(bb)
     if text then D.text(bb, D.s(84), baseline, face, text) end
     D.textRight(bb, w - D.s(84), baseline, face, Progress.percent(self.ui) .. "%")
     if G_reader_settings:isTrue("lexeme_show_clock") then
-        D.textCenter(bb, w / 2, D.s(48), D.face("regular", 26), Status.clock())
+        D.textCenter(bb, w / 2, D.s(48), D.face("bold", 26), Status.clock())
     end
 end
 

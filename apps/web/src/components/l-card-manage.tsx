@@ -83,7 +83,7 @@ export function LCardManage(props: TLCardManageProps) {
             <DropdownMenuTrigger
               render={
                 <Button variant="ghost" className="size-9 text-muted-foreground">
-                  <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
+                  <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition-transform" />
                 </Button>
               }
             ></DropdownMenuTrigger>

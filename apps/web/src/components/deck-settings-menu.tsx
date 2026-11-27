@@ -102,7 +102,7 @@ export function DeckSettingsMenu({
               size="icon-lg"
               className={cn("relative text-muted-foreground", triggerClassName)}
             >
-              <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
+              <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition-transform" />
               <CalibrationDot profileId={deck.learning_profile_id} />
             </Button>
           }

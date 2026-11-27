@@ -56,7 +56,7 @@ export function ReadingSettingsMenu() {
         <DropdownMenuTrigger
           render={
             <Button variant="ghost" size="icon-lg" className="shrink-0 text-muted-foreground">
-              <SettingsIcon className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
+              <SettingsIcon className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition-transform" />
             </Button>
           }
         />

@@ -370,6 +370,8 @@ export const readingGoals = pgTable("reading_goals", {
   day_starts_at: integer("day_starts_at").notNull().default(0),
   /** "location" | "page" */
   position_unit: text("position_unit").notNull().default("location"),
+  /** When position_unit was last chosen, on a device or here; the latest choice wins. */
+  position_unit_changed_at: timestamp("position_unit_changed_at", { withTimezone: true }),
   created_at: createdAt(),
   updated_at: updatedAt(),
 });

@@ -114,6 +114,43 @@ local function remember(ok, message, detail)
     G_reader_settings:saveSetting("lexeme_sync_failure", { message = message, detail = detail, at = os.time() })
 end
 
+-- Epoch milliseconds for an ISO time in UTC, like "2026-11-27T13:42:23.000Z".
+local function utcMilliseconds(iso)
+    local y, m, d, hh, mm, ss, frac = tostring(iso):match("^(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)%.?(%d*)Z$")
+    if not y then return end
+    y, m, d = tonumber(y), tonumber(m), tonumber(d)
+    if m <= 2 then y = y - 1 end
+    local era = math.floor(y / 400)
+    local year_of_era = y - era * 400
+    local day_of_year = math.floor((153 * (m + (m > 2 and -3 or 9)) + 2) / 5) + d - 1
+    local day_of_era = year_of_era * 365 + math.floor(year_of_era / 4) - math.floor(year_of_era / 100) + day_of_year
+    local days = era * 146097 + day_of_era - 719468
+    local ms = tonumber((frac .. "000"):sub(1, 3))
+    return ((days * 24 + tonumber(hh)) * 60 + tonumber(mm)) * 60000 + tonumber(ss) * 1000 + ms
+end
+
+-- Queues a progress units choice made in Settings that Lexeme hasn't had yet; returns when it was made.
+local function queuePositionUnit(since)
+    local changed_at = G_reader_settings:readSetting("lexeme_position_unit_changed_at")
+    if not changed_at then return end
+    if since ~= 0 and changed_at == G_reader_settings:readSetting("lexeme_position_unit_sent_at") then return end
+    local unit = G_reader_settings:readSetting("lexeme_position_unit") == "page" and "page" or "location"
+    Outbox.push("reading", { position_unit = unit, position_unit_changed_at = changed_at })
+    return changed_at
+end
+
+-- Takes Lexeme's progress units when they were chosen there after this Kindle's last choice.
+local function adoptPositionUnit()
+    local ok, settings = Api.get("/api/v1/reading/settings")
+    if not ok or type(settings) ~= "table" then return end
+    local unit, changed_at = settings.position_unit, utcMilliseconds(settings.position_unit_changed_at)
+    if (unit ~= "location" and unit ~= "page") or not changed_at then return end
+    if changed_at <= (G_reader_settings:readSetting("lexeme_position_unit_changed_at") or 0) then return end
+    G_reader_settings:saveSetting("lexeme_position_unit", unit)
+    G_reader_settings:saveSetting("lexeme_position_unit_changed_at", changed_at)
+    G_reader_settings:saveSetting("lexeme_position_unit_sent_at", changed_at)
+end
+
 local function syncAll()
     if not isOnline() then return false, OFFLINE end
     local started = os.time()
@@ -126,15 +163,13 @@ local function syncAll()
     local everything = Reading.snapshot(since)
     local snapshot = changedSince(everything, since)
     local now = Sent.addDeleted(everything, snapshot)
-    -- Whether Lexeme shows places as locations or pages, from Settings; sent when it changes, and with every resend.
-    local position_unit = G_reader_settings:readSetting("lexeme_position_unit") == "page" and "page" or "location"
-    local unit_changed = since == 0 or position_unit ~= G_reader_settings:readSetting("lexeme_sent_position_unit")
-    if unit_changed then Outbox.push("reading", { position_unit = position_unit }) end
+    local unit_sent_at = queuePositionUnit(since)
     Sync.queueReading(snapshot)
     Reading.forget(snapshot.removed)
     local _, failure = Outbox.flush()
     if failure then return false, failure end
-    if unit_changed then G_reader_settings:saveSetting("lexeme_sent_position_unit", position_unit) end
+    if unit_sent_at then G_reader_settings:saveSetting("lexeme_position_unit_sent_at", unit_sent_at) end
+    adoptPositionUnit()
     Sent.remember(now)
     -- With this Kindle's reading in, the streak Home shows is up to date.
     if Streak.refresh() then

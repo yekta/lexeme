@@ -230,8 +230,9 @@ export const syncReadingArgs = z.object({
   removed_lookup_ids: z.array(uuidArg).max(5000).default([]),
   /** Books deleted from the device; removed here with what was recorded about them. */
   removed_book_keys: z.array(bookKey).max(2000).default([]),
-  /** Whether Lexeme shows places as locations or pages, as set on the device. */
+  /** Whether Lexeme shows places as locations or pages, as chosen on the device, and when it was chosen there. */
   position_unit: z.enum(POSITION_UNITS).nullish(),
+  position_unit_changed_at: epochMs.nullish(),
 });
 
 export const readingGoalArgs = z.object({
@@ -247,12 +248,15 @@ export const deleteReadingSessionArgs = z
   .object({ book_id: uuidArg, started_at: epochMs, ended_at: epochMs })
   .refine((args) => args.ended_at >= args.started_at, "A session can't end before it starts.");
 
+type TReadingSettings = {
+  daily_minutes: number;
+  day_starts_at: number;
+  position_unit: TPositionUnit;
+  position_unit_changed_at: number;
+};
+
 /** Changes some of the user's reading settings; the rest keep their values, or the defaults for a new row. */
-async function saveReadingSettings(
-  tx: Transaction,
-  user_id: string,
-  changes: Partial<{ daily_minutes: number; day_starts_at: number; position_unit: TPositionUnit }>,
-) {
+async function saveReadingSettings(tx: Transaction, user_id: string, changes: Partial<TReadingSettings>) {
   const existing = await tx.run(zql.reading_goals.where("user_id", user_id).one());
   const now = Date.now();
   await tx.mutate.reading_goals.upsert({
@@ -260,10 +264,18 @@ async function saveReadingSettings(
     daily_minutes: existing?.daily_minutes ?? DEFAULT_DAILY_GOAL_MINUTES,
     day_starts_at: existing?.day_starts_at ?? DEFAULT_DAY_STARTS_AT,
     position_unit: existing?.position_unit ?? "location",
+    position_unit_changed_at: existing?.position_unit_changed_at ?? undefined,
     ...changes,
     created_at: existing?.created_at ?? now,
     updated_at: now,
   });
+}
+
+/** Saves a choice of position unit made at `changed_at`, unless one made later is already saved: the latest choice wins. */
+async function choosePositionUnit(tx: Transaction, user_id: string, position_unit: TPositionUnit, changed_at: number) {
+  const existing = await tx.run(zql.reading_goals.where("user_id", user_id).one());
+  if (existing?.position_unit_changed_at != null && existing.position_unit_changed_at >= changed_at) return;
+  await saveReadingSettings(tx, user_id, { position_unit, position_unit_changed_at: changed_at });
 }
 
 // --- access ---
@@ -631,7 +643,9 @@ export const mutatorDefs = {
         await tx.mutate.books.delete({ id });
       }
 
-      if (args.position_unit) await saveReadingSettings(tx, user_id, { position_unit: args.position_unit });
+      if (args.position_unit && args.position_unit_changed_at != null) {
+        await choosePositionUnit(tx, user_id, args.position_unit, args.position_unit_changed_at);
+      }
     }),
 
     deleteSession: defineMutator(deleteReadingSessionArgs, async ({ tx, ctx, args }) => {
@@ -671,7 +685,7 @@ export const mutatorDefs = {
 
     setPositionUnit: defineMutator(positionUnitArgs, async ({ tx, ctx, args }) => {
       const { user_id } = mustBeSignedIn(ctx);
-      await saveReadingSettings(tx, user_id, args);
+      await choosePositionUnit(tx, user_id, args.position_unit, Date.now());
     }),
   },
 

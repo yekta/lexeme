@@ -1,3 +1,4 @@
+import type { TPositionUnit } from "@lexeme/shared";
 import { useForm } from "@tanstack/react-form";
 import { MoreVertical, Settings } from "lucide-react";
 import { useState } from "react";
@@ -16,13 +17,18 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuItemText,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useReadingGoal, useUpdateReadingGoal, type TReadingGoal } from "@/hooks/data/use-reading";
+import { usePositionUnit, useReadingGoal, useUpdateReadingGoal, type TReadingGoal } from "@/hooks/data/use-reading";
 
 const goalSchema = z.object({
   daily_minutes: z.number().int("Whole minutes only").min(1, "At least 1 minute").max(24 * 60, "At most 24 hours"),
@@ -37,31 +43,44 @@ const fromClock = (clock: string) => {
   return hours * 60 + minutes;
 };
 
-/** The streak's three-dot menu: its goal and when a day starts. */
-export function ReadingGoalMenu({ isPlaceholder }: { isPlaceholder?: boolean }) {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+/** The Reading page's three-dot menu, by its title: progress units and the streak's settings. */
+export function ReadingSettingsMenu() {
+  const [isStreakOpen, setIsStreakOpen] = useState(false);
   const { goal, isPending } = useReadingGoal();
-  const trigger = (
-    <Button variant="ghost" size="icon-lg" isPlaceholder={isPlaceholder} className="-my-0.5 shrink-0 text-muted-foreground">
-      <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
-    </Button>
-  );
-  if (isPlaceholder) return trigger;
+  const { unit, setUnit } = usePositionUnit();
 
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={trigger} />
-        <DropdownMenuContent align="end" className="min-w-40">
-          <DropdownMenuItem className="cursor-pointer" onClick={() => setIsSettingsOpen(true)}>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon-lg" className="shrink-0 text-muted-foreground">
+              <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="start" className="min-w-52">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Progress units</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={unit} onValueChange={(value) => setUnit(value as TPositionUnit)}>
+              <DropdownMenuRadioItem value="location" className="cursor-pointer">
+                Locations
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="page" className="cursor-pointer">
+                Pages
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="cursor-pointer" onClick={() => setIsStreakOpen(true)}>
             <Settings className="size-5 shrink-0" />
-            <DropdownMenuItemText>Settings</DropdownMenuItemText>
+            <DropdownMenuItemText>Streak settings</DropdownMenuItemText>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+      <Dialog open={isStreakOpen} onOpenChange={setIsStreakOpen}>
         <DialogContent>
-          <ReadingGoalForm goal={goal} isPending={isPending} onDone={() => setIsSettingsOpen(false)} />
+          <ReadingGoalForm goal={goal} isPending={isPending} onDone={() => setIsStreakOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

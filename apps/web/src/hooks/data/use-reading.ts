@@ -49,17 +49,17 @@ export function useUpdateReadingGoal() {
   };
 }
 
-/** Whether places in a book show as Kindle locations or pages: as set on the Kindle, until switched here. */
+/** Whether places in a book show as Kindle locations or pages: the latest choice, made here or on the Kindle. */
 export function usePositionUnit() {
   const zero = useZero();
   const [row] = useQuery(queries.readingGoal());
   const unit: TPositionUnit = row?.position_unit === "page" ? "page" : "location";
-  const toggle = () =>
-    commit(zero.mutate(mutators.readingGoal.setPositionUnit({ position_unit: unit === "page" ? "location" : "page" })), {
+  const setUnit = (position_unit: TPositionUnit) =>
+    commit(zero.mutate(mutators.readingGoal.setPositionUnit({ position_unit })), {
       kind: "reading_goals",
-      message: "Failed to switch between pages and locations",
+      message: "Failed to save the progress units",
     });
-  return { unit, toggle };
+  return { unit, setUnit };
 }
 
 /** Everything the e-readers reported, for the reading screens, with days cut where the user's day starts. */

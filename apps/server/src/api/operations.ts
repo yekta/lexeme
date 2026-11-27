@@ -566,7 +566,7 @@ export const operations: TOperation[] = [
     name: "sync-reading",
     title: "Sync reading data",
     description:
-      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. What was deleted on the device goes too: removed_highlight_ids and removed_lookup_ids by id, and book_page_reads lists every page visit a book still has, so its others are deleted. Page visits sent with imported: true came from another reader's history, so book_page_reads never deletes them. A highlight's location and a book's locations are Kindle locations, which unlike pages don't move with the layout; position_unit is whether Lexeme shows places as locations or pages, as set on the device. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing. For more than fits in one call, write this same input to a JSON file and use import-reading.",
+      "Send books, every page visit, highlights and bookmarks, and looked-up words from an e-reader, and the keys of books deleted from it. What was deleted on the device goes too: removed_highlight_ids and removed_lookup_ids by id, and book_page_reads lists every page visit a book still has, so its others are deleted. Page visits sent with imported: true came from another reader's history, so book_page_reads never deletes them. A highlight's location and a book's locations are Kindle locations, which unlike pages don't move with the layout; position_unit is whether Lexeme shows places as locations or pages, as chosen on the device at position_unit_changed_at; the latest choice, from a device or Lexeme, wins. Rows are matched on the ids and book keys the device sends, so sending the same data again changes nothing. For more than fits in one call, write this same input to a JSON file and use import-reading.",
     role: "editor",
     method: "POST",
     path: "/reading",
@@ -635,6 +635,26 @@ export const operations: TOperation[] = [
           last_read_at: book.last_read_at?.toISOString() ?? null,
           finished_at: book.finished_at?.toISOString() ?? null,
         })),
+      };
+    },
+  }),
+
+  defineOperation({
+    name: "get-reading-settings",
+    title: "Get reading settings",
+    description:
+      "How the user reads: the daily goal in minutes and the minute past midnight a reading day starts at, for the streak, and whether places in books show as Kindle locations or pages (position_unit), with when that was last chosen. E-readers read it to show places the way the user last chose, on whichever device.",
+    role: "viewer",
+    method: "GET",
+    path: "/reading/settings",
+    input: z.object({}),
+    run: async (caller) => {
+      const [settings] = await db.select().from(readingGoals).where(eq(readingGoals.user_id, caller.userId));
+      return {
+        daily_minutes: settings?.daily_minutes ?? DEFAULT_DAILY_GOAL_MINUTES,
+        day_starts_at: settings?.day_starts_at ?? DEFAULT_DAY_STARTS_AT,
+        position_unit: settings?.position_unit ?? "location",
+        position_unit_changed_at: settings?.position_unit_changed_at?.toISOString() ?? null,
       };
     },
   }),

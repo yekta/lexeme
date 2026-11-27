@@ -1,0 +1,1 @@
+ALTER TABLE "reading_goals" ADD COLUMN "position_unit_changed_at" timestamp with time zone;

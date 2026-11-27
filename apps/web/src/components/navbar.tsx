@@ -69,10 +69,12 @@ function ThemeMenuItem() {
 type TNavbarProps = {
   backHref?: string;
   title?: React.ReactNode;
+  /** Shown right after the title, like a ⋮ menu for what the page shows. */
+  titleActions?: React.ReactNode;
   rightActions?: React.ReactNode;
 };
 
-export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
+export function Navbar({ backHref, title, titleActions, rightActions }: TNavbarProps) {
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -98,6 +100,7 @@ export function Navbar({ backHref, title, rightActions }: TNavbarProps) {
                   {title}
                 </h1>
               )}
+              {titleActions}
             </div>
           )}
         </div>

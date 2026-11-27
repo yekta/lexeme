@@ -15,7 +15,7 @@ import {
 import { HighlightItem } from "@/components/highlight-item";
 import { LoadError } from "@/components/load-error";
 import { ReadingChart } from "@/components/reading-chart";
-import { ReadingGoalMenu } from "@/components/reading-goal-menu";
+import { ReadingSettingsMenu } from "@/components/reading-settings-menu";
 import { StreakCalendar } from "@/components/streak-calendar";
 import { Navbar } from "@/components/navbar";
 import { Page } from "@/components/page";
@@ -70,7 +70,13 @@ function ReadingPage() {
   const titles = useMemo(() => new Map(reading.books.map((book) => [book.id, book.title])), [reading.books]);
 
   return (
-    <Page title="Reading" backHref="/" className="gap-8" isPlaceholder={isPlaceholder}>
+    <Page
+      title="Reading"
+      titleActions={!isPlaceholder && <ReadingSettingsMenu />}
+      backHref="/"
+      className="gap-8"
+      isPlaceholder={isPlaceholder}
+    >
       {reading.isError ? (
         <LoadError error={reading.error} onRetry={reading.refetch} />
       ) : !reading.isPending && reading.books.length === 0 ? (
@@ -87,10 +93,7 @@ function ReadingPage() {
           </section>
 
           <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-4">
-              <SectionTitle title="Streak" />
-              <ReadingGoalMenu isPlaceholder={isPlaceholder} />
-            </div>
+            <SectionTitle title="Streak" />
             <StreakCalendar days={summary.streakDays} goalMinutes={reading.goal.daily_minutes} isPlaceholder={isPlaceholder} />
           </section>
 

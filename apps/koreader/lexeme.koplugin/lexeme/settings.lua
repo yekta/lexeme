@@ -611,29 +611,6 @@ local function progressUnitLabel()
     end
 end
 
-function Settings:progressUnitsPage()
-    return {
-        title = "Progress units",
-        intro = "Show where you are in a book as locations or pages in Lexeme.",
-        rows = function()
-            local rows = {}
-            for _, unit in ipairs(PROGRESS_UNITS) do
-                table.insert(rows, {
-                    title = unit.label,
-                    plain = true,
-                    check = unit.key == progressUnit(),
-                    tap = function()
-                        G_reader_settings:saveSetting("lexeme_position_unit", unit.key)
-                        require("lexeme/sync").soon()
-                        self:refresh()
-                    end,
-                })
-            end
-            return rows
-        end,
-    }
-end
-
 function Settings:libraryPage()
     local connected = require("lexeme/sync").isConnected()
     local setting = connected and "lexeme_home_stats" or "lexeme_home_recently_added"
@@ -665,7 +642,19 @@ function Settings:libraryPage()
                     title = "Progress units",
                     subtitle = "Show where you are in a book as locations or pages in Lexeme.",
                     value = progressUnitLabel(),
-                    page = function() return self:progressUnitsPage() end,
+                    dropdown = (function()
+                        local items = {}
+                        for _, unit in ipairs(PROGRESS_UNITS) do
+                            table.insert(items, { text = unit.label, callback = function()
+                                -- When it was chosen, so the latest choice wins between the Kindle and Lexeme.
+                                G_reader_settings:saveSetting("lexeme_position_unit", unit.key)
+                                G_reader_settings:saveSetting("lexeme_position_unit_changed_at", os.time() * 1000)
+                                require("lexeme/sync").soon()
+                                self:refresh()
+                            end })
+                        end
+                        return items
+                    end)(),
                 } or nil,
             }
         end,
@@ -818,6 +807,9 @@ function Settings:paintRow(bb, x, top, w, row_h, row, icons)
         C.toggle(bb, x + w - D.s(140), cy, row.toggle)
     elseif row.check then
         D.icon(bb, "check", x + w - D.s(210), cy - D.s(24), D.s(48), D.s(48))
+    elseif row.dropdown then
+        D.icon(bb, "chevron-down", right - D.s(10), cy - D.s(22), D.s(44), D.s(44))
+        D.textRight(bb, right - D.s(40), cy + D.s(12), D.face("regular", 32), row.value, color)
     elseif row.page or row.chevron or row.value then
         if row.page or row.chevron or row.tap then
             D.icon(bb, "chevron-right", right - D.s(10), cy - D.s(22), D.s(44), D.s(44))
@@ -832,7 +824,11 @@ function Settings:paintRow(bb, x, top, w, row_h, row, icons)
     local pressedRow = (row.toggle == nil and not row.check) and {
         x = x + D.s(36), y = top + D.s(7), w = w - D.s(icons and 72 or 128), h = row_h - D.s(16),
     } or nil
-    if row.page then
+    if row.dropdown then
+        self:pressable(x, top, w, row_h, function()
+            require("lexeme/menu"):new{ items = row.dropdown, right = right + D.s(34), top = top + row_h - D.s(20) }:show()
+        end, pressedRow)
+    elseif row.page then
         self:pressable(x, top, w, row_h, function() self:push(row.page()) end, pressedRow)
     elseif row.tap then
         self:pressable(x, top, w, row_h, row.tap, pressedRow)

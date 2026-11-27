@@ -255,6 +255,7 @@ const readingGoals = table("reading_goals")
     day_starts_at: number(),
     /** "location" | "page" */
     position_unit: string(),
+    position_unit_changed_at: number().optional(),
     created_at: number(),
     updated_at: number(),
   })

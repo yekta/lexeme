@@ -6,6 +6,7 @@ local D = require("lexeme/draw")
 local Menu = require("lexeme/menu")
 local Progress = require("lexeme/progress")
 local Status = require("lexeme/status")
+local Timer = require("lexeme/timer")
 local View = require("lexeme/view")
 
 local Toolbar = View:extend{
@@ -69,11 +70,29 @@ function Toolbar:paintTop(bb, x, y, w)
             end
         end, { x = x + D.s(b.box), y = y + D.s(108), w = D.s(b.box_w), h = D.s(101) })
     end
+    self:paintTimer(bb, x, y)
     D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
 
     local title = self.ui.doc_props and self.ui.doc_props.display_title or ""
     D.text(bb, x + D.s(39), y + D.s(287), D.face("bold", 32), title, D.BLACK, w - D.s(78))
     D.rect(bb, x, y + D.s(334), w, D.s(4))
+end
+
+-- A running reading timer shows in the gap between Home and the buttons: the time left, and a
+-- line under it that fills as the time passes.
+function Toolbar:paintTimer(bb, x, y)
+    if not Timer.isRunning() then return end
+    local face = D.face("regular", 32)
+    local label = Timer.shortLabel(Timer.minutesLeft()) .. " left"
+    local icon, gap = D.s(40), D.s(12)
+    local group_w = icon + gap + D.width(face, label)
+    local left = x + D.s(511) - math.floor(group_w / 2)
+    D.icon(bb, "timer", left, y + D.s(132), icon, icon)
+    D.text(bb, left + icon + gap, y + D.s(164), face, label)
+    local line_y = y + D.s(186)
+    D.rect(bb, left, line_y, group_w, D.s(2), D.gray(170))
+    local passed = math.floor(group_w * Timer.progress() + 0.5)
+    if passed > 0 then D.rect(bb, left, line_y - D.s(1), passed, D.s(4)) end
 end
 
 function Toolbar:openMore(right)

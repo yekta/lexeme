@@ -103,6 +103,13 @@ function Timer.minutesLeft()
     return math.max(1, math.ceil(seconds / 60))
 end
 
+-- How much of the running timer has passed, from 0 to 1, or nil when none runs.
+function Timer.progress()
+    if not minutes then return nil end
+    local left = paused_left or math.max(0, ends_at - os.time())
+    return math.min(1, math.max(0, 1 - left / (minutes * 60)))
+end
+
 function Timer.pause()
     if not ends_at then return end
     paused_left = math.max(0, ends_at - os.time())

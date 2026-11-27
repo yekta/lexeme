@@ -1,5 +1,4 @@
 -- Home and Library: the screens shown instead of KOReader's file browser.
-local GestureRange = require("ui/gesturerange")
 local UIManager = require("ui/uimanager")
 
 local Books = require("lexeme/books")
@@ -7,6 +6,7 @@ local D = require("lexeme/draw")
 local LibrarySheets = require("lexeme/library_sheets")
 local Menu = require("lexeme/menu")
 local Quick = require("lexeme/quick")
+local Scrollbar = require("lexeme/scrollbar")
 local Status = require("lexeme/status")
 local Streak = require("lexeme/streak")
 local Study = require("lexeme/study")
@@ -40,11 +40,6 @@ function Shell:init()
     self.sort = G_reader_settings:readSetting("lexeme_library_sort") or "recent"
     self.descending = G_reader_settings:nilOrTrue("lexeme_library_descending")
     self.layout = G_reader_settings:readSetting("lexeme_library_layout") or "grid"
-    -- Dragging the scrollbar: a finger that moves at once makes a pan, one that rests first a hold.
-    for name, ges in pairs({ LexemePan = "pan", LexemePanRelease = "pan_release",
-            LexemeHoldPan = "hold_pan", LexemeHoldRelease = "hold_release" }) do
-        self.ges_events[name] = { GestureRange:new{ ges = ges, range = self.dimen } }
-    end
     self:reload()
     if self.tab == "lexeme" then UIManager:nextTick(function() self:refreshDecks() end) end
 end
@@ -412,87 +407,8 @@ function Shell:paintList(area, ox, oy, w, first)
 end
 
 function Shell:paintScrollbar(bb, right, top, bottom, pages)
-    local up = self.page > 1
-    local down = self.page < pages
-    D.icon(bb, up and "triangle-up" or "triangle-up-gray", right - D.s(74), top + D.s(42), D.s(34), D.s(21))
-    D.icon(bb, down and "triangle-down" or "triangle-down-gray", right - D.s(75), bottom - D.s(68), D.s(34), D.s(21))
-    local track_top, track_bottom = top + D.s(103), bottom - D.s(109)
-    local track_x = right - D.s(63)
-    for ty = track_top, track_bottom, D.s(4) do
-        D.rect(bb, track_x + D.s(3), ty, D.s(4), D.s(2), D.gray(102))
-    end
-    local span = track_bottom - track_top
-    local thumb_h = math.max(D.s(40), math.floor(span / pages))
-    local thumb_y = track_top + math.floor((span - thumb_h) * (self.page - 1) / math.max(1, pages - 1))
-    D.roundRect(bb, track_x, thumb_y, D.s(10), thumb_h, D.BLACK, D.s(5))
-    if pages > 1 then
-        -- Between the arrows, a finger moves the thumb: dragged, or tapped where it should go.
-        self.scrollbar = { x = right - D.s(100), top = top + D.s(110), bottom = bottom - D.s(110),
-            track_top = track_top, travel = span - thumb_h, thumb_y = thumb_y, thumb_h = thumb_h, pages = pages }
-        self:hit(right - D.s(100), top + D.s(110), D.s(100), bottom - top - D.s(220), function()
-            self:scrollTo(self.last_tap.y, self:grabScrollbar(self.last_tap))
-        end)
-    end
-    self:pressable(right - D.s(100), top, D.s(100), D.s(110), function() self:turnPage(-1, pages) end,
-        D.around(right - D.s(57), top + D.s(52), D.s(101), D.s(101)))
-    self:pressable(right - D.s(100), bottom - D.s(110), D.s(100), D.s(110), function() self:turnPage(1, pages) end,
-        D.around(right - D.s(58), bottom - D.s(57), D.s(101), D.s(101)))
-end
-
-function Shell:onScrollbar(pos)
-    local bar = self.scrollbar
-    return bar ~= nil and pos.x >= bar.x and pos.y >= bar.top and pos.y < bar.bottom
-end
-
--- How far below the thumb's top the finger holds it; a finger put down beside the thumb takes its middle.
-function Shell:grabScrollbar(pos)
-    local bar = self.scrollbar
-    if pos.y >= bar.thumb_y and pos.y < bar.thumb_y + bar.thumb_h then return pos.y - bar.thumb_y end
-    return math.floor(bar.thumb_h / 2)
-end
-
--- Shows the page whose thumb sits where the finger, holding it `grab` below its top, is at `y`.
-function Shell:scrollTo(y, grab)
-    local bar = self.scrollbar
-    if not bar then return end
-    local page = 1 + math.floor((y - grab - bar.track_top) * (bar.pages - 1) / bar.travel + 0.5)
-    self:turnPage(math.max(1, math.min(bar.pages, page)) - self.page, bar.pages)
-end
-
-function Shell:onLexemePan(_, ges)
-    local start = ges.start_pos or ges.pos
-    if not self:onScrollbar(start) then
-        self.scroll_grab = nil
-        return
-    end
-    self.scroll_grab = self.scroll_grab or self:grabScrollbar(start)
-    self:scrollTo(ges.pos.y, self.scroll_grab)
-    return true
-end
-
-function Shell:onLexemePanRelease(_, ges)
-    if not self.scroll_grab then return end
-    self:scrollTo(ges.pos.y, self.scroll_grab)
-    self.scroll_grab = nil
-    return true
-end
-
-function Shell:onLexemeHold(arg, ges)
-    self.scroll_grab = nil
-    if not self:onScrollbar(ges.pos) then return View.onLexemeHold(self, arg, ges) end
-    self.scroll_grab = self:grabScrollbar(ges.pos)
-    self:scrollTo(ges.pos.y, self.scroll_grab)
-    return true
-end
-
-function Shell:onLexemeHoldPan(_, ges)
-    if not self.scroll_grab then return end
-    self:scrollTo(ges.pos.y, self.scroll_grab)
-    return true
-end
-
-function Shell:onLexemeHoldRelease(arg, ges)
-    return self:onLexemePanRelease(arg, ges)
+    Scrollbar.paint(self, bb, right, top, bottom, { at = self.page, last = self.page, count = pages,
+        go = function(page) self:turnPage(page - self.page, pages) end })
 end
 
 function Shell:turnPage(delta, pages)
@@ -525,12 +441,7 @@ function Shell:scrollCarousel(direction, y)
 end
 
 function Shell:onSwipe(direction, ges)
-    -- A quick drag on the scrollbar ends as a swipe, starting where the finger went down.
-    if self:onScrollbar(ges.pos) then
-        self:scrollTo(ges.end_pos.y, self.scroll_grab or self:grabScrollbar(ges.pos))
-        self.scroll_grab = nil
-        return true
-    end
+    if Scrollbar.onSwipe(self, ges) then return true end
     if direction == "south" and ges.pos.y < D.s(200) then
         self:openQuick()
         return true
@@ -887,5 +798,7 @@ end
 function Shell:openSearch()
     require("lexeme/search").showLibrary(self)
 end
+
+Scrollbar.extend(Shell)
 
 return Shell

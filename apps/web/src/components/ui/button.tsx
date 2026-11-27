@@ -11,19 +11,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/80 active:bg-primary/80 shadow-md shadow-shadow/shadow-muted-more border-transparent",
+          "bg-primary text-primary-foreground hover:bg-primary/80 active:bg-primary/80 border-transparent",
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground shadow-md shadow-shadow/shadow-muted-more",
+          "border-border bg-background hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground shadow-md shadow-shadow/shadow-muted-more",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground active:bg-muted active:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         "ghost-destructive":
           "hover:bg-destructive/15 hover:text-destructive active:bg-destructive/15 active:text-destructive aria-expanded:bg-destructive/15 aria-expanded:text-destructive focus-visible:border-destructive focus-visible:ring-destructive/25",
         destructive:
-          "bg-destructive text-background border-destructive hover:bg-destructive/80 active:bg-destructive/80 focus-visible:border-destructive focus-visible:ring-destructive/25 shadow-md shadow-shadow/shadow-muted-more",
+          "bg-destructive text-background border-destructive hover:bg-destructive/80 active:bg-destructive/80 focus-visible:border-destructive focus-visible:ring-destructive/25",
         warning:
-          "bg-warning text-background border-warning hover:bg-warning/80 active:bg-warning/80 focus-visible:border-warning focus-visible:ring-warning/25 shadow-md shadow-shadow/shadow-muted-more",
+          "bg-warning text-background border-warning hover:bg-warning/80 active:bg-warning/80 focus-visible:border-warning focus-visible:ring-warning/25",
         link: "text-primary underline-offset-4 hover:underline active:underline",
       },
       size: {

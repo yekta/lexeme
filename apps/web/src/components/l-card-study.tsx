@@ -80,7 +80,7 @@ export function LCardStudy(props: TLCardStudyProps) {
           style={{ backfaceVisibility: "hidden", opacity: frontOpacity }}
           className={cn(
             faceBase,
-            "absolute inset-0 border border-border bg-background shadow-lg shadow-shadow/shadow-muted overflow-hidden flex flex-col items-center",
+            "absolute inset-0 border border-border bg-background overflow-hidden flex flex-col items-center",
           )}
         >
           <p className="max-w-full shrink min-w-0 text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-5 text-center relative z-10 group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
@@ -107,7 +107,7 @@ export function LCardStudy(props: TLCardStudyProps) {
             }}
             className={cn(
               faceBase,
-              "border bg-background overflow-hidden border-border shadow-lg shadow-shadow/shadow-muted",
+              "border bg-background overflow-hidden border-border",
             )}
           >
             <BgPattern />

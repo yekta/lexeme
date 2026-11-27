@@ -86,7 +86,7 @@ export function LDeck(props: TLDeckProps) {
     >
       {/* Main card */}
       <motion.div className="relative z-10 h-full">
-        <Card className="h-full flex flex-col shadow-md shadow-shadow/shadow relative isolate transition-colors">
+        <Card className="h-full flex flex-col relative isolate transition-colors">
           {!isPlaceholder && (
             <DeckSettingsMenu
               deck={props.deck}

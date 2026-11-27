@@ -62,7 +62,6 @@
   --color-new-item: var(--new-item);
   --opacity-shadow: var(--o-shadow);
   --opacity-shadow-muted: var(--o-shadow-muted);
-  --opacity-shadow-muted-more: var(--o-shadow-muted-more);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -128,7 +127,6 @@
   --new-item: oklch(77.194% 0.17376 64.545);
   --o-shadow: 12%;
   --o-shadow-muted: 8%;
-  --o-shadow-muted-more: 6%;
 }
 
 .dark {
@@ -185,7 +183,6 @@
   --new-item: oklch(86.736% 0.11547 76.068);
   --o-shadow: 20%;
   --o-shadow-muted: 10%;
-  --o-shadow-muted-more: 8%;
 }
 
 @layer base {

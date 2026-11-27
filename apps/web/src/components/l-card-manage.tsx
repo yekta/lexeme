@@ -68,11 +68,8 @@ export function LCardManage(props: TLCardManageProps) {
 
   return (
     <div
-      className="group relative rounded-xl border flex flex-col border-border bg-background shadow-md shadow-shadow/shadow overflow-hidden isolate transition-colors"
+      className="group relative rounded-xl border flex flex-col border-border bg-background overflow-hidden isolate transition-colors"
       data-placeholder={isPlaceholder || undefined}
-      style={{
-        boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
-      }}
     >
       {/* Menu */}
       <div className="absolute top-1 right-1 z-10">

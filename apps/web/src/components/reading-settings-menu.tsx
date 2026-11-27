@@ -1,6 +1,6 @@
 import type { TPositionUnit } from "@lexeme/shared";
 import { useForm } from "@tanstack/react-form";
-import { MoreVertical, Settings } from "lucide-react";
+import { BookOpenIcon, FlameIcon, MapPinIcon, SettingsIcon } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -17,13 +17,8 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuItemText,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FormInput } from "@/components/ui/input";
@@ -43,11 +38,17 @@ const fromClock = (clock: string) => {
   return hours * 60 + minutes;
 };
 
-/** The Reading page's three-dot menu, by its title: progress units and the streak's settings. */
+const UNIT_META: Record<TPositionUnit, { label: string; icon: React.ElementType }> = {
+  location: { label: "Locations", icon: MapPinIcon },
+  page: { label: "Pages", icon: BookOpenIcon },
+};
+
+/** The Reading page's settings menu, by its title: progress units and the streak's settings. */
 export function ReadingSettingsMenu() {
   const [isStreakOpen, setIsStreakOpen] = useState(false);
   const { goal, isPending } = useReadingGoal();
   const { unit, setUnit } = usePositionUnit();
+  const { label, icon: UnitIcon } = UNIT_META[unit];
 
   return (
     <>
@@ -55,26 +56,22 @@ export function ReadingSettingsMenu() {
         <DropdownMenuTrigger
           render={
             <Button variant="ghost" size="icon-lg" className="shrink-0 text-muted-foreground">
-              <MoreVertical className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
+              <SettingsIcon className="size-5 shrink-0 group-data-popup-open/button:rotate-90 transition" />
             </Button>
           }
         />
-        <DropdownMenuContent align="start" className="min-w-52">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Progress units</DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={unit} onValueChange={(value) => setUnit(value as TPositionUnit)}>
-              <DropdownMenuRadioItem value="location" className="cursor-pointer">
-                Locations
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="page" className="cursor-pointer">
-                Pages
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
+        <DropdownMenuContent align="start" className="min-w-56">
+          <DropdownMenuItem
+            className="cursor-pointer"
+            closeOnClick={false}
+            onClick={() => setUnit(unit === "location" ? "page" : "location")}
+          >
+            <UnitIcon className="size-5 shrink-0" />
+            <DropdownMenuItemText>Progress Units: {label}</DropdownMenuItemText>
+          </DropdownMenuItem>
           <DropdownMenuItem className="cursor-pointer" onClick={() => setIsStreakOpen(true)}>
-            <Settings className="size-5 shrink-0" />
-            <DropdownMenuItemText>Streak settings</DropdownMenuItemText>
+            <FlameIcon className="size-5 shrink-0" />
+            <DropdownMenuItemText>Streak Settings</DropdownMenuItemText>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

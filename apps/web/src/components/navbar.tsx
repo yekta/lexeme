@@ -35,12 +35,7 @@ const THEME_META: Record<TTheme, { label: string; icon: React.ElementType }> = {
 };
 
 function ThemeMenuItem() {
-  // `theme` is undefined for the first render: next-themes resolves the stored
-  // choice in an effect, so the label falls back until it lands. This used to
-  // be gated behind a hydration flag as well, because the server had no
-  // localStorage to read and rendering the real label there was a mismatch.
-  // Nothing is server-rendered now, so the flag is gone; the fallback below is
-  // all that was ever doing the work.
+  // `theme` is undefined until next-themes reads the stored choice, so the label falls back until then.
   const { theme: current, setTheme, themes } = useTheme();
 
   const themeForLabel = AvailableThemesEnum.safeParse(current);

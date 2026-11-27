@@ -14,6 +14,10 @@ import {
   FSRS_DEFAULT_RELEARNING_STEPS,
   FSRS_DEFAULT_REQUEST_RETENTION,
   FSRS_DEFAULT_W,
+  DEFAULT_DAILY_GOAL_MINUTES,
+  DEFAULT_DAY_STARTS_AT,
+  POSITION_UNITS,
+  type TPositionUnit,
 } from "@lexeme/shared";
 import { mustBeSignedIn } from "./context.ts";
 import { zql } from "./schema.ts";
@@ -158,6 +162,7 @@ export const syncReadingArgs = z.object({
         progress: z.number().min(0).max(1).nullish(),
         status: z.enum(BOOK_STATUSES),
         pages: z.number().int().min(0).nullish(),
+        locations: z.number().int().min(0).nullish(),
         series: z.string().trim().max(1000).nullish(),
         language: z.string().trim().max(50).nullish(),
         description: z.string().trim().max(20_000).nullish(),
@@ -193,6 +198,7 @@ export const syncReadingArgs = z.object({
         note: optionalText,
         chapter: z.string().trim().max(1000).nullish(),
         page: z.string().trim().max(50).nullish(),
+        location: z.number().int().min(1).nullish(),
         highlighted_at: epochMs,
       }),
     )
@@ -221,6 +227,8 @@ export const syncReadingArgs = z.object({
   removed_lookup_ids: z.array(uuidArg).max(5000).default([]),
   /** Books deleted from the device; removed here with what was recorded about them. */
   removed_book_keys: z.array(bookKey).max(2000).default([]),
+  /** Whether the device shows places as pages or locations, sent when that changes there. */
+  position_unit: z.enum(POSITION_UNITS).nullish(),
 });
 
 export const readingGoalArgs = z.object({
@@ -229,10 +237,31 @@ export const readingGoalArgs = z.object({
   day_starts_at: z.number().int().min(0).max(24 * 60 - 1),
 });
 
+export const positionUnitArgs = z.object({ position_unit: z.enum(POSITION_UNITS) });
+
 /** A reading session is a book's page visits that started between `started_at` and `ended_at`. */
 export const deleteReadingSessionArgs = z
   .object({ book_id: uuidArg, started_at: epochMs, ended_at: epochMs })
   .refine((args) => args.ended_at >= args.started_at, "A session can't end before it starts.");
+
+/** Changes some of the user's reading settings; the rest keep their values, or the defaults for a new row. */
+async function saveReadingSettings(
+  tx: Transaction,
+  user_id: string,
+  changes: Partial<{ daily_minutes: number; day_starts_at: number; position_unit: TPositionUnit }>,
+) {
+  const existing = await tx.run(zql.reading_goals.where("user_id", user_id).one());
+  const now = Date.now();
+  await tx.mutate.reading_goals.upsert({
+    user_id,
+    daily_minutes: existing?.daily_minutes ?? DEFAULT_DAILY_GOAL_MINUTES,
+    day_starts_at: existing?.day_starts_at ?? DEFAULT_DAY_STARTS_AT,
+    position_unit: existing?.position_unit ?? "page",
+    ...changes,
+    created_at: existing?.created_at ?? now,
+    updated_at: now,
+  });
+}
 
 // --- access ---
 //
@@ -474,6 +503,7 @@ export const mutatorDefs = {
           progress: progress ?? undefined,
           status: book.status,
           pages: book.pages ?? undefined,
+          locations: book.locations ?? undefined,
           series: book.series ?? undefined,
           language: book.language ?? undefined,
           description: book.description ?? undefined,
@@ -523,6 +553,7 @@ export const mutatorDefs = {
           note: highlight.note ?? undefined,
           chapter: highlight.chapter ?? undefined,
           page: highlight.page ?? undefined,
+          location: highlight.location ?? undefined,
           highlighted_at: highlight.highlighted_at,
           created_at: now,
           updated_at: now,
@@ -573,6 +604,8 @@ export const mutatorDefs = {
         if (!id) continue;
         await tx.mutate.books.delete({ id });
       }
+
+      if (args.position_unit) await saveReadingSettings(tx, user_id, { position_unit: args.position_unit });
     }),
 
     deleteSession: defineMutator(deleteReadingSessionArgs, async ({ tx, ctx, args }) => {
@@ -607,14 +640,12 @@ export const mutatorDefs = {
   readingGoal: {
     update: defineMutator(readingGoalArgs, async ({ tx, ctx, args }) => {
       const { user_id } = mustBeSignedIn(ctx);
-      const existing = await tx.run(zql.reading_goals.where("user_id", user_id).one());
-      const now = Date.now();
-      await tx.mutate.reading_goals.upsert({
-        user_id,
-        ...args,
-        created_at: existing?.created_at ?? now,
-        updated_at: now,
-      });
+      await saveReadingSettings(tx, user_id, args);
+    }),
+
+    setPositionUnit: defineMutator(positionUnitArgs, async ({ tx, ctx, args }) => {
+      const { user_id } = mustBeSignedIn(ctx);
+      await saveReadingSettings(tx, user_id, args);
     }),
   },
 

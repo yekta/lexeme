@@ -210,8 +210,12 @@ function Layout.resetSpacing(ui)
     applyCss(ui)
 end
 
+function Layout.sideMargin()
+    return D.s(Layout.MARGINS[Layout.get("lexeme_margins")])
+end
+
 function Layout.applyMargins(ui)
-    local side = D.s(Layout.MARGINS[Layout.get("lexeme_margins")])
+    local side = Layout.sideMargin()
     local top, bottom = D.s(Layout.TOP_MARGIN), D.s(Layout.BOTTOM_MARGIN)
     -- KOReader keeps margins in its own units and scales them up when it reapplies them.
     local factor = Screen:scaleBySize(10000) / 10000

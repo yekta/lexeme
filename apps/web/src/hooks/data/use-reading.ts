@@ -11,6 +11,7 @@ import {
   secondsByDay,
   type TBookDay,
   type TReadingDay,
+  type TPositionUnit,
   type TReadingSession,
 } from "@lexeme/shared";
 import { useQuery, useZero } from "@rocicorp/zero/react";
@@ -46,6 +47,19 @@ export function useUpdateReadingGoal() {
       });
     },
   };
+}
+
+/** Whether places in a book show as pages or Kindle locations: as the Kindle shows them, until switched here. */
+export function usePositionUnit() {
+  const zero = useZero();
+  const [row] = useQuery(queries.readingGoal());
+  const unit: TPositionUnit = row?.position_unit === "location" ? "location" : "page";
+  const toggle = () =>
+    commit(zero.mutate(mutators.readingGoal.setPositionUnit({ position_unit: unit === "page" ? "location" : "page" })), {
+      kind: "reading_goals",
+      message: "Failed to switch between pages and locations",
+    });
+  return { unit, toggle };
 }
 
 /** Everything the e-readers reported, for the reading screens, with days cut where the user's day starts. */

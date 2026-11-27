@@ -3,6 +3,8 @@ local UIManager = require("ui/uimanager")
 
 local C = require("lexeme/controls")
 local D = require("lexeme/draw")
+local Footer = require("lexeme/footer")
+local Locations = require("lexeme/locations")
 local Menu = require("lexeme/menu")
 local Progress = require("lexeme/progress")
 local Status = require("lexeme/status")
@@ -99,8 +101,15 @@ function Toolbar:paintBottom(bb, x, y, w)
     D.textCenter(bb, x + w / 2, y + D.s(1526 - 1473), D.face("regular", 36), Progress.chapter(ui), D.BLACK,
         w - D.s(260))
     local page, count = Progress.page(ui), Progress.pageCount(ui)
-    local info = string.format("Page %s of %s | %s left in chapter | %d%%",
-        Progress.pageLabel(ui), Progress.pageCountLabel(ui), Progress.chapterTimeLeft(ui), Progress.percent(ui))
+    local position = string.format("Page %s of %s", Progress.pageLabel(ui), Progress.pageCountLabel(ui))
+    if Footer.mode() == "location" then
+        local location, total = Locations.current(ui)
+        if location then
+            position = string.format("Loc %s of %s", Locations.format(location), Locations.format(total))
+        end
+    end
+    local info = string.format("%s | %s left in chapter | %d%%", position, Progress.chapterTimeLeft(ui),
+        Progress.percent(ui))
     D.textCenter(bb, x + w / 2, y + D.s(1573 - 1473), D.face("regular", 32), info, D.BLACK, w - D.s(260))
 
     local prev_chapter = ui.toc:getPreviousChapter(page)

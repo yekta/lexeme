@@ -615,7 +615,7 @@ function Settings:libraryPage()
                     end,
                 },
                 connected and {
-                    title = "Show Lexeme",
+                    title = "Show Lexeme Tab",
                     subtitle = "Show a Lexeme tab beside Home and Library for studying your decks.",
                     toggle = G_reader_settings:nilOrTrue("lexeme_study_tab"),
                     tap = function()

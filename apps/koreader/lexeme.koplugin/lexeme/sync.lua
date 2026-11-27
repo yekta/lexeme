@@ -19,7 +19,7 @@ local Streak = require("lexeme/streak")
 local Sync = {}
 
 -- Bumped when a sync starts sending something new, so the next one sends it all.
-local SYNC_VERSION = 5
+local SYNC_VERSION = 6
 
 local CHUNK = {
     books = 200, page_reads = 2000, highlights = 500, lookups = 500,
@@ -122,10 +122,15 @@ local function syncAll()
     local everything = Reading.snapshot(since)
     local snapshot = changedSince(everything, since)
     local now = Sent.addDeleted(everything, snapshot)
+    -- Lexeme shows places as this Kindle does: in locations when its progress line shows them, pages otherwise.
+    local position_unit = G_reader_settings:readSetting("lexeme_progress_mode") == "location" and "location" or "page"
+    local unit_changed = position_unit ~= G_reader_settings:readSetting("lexeme_sent_position_unit")
+    if unit_changed then Outbox.push("reading", { position_unit = position_unit }) end
     Sync.queueReading(snapshot)
     Reading.forget(snapshot.removed)
     local _, failure = Outbox.flush()
     if failure then return false, failure end
+    if unit_changed then G_reader_settings:saveSetting("lexeme_sent_position_unit", position_unit) end
     Sent.remember(now)
     -- With this Kindle's reading in, the streak Home shows is up to date.
     if Streak.refresh() then

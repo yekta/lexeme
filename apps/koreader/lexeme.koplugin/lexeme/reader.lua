@@ -8,6 +8,7 @@ local Marks = require("lexeme/marks")
 local Quick = require("lexeme/quick")
 local Selection = require("lexeme/selection")
 local Toolbar = require("lexeme/toolbar")
+local Zones = require("lexeme/zones")
 
 local Reader = {}
 
@@ -154,10 +155,11 @@ function Reader.beforeRender(ui)
 end
 
 function Reader.onReaderReady(ui)
-    -- KOReader's gesture shortcuts (a bookmark on the top-right corner, page flipping on
-    -- the top-left, the light on the bottom-left, 10-page jumps...) aren't the Kindle's;
-    -- without them a tap falls through to the reader, so the whole top bar opens the toolbar.
+    -- KOReader's gesture shortcuts (page flipping on the top-left, the light on the
+    -- bottom-left, 10-page jumps...) aren't the Kindle's; the Kindle's own are in Zones.
     if ui.gestures then ui.gestures.gestures = {} end
+    -- After the reader modules' own zones, which are set up as the reader gets ready.
+    Zones.install(ui)
     -- Vocabulary Builder is set up after the reader modules, so it's replaced here.
     -- It keeps every look-up, without stopping to say a word is already in it.
     local vocabulary = package.loaded["db"]

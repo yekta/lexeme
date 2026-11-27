@@ -132,6 +132,7 @@ const books = table("books")
     progress: number().optional(),
     status: enumeration<TBookStatus>(),
     pages: number().optional(),
+    locations: number().optional(),
     series: string().optional(),
     language: string().optional(),
     description: string().optional(),
@@ -171,6 +172,7 @@ const highlights = table("highlights")
     note: string().optional(),
     chapter: string().optional(),
     page: string().optional(),
+    location: number().optional(),
     highlighted_at: number(),
     created_at: number(),
     updated_at: number(),
@@ -242,13 +244,15 @@ const bookRelationships = relationships(books, ({ many }) => ({
   lookups: many({ sourceField: ["id"], destField: ["book_id"], destSchema: lookups }),
 }));
 
-/** What counts as a day read; a user without a row uses the defaults. */
+/** What counts as a day read, and whether places show as pages or locations; a user without a row uses the defaults. */
 const readingGoals = table("reading_goals")
   .columns({
     user_id: string(),
     daily_minutes: number(),
     /** Minutes past midnight. */
     day_starts_at: number(),
+    /** "page" | "location" */
+    position_unit: string(),
     created_at: number(),
     updated_at: number(),
   })

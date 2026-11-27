@@ -91,6 +91,13 @@ function Reader.install(ui)
     ui.highlight.onHold = function(self, arg, ges)
         self.lexeme_holding = true
         local handled = on_hold(self, arg, ges)
+        -- KOReader gives a held word one box around all of it, which for a word hyphenated
+        -- across two lines covers both lines whole; it gets one box per line instead.
+        local selected = self.selected_text
+        if ui.rolling and selected and selected.pos0 and selected.pos1 then
+            local boxes = ui.document:getScreenBoxesFromPositions(selected.pos0, selected.pos1, true)
+            if #boxes > 1 then selected.sboxes = boxes end
+        end
         Marks.refresh(ui)
         return handled
     end

@@ -4,6 +4,7 @@ local Event = require("ui/event")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 
+local Bluetooth = require("lexeme/bluetooth")
 local C = require("lexeme/controls")
 local D = require("lexeme/draw")
 local Menu = require("lexeme/menu")
@@ -20,6 +21,8 @@ local Quick = View:extend{
 }
 
 local PANEL_HEIGHT = 1184
+-- The second row of buttons on Amazon's Paperwhite 5 Quick Actions.
+local ROW_PITCH = 232
 
 function Quick:init()
     View.init(self)
@@ -42,11 +45,16 @@ function Quick:button(bb, cx, cy, icon, label, on, on_tap)
 end
 
 function Quick:render(bb, x, y, w, h)
-    local bottom = y + D.s(PANEL_HEIGHT)
-    D.scrim(bb, x, bottom, w, h - D.s(PANEL_HEIGHT))
-    self:hit(x, bottom, w, h - D.s(PANEL_HEIGHT), function() self:close() end)
-    self:hit(x, y, w, D.s(PANEL_HEIGHT), function() end)
-    D.rect(bb, x, y, w, D.s(PANEL_HEIGHT), D.WHITE)
+    -- With Bluetooth, the buttons take two rows of three, as on Amazon's Paperwhite 5, and what's
+    -- below them moves down a row.
+    local two_rows = Bluetooth.available()
+    local shift = two_rows and D.s(ROW_PITCH) or 0
+    local panel_h = D.s(PANEL_HEIGHT) + shift
+    local bottom = y + panel_h
+    D.scrim(bb, x, bottom, w, h - panel_h)
+    self:hit(x, bottom, w, h - panel_h, function() self:close() end)
+    self:hit(x, y, w, panel_h, function() end)
+    D.rect(bb, x, y, w, panel_h, D.WHITE)
     D.rect(bb, x, bottom - D.s(4), w, D.s(4))
 
     D.text(bb, x + D.s(37), y + D.s(71), D.face("bold", 40), self.name, D.BLACK, w - D.s(400))
@@ -56,36 +64,60 @@ function Quick:render(bb, x, y, w, h)
     D.textRight(bb, x + w - D.s(111), y + D.s(71), D.face("regular", 34), level .. "%")
     D.text(bb, x + D.s(40), y + D.s(129), D.face("regular", 32), dateLine())
 
+    -- Button centres: one row of five, or Amazon's two rows of three.
+    local spots = two_rows and {
+        { 212, 262 }, { 636, 262 }, { 1060, 262 }, { 212, 262 + ROW_PITCH }, { 636, 262 + ROW_PITCH },
+        { 1060, 262 + ROW_PITCH },
+    } or { { 127, 262 }, { 382, 262 }, { 636, 262 }, { 890, 262 }, { 1145, 262 } }
+    local next_spot = 0
+    local function spot()
+        next_spot = next_spot + 1
+        return x + D.s(spots[next_spot][1]), y + D.s(spots[next_spot][2])
+    end
+
     local airplane = not NetworkMgr:isWifiOn()
-    self:button(bb, x + D.s(127), y + D.s(262), "plane", airplane and "On" or "Off", airplane, function()
+    local ax, ay = spot()
+    self:button(bb, ax, ay, "plane", airplane and "On" or "Off", airplane, function()
         if airplane then NetworkMgr:toggleWifiOn() else NetworkMgr:toggleWifiOff() end
         UIManager:scheduleIn(1, function() self:refresh() end)
     end)
+    if two_rows then
+        local bluetooth = Bluetooth.isOn()
+        local bx, by = spot()
+        self:button(bb, bx, by, "bluetooth", bluetooth and "On" or "Off", bluetooth, function()
+            Bluetooth.setOn(not bluetooth)
+            UIManager:scheduleIn(2, function() self:refresh() end)
+        end)
+    end
     local night = G_reader_settings:isTrue("night_mode")
-    self:button(bb, x + D.s(382), y + D.s(262), "contrast", "Dark mode", night, function()
+    local nx, ny = spot()
+    self:button(bb, nx, ny, "contrast", "Dark mode", night, function()
         UIManager:broadcastEvent(Event:new("ToggleNightMode"))
         self:refresh("full")
     end)
-    self:button(bb, x + D.s(636), y + D.s(262), "refresh-cw", "Sync", false, function()
+    local sx, sy = spot()
+    self:button(bb, sx, sy, "refresh-cw", "Sync", false, function()
         self:close()
         UIManager:broadcastEvent(Event:new("LexemeSync"))
     end)
     local running = Timer.isRunning()
     local timer_label = running and Timer.shortLabel(Timer.minutesLeft()) .. " left" or "Timer"
-    self:button(bb, x + D.s(890), y + D.s(262), "timer", timer_label, running, function()
-        self:chooseTimer(x + w - D.s(37), y + D.s(400))
+    local tx, ty = spot()
+    self:button(bb, tx, ty, "timer", timer_label, running, function()
+        self:chooseTimer(x + w - D.s(37), y + D.s(400) + shift)
     end)
-    self:button(bb, x + D.s(1145), y + D.s(262), "settings", "All settings", false, function()
+    local gx, gy = spot()
+    self:button(bb, gx, gy, "settings", "All settings", false, function()
         self:close()
         if self.open_settings then UIManager:nextTick(self.open_settings) end
     end)
 
-    D.rect(bb, x, y + D.s(467), w, D.s(2), D.gray(136))
+    D.rect(bb, x, y + D.s(467) + shift, w, D.s(2), D.gray(136))
 
     if Device:hasFrontlight() then
-        D.text(bb, x + D.s(68), y + D.s(539), D.face("regular", 32), "Brightness")
+        D.text(bb, x + D.s(68), y + D.s(539) + shift, D.face("regular", 32), "Brightness")
         C.slider(self, bb, {
-            x0 = x + D.s(177), x1 = x + D.s(1096), cy = y + D.s(652),
+            x0 = x + D.s(177), x1 = x + D.s(1096), cy = y + D.s(652) + shift,
             min = power.fl_min, max = power.fl_max, value = power:frontlightIntensity(),
             knob = D.s(69), thick = D.s(10), thin = D.s(3), label = true, buttons = true,
             on_change = function(v)
@@ -95,10 +127,10 @@ function Quick:render(bb, x, y, w, h)
         })
     end
     if Device:hasNaturalLight() then
-        D.text(bb, x + D.s(66), y + D.s(779), D.face("regular", 32), "Warmth")
+        D.text(bb, x + D.s(66), y + D.s(779) + shift, D.face("regular", 32), "Warmth")
         local warmth = math.floor(power:frontlightWarmth() * 24 / 100 + 0.5)
         C.slider(self, bb, {
-            x0 = x + D.s(177), x1 = x + D.s(1096), cy = y + D.s(888),
+            x0 = x + D.s(177), x1 = x + D.s(1096), cy = y + D.s(888) + shift,
             min = 0, max = 24, value = warmth,
             knob = D.s(69), thick = D.s(10), thin = D.s(3), label = true, buttons = true,
             on_change = function(v)
@@ -109,9 +141,9 @@ function Quick:render(bb, x, y, w, h)
     end
 
     local hw = D.s(111)
-    D.icon(bb, "handle-up", x + math.floor((w - hw) / 2), y + D.s(1089), hw, D.s(23))
+    D.icon(bb, "handle-up", x + math.floor((w - hw) / 2), y + D.s(1089) + shift, hw, D.s(23))
     local hx = x + math.floor((w - hw) / 2)
-    self:hit(hx - D.s(80), y + D.s(1044), hw + D.s(160), D.s(110), function() self:close() end)
+    self:hit(hx - D.s(80), y + D.s(1044) + shift, hw + D.s(160), D.s(110), function() self:close() end)
 end
 
 local function startTimer(m)

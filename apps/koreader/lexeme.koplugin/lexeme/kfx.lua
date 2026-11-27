@@ -80,7 +80,9 @@ local function entities(s)
     local info = ion(s, u32(s, 11) + 1)
     local index, size = info[413], info[414]
     if not index or not size then return end
-    local found = { [TEXT] = {}, [STORYLINE] = {}, [SECTION] = {}, [LOCATION_MAP] = {}, [METADATA] = {}, [DOCUMENT_DATA] = {} }
+    local found = {
+        [TEXT] = {}, [STORYLINE] = {}, [SECTION] = {}, [LOCATION_MAP] = {}, [METADATA] = {}, [DOCUMENT_DATA] = {},
+    }
     for k = 0, size / 24 - 1 do
         local entry = index + 1 + k * 24
         local kind = u32(s, entry + 4)
@@ -99,7 +101,9 @@ local function codepoints(text)
 end
 
 -- Spaces of every kind, soft hyphens and byte-order marks: never counted, as the two copies differ in them.
-local INVISIBLE = { "%s", "\194\160", "\194\173", "\226\128[\128-\139\175]", "\226\129\159", "\227\128\128", "\239\187\191" }
+local INVISIBLE = {
+    "%s", "\194\160", "\194\173", "\226\128[\128-\139\175]", "\226\129\159", "\227\128\128", "\239\187\191",
+}
 
 -- Characters as locations are matched by: the visible ones.
 function Kfx.length(text)
@@ -210,7 +214,9 @@ function Kfx.locationStarts(path)
                     if inline and not text then
                         for _, part in ipairs(item[ITEMS]) do
                             local part_text = type(part) == "string" and part or textOf(part)
-                            if type(part) == "table" and part[ID] and not start[part[ID]] then start[part[ID]] = total end
+                            if type(part) == "table" and part[ID] and not start[part[ID]] then
+                                start[part[ID]] = total
+                            end
                             table.insert(segments, part_text or false)
                             if part_text then total = total + Kfx.length(part_text) end
                         end

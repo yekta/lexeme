@@ -9,8 +9,9 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
 (an entry in `~/.ssh/config` with key login as root); the default is `kindle`.
 
 - `pnpm run deploy` (`scripts/deploy.sh`) copies the plugin, checks every file
-  compiles, and restarts KOReader. Wait about 25 seconds after a restart
-  before tapping; earlier touches are dropped.
+  compiles, and has KOReader restart itself, which it only listens for in dev
+  mode. Wait about 25 seconds after a restart before tapping; earlier touches
+  are dropped.
 - `scripts/dev-mode.sh on` before testing on a Kindle someone reads on: it
   snapshots what reading leaves behind (statistics, look-ups, highlights,
   positions, history, the sync outbox) and pauses syncing, with "Dev Mode" shown by
@@ -25,7 +26,7 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
 - `python3 scripts/kindle.py shot out.png` saves a framebuffer screenshot.
 - `python3 scripts/kindle.py tap X Y` / `hold X Y` / `swipe X1 Y1 X2 Y2`
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a
-  Paperwhite).
+  Paperwhite 12, 1236 × 1648 on a Paperwhite 5).
 
 ### Text rendering
 
@@ -34,13 +35,68 @@ Amazon's reader draws text with the Kindle's own FreeType
 rasterizer. `deploy.sh` copies that library into KOReader, so book text comes
 out pixel for pixel as on Amazon's reader. iType pads glyph rows, which stock
 crengine doesn't handle, and reports glyph widths differently from FreeType's
-own drivers, which breaks MuPDF's layout of dictionary entries. `patches/`
-fixes both and `scripts/build-engine.sh` builds crengine and MuPDF for the
-KOReader version on the Kindle with Docker (it needs to run `linux/amd64`
-images; on Apple silicon use a Rosetta VM, e.g.
-`colima start --vm-type vz --vz-rosetta`). `deploy.sh` installs them and the
-FreeType only when that build matches the Kindle's KOReader. A KOReader
-update replaces them; build again for the new version.
+own drivers, which breaks MuPDF's layout of dictionary entries. Some Kindles'
+FreeType (a Paperwhite 5 on 5.19.2, FreeType 2.9) is also older than
+KOReader's. It lacks `FT_Error_String`, which crengine calls when logging an
+error, and `FT_Get_Transform`, which HarfBuzz calls when sizing glyphs of a
+transformed font, so neither would load at all. `patches/` fixes all four, and
+`scripts/build-engine.sh` builds crengine, MuPDF and HarfBuzz for the KOReader
+version on the Kindle with Docker (it needs to run `linux/amd64` images; on
+Apple silicon use a Rosetta VM, e.g. `colima start --vm-type vz --vz-rosetta`).
+`deploy.sh` installs them and the FreeType only when that build matches the
+Kindle's KOReader, and HarfBuzz only on a Kindle whose FreeType lacks
+`FT_Get_Transform`. A KOReader update replaces them; build again for the new
+version.
+
+### Verb forms in the dictionary
+
+The dictionary sheet says which conjugation a French word is, in French
+grammar's terms ("oblique is a form of obliquer: présent de l'indicatif et du
+subjonctif (je, il/elle); impératif (tu)"), from `lexeme_forms.sqlite3` in
+`koreader/settings/`. `scripts/french_forms.py` builds it from kaikki.org's
+French Wiktionary data (about 60 MB to download, 7.8 MB built); without it the
+sheet just leaves the line out.
+
+### Bluetooth
+
+On a Kindle with Bluetooth, Settings > Wi-Fi and Bluetooth and Quick Actions
+turn it on and off, and connect devices already paired in the Kindle's own
+Settings, through Amazon's Bluetooth service (`com.lab126.btfd`, the same
+`BTenable "1:6"`/`"0:6"`, `Connect` and `Disconnect` its Settings uses).
+Pairing stays in Amazon's Settings.
+
+### Dictionaries
+
+KOReader looks words up with sdcv, which needs a dictionary's `.idx` and
+`.syn` sorted with only A–Z folded to lowercase. xxyzz's Wiktionary
+dictionaries sort "É" beside "é", so sdcv misses words like "école" or
+"égout" and shows unrelated fuzzy matches instead.
+`scripts/sort_stardict.py <dictionary.ifo> <out dir>` re-sorts both files;
+copy them over the dictionary's and delete its `.oft` caches.
+
+### Vocabulary Builder
+
+Lexeme keeps every word looked up while reading in
+`koreader/settings/lexeme_vocabulary.sqlite3`, with the sentence it was read
+in, the book and its language. The language comes from the dictionary that
+had the word, the sentence around it, then the book's metadata. The first time
+Vocabulary Builder opens, it brings in Amazon's own list
+(`system/vocabulary/vocab.db`, which Amazon trims to 2,000 words; a full copy
+saved as `koreader/settings/lexeme_amazon_vocab.db` is read too) and
+KOReader's lookup history. It's on the reader's and Home's ⋮ menus, and
+Settings > Reading options turns the recording off. While a Lexeme account is
+connected, a word's card adds it to Lexeme and Study in Lexeme opens the
+Lexeme tab; without one, words are marked Mastered and studied on Amazon's
+flashcards. Either way the list stays on the Kindle: what reaches Lexeme is
+KOReader's lookup history, as before.
+
+### Amazon reading history
+
+`scripts/amazon_history.py` reads the Kindle part of Amazon's "Request your
+data" export. Written as `.json`, it's for Lexeme's `import-reading`, so the
+sessions count in Lexeme's stats everywhere; written as `.sqlite3`
+(`lexeme_history.sqlite3` in `koreader/settings/`), it feeds the stats Home
+counts on a Kindle without a Lexeme account.
 
 ### Rules that keep the Kindle alive
 

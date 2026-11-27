@@ -3,11 +3,14 @@ local UIManager = require("ui/uimanager")
 local util = require("util")
 
 local Footer = require("lexeme/footer")
+local HighlightPositions = require("lexeme/highlight_positions")
 local Layout = require("lexeme/layout")
 local Marks = require("lexeme/marks")
 local Quick = require("lexeme/quick")
+local Reading = require("lexeme/reading")
 local Selection = require("lexeme/selection")
 local Toolbar = require("lexeme/toolbar")
+local Vocabulary = require("lexeme/vocabulary")
 local Zones = require("lexeme/zones")
 
 local Reader = {}
@@ -27,6 +30,7 @@ local function actions(ui)
         end,
         more_items = function()
             return {
+                { text = "Vocabulary Builder", callback = function() require("lexeme/vocabulary_screen").show(ui) end },
                 { text = "About this book", callback = function() require("lexeme/about").open(ui.document.file) end },
                 { text = "Settings", callback = function() require("lexeme/settings").show() end },
             }
@@ -69,6 +73,7 @@ function Reader.install(ui)
         rect = { x = rect.x + 1, y = rect.y, w = math.max(1, rect.w - 2), h = rect.h }
         return draw_highlight_rect(view, bb, x, y, rect, drawer, color, draw_note_mark)
     end
+    HighlightPositions.install(ui)
     if ui.rolling then
         local get_text = ui.document.getTextFromPositions
         ui.document.getTextFromPositions = function(document, pos0, pos1)
@@ -89,6 +94,13 @@ function Reader.install(ui)
     ui.highlight.onHold = function(self, arg, ges)
         self.lexeme_holding = true
         local handled = on_hold(self, arg, ges)
+        -- KOReader gives a held word one box around all of it, which for a word hyphenated
+        -- across two lines covers both lines whole; it gets one box per line instead.
+        local selected = self.selected_text
+        if ui.rolling and selected and selected.pos0 and selected.pos1 then
+            local boxes = ui.document:getScreenBoxesFromPositions(selected.pos0, selected.pos1, true)
+            if #boxes > 1 then selected.sboxes = boxes end
+        end
         Marks.refresh(ui)
         return handled
     end
@@ -105,7 +117,18 @@ function Reader.install(ui)
     ui.dictionary.showLookupInfo = function(dict, word)
         dict.lookup_progress_msg = Selection.showSearching(ui, word)
     end
+    -- Vocabulary Builder keeps the word with the sentence it was read in, once the sheet is up.
+    local function record(word, results)
+        local ok, sentence, pos = pcall(function()
+            local before, after = ui.highlight:getSelectedWordContext(15)
+            local selected = ui.highlight.selected_text
+            return before and Reading.sentence(before, word, after) or nil, selected and selected.pos0
+        end)
+        if not ok then sentence, pos = nil, nil end
+        UIManager:nextTick(function() Vocabulary.record(ui, word, results, sentence, pos) end)
+    end
     local function showResults(dict, word, results, boxes, close_cb)
+        record(word, results)
         local searching = dict.lookup_progress_msg
         dict.lookup_progress_msg = nil
         local opts = { word = word, results = results, boxes = boxes, close_cb = close_cb,
@@ -185,6 +208,7 @@ function Reader.onReaderReady(ui)
     UIManager:nextTick(function()
         if ui.document then ui.document:enablePartialRerendering(false) end
     end)
+    require("lexeme/locations").openWhereAmazonLeftOff(ui)
 end
 
 return Reader

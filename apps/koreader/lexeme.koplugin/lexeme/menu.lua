@@ -4,6 +4,7 @@ The bordered dropdown used by every ⋮ button. Items are
 An item with `more` gets its own ⋮ that opens those items as a submenu over the dropdown.
 ]]
 local Geom = require("ui/geometry")
+local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 
 local D = require("lexeme/draw")
@@ -46,7 +47,10 @@ function Menu:init()
     self.rows = rows
     local w = math.max(text_w + more_w + D.s(132), D.s(440))
     local h = D.s(height)
-    self.region = Geom:new{ x = self.left or (self.right - w), y = self.top or (self.bottom - h), w = w, h = h }
+    -- Kept on screen, whichever edges it was placed by.
+    local x = math.max(0, math.min(self.left or (self.right - w), Screen:getWidth() - w))
+    local y = math.max(0, math.min(self.top or (self.bottom - h), Screen:getHeight() - h))
+    self.region = Geom:new{ x = x, y = y, w = w, h = h }
     View.init(self)
 end
 

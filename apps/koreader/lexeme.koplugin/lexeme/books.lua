@@ -9,6 +9,8 @@ local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 
+local AmazonLibrary = require("lexeme/amazon_library")
+
 local Books = {}
 
 -- What the library calls each file type it lists.
@@ -45,10 +47,23 @@ local function lastReadTimes()
     return times
 end
 
+-- Title and authors from coverbrowser's store, whose rows come with their covers; kept while
+-- the file is unchanged and until the next extraction.
+local metadata = {}
+
+local function bookMetadata(path, mtime, manager)
+    local known = metadata[path]
+    if known and known.mtime == mtime then return known.meta end
+    local meta = manager:getBookInfo(path, false)
+    meta = meta and { title = meta.title, authors = meta.authors } or false
+    metadata[path] = { mtime = mtime, meta = meta }
+    return meta
+end
+
 local function describe(path, file, mtime, read_times, manager)
     local kind = KINDS[(file:match("%.([^.]+)$") or ""):lower()]
     local book = { path = path, title = stripExtension(file), authors = nil, added = mtime or 0, kind = kind }
-    local meta = manager and manager:getBookInfo(path, false)
+    local meta = manager and bookMetadata(path, mtime, manager)
     if meta then
         if meta.title and meta.title ~= "" then book.title = meta.title end
         book.authors = meta.authors
@@ -59,6 +74,16 @@ local function describe(path, file, mtime, read_times, manager)
     book.percent = info.percent_finished
     book.status = info.been_opened and (info.status or "reading") or "new"
     book.last_read = read_times[path] or 0
+    -- What the Kindle's own reader did with the book: its progress until KOReader opens the
+    -- book, and its last open for the "recent" order.
+    local amazon = AmazonLibrary.forPath(path)
+    if amazon then
+        book.last_read = math.max(book.last_read, amazon.last_access)
+        if not info.been_opened and (amazon.percent > 0 or amazon.read) then
+            book.percent = amazon.percent
+            book.status = amazon.read and "complete" or "reading"
+        end
+    end
     return book
 end
 
@@ -79,11 +104,34 @@ function Books.description(path)
     return (text:gsub("\n%s*\n%s*\n+", "\n\n"):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+-- Folders the library never lists from; they hold most of a Kindle's files.
+local function skipsFolder(path, name)
+    return name:sub(1, 1) == "." or name:find("%.sdr$") or name == "dictionaries"
+        or name == "Kindle Reference" or path:find("/Downloads/Items01$")
+end
+
+-- util.findFiles, without going into the folders above.
+local function findFiles(dir, callback)
+    local ok, iter, dir_obj = pcall(lfs.dir, dir)
+    if not ok then return end
+    for name in iter, dir_obj do
+        if name ~= "." and name ~= ".." then
+            local path = dir .. "/" .. name
+            local attr = lfs.attributes(path) or {}
+            if attr.mode == "directory" then
+                if not skipsFolder(path, name) then findFiles(path, callback) end
+            elseif attr.mode == "file" or attr.mode == "link" then
+                callback(path, name, attr)
+            end
+        end
+    end
+end
+
 function Books.scan()
     local manager = infoManager()
     local read_times = lastReadTimes()
     local list = {}
-    util.findFiles(Books.homeDir(), function(path, file, attr)
+    findFiles(Books.homeDir(), function(path, file, attr)
         -- Amazon's own downloads (Downloads/Items01) are its copies; KOReader keeps converted ones in Books.
         if file:sub(1, 1) == "." or path:find("/%.") or path:find("%.sdr/") or path:find("/dictionaries/")
             or path:find("/Kindle Reference/") or path:find("/Downloads/Items01/") then
@@ -227,6 +275,7 @@ function Books.extractMissing(list, on_done)
             return
         end
         extracting = false
+        metadata = {}
         Books.clearCovers()
         on_done()
     end

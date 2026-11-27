@@ -3,13 +3,17 @@ The Kindle's "Loc" numbers. A book converted from Amazon's own copy (its KFX in
 Downloads/Items01, named like the book plus an id) takes them from that copy's
 location map, so they are the Kindle's exactly. Any other book gets the rule
 Amazon's map follows: a location every 150 bytes of its HTML, which is the text
-and about 20 bytes for each paragraph.
+and about 20 bytes for each paragraph. A MOBI file says how long its HTML is, so
+its count is exact and the estimate only spreads it over the text.
 ]]
 local lfs = require("libs/libkoreader-lfs")
 local utf8proc = require("ffi/utf8proc")
 
 local Books = require("lexeme/books")
 local Kfx = require("lexeme/kfx")
+
+local Event = require("ui/event")
+local UIManager = require("ui/uimanager")
 
 local Locations = {}
 
@@ -41,6 +45,38 @@ local function htmlBytes(text)
     return #text + BYTES_PER_PARAGRAPH * paragraphs
 end
 
+local function u16(s, i)
+    local a, b = s:byte(i, i + 1)
+    return a * 256 + b
+end
+
+local function u32(s, i)
+    local a, b, c, d = s:byte(i, i + 3)
+    return ((a * 256 + b) * 256 + c) * 256 + d
+end
+
+local function isMobi(file)
+    local ext = (file:match("%.(%w+)$") or ""):lower()
+    return ext == "mobi" or ext == "azw" or ext == "azw3" or ext == "prc"
+end
+
+-- A MOBI file's HTML length, from its first record's header; nil when encrypted or not a MOBI.
+local function mobiTextLength(file)
+    local f = io.open(file, "rb")
+    if not f then return nil end
+    local ok, length = pcall(function()
+        local head = f:read(78)
+        if not head or #head < 78 or head:sub(61, 68) ~= "BOOKMOBI" then return nil end
+        f:seek("set", u32(f:read(8), 1))
+        local record = f:read(16)
+        if u16(record, 13) ~= 0 then return nil end
+        local length = u32(record, 5)
+        return length > 0 and length or nil
+    end)
+    f:close()
+    return ok and length or nil
+end
+
 local function book(ui)
     local document = ui.document
     if books[document] then return books[document] end
@@ -51,8 +87,13 @@ local function book(ui)
         entry.total = #starts
     else
         local last = document:getPageXPointer(document:getPageCount())
-        entry.total = math.floor(htmlBytes(document:getTextFromXPointers(document:getPageXPointer(1), last) or "")
-            / BYTES_PER_LOCATION) + 1
+        local bytes = htmlBytes(document:getTextFromXPointers(document:getPageXPointer(1), last) or "")
+        local length = isMobi(document.file) and mobiTextLength(document.file)
+        if length and bytes > 0 then
+            entry.measure = function(text) return htmlBytes(text) * length / bytes end
+            bytes = length
+        end
+        entry.total = math.floor(bytes / BYTES_PER_LOCATION) + 1
     end
     books[document] = entry
     return entry
@@ -107,6 +148,65 @@ local function annotationXPointer(item)
     return type(xpointer) == "string" and xpointer or nil
 end
 
+-- A highlight's or bookmark's location, as recorded or worked out now.
+function Locations.ofAnnotation(ui, item)
+    if not ui.rolling then return end
+    if item.lexeme_location then return item.lexeme_location end
+    local xpointer = annotationXPointer(item)
+    return xpointer and locationOf(book(ui), ui.document, xpointer)
+end
+
+-- Turns to the page `location` is on.
+function Locations.goTo(ui, location)
+    if not ui.rolling then return end
+    local entry, document = book(ui), ui.document
+    local low, high = 1, document:getPageCount()
+    while low < high do
+        local mid = math.floor((low + high + 1) / 2)
+        if locationOf(entry, document, document:getPageXPointer(mid)) <= location then low = mid else high = mid - 1 end
+    end
+    ui:handleEvent(Event:new("GotoPage", low))
+end
+
+-- Where Amazon's reader left a MOBI book: a byte offset into its HTML, the first number of "lpr" in
+-- the book's .sdr/*.mbs (a KRDS file: typed values, a field named after 0xFE).
+local function amazonOffset(file)
+    local sdr = file:gsub("%.[^.]+$", "") .. ".sdr"
+    if lfs.attributes(sdr, "mode") ~= "directory" then return nil end
+    for name in lfs.dir(sdr) do
+        local f = name:match("%.mbs$") and io.open(sdr .. "/" .. name, "rb")
+        local data = f and f:read("*a")
+        if f then f:close() end
+        local at = data and data:find("\254\0\0\3lpr", 1, true)
+        local pos = at and at + 7
+        -- The field's values: a version byte, then the position string.
+        for _ = 1, pos and 4 or 0 do
+            local kind = data:byte(pos)
+            if kind == 7 then
+                pos = pos + 2
+            elseif kind == 1 then
+                pos = pos + 5
+            elseif kind == 2 then
+                pos = pos + 9
+            elseif kind == 3 and data:byte(pos + 1) == 0 then
+                return tonumber(data:sub(pos + 4, pos + 3 + u16(data, pos + 2)):match("^(%d+)"))
+            else
+                break
+            end
+        end
+    end
+end
+
+-- A MOBI book opened in KOReader for the first time starts where Amazon's reader left it.
+function Locations.openWhereAmazonLeftOff(ui)
+    if not (ui.rolling and ui.document.is_new and isMobi(ui.document.file)) then return end
+    local offset = amazonOffset(ui.document.file)
+    if not offset or offset <= 0 then return end
+    UIManager:nextTick(function()
+        if ui.document then Locations.goTo(ui, math.floor(offset / BYTES_PER_LOCATION) + 1) end
+    end)
+end
+
 -- Where each page read starts and where the next one does, keyed by the page count of the layout it was read in.
 local PAGE_XPOINTERS, PAGE_LOCATIONS = "lexeme_page_xpointers", "lexeme_page_locations"
 
@@ -121,7 +221,8 @@ function Locations.notePage(ui, page)
     local noted = settings:readSetting(PAGE_XPOINTERS) or {}
     noted[layout] = noted[layout] or {}
     if noted[layout][page] then return end
-    noted[layout][page] = { document:getPageXPointer(page), page < count and document:getPageXPointer(page + 1) or false }
+    local next_page = page < count and document:getPageXPointer(page + 1) or false
+    noted[layout][page] = { document:getPageXPointer(page), next_page }
     settings:saveSetting(PAGE_XPOINTERS, noted)
 end
 
@@ -220,7 +321,9 @@ function Locations.recordClosedBooks(open_file)
             local settings = DocSettings:open(file)
             local xpointers = unlocated(settings, settings:readSetting("annotations") or {})
             if #xpointers > 0 or settings:hasNot("lexeme_locations") then
-                local ok, total, found = pcall(Background.await, function() return measureClosedBook(file, xpointers) end)
+                local ok, total, found = pcall(Background.await, function()
+                    return measureClosedBook(file, xpointers)
+                end)
                 -- Read again: the book may have been opened and changed meanwhile.
                 settings = DocSettings:open(file)
                 local annotations = settings:readSetting("annotations") or {}

@@ -4,12 +4,13 @@ local D = require("lexeme/draw")
 local C = {}
 
 --[[
-A track from x0 to x1 at centre line cy. `value` runs from min to max;
-tapping the track or the -/+ buttons calls on_change with the new value.
+A track from x0 to x1 at centre line cy. `value` runs from min to max in steps of `step` (1
+unless given); tapping the track or the -/+ buttons calls on_change with the new value.
 ]]
 function C.slider(view, bb, opts)
     local x0, x1, cy = opts.x0, opts.x1, opts.cy
     local steps = opts.max - opts.min
+    local step = opts.step or 1
     local fraction = steps > 0 and (opts.value - opts.min) / steps or 0
     local knob = opts.knob or D.s(46)
     local kx = math.floor(x0 + (x1 - x0) * fraction + 0.5)
@@ -28,10 +29,10 @@ function C.slider(view, bb, opts)
         D.rect(bb, plus_x, cy - D.s(1), size, D.s(3))
         D.rect(bb, plus_x + D.s(15), cy - D.s(16), D.s(3), size)
         view:pressable(minus_x - D.s(30), cy - D.s(50), D.s(84), D.s(100), function()
-            if opts.value > opts.min then opts.on_change(opts.value - 1) end
+            if opts.value > opts.min then opts.on_change(math.max(opts.min, opts.value - step)) end
         end, D.around(minus_x + D.s(16), cy, D.s(94), D.s(94)))
         view:pressable(plus_x - D.s(30), cy - D.s(50), D.s(84), D.s(100), function()
-            if opts.value < opts.max then opts.on_change(opts.value + 1) end
+            if opts.value < opts.max then opts.on_change(math.min(opts.max, opts.value + step)) end
         end, D.around(plus_x + D.s(16), cy, D.s(94), D.s(94)))
     end
     view:hit(x0 - D.s(10), cy - D.s(45), x1 - x0 + D.s(20), D.s(90), nil)
@@ -40,7 +41,7 @@ function C.slider(view, bb, opts)
         local pos = view.last_tap
         if not pos then return end
         local f = math.max(0, math.min(1, (pos.x - x0) / (x1 - x0)))
-        local value = opts.min + (opts.continuous and f * steps or math.floor(f * steps + 0.5))
+        local value = opts.min + (opts.continuous and f * steps or math.floor(f * steps / step + 0.5) * step)
         opts.on_change(value)
     end
 end

@@ -9,6 +9,7 @@ local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 
+local Bluetooth = require("lexeme/bluetooth")
 local C = require("lexeme/controls")
 local D = require("lexeme/draw")
 local Status = require("lexeme/status")
@@ -42,13 +43,18 @@ end
 
 -- Pages ----------------------------------------------------------------------------
 
+-- "Wi-Fi and Bluetooth" on a Kindle with Bluetooth, as Amazon names it.
+local function wifiTitle()
+    return Bluetooth.available() and "Wi-Fi and Bluetooth" or "Wi-Fi"
+end
+
 function Settings:rootPage()
     return {
         title = "Settings",
         icons = true,
         rows = function()
             return {
-                { icon = "wifi", title = "Wi-Fi", page = function() return self:wifiPage() end },
+                { icon = "wifi", title = wifiTitle(), page = function() return self:wifiPage() end },
                 { icon = "tablet", title = "Device options", page = function() return self:devicePage() end },
                 { icon = "sun", title = "Screen and brightness", page = function() return self:screenPage() end },
                 { icon = "book-open-text", title = "Reading options", page = function() return self:readingPage() end },
@@ -74,6 +80,41 @@ end
 
 local function refreshRateIsEveryPage()
     return UIManager:getRefreshRate() == 1
+end
+
+local HOLD_CHOICES_MS = { 200, 250, 300, 350, 400, 450, 500 }
+
+local function holdMs()
+    return G_reader_settings:readSetting("ges_hold_interval_ms") or 500
+end
+
+-- "0.35 seconds", "0.4 seconds".
+local function secondsLabel(ms)
+    return (string.format("%.2f", ms / 1000):gsub("0$", "")) .. " seconds"
+end
+
+function Settings:holdPage()
+    return {
+        title = "Hold to select",
+        intro = "Set how long to hold a word before it's selected. Shorter is quicker, longer avoids selecting "
+            .. "by accident.",
+        rows = function()
+            local rows = {}
+            for _, ms in ipairs(HOLD_CHOICES_MS) do
+                table.insert(rows, {
+                    title = secondsLabel(ms),
+                    plain = true,
+                    check = ms == holdMs(),
+                    tap = function()
+                        G_reader_settings:saveSetting("ges_hold_interval_ms", ms)
+                        require("device/gesturedetector").ges_hold_interval = require("ui/time").ms(ms)
+                        self:refresh()
+                    end,
+                })
+            end
+            return rows
+        end,
+    }
 end
 
 function Settings:readingPage()
@@ -131,6 +172,21 @@ function Settings:readingPage()
                     end,
                 },
                 {
+                    title = "Vocabulary Builder",
+                    subtitle = "Keep the words you look up, with the sentence you read them in.",
+                    toggle = G_reader_settings:nilOrTrue("lexeme_vocabulary_builder"),
+                    tap = function()
+                        G_reader_settings:flipNilOrTrue("lexeme_vocabulary_builder")
+                        self:refresh()
+                    end,
+                },
+                {
+                    title = "Hold to select",
+                    subtitle = "Set how long to hold a word before it's selected.",
+                    value = secondsLabel(holdMs()),
+                    page = function() return self:holdPage() end,
+                },
+                {
                     title = "Page refresh",
                     subtitle = "Refresh the screen fully on every page turn to clear ghosting.",
                     toggle = refreshRateIsEveryPage(),
@@ -181,12 +237,11 @@ local function syncedLabel()
 end
 
 local function syncSubtitle()
-    local failure = require("lexeme/sync").lastFailure()
-    if not failure then
-        return "Send words, highlights and reading time to Lexeme. This also happens on its own whenever "
-            .. "Wi-Fi connects."
-    end
-    return "The last sync failed: " .. failure.detail
+    local Sync = require("lexeme/sync")
+    local failure = Sync.lastFailure()
+    if failure then return "The last sync failed: " .. failure.detail end
+    local what = Sync.sendsHighlights() and "words, highlights and reading time" or "words and reading time"
+    return "Send " .. what .. " to Lexeme. This also happens on its own whenever Wi-Fi connects."
 end
 
 function Settings:syncNow()
@@ -213,6 +268,19 @@ function Settings:connectLexeme()
     }:show()
 end
 
+function Settings:highlightsRow()
+    local Sync = require("lexeme/sync")
+    return {
+        title = "Sync highlights and notes",
+        subtitle = "Send highlights, notes, bookmarks and book reviews to Lexeme. When off, they stay on this Kindle.",
+        toggle = Sync.sendsHighlights(),
+        tap = function()
+            G_reader_settings:saveSetting("lexeme_sync_highlights", not Sync.sendsHighlights())
+            self:refresh()
+        end,
+    }
+end
+
 function Settings:lexemePage()
     local Sync = require("lexeme/sync")
     return {
@@ -231,6 +299,7 @@ function Settings:lexemePage()
                         subtitle = "Words you add while reading wait here until this Kindle is connected.",
                         value = tostring(#Words.pending()),
                     },
+                    self:highlightsRow(),
                 }
             end
             return {
@@ -251,10 +320,12 @@ function Settings:lexemePage()
                     title = "Words waiting to sync",
                     value = tostring(#Words.pending()),
                 },
+                self:highlightsRow(),
                 {
                     title = "Import Kindle history",
-                    subtitle = "Send the words you looked up, your highlights and the books you read in "
-                        .. "Amazon's reader.",
+                    subtitle = Sync.sendsHighlights()
+                        and "Send the words you looked up, your highlights and the books you read in Amazon's reader."
+                        or "Send the words you looked up and the books you read in Amazon's reader.",
                     tap = function() self:importHistory() end,
                     chevron = true,
                 },
@@ -315,8 +386,12 @@ function Settings:importHistory()
             Toast.show("Couldn't read the Kindle's history.")
             return
         end
-        Toast.show(string.format("Found %d words, %d highlights and %d books. Sending…",
-            result.lookups, result.highlights, result.books))
+        if require("lexeme/sync").sendsHighlights() then
+            Toast.show(string.format("Found %d words, %d highlights and %d books. Sending…",
+                result.lookups, result.highlights, result.books))
+        else
+            Toast.show(string.format("Found %d words and %d books. Sending…", result.lookups, result.books))
+        end
         self:syncNow()
     end)
 end
@@ -334,13 +409,42 @@ function Settings:confirmDisconnect()
     }:show()
 end
 
+-- KOReader's SSH server, from whichever of the reader and the file manager is open; nil when
+-- the plugin is turned off.
+local function sshServer()
+    for _, module in ipairs({ "apps/reader/readerui", "apps/filemanager/filemanager" }) do
+        local ok, app = pcall(require, module)
+        if ok and app.instance and app.instance.SSH then return app.instance.SSH end
+    end
+end
+
+-- This Kindle's address on the network, or nil.
+local function ipAddress()
+    local ok, ifaces = pcall(function() return require("ffi/netinfo"):new():retrieve() end)
+    if not ok then return nil end
+    for _, iface in ipairs(ifaces or {}) do
+        if iface.ipv4 and iface.wireless then return iface.ipv4 end
+    end
+end
+
+-- Starts or stops the SSH server without KOReader's own pop-ups; the row shows the result.
+local function toggleSsh(ssh)
+    local show = UIManager.show
+    UIManager.show = function() end
+    local ok, err = pcall(function()
+        if ssh:isRunning() then ssh:stop() else ssh:start() end
+    end)
+    UIManager.show = show
+    if not ok then error(err) end
+end
+
 function Settings:wifiPage()
     return {
-        title = "Wi-Fi",
+        title = wifiTitle(),
         rows = function()
             local on = NetworkMgr:isWifiOn()
             local current = on and NetworkMgr:isConnected() and NetworkMgr:getCurrentNetwork()
-            return {
+            local rows = {
                 {
                     title = "Airplane mode",
                     subtitle = "Disable all network connections.",
@@ -368,10 +472,100 @@ function Settings:wifiPage()
                     enabled = on,
                 },
             }
+            if Bluetooth.available() then
+                local bluetooth_on = Bluetooth.isOn()
+                table.insert(rows, {
+                    title = "Bluetooth",
+                    subtitle = "Turn on to connect to a Bluetooth audio device.",
+                    toggle = bluetooth_on,
+                    tap = function()
+                        Bluetooth.setOn(not bluetooth_on)
+                        UIManager:scheduleIn(2, function() self:refresh() end)
+                    end,
+                })
+                if bluetooth_on then
+                    table.insert(rows, {
+                        title = "Bluetooth devices",
+                        subtitle = "Manage your Bluetooth devices.",
+                        value = Bluetooth.connectedName() or "Not Connected",
+                        page = function() return self:bluetoothPage() end,
+                    })
+                end
+            end
+            local ssh = sshServer()
+            if ssh then
+                local running = ssh:isRunning()
+                local address = running and ipAddress()
+                table.insert(rows, {
+                    title = "SSH server",
+                    subtitle = address
+                        and ("Running at " .. address .. ", port " .. ssh.SSH_port .. ".")
+                        or "Log in to this Kindle from a computer on the same network.",
+                    toggle = running,
+                    tap = function()
+                        toggleSsh(ssh)
+                        UIManager:scheduleIn(1, function() self:refresh() end)
+                    end,
+                })
+                table.insert(rows, {
+                    title = "Start SSH with KOReader",
+                    subtitle = "Turn the SSH server on every time KOReader opens.",
+                    toggle = G_reader_settings:isTrue("SSH_autostart"),
+                    tap = function()
+                        G_reader_settings:flipNilOrFalse("SSH_autostart")
+                        ssh.autostart = G_reader_settings:isTrue("SSH_autostart")
+                        self:refresh()
+                    end,
+                })
+            end
+            return rows
         end,
-        note = "You can also toggle airplane mode in Quick Actions by tapping or swiping on the arrow at the top of "
-            .. "your screen.",
+        note = (Bluetooth.available() and "You can also toggle airplane mode and Bluetooth"
+            or "You can also toggle airplane mode") .. " in Quick Actions by tapping or swiping on the arrow at the "
+            .. "top of your screen.",
     }
+end
+
+-- The devices paired in the Kindle's own Settings; a tap connects or disconnects one.
+function Settings:bluetoothPage()
+    local page = { title = "Bluetooth Devices" }
+    local function read()
+        page.devices = Bluetooth.paired()
+        page.intro = #page.devices > 0 and "Choose a paired device to connect to your Kindle."
+            or "No paired devices."
+    end
+    read()
+    page.rows = function()
+        local rows = {}
+        for _, device in ipairs(page.devices) do
+            table.insert(rows, {
+                icon = "bluetooth",
+                title = device.name,
+                network = true,
+                check = device.connected,
+                tap = function()
+                    if device.connected then
+                        Bluetooth.disconnect(device.address)
+                    else
+                        Bluetooth.connect(device.address)
+                    end
+                    for _, delay in ipairs({ 3, 8 }) do
+                        UIManager:scheduleIn(delay, function()
+                            read()
+                            self:refresh()
+                        end)
+                    end
+                end,
+            })
+        end
+        table.insert(rows, { title = "Refresh", plain = true, tap = function()
+            read()
+            self:refresh()
+        end })
+        return rows
+    end
+    page.note = "To pair a new device, exit KOReader and go to Settings, Wi-Fi and Bluetooth, Bluetooth devices."
+    return page
 end
 
 function Settings:networksPage()
@@ -613,21 +807,38 @@ end
 
 function Settings:libraryPage()
     local connected = require("lexeme/sync").isConnected()
-    local setting = connected and "lexeme_home_stats" or "lexeme_home_recently_added"
     return {
         title = "Home and library",
         rows = function()
             return {
                 {
-                    title = connected and "Show stats" or "Show recently added",
+                    title = "Show stats",
                     subtitle = connected
-                        and "Show your reading time, streak and finished books on Home in place of Recently Added."
-                        or "Show the books you added most recently on Home.",
-                    toggle = G_reader_settings:nilOrTrue(setting),
+                        and "Show your reading time, streak, finished books and reading calendar on Home in place "
+                            .. "of Recently Added."
+                        or "Show your reading time, streak, finished books and reading calendar on Home in place "
+                            .. "of Recently Added, counted on this Kindle.",
+                    toggle = G_reader_settings:nilOrTrue("lexeme_home_stats"),
                     tap = function()
-                        G_reader_settings:flipNilOrTrue(setting)
+                        G_reader_settings:flipNilOrTrue("lexeme_home_stats")
                         self:refresh()
                     end,
+                },
+                {
+                    title = "Reading calendar",
+                    subtitle = "Shade each day by how long you read, or by whether you met your reading goal.",
+                    value = G_reader_settings:readSetting("lexeme_calendar_style") == "goal" and "Reading goal"
+                        or "Heatmap",
+                    dropdown = {
+                        { text = "Heatmap", callback = function()
+                            G_reader_settings:delSetting("lexeme_calendar_style")
+                            self:refresh()
+                        end },
+                        { text = "Reading goal", callback = function()
+                            G_reader_settings:saveSetting("lexeme_calendar_style", "goal")
+                            self:refresh()
+                        end },
+                    },
                 },
                 connected and {
                     title = "Show Lexeme tab",
@@ -690,11 +901,38 @@ local function installedDictionaries()
 end
 
 function Settings:dictionariesPage()
+    local Selection = require("lexeme/selection")
     return {
         title = "Dictionaries",
         rows = function()
             local disabled = G_reader_settings:readSetting("dicts_disabled") or {}
-            local rows = {}
+            local rows = {
+                {
+                    title = "Show Add to Lexeme",
+                    subtitle = "Show Add to Lexeme in the selection toolbar and under each definition. "
+                        .. "It's always in the toolbar's menu.",
+                    toggle = Selection.showsAddButton(),
+                    tap = function()
+                        G_reader_settings:saveSetting("lexeme_dictionary_add_button", not Selection.showsAddButton())
+                        self:refresh()
+                    end,
+                },
+                {
+                    title = "Look up opens",
+                    subtitle = "What Look up in the selection toolbar shows first.",
+                    value = Selection.lookUpTranslates() and "Translate" or "Dictionary",
+                    dropdown = {
+                        { text = "Translate", callback = function()
+                            G_reader_settings:delSetting("lexeme_look_up_opens")
+                            self:refresh()
+                        end },
+                        { text = "Dictionary", callback = function()
+                            G_reader_settings:saveSetting("lexeme_look_up_opens", "dictionary")
+                            self:refresh()
+                        end },
+                    },
+                },
+            }
             for _, dict in ipairs(installedDictionaries()) do
                 table.insert(rows, {
                     title = dict.name,
@@ -826,7 +1064,9 @@ function Settings:paintRow(bb, x, top, w, row_h, row, icons)
     } or nil
     if row.dropdown then
         self:pressable(x, top, w, row_h, function()
-            require("lexeme/menu"):new{ items = row.dropdown, right = right + D.s(34), top = top + row_h - D.s(20) }:show()
+            require("lexeme/menu"):new{
+                items = row.dropdown, right = right + D.s(34), top = top + row_h - D.s(20),
+            }:show()
         end, pressedRow)
     elseif row.page then
         self:pressable(x, top, w, row_h, function() self:push(row.page()) end, pressedRow)

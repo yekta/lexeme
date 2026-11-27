@@ -9,11 +9,16 @@ cd "$(dirname "$0")/.."
 tar -cf - lexeme.koplugin | ssh "$HOST" "rm -rf $PLUGINS/lexeme.koplugin && tar -C $PLUGINS -xf -"
 
 # Amazon's reader draws text with the Kindle's own FreeType, which renders through Monotype's
-# iType; KOReader uses it too. crengine and MuPDF need patches/ (scripts/build-engine.sh) to
-# work with iType, so all three are installed only when that build exists for this KOReader.
+# iType; KOReader uses it too. crengine and MuPDF need patches/ (scripts/build-engine.sh) to work
+# with iType, and HarfBuzz to load with a FreeType older than 2.11, so they are installed only when
+# that build exists for this KOReader. HarfBuzz goes only to Kindles whose FreeType needs it.
 VERSION=$(ssh "$HOST" cat /mnt/us/koreader/git-rev)
-if [ -f "build/$VERSION/libs/libkoreader-cre.so" ] && [ -f "build/$VERSION/libs/libwrap-mupdf.so" ]; then
-  for lib in libkoreader-cre.so libwrap-mupdf.so; do
+ENGINE="libkoreader-cre.so libwrap-mupdf.so"
+ssh "$HOST" 'grep -q FT_Get_Transform /usr/lib/libfreetype.so.6' || ENGINE="$ENGINE libharfbuzz.so.0"
+BUILT=yes
+for lib in $ENGINE; do [ -f "build/$VERSION/libs/$lib" ] || BUILT=; done
+if [ -n "$BUILT" ]; then
+  for lib in $ENGINE; do
     ssh "$HOST" "cat > /mnt/us/koreader/libs/$lib.new && mv /mnt/us/koreader/libs/$lib.new /mnt/us/koreader/libs/$lib" < "build/$VERSION/libs/$lib"
   done
   ssh "$HOST" 'cp /usr/lib/libfreetype.so.6 /mnt/us/koreader/libs/libfreetype.so.6.new && mv /mnt/us/koreader/libs/libfreetype.so.6.new /mnt/us/koreader/libs/libfreetype.so.6'
@@ -25,11 +30,16 @@ ssh "$HOST" 'sh -s' <<'EOF'
 for f in $(find /mnt/us/koreader/plugins/lexeme.koplugin -name "*.lua"); do
   /mnt/us/koreader/luajit -e "assert(loadfile('$f'))" || exit 1
 done
-pid=$(pidof reader.lua | tr " " "\n" | sort -n | head -1)
-[ -n "$pid" ] && kill "$pid"
-for _ in $(seq 1 30); do
-  pidof reader.lua >/dev/null || ps | grep -q "[k]oreader.sh" || break
+# KOReader restarts itself (lexeme/devrestart.lua). Killing it from outside makes its launcher
+# toggle the Kindle's own services, which has failed to read the frontlight and crashed the Kindle.
+mkdir -p /mnt/us/lexeme-dev
+before=$(pidof reader.lua)
+touch /mnt/us/lexeme-dev/restart-request
+for _ in $(seq 1 20); do
   sleep 1
+  now=$(pidof reader.lua)
+  [ -n "$now" ] && [ "$now" != "$before" ] && { echo "KOReader restarted."; exit 0; }
 done
-nohup /var/local/kmc/bin/kpm launch koreader --asap >/dev/null 2>&1 &
+rm -f /mnt/us/lexeme-dev/restart-request
+echo "KOReader didn't restart by itself: it only listens for deploys in dev mode (scripts/dev-mode.sh on)." >&2
 EOF

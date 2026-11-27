@@ -54,6 +54,8 @@ local function parseDatetime(text)
     return os.time{ year = y, month = mo, day = d, hour = h, min = mi, sec = s } * 1000
 end
 
+Reading.parseDatetime = parseDatetime
+
 local function highlightsOf(key, settings)
     local result = {}
     for _, item in ipairs(settings:readSetting("annotations") or {}) do

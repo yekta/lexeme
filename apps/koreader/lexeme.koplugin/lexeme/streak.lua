@@ -218,16 +218,44 @@ local function finishedStamp()
 end
 
 local kept_finished
+-- Each history book's part, by file: its key and when it was finished (false if it isn't), kept
+-- while its sidecar and its time in the history are unchanged, so a book closing reads only its own.
+local finished_by_file = {}
+
+-- As Reading.books() counts a book finished: marked complete, or read to the end.
+local function bookFinished(entry, sidecar)
+    local stamp = fileStamp(sidecar) .. "@" .. tostring(entry.time)
+    local kept = finished_by_file[entry.file]
+    if kept and kept.stamp == stamp then return kept end
+    local Reading = require("lexeme/reading")
+    local settings = require("docsettings"):open(entry.file)
+    local summary = settings:readSetting("summary") or {}
+    local finished = summary.status == "complete" or (settings:readSetting("percent_finished") or 0) >= 1
+    kept = {
+        stamp = stamp,
+        key = Reading.bookKey(entry.file, settings),
+        finished_at = finished and (Reading.parseDatetime(summary.modified) or (entry.time or 0) * 1000) or false,
+    }
+    finished_by_file[entry.file] = kept
+    return kept
+end
 
 -- When each finished book was finished, in epoch seconds: from KOReader and from Amazon.
--- Kept until a book in the history or its sidecar changes: finding them reads every sidecar.
+-- Kept until a book in the history or its sidecar changes.
 local function finishedTimes()
     local stamp = finishedStamp()
     if kept_finished and kept_finished.stamp == stamp then return kept_finished.times end
-    local times = {}
-    for _, book in ipairs(require("lexeme/reading").books()) do
-        if book.status == "finished" and book.finished_at then
-            table.insert(times, math.floor(book.finished_at / 1000))
+    local DocSettings = require("docsettings")
+    local times, seen = {}, {}
+    for _, entry in ipairs(require("readhistory").hist) do
+        local file = entry.file
+        local sidecar = file and lfs.attributes(file, "mode") == "file" and DocSettings:findSidecarFile(file)
+        if sidecar then
+            local book = bookFinished(entry, sidecar)
+            if book.key and not seen[book.key] then
+                seen[book.key] = true
+                if book.finished_at then table.insert(times, math.floor(book.finished_at / 1000)) end
+            end
         end
     end
     local columns = columnsOf(settingsFile("lexeme_history.sqlite3"),

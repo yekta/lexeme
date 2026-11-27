@@ -9,6 +9,7 @@ local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 
+local Bluetooth = require("lexeme/bluetooth")
 local C = require("lexeme/controls")
 local D = require("lexeme/draw")
 local Status = require("lexeme/status")
@@ -42,13 +43,18 @@ end
 
 -- Pages ----------------------------------------------------------------------------
 
+-- "Wi-Fi and Bluetooth" on a Kindle with Bluetooth, as Amazon names it.
+local function wifiTitle()
+    return Bluetooth.available() and "Wi-Fi and Bluetooth" or "Wi-Fi"
+end
+
 function Settings:rootPage()
     return {
         title = "Settings",
         icons = true,
         rows = function()
             return {
-                { icon = "wifi", title = "Wi-Fi", page = function() return self:wifiPage() end },
+                { icon = "wifi", title = wifiTitle(), page = function() return self:wifiPage() end },
                 { icon = "tablet", title = "Device options", page = function() return self:devicePage() end },
                 { icon = "sun", title = "Screen and brightness", page = function() return self:screenPage() end },
                 { icon = "book-open-text", title = "Reading options", page = function() return self:readingPage() end },
@@ -434,7 +440,7 @@ end
 
 function Settings:wifiPage()
     return {
-        title = "Wi-Fi",
+        title = wifiTitle(),
         rows = function()
             local on = NetworkMgr:isWifiOn()
             local current = on and NetworkMgr:isConnected() and NetworkMgr:getCurrentNetwork()
@@ -466,6 +472,26 @@ function Settings:wifiPage()
                     enabled = on,
                 },
             }
+            if Bluetooth.available() then
+                local bluetooth_on = Bluetooth.isOn()
+                table.insert(rows, {
+                    title = "Bluetooth",
+                    subtitle = "Turn on to connect to a Bluetooth audio device.",
+                    toggle = bluetooth_on,
+                    tap = function()
+                        Bluetooth.setOn(not bluetooth_on)
+                        UIManager:scheduleIn(2, function() self:refresh() end)
+                    end,
+                })
+                if bluetooth_on then
+                    table.insert(rows, {
+                        title = "Bluetooth devices",
+                        subtitle = "Manage your Bluetooth devices.",
+                        value = Bluetooth.connectedName() or "Not Connected",
+                        page = function() return self:bluetoothPage() end,
+                    })
+                end
+            end
             local ssh = sshServer()
             if ssh then
                 local running = ssh:isRunning()
@@ -494,9 +520,52 @@ function Settings:wifiPage()
             end
             return rows
         end,
-        note = "You can also toggle airplane mode in Quick Actions by tapping or swiping on the arrow at the top of "
-            .. "your screen.",
+        note = (Bluetooth.available() and "You can also toggle airplane mode and Bluetooth"
+            or "You can also toggle airplane mode") .. " in Quick Actions by tapping or swiping on the arrow at the "
+            .. "top of your screen.",
     }
+end
+
+-- The devices paired in the Kindle's own Settings; a tap connects or disconnects one.
+function Settings:bluetoothPage()
+    local page = { title = "Bluetooth Devices" }
+    local function read()
+        page.devices = Bluetooth.paired()
+        page.intro = #page.devices > 0 and "Choose a paired device to connect to your Kindle."
+            or "No paired devices."
+    end
+    read()
+    page.rows = function()
+        local rows = {}
+        for _, device in ipairs(page.devices) do
+            table.insert(rows, {
+                icon = "bluetooth",
+                title = device.name,
+                network = true,
+                check = device.connected,
+                tap = function()
+                    if device.connected then
+                        Bluetooth.disconnect(device.address)
+                    else
+                        Bluetooth.connect(device.address)
+                    end
+                    for _, delay in ipairs({ 3, 8 }) do
+                        UIManager:scheduleIn(delay, function()
+                            read()
+                            self:refresh()
+                        end)
+                    end
+                end,
+            })
+        end
+        table.insert(rows, { title = "Refresh", plain = true, tap = function()
+            read()
+            self:refresh()
+        end })
+        return rows
+    end
+    page.note = "To pair a new device, exit KOReader and go to Settings, Wi-Fi and Bluetooth, Bluetooth devices."
+    return page
 end
 
 function Settings:networksPage()

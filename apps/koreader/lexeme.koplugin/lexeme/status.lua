@@ -2,6 +2,7 @@
 local Device = require("device")
 local NetworkMgr = require("ui/network/manager")
 
+local Bluetooth = require("lexeme/bluetooth")
 local D = require("lexeme/draw")
 
 local Status = { HEIGHT = 90 }
@@ -72,7 +73,8 @@ function Status.paint(view, bb, x, y, w, on_handle)
     local level = power:getCapacity()
     Status.paintBattery(bb, x + w - D.s(86), y + D.s(37), level, power:isCharging())
     D.textRight(bb, x + w - D.s(93), y + D.s(60), D.face("regular", 28), level .. "%")
-    -- Amazon keeps the Wi-Fi icon in place however wide the percentage is.
+    -- Amazon keeps the Wi-Fi icon in place however wide the percentage is, and Bluetooth beside it.
+    if Bluetooth.isOnCached() then D.icon(bb, "bluetooth", x + w - D.s(282), y + D.s(31), D.s(38), D.s(38)) end
     if NetworkMgr:isConnected() then
         D.icon(bb, "status-wifi", x + w - D.s(216), y + D.s(33), D.s(44), D.s(34))
     elseif NetworkMgr:isWifiOn() then

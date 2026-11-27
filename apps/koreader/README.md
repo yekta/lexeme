@@ -55,6 +55,14 @@ subjonctif (je, il/elle); impératif (tu)"), from `lexeme_forms.sqlite3` in
 French Wiktionary data (about 60 MB to download, 7.8 MB built); without it the
 sheet just leaves the line out.
 
+### Bluetooth
+
+On a Kindle with Bluetooth, Settings > Wi-Fi and Bluetooth and Quick Actions
+turn it on and off, and connect devices already paired in the Kindle's own
+Settings, through Amazon's Bluetooth service (`com.lab126.btfd`, the same
+`BTenable "1:6"`/`"0:6"`, `Connect` and `Disconnect` its Settings uses).
+Pairing stays in Amazon's Settings.
+
 ### Dictionaries
 
 KOReader looks words up with sdcv, which needs a dictionary's `.idx` and

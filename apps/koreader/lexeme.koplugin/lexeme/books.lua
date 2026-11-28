@@ -356,8 +356,10 @@ local cover_cache = {}
 local cover_paint, paint = {}, 0
 
 -- Returns the cover scaled to fit w x h, or nil when there is none (yet).
-function Books.cover(book, w, h)
-    local key = book.path .. "|" .. w .. "|" .. h
+-- `contain`: the cover fitted whole into w x h, as the Kindle's library grid shows them, rather than a
+-- taller book-shaped one trimmed to the box.
+function Books.cover(book, w, h, contain)
+    local key = book.path .. "|" .. w .. "|" .. h .. (contain and "|contain" or "")
     cover_paint[key] = paint
     local cached = cover_cache[key]
     if cached ~= nil then return cached or nil end
@@ -367,7 +369,7 @@ function Books.cover(book, w, h)
         if meta then cover_cache[key] = false end
         return nil
     end
-    local cover = Books.fill(meta.cover_bb, w, h)
+    local cover = Books.fill(meta.cover_bb, w, h, contain)
     cover_cache[key] = cover
     return cover
 end
@@ -380,9 +382,9 @@ local function isBookShaped(iw, ih, w, h)
     return ratio > box * 0.8 and ratio < box * 1.25
 end
 
-function Books.fill(image, w, h)
+function Books.fill(image, w, h, contain)
     local iw, ih = image:getWidth(), image:getHeight()
-    if not isBookShaped(iw, ih, w, h) then
+    if contain or not isBookShaped(iw, ih, w, h) then
         local k = math.min(w / iw, h / ih)
         return RenderImage:scaleBlitBuffer(image, math.floor(iw * k + 0.5), math.floor(ih * k + 0.5), true)
     end

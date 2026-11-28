@@ -213,8 +213,8 @@ function D.setIconDir(dir)
     icon_dir = dir
 end
 
--- `name` is one of Lexeme's icons, or the full path of an SVG of the Kindle's own.
-function D.icon(bb, name, x, y, w, h)
+-- `name` is one of Lexeme's icons, or the full path of an SVG of the Kindle's own: drawn at w x h once.
+function D.iconImage(name, w, h)
     local key = name .. "|" .. w .. "|" .. h
     local image = icon_cache[key]
     if image == nil then
@@ -222,6 +222,11 @@ function D.icon(bb, name, x, y, w, h)
         image = RenderImage:renderSVGImageFile(file, w, h) or false
         icon_cache[key] = image
     end
+    return image or nil
+end
+
+function D.icon(bb, name, x, y, w, h)
+    local image = D.iconImage(name, w, h)
     if not image then return end
     bb:alphablitFrom(image, x, y, 0, 0, image:getWidth(), image:getHeight())
 end

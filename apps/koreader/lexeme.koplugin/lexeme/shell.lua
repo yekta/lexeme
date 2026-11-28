@@ -4,6 +4,7 @@ local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 
 local Books = require("lexeme/books")
+local CoverMarks = require("lexeme/cover_marks")
 local D = require("lexeme/draw")
 local LibrarySheets = require("lexeme/library_sheets")
 local Menu = require("lexeme/menu")
@@ -24,7 +25,10 @@ local Shell = View:extend{
     open_settings = nil,
 }
 
-local GRID = { x = 109, pitch_x = 357, top = 361, pitch_y = 632, cover_w = 310, cover_h = 512, cols = 3 }
+-- The Kindle's library grid on a Paperwhite 5, in its pixels (D.px): each cover fitted whole into a
+-- 330 x 511 box, on the box's bottom, with how far it's read on the cover itself; the first box 30 px
+-- under the rule, and a third row peeking in under the second.
+local GRID = { x = 60, pitch_x = 363, top = 30, pitch_y = 544, cover_w = 330, cover_h = 511, cols = 3 }
 local LIST = { top = 345, pitch = 265 }
 local DECKS = { top = 345, pitch = 206, per_page = 6 }
 -- Seconds after a book closes before the library is scanned again.
@@ -321,10 +325,11 @@ local function openingBand(dx, dy, dw, dh)
     return dx - D.s(2), dy + dh + D.s(2) - band, dw + D.s(4), band
 end
 
-local function paintOpening(area, ox, oy, dx, dy, dw, dh)
+local function paintOpening(area, ox, oy, dx, dy, dw, dh, label)
     local bx, by, bw, bh = openingBand(dx, dy, dw, dh)
     D.rect(area, bx - ox, by - oy, bw, bh)
-    D.textCenter(area, dx - ox + math.floor(dw / 2), by - oy + D.s(44), D.face("regular", 29), "Opening", D.WHITE)
+    D.textCenter(area, dx - ox + math.floor(dw / 2), by - oy + D.s(44), D.face("regular", 29), label or "Opening",
+        D.WHITE, dw - D.s(16))
 end
 
 -- "Opening" on a cover just tapped. Drawn straight onto the screen, with only that band refreshed,
@@ -349,17 +354,25 @@ function Shell:showOpening(path)
     UIManager:forceRePaint()
 end
 
-function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu)
+-- `marked`: drawn as the Kindle's library grid draws a cover, fitted whole into the box, with how far
+-- it's read on it (lexeme/cover_marks.lua) rather than beside it.
+function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu, marked)
+    -- The Kindle's cover for a book without one is as tall as its grid's boxes, elsewhere 2:3.
+    local generic_h = math.min(ch, math.floor(cw * (marked and GRID.cover_h / GRID.cover_w or 1.5) + 0.5))
     if book.delivery then
-        local dh = math.min(ch, math.floor(cw * 1.5 + 0.5))
+        local dh = generic_h
         local dy = cy + ch - dh
         D.rect(area, cx - ox, dy - oy, cw, dh, D.gray(102))
         local icon = math.floor(cw * 0.17)
         D.icon(area, "book", cx - ox + math.floor((cw - icon) / 2), dy - oy + math.floor((dh - icon) / 2), icon, icon)
         D.border(area, cx - ox - D.s(2), dy - oy - D.s(2), cw + D.s(4), dh + D.s(4), D.s(2), D.gray(102))
+        if marked then
+            local percent = book.delivery.percent
+            paintOpening(area, ox, oy, cx, dy, cw, dh, percent and ("Downloading - " .. percent .. "%") or "Queued")
+        end
         return cx, dy, cw, dh
     end
-    local cover = Books.cover(book, cw, ch)
+    local cover = Books.cover(book, cw, ch, marked)
     local dx, dy, dw, dh
     if cover then
         dw, dh = cover:getWidth(), cover:getHeight()
@@ -371,7 +384,7 @@ function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu)
         -- 287 px wide version.
         local k = cw / D.s(287)
         dw = cw
-        dh = math.min(ch, math.floor(cw * 1.5 + 0.5))
+        dh = generic_h
         dx, dy = cx, cy + ch - dh
         local band = math.floor(dh * 0.195)
         D.rect(area, dx - ox, dy - oy, dw, dh, D.WHITE)
@@ -395,12 +408,23 @@ function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu)
     D.border(area, dx - ox - D.s(2), dy - oy - D.s(2), dw + D.s(4), dh + D.s(4), D.s(2), D.gray(102))
     self.cover_boxes[book.path] = { x = dx, y = dy, w = dw, h = dh,
         area = { x = ox, y = oy, w = area:getWidth(), h = area:getHeight() } }
+    if marked then
+        if book.status == "new" then
+            CoverMarks.band(area, dx - ox, dy - oy, dw, dh, "New")
+        elseif book.status == "complete" then
+            CoverMarks.band(area, dx - ox, dy - oy, dw, dh, "Read")
+        elseif book.percent then
+            CoverMarks.ribbon(area, dx - ox, dy - oy, dw, math.floor(book.percent * 100 + 0.5) .. "%")
+        end
+        CoverMarks.check(area, dx - ox, dy - oy, dh)
+    end
     if self.opening == book.path then
         paintOpening(area, ox, oy, dx, dy, dw, dh)
         return dx, dy, dw, dh
     end
     if with_menu then
-        D.icon(area, "cover-menu", dx - ox + dw - D.s(29), dy - oy + dh - D.s(60), D.s(13), D.s(49))
+        local mx, my, mw, mh = CoverMarks.menuBox(dx, dy, dw, dh)
+        D.icon(area, "cover-menu", mx - ox, my - oy, mw, mh)
     end
     return dx, dy, dw, dh
 end
@@ -426,26 +450,23 @@ end
 
 -- A cover's ⋮ pressed: its three dots filled in.
 local function pressedCoverMenu(dx, dy, dw, dh)
-    local x, y, w, h = dx + dw - D.s(29), dy + dh - D.s(60), D.s(13), D.s(49)
+    local x, y, w, h = CoverMarks.menuBox(dx, dy, dw, dh)
     return { x = x, y = y, w = w, h = h, paint = function(bb) D.icon(bb, "cover-menu-pressed", x, y, w, h) end }
 end
 
 function Shell:paintGrid(area, ox, oy, first)
+    local cw, ch = D.px(GRID.cover_w), D.px(GRID.cover_h)
     for i = 0, GRID.cols * 3 - 1 do
         local book = self.books[first + i + 1]
         if not book then break end
         local col, row = i % GRID.cols, math.floor(i / GRID.cols)
-        local cx = ox + D.s(GRID.x + col * GRID.pitch_x)
-        local cy = oy + D.s(GRID.top - 345 + row * GRID.pitch_y)
-        local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h), true)
-        self:paintBadge(area, ox, oy, book, cx, cy + D.s(GRID.cover_h + 41))
+        local cx = ox + D.px(GRID.x + col * GRID.pitch_x)
+        local cy = oy + D.px(GRID.top + row * GRID.pitch_y)
+        local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, cx, cy, cw, ch, true, true)
         if row < 2 then
-            self:hit(cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h + 60),
-                function() self.open_book(book.path) end,
-                function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end)
-            local menu_x = cx + D.s(GRID.cover_w - 50)
-            self:pressable(menu_x, cy + D.s(GRID.cover_h - 80), D.s(60), D.s(80),
-                function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end,
+            local function menu() self:openBookMenu(book, dx + dw, dy + dh) end
+            self:hit(dx, dy, dw, dh, function() self.open_book(book.path) end, menu)
+            self:pressable(dx + dw - D.px(50), dy + dh - D.px(80), D.px(50), D.px(80), menu,
                 pressedCoverMenu(dx, dy, dw, dh))
         end
     end

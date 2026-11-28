@@ -62,6 +62,15 @@ FileManager.showFiles = function(...)
     local lexeme = FileManager.instance and FileManager.instance.lexeme
     if lexeme and lexeme.showShell then lexeme:showShell() end
 end
+-- KOReader's gesture shortcuts aren't Lexeme's: Reader.onReaderReady emptied them in every book,
+-- once the gestures plugin had set them all up, 30 ms each time a book opened. The plugin isn't
+-- started in a book now (KOReader works as when it's turned off); Home keeps it.
+local PluginLoader = require("pluginloader")
+local createPluginInstance = PluginLoader.createPluginInstance
+PluginLoader.createPluginInstance = function(loader, plugin, attr)
+    if plugin.name == "gestures" and attr and attr.document then return nil, "not used in a book" end
+    return createPluginInstance(loader, plugin, attr)
+end
 -- A book file this big opens without the spinner turning (see Lexeme:openBook).
 local BIG_BOOK_BYTES = 8 * 1024 * 1024
 -- The Kindle's FreeType never kerns, and errors when asked before a font has drawn a glyph,

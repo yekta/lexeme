@@ -39,8 +39,18 @@ function Progress.pageCountLabel(ui)
     return tostring(Progress.pageCount(ui))
 end
 
+-- How far into the book the page is, 0 to 1: by screen pages, or with "Progress by location" on, as
+-- Amazon's reader counts it, by the page's location out of the book's, which no layout changes.
+function Progress.fraction(ui)
+    if ui.rolling and G_reader_settings:isTrue("lexeme_progress_by_location") then
+        local location, total = require("lexeme/locations").current(ui)
+        if location and total and total > 0 then return math.min(1, location / total) end
+    end
+    return Progress.page(ui) / math.max(1, Progress.pageCount(ui))
+end
+
 function Progress.percent(ui)
-    return math.floor(Progress.page(ui) / math.max(1, Progress.pageCount(ui)) * 100 + 0.5)
+    return math.floor(Progress.fraction(ui) * 100 + 0.5)
 end
 
 function Progress.chapter(ui)

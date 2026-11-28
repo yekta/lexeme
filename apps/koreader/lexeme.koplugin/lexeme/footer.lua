@@ -69,7 +69,7 @@ end
 function Footer:recordProgress()
     local footer = self.ui.view.footer
     local count = Progress.pageCount(self.ui)
-    local percent = Progress.page(self.ui) / math.max(1, count)
+    local percent = Progress.fraction(self.ui)
     footer.pages = count
     if footer.percent_finished == percent then return end
     footer.percent_finished = percent

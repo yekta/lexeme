@@ -297,11 +297,24 @@ function Toolbar:paintBack(bb, x, y, w, h)
 end
 
 -- The slider's dots: the places "Back to" can go (lexeme/backstack.lua).
-local function paintMarks(bb, ui, x0, x1, cy, count)
+-- With "Progress by location", the slider runs over the book's locations, as the percent does, rather
+-- than its pages: their count then, nil otherwise.
+local function sliderLocations(ui)
+    if not (ui.rolling and G_reader_settings:isTrue("lexeme_progress_by_location")) then return nil end
+    local _, total = Locations.current(ui)
+    return total and total > 0 and total or nil
+end
+
+local function paintMarks(bb, ui, x0, x1, cy, count, total)
     local size = D.px(48)
     for _, xp in ipairs(Back.marks(ui)) do
-        local page = Back.page(ui, xp)
-        local f = count > 1 and (page - 1) / (count - 1) or 0
+        local f
+        if total then
+            f = math.min(1, (Locations.at(ui, xp) or 1) / total)
+        else
+            local page = Back.page(ui, xp)
+            f = count > 1 and (page - 1) / (count - 1) or 0
+        end
         local mx = math.floor(x0 + (x1 - x0) * f + 0.5)
         D.icon(bb, "slider-mark", mx - math.floor(size / 2), cy - math.floor(size / 2), size, size)
     end
@@ -347,18 +360,25 @@ function Toolbar:paintBottom(bb, x, y, w, h)
 
     -- The slider: a thick line up to the page, a thin one after, the places to go back to, the knob.
     local x0, x1, cy = x + D.px(186), x + w - D.px(188), at(1596)
-    local fraction = count > 1 and (page - 1) / (count - 1) or 0
+    local total = sliderLocations(ui)
+    local fraction = total and Progress.fraction(ui) or count > 1 and (page - 1) / (count - 1) or 0
     local kx = math.floor(x0 + (x1 - x0) * fraction + 0.5)
     D.rect(bb, x0, at(1589), kx - x0, D.px(14))
     D.rect(bb, kx, at(1594), x1 - kx + 1, D.px(4))
-    paintMarks(bb, ui, x0, x1, cy, count)
+    paintMarks(bb, ui, x0, x1, cy, count, total)
     local knob = D.px(61)
     D.icon(bb, "knob", kx - math.floor(knob / 2), cy - math.floor(knob / 2), knob, knob)
     self:hit(x0 - D.px(10), cy - D.px(45), x1 - x0 + D.px(20), D.px(90), function()
         local pos = self.last_tap
         if not pos then return end
         local f = math.max(0, math.min(1, (pos.x - x0) / (x1 - x0)))
-        self:jump(math.floor(1 + f * (count - 1) + 0.5))
+        if total then
+            local location = math.max(1, math.floor(f * total + 0.5))
+            Back.jump(ui, function() Locations.goTo(ui, location) end)
+            self:refresh()
+        else
+            self:jump(math.floor(1 + f * (count - 1) + 0.5))
+        end
     end)
 end
 

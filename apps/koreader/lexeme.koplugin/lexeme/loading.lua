@@ -30,30 +30,13 @@ end
 -- Shows it now, before whatever blocks next; closes itself if nothing does within `timeout` seconds.
 -- `still` leaves the spinner unturned, for a book big enough that the memory the turning takes
 -- is better left to laying it out.
--- Draws what's waiting to be drawn, leaving a flash to finish on its own: KOReader waits for each
--- flashing refresh to complete (half a second on a Paperwhite 5), which here would keep the book
--- from starting to load. The update before is still waited for as usual, and the next refresh
--- that needs to waits for this one (as KOReader's own comment on the wait says it could).
-local function paintWithoutWaiting()
-    local fb = Screen
-    local wait = fb.mech_wait_update_complete
-    if not wait then return UIManager:forceRePaint() end
-    local previous = fb.marker
-    fb.mech_wait_update_complete = function(this, marker)
-        if marker == previous then return wait(this, marker) end
-        return 0
-    end
-    local ok, err = pcall(UIManager.forceRePaint, UIManager)
-    fb.mech_wait_update_complete = wait
-    if fb.marker ~= previous then fb.dont_wait_for_marker = nil end
-    if not ok then error(err, 0) end
-end
-
 function Loading.show(timeout, still)
     Loading.close()
     current = Loading:new{}
     UIManager:show(current, "flashui")
-    paintWithoutWaiting()
+    -- Drawn now, without waiting for the flash to finish, which would keep the book from
+    -- starting to load.
+    require("lexeme/flash").withoutWaiting(UIManager.forceRePaint, UIManager)
     if not still then Spinner.start(current:spinnerBox()) end
     local shown = current
     UIManager:scheduleIn(timeout or 20, function()

@@ -184,10 +184,12 @@ function Lexeme:useClassicFileBrowser()
 end
 
 -- Home over the file browser. Once the browser has put Home on the screen, no second refresh.
+-- Home flashes up, as on a Kindle, and takes taps as soon as the flash starts (see lexeme/flash).
 function Lexeme:showShell()
     if not self.shell or self.shell_shown then return end
     self.shell_shown = true
     UIManager:show(self.shell, not self.shell_painted and "flashui" or nil)
+    require("lexeme/flash").nextRepaint()
 end
 
 function Lexeme:createShell()

@@ -124,6 +124,40 @@ short slices while it is being read (`lexeme/cachesave.lua`), so the first
 close of a long book no longer waits for it: Woolf's took 5.7 seconds and now
 takes 0.4.
 
+### Links, footnotes and Back to location
+
+Lexeme follows links and notes as Amazon's reader does (measured off it, see
+`lexeme/notes.lua` and `lexeme/backstack.lua`):
+
+- A note the book marks as a footnote or an endnote (`epub:type`, as Amazon's
+  KFX conversion writes them) opens in a sheet at the bottom of the page. The
+  note in it is drawn by crengine as it stands in the book, so it looks the
+  same as there. "Go to footnotes" goes to it and points at it.
+- Any other link is followed, and a "Back to loc 323 / Stay here" bar takes the
+  line under the page's place until one of them is tapped.
+- A jump from the table of contents, the slider, Go to, a search result, a note
+  or the page grid keeps the toolbar open with a "Back to loc 2,147" button, and
+  a dot on the slider for each place it can go back to. Which places it keeps
+  follows Amazon's rules, written out in `backstack.lua`.
+- A long press on a note's number doesn't select it.
+
+KOReader's in-page footnotes (on by default) are left out of the stylesheet:
+the Kindle keeps notes where the book has them, at the text's size. That
+changed the stylesheet, so each book is laid out once more the first time it
+opens.
+
+### Sizes on a Paperwhite 5
+
+Amazon's reader draws the same pixel sizes on a Paperwhite 5 as on a
+Paperwhite 12 (both 300 dpi) and pins things to the screen's edges, while
+`D.s` scales everything to the narrower screen. The toolbar, the Go To panel,
+the footnote sheet, the link bar, the status line and the line under the page
+use `D.px`, `D.right` and `D.bottom` instead, and match Amazon's on a
+Paperwhite 5 to a pixel or two. Amazon's keyboard is its own case: on a
+Paperwhite 5 it has measurements of its own, kept in `keyboard.lua`. Pressed
+buttons show from the moment a finger touches them and stay about a quarter of
+a second after it lifts, as on the Kindle.
+
 ### Vocabulary Builder
 
 Lexeme keeps every word looked up while reading in

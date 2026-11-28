@@ -120,7 +120,21 @@ oldest first, as { day = "YYYY-MM-DD", seconds = n }; `goal_minutes`; `today`, `
 and `total` in seconds; `streak` in days; `finished` books, and `finished_this_year`
 of them this year.
 ]]
+local kept_summary
+
 function Streak.summary()
+    -- Home paints it after every book: kept while what it's counted from is unchanged, a minute at most.
+    local now = os.time()
+    local stamp = table.concat({ dayKey(now, 0),
+        lfs.attributes(DataStorage:getSettingsDir() .. "/lexeme_streak.lua", "modification") or 0,
+        lfs.attributes(DataStorage:getSettingsDir() .. "/statistics.sqlite3", "modification") or 0 }, "/")
+    if kept_summary and kept_summary.stamp == stamp and now - kept_summary.at < 60 then return kept_summary.summary end
+    local summary = Streak.summaryNow()
+    kept_summary = { stamp = stamp, at = now, summary = summary }
+    return summary
+end
+
+function Streak.summaryNow()
     local saved = store():readSetting("streak")
     if not (saved and saved.first_day and saved.seconds) then return nil end
     local here = readHere(saved.fetched_at, saved.day_starts_at)

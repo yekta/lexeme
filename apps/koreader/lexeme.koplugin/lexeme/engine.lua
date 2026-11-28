@@ -60,6 +60,89 @@ local function openWithoutCollecting(open, ...)
     return document
 end
 
+-- A book's layout cache, read into memory while the reader starts up. crengine reads it in small
+-- pieces from all over the file, and /mnt/base-us is a loop device that reads nothing ahead (nor
+-- does posix_fadvise make it), so a long book's cache came in at a quarter of the card's speed:
+-- Woolf's 18 MB took 4.3 s to load when it wasn't in memory, 1.4 s when it was. A child process
+-- reading the file straight through brings it all in, in 0.7 s, meanwhile. Small caches aren't
+-- worth it. crengine starts loading once the read is done (Engine.awaitReadAhead): reading
+-- alongside it, both went at the scattered pace.
+local READ_AHEAD_BYTES = 2 * 1024 * 1024
+local READ_AHEAD_WAIT_SECONDS = 4
+local reading
+local spawn_declared
+function Engine.readAhead(path)
+    if type(path) ~= "string" or (lfs.attributes(path, "size") or 0) < READ_AHEAD_BYTES then return end
+    local ffi = require("ffi")
+    local C = ffi.C
+    if spawn_declared == nil then
+        require("ffi/posix_h")
+        -- One by one: another plugin may have declared some of them already.
+        for _, declaration in ipairs({
+            "int posix_spawn(int *pid, const char *path, const void *file_actions, const void *attrp, char *const argv[], char *const envp[]);",
+            "int posix_spawn_file_actions_init(void *file_actions);",
+            "int posix_spawn_file_actions_addopen(void *file_actions, int fd, const char *path, int oflag, int mode);",
+            "int posix_spawn_file_actions_destroy(void *file_actions);",
+            "int posix_spawnattr_init(void *attr);",
+            "int posix_spawnattr_setflags(void *attr, short flags);",
+            "int posix_spawnattr_destroy(void *attr);",
+            "extern char **environ;",
+        }) do
+            pcall(ffi.cdef, declaration)
+        end
+        spawn_declared = pcall(function()
+            return C.posix_spawn, C.posix_spawn_file_actions_init, C.posix_spawn_file_actions_addopen,
+                C.posix_spawn_file_actions_destroy, C.posix_spawnattr_init, C.posix_spawnattr_setflags,
+                C.posix_spawnattr_destroy, C.environ
+        end)
+    end
+    if not spawn_declared then return end
+    -- cat, its output to /dev/null; vfork mode, so KOReader's memory isn't copied first.
+    local actions, attr = ffi.new("uint64_t[32]"), ffi.new("uint64_t[64]")
+    local pid = ffi.new("int[1]")
+    local strings = { "/bin/cat", path }
+    local keep, argv = {}, ffi.new("char *[3]")
+    for i, str in ipairs(strings) do
+        keep[i] = ffi.new("char[?]", #str + 1, str)
+        argv[i - 1] = keep[i]
+    end
+    local res = -1
+    if C.posix_spawn_file_actions_init(actions) == 0 then
+        if C.posix_spawnattr_init(attr) == 0 then
+            if C.posix_spawn_file_actions_addopen(actions, 1, "/dev/null", C.O_WRONLY, 0) == 0
+                and C.posix_spawnattr_setflags(attr, 0x40) == 0 then -- POSIX_SPAWN_USEVFORK
+                res = C.posix_spawn(pid, "/bin/cat", actions, attr, argv, C.environ)
+            end
+            C.posix_spawnattr_destroy(attr)
+        end
+        C.posix_spawn_file_actions_destroy(actions)
+    end
+    if res ~= 0 then return end
+    reading = pid[0]
+    -- Reaped once it's done, should nothing wait for it.
+    local ffiutil = require("ffi/util")
+    local UIManager = require("ui/uimanager")
+    local child = reading
+    local function reap()
+        if not ffiutil.isSubProcessDone(child) then UIManager:scheduleIn(1, reap) end
+    end
+    UIManager:scheduleIn(1, reap)
+end
+
+-- Waits for the cache read started by Engine.readAhead, a few seconds at most; called just before
+-- crengine loads the book.
+function Engine.awaitReadAhead()
+    if not reading then return end
+    local child = reading
+    reading = nil
+    local ffiutil = require("ffi/util")
+    local time = require("ui/time")
+    local deadline = time.now() + time.s(READ_AHEAD_WAIT_SECONDS)
+    while not ffiutil.isSubProcessDone(child) and time.now() < deadline do
+        ffiutil.usleep(10000)
+    end
+end
+
 function Engine.install()
     if G_reader_settings:hasNot("cre_disk_cache_max_size") then
         G_reader_settings:saveSetting("cre_disk_cache_max_size", CACHE_MB)

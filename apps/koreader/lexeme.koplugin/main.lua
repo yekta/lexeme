@@ -210,22 +210,25 @@ function Lexeme:openSettings()
     require("lexeme/settings").show()
 end
 
--- Whether the book opens in about a second: it isn't big and its layout is cached from last time.
-local function opensQuickly(path)
-    if (lfs.attributes(path, "size") or 0) > BIG_BOOK_BYTES then return false end
+-- The book's layout cache from last time, if it's there.
+local function layoutCache(path)
     local cache = DocSettings:open(path):readSetting("cache_file_path")
-    return cache ~= nil and lfs.attributes(cache, "mode") == "file"
+    if cache ~= nil and lfs.attributes(cache, "mode") == "file" then return cache end
 end
 
 -- Like the Kindle: the cover says "Opening" until the book shows. A book that takes longer, being
 -- laid out, gets the loading screen, a spinner holding the screen until the book is ready.
 function Lexeme:openBook(path)
     if path:find("^lexeme%-delivery:") then return end
+    local cache = layoutCache(path)
+    -- The cache starts coming into memory now, while the cover and the reader are drawn and set up.
+    require("lexeme/engine").readAhead(cache)
     if self.shell then
         G_reader_settings:saveSetting("lexeme_tab", self.shell.tab)
         self.shell:showOpening(path)
     end
-    local quick = opensQuickly(path)
+    -- Whether the book opens in about a second: it isn't big and its layout is cached.
+    local quick = cache ~= nil and (lfs.attributes(path, "size") or 0) <= BIG_BOOK_BYTES
     -- Turning the spinner keeps a copy of KOReader's memory while the book is laid out; a book
     -- this big needs it more than the spinner does.
     local still = (lfs.attributes(path, "size") or 0) > BIG_BOOK_BYTES

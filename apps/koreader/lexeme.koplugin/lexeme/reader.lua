@@ -178,6 +178,8 @@ end
 -- book as it loads it, and anything that differs by the time it's laid out (the stylesheet, a
 -- margin a pixel off from KOReader's rounding) has it style the whole book again.
 function Reader.beforeLoad(ui)
+    -- crengine reads its cache once the read started as the cover was tapped is done.
+    require("lexeme/engine").awaitReadAhead()
     if not ui.rolling then return end
     -- A book laid out before loads its styles with it from crengine's cache: nothing to gain, and
     -- reading the stylesheets out of the EPUB would only slow its opening down.

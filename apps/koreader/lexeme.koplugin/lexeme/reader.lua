@@ -226,7 +226,10 @@ function Reader.onReaderReady(ui)
     UIManager:nextTick(function()
         if ui.document then ui.document:enablePartialRerendering(false) end
     end)
+    require("lexeme/locations").setup(ui)
     require("lexeme/locations").openWhereAmazonLeftOff(ui)
+    -- A converted book opened for the first time takes the Kindle reader's highlights and position.
+    require("lexeme/amazon_import").apply(ui)
     -- Where the book opened is its reading spot, for "Back to loc …" (lexeme/backstack.lua); after
     -- the tick on which it may move to where Amazon's reader left the book.
     UIManager:nextTick(function()

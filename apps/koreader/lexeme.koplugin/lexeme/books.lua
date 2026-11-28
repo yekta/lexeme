@@ -84,6 +84,8 @@ local function describe(path, file, mtime, read_times, manager)
             book.percent = amazon.percent
             book.status = amazon.read and "complete" or "reading"
         end
+        -- A converted copy isn't a new book: it takes the original's place in "recent".
+        if path:find("/Converted/", 1, true) then book.recent = book.last_read end
     end
     return book
 end
@@ -291,7 +293,8 @@ end
 -- Each sort in ascending order: oldest, A to Z.
 local SORTS = {
     recent = function(a, b)
-        local ta, tb = math.max(a.last_read, a.added), math.max(b.last_read, b.added)
+        local ta = a.recent or math.max(a.last_read, a.added)
+        local tb = b.recent or math.max(b.last_read, b.added)
         if ta ~= tb then return ta < tb end
         return a.title > b.title
     end,

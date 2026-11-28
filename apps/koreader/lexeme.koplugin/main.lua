@@ -126,6 +126,7 @@ function Lexeme:onPreRenderDocument()
 end
 
 function Lexeme:onReaderReady()
+    self.forgetOpening()
     Reader.onReaderReady(self.ui)
     require("lexeme/loading").close()
 end
@@ -212,10 +213,40 @@ function Lexeme:openSettings()
     require("lexeme/settings").show()
 end
 
+-- KOReader reads a book's settings twice more as it opens it, for the document handler and for the
+-- reader. With many highlights the file is big (264 of them: 150 KB, 20-30 ms a read on a Kindle),
+-- so the copy read as the cover is tapped serves both, as long as the file hasn't changed since.
+local opening
+local openSettings = DocSettings.open
+DocSettings.open = function(self, path)
+    if opening and opening.path == path then
+        local file = lfs.attributes(opening.file)
+        if file and file.modification == opening.modification and file.size == opening.size then
+            return opening.settings
+        end
+        opening = nil
+    end
+    return openSettings(self, path)
+end
+
 -- The book's layout cache from last time, if it's there.
 local function layoutCache(path)
-    local cache = DocSettings:open(path):readSetting("cache_file_path")
+    opening = nil
+    local settings = DocSettings:open(path)
+    local file = settings.source_candidate and lfs.attributes(settings.source_candidate)
+    if file then
+        opening = {
+            path = path, settings = settings, file = settings.source_candidate,
+            modification = file.modification, size = file.size,
+        }
+    end
+    local cache = settings:readSetting("cache_file_path")
     if cache ~= nil and lfs.attributes(cache, "mode") == "file" then return cache end
+end
+
+-- Once the reader has the book's settings, they're its own.
+function Lexeme.forgetOpening()
+    opening = nil
 end
 
 -- Like the Kindle: the cover says "Opening" until the book shows. A book that takes longer, being

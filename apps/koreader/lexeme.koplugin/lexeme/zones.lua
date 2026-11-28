@@ -16,13 +16,14 @@ local BOOKMARK_CORNER = 130
 local EVERYWHERE = { ratio_x = 0, ratio_y = 0, ratio_w = 1, ratio_h = 1 }
 
 local function ribbon()
-    return Geom:new{ x = Screen:getWidth() - D.s(48 + 39), y = 0, w = D.s(39), h = D.s(63) }
+    return Geom:new{ x = Screen:getWidth() - D.px(48 + 39), y = 0, w = D.px(39), h = D.px(63) }
 end
 
--- The Kindle's bookmark: a black ribbon with a notched end, in place of KOReader's dog-ear.
+-- The Kindle's bookmark: a black ribbon with a notched end, in place of KOReader's dog-ear. The
+-- Kindle's reader draws it, and takes taps on the corner, the same size on every 300 dpi screen.
 local function paintRibbon(_, bb, x, y)
     local box = ribbon()
-    local notch = D.s(14)
+    local notch = D.px(14)
     local left, top = x + box.x, y + box.y
     D.rect(bb, left, top + 1, box.w, box.h - notch - 1)
     local center = left + box.w / 2
@@ -72,7 +73,7 @@ function Zones.install(ui)
     ui.view.dogear.getRefreshRegion = ribbon
 
     local w, h = Screen:getWidth(), Screen:getHeight()
-    local corner = D.s(BOOKMARK_CORNER)
+    local corner = D.px(BOOKMARK_CORNER)
     ui:unRegisterTouchZones({ { id = "readermenu_ext_tap" } })
     ui:registerTouchZones({
         {

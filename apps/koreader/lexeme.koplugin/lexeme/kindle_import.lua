@@ -33,13 +33,28 @@ local function rows(path, sql)
     return result
 end
 
--- The file name the KOReader copy of an Amazon book was given. Amazon keeps titles in decomposed Unicode.
-local function convertedPath(title)
-    local ok, composed = pcall(utf8proc.normalize_NFC, title)
-    title = ok and composed or title
-    local name = title:gsub('[\\/:*?"<>|]+', ""):gsub("^%s+", ""):gsub("[%s%.]+$", ""):sub(1, 150)
-    local path = Books.homeDir() .. "/Books/" .. name .. ".epub"
-    if lfs.attributes(path, "mode") == "file" then return path end
+-- The KOReader copy of an Amazon book, in documents/Converted: named after the Amazon file at
+-- `location` without the Kindle's "_<key>" suffix, in composed Unicode and without the space Amazon
+-- sometimes puts in front (as the conversion names them), else with its whole name.
+local CONVERTED_TYPES = { "epub", "azw3", "azw", "mobi" }
+
+local function convertedPath(location)
+    local name = type(location) == "string" and location:match("([^/]+)%.[^./]+$")
+    if not name then return nil end
+    local names = { name }
+    local key = name:match("_([%dA-Z]+)$")
+    if key and #key >= 10 then table.insert(names, 1, name:sub(1, #name - #key - 1)) end
+    local dir = Books.homeDir() .. "/Converted/"
+    for _, candidate in ipairs(names) do
+        -- A combining accent left after a space belongs to the letter before it.
+        candidate = candidate:gsub("(%w) (\204[\128-\191])", "%1%2"):gsub("(%w) (\205[\128-\175])", "%1%2")
+        local ok, composed = pcall(utf8proc.normalize_NFC, candidate)
+        candidate = ((ok and composed or candidate):gsub("^%s+", ""):gsub("%s+$", ""))
+        for _, ext in ipairs(CONVERTED_TYPES) do
+            local path = dir .. candidate .. "." .. ext
+            if lfs.attributes(path, "mode") == "file" then return path end
+        end
+    end
 end
 
 local function authorsOf(credits)
@@ -57,14 +72,16 @@ end
 local function amazonBooks()
     local books = {}
     for _, row in ipairs(rows(CC_DB, [[
-        SELECT p_cdeKey, p_titles_0_nominal, j_credits, p_percentFinished, p_lastAccess, p_readState
+        SELECT p_cdeKey, p_titles_0_nominal, j_credits, p_percentFinished, p_lastAccess, p_readState, p_location
         FROM Entries WHERE p_cdeType IN ('EBOK', 'PDOC') AND p_cdeKey IS NOT NULL
-          AND p_titles_0_nominal IS NOT NULL;]])) do
+          AND p_titles_0_nominal IS NOT NULL
+          -- The Kindle indexes the MOBI-family copies in Converted too: they're the KOReader copies.
+          AND (p_location IS NULL OR p_location NOT LIKE '%/Converted/%');]])) do
         local cde, title = row[1], row[2]
         local percent = tonumber(row[4])
         local opened = (tonumber(row[5]) or 0) > 0 and (percent or 0) > 0
         if not books[cde] or opened then
-            local path = convertedPath(title)
+            local path = convertedPath(row[7])
             -- The key KOReader keeps for the copy, as syncing sends it; the file's checksum can since differ.
             local settings = path and DocSettings:hasSidecarFile(path) and DocSettings:open(path) or nil
             local key = path and Reading.bookKey(path, settings) or "kindle:" .. cde

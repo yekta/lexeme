@@ -22,6 +22,9 @@ The scripts reach the Kindle over SSH. Set `KINDLE_HOST` to an SSH host
   Lexeme (syncing, studying), run a dev stack and turn dev mode on with
   `LEXEME_SERVER=http://<this machine>:<port> LEXEME_TOKEN=lx_…`: the Kindle
   uses that server, with syncing on, until `off`.
+- To keep the Kindle awake on its own, for long unattended runs, create
+  `/mnt/us/lexeme-dev/stay-awake` on it; delete it to let the Kindle sleep
+  again. Dev mode does this too.
 - `python3 scripts/kindle.py shot out.png` saves a framebuffer screenshot.
 - `python3 scripts/kindle.py tap X Y` / `hold X Y` / `swipe X1 Y1 X2 Y2`
   inject touches. Coordinates are framebuffer pixels (1272 × 1696 on a

@@ -74,6 +74,7 @@ case "$MODE" in
     mv "$SNAP.partial" "$SNAP"
     lipc-set-prop com.lab126.powerd flIntensity 0
     lipc-set-prop com.lab126.powerd preventScreenSaver 1
+    touch /mnt/us/lexeme-dev/stay-awake # KOReader's own auto-suspend too (lexeme/devrestart.lua)
     set_flag true
     if [ -n "$LEXEME_SERVER" ] && [ -n "$LEXEME_TOKEN" ]; then
       use_server
@@ -90,6 +91,7 @@ case "$MODE" in
     (cd / && tar -xf "$SNAP/data.tar")
     if [ -s "$SNAP/brightness" ]; then lipc-set-prop com.lab126.powerd flIntensity "$(cat "$SNAP/brightness")"; fi
     lipc-set-prop com.lab126.powerd preventScreenSaver 0
+    rm -f /mnt/us/lexeme-dev/stay-awake
     rm -rf "$SNAP"
     set_flag false
     start_koreader

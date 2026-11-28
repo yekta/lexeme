@@ -29,7 +29,7 @@ GoTo.run = Toolbar.run
 local PANEL_TOP = 347
 local FIRST_BASELINE, ROW_PITCH = 775, 100.75
 local ROWS = 9
-local INDENT = 40
+local INDENT = 57
 
 local KINDLE_ICONS = "/app/KPPMainApp/res/KPPUIComponents/internal/icons/"
 local function chevron(name)
@@ -193,8 +193,14 @@ function GoTo:paintScroll(bb, x, y, w, total)
         D.around(cx, up_y + D.px(10), D.px(101), D.px(101)))
     self:pressable(cx - D.px(50), down_y - D.px(40), D.px(100), D.px(100), function() self:onSwipe("north") end,
         D.around(cx, down_y + D.px(10), D.px(101), D.px(101)))
-    local track_top, track_bottom = up_y + D.px(46), down_y - D.px(40)
-    for dot = track_top, track_bottom, D.px(5) do D.rect(bb, cx, dot, 1, 1, D.gray(80)) end
+    -- The track: a 10 px band hatched with diagonal lines 5 px apart.
+    local track_top, track_bottom = up_y + D.px(62), down_y - D.px(42)
+    local band = cx - D.px(5)
+    for py = track_top, track_bottom do
+        local o = (track_top - py) % 5
+        D.rect(bb, band + o, py, 1, 1)
+        if o + 5 < D.px(10) then D.rect(bb, band + o + 5, py, 1, 1) end
+    end
     local span = track_bottom - track_top
     local t0 = track_top + math.floor(span * (self.first - 1) / total)
     local t1 = track_top + math.floor(span * math.min(total, self.first + ROWS - 1) / total)

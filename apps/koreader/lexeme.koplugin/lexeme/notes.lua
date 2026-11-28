@@ -10,8 +10,9 @@ Links in the text, as the Kindle's reader follows them:
   its number shown inverted.
 - A long press on a note's number doesn't select it.
 
-Which notes open in the sheet follows Amazon's reader, which shows notes the book marks as
-footnotes (epub:type="footnote", as Amazon's conversion writes them) and follows the rest.
+Which notes open in the sheet follows Amazon's reader: notes the book marks as footnotes or endnotes
+(epub:type, as Amazon's conversion writes them) open there, titled "Footnote" either way; other links
+are followed.
 ]]
 local Blitbuffer = require("ffi/blitbuffer")
 local Geom = require("ui/geometry")
@@ -172,9 +173,9 @@ local Sheet = View:extend{
 }
 
 -- Measured off Amazon's sheet on a Paperwhite 5, from the bottom up: "Go to footnotes" sits on a
--- baseline 30 px up, the note ends 120 px up, its top is 20 px under a 4 px rule, the title's baseline
+-- baseline 30 px up, the note ends about 114 px up, its top is 20 px under a 4 px rule, the title's baseline
 -- is 30 px above that rule, the handle 146 px and the sheet's 9 px top border 178 px.
-local GOTO_BASELINE, NOTE_BOTTOM = 30, 120
+local GOTO_BASELINE, NOTE_BOTTOM = 30, 114
 
 function Sheet:init()
     local w, h = Screen:getWidth(), Screen:getHeight()
@@ -323,7 +324,7 @@ function Notes.install(ui)
         if not (link and link.xpointer and link.xpointer ~= "" and doc:isXPointerInDocument(link.xpointer)) then
             return show_link_box(link_module, link, allow_footnote_popup)
         end
-        if Notes.kind(ui, link.xpointer) == "footnote" then
+        if Notes.kind(ui, link.xpointer) then
             local ok, shown = pcall(Notes.showSheet, ui, link)
             if not ok then logger.warn("Lexeme: footnote sheet", shown) end
             if ok and shown then return true end

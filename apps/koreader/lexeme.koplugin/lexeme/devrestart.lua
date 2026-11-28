@@ -7,11 +7,12 @@ Killing KOReader from outside and launching it again makes its launcher start th
 services and stop them again moments later; a launch that lands while they're still coming up can
 fail to read the frontlight or battery, or take the Kindle down with it.
 
-While stay-awake exists there, the Kindle doesn't sleep, so it stays on SSH: powerd's screensaver
-timer is held off, and so is KOReader's own auto-suspend, which on a Kindle presses the power
-button and so ignores powerd's hold. Deleting the file lets both run again. As with KOReader's Keep
-alive, PluginShare.keepalive is set too: auto-suspend then stops resetting powerd's screensaver
-timer, which with the screensaver held off blocked KOReader for good in powerd's reply.
+While stay-awake exists there, the Kindle doesn't go to sleep on its own, so it stays on SSH; the
+power button still puts it to sleep. KOReader's own auto-suspend is paused, and powerd's screensaver
+timer (10 minutes at the least) is reset every 4 minutes, as KOReader does while it's being used.
+That's done from a background process: a lipc call that never returns (powerd once kept KOReader
+waiting for an hour) can't hold KOReader up. powerd's screensaver itself isn't held off, which
+would keep the button from working too. Deleting the file lets both timers run again.
 ]]
 local PluginShare = require("pluginshare")
 local UIManager = require("ui/uimanager")
@@ -21,18 +22,29 @@ local DIR = "/mnt/us/lexeme-dev"
 local REQUEST = DIR .. "/restart-request"
 local AWAKE = DIR .. "/stay-awake"
 local INTERVAL = 2
+local T1_RESET = 4 * 60
 
 local DevRestart = {}
 
 local watching = false
 local awake = false
+local last_reset
+
+local function lipc(args)
+    os.execute("lipc-set-prop " .. args .. " >/dev/null 2>&1 &")
+end
 
 local function stayAwake(on)
+    if on and (not last_reset or os.time() - last_reset >= T1_RESET) then
+        last_reset = os.time()
+        lipc("-i com.lab126.powerd touchScreenSaverTimeout 1")
+    end
     if on == awake then return end
     awake = on
     PluginShare.pause_auto_suspend = on
-    PluginShare.keepalive = on
-    os.execute("lipc-set-prop com.lab126.powerd preventScreenSaver " .. (on and 1 or 0))
+    if not on then last_reset = nil end
+    -- An earlier stay-awake held powerd's screensaver off; that ends here.
+    if on then lipc("com.lab126.powerd preventScreenSaver 0") end
 end
 
 local function restart()

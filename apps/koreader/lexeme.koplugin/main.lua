@@ -3,8 +3,10 @@ local plugin_root = debug.getinfo(1, "S").source:match("^@(.*)/[^/]*$")
 -- our modules are required later too.
 package.path = plugin_root .. "/?.lua;" .. package.path
 
+local DocSettings = require("docsettings")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local lfs = require("libs/libkoreader-lfs")
 
 local D = require("lexeme/draw")
 local Layout = require("lexeme/layout")
@@ -41,6 +43,36 @@ G_reader_settings:saveSetting("vocabulary_builder", { enabled = true, with_conte
 local plugins_disabled = G_reader_settings:readSetting("plugins_disabled") or {}
 plugins_disabled.externalkeyboard = true
 G_reader_settings:saveSetting("plugins_disabled", plugins_disabled)
+require("lexeme/engine").install()
+-- Home always covers KOReader's file browser (Lexeme:init paints Home in its place), so the
+-- browser needn't list the home folder each time it's built, as every book closes: for a
+-- Kindle's 500 entries through its FUSE layer that took 0.15 s. Other file choosers still list.
+local FileChooser = require("ui/widget/filechooser")
+local listFolder = FileChooser.genItemTableFromPath
+FileChooser.genItemTableFromPath = function(chooser, path)
+    if chooser.name == "filemanager" then return {} end
+    return listFolder(chooser, path)
+end
+-- Home shows in the same pass as the file browser it covers, rather than a tick later: a tick
+-- later, the browser had painted Home already, and Home was painted all over again (0.35 s).
+local FileManager = require("apps/filemanager/filemanager")
+local showFiles = FileManager.showFiles
+FileManager.showFiles = function(...)
+    showFiles(...)
+    local lexeme = FileManager.instance and FileManager.instance.lexeme
+    if lexeme and lexeme.showShell then lexeme:showShell() end
+end
+-- KOReader's gesture shortcuts aren't Lexeme's: Reader.onReaderReady emptied them in every book,
+-- once the gestures plugin had set them all up, 30 ms each time a book opened. The plugin isn't
+-- started in a book now (KOReader works as when it's turned off); Home keeps it.
+local PluginLoader = require("pluginloader")
+local createPluginInstance = PluginLoader.createPluginInstance
+PluginLoader.createPluginInstance = function(loader, plugin, attr)
+    if plugin.name == "gestures" and attr and attr.document then return nil, "not used in a book" end
+    return createPluginInstance(loader, plugin, attr)
+end
+-- A book file this big opens without the spinner turning (see Lexeme:openBook).
+local BIG_BOOK_BYTES = 8 * 1024 * 1024
 -- The Kindle's FreeType never kerns, and errors when asked before a font has drawn a glyph,
 -- which KOReader's text drawing treats as fatal. Its UI text isn't kerned anyway.
 local RenderText = require("ui/rendertext")
@@ -66,16 +98,27 @@ function Lexeme:init()
     end
     self:useClassicFileBrowser()
     self:createShell()
-    -- The file browser paints Home in its place, so its own screen never shows
-    -- before Home opens on top of it.
-    local painted = false
+    -- Home goes up with the file browser, as FileManager:showFiles shows it (see showShell), and
+    -- covers all of it: the browser itself is never painted, and Home is painted once. Should the
+    -- browser show before Home does, it paints Home in its place, so its own screen never shows.
     self.ui.paintTo = function(_, bb, x, y)
-        if not self.shell then return end
+        if not self.shell or self.shell_shown then return end
         self.shell:paintTo(bb, x, y)
-        painted = true
+        self.shell_painted = true
     end
-    -- Back from a book, the file browser has already flashed Home on; "ui" doesn't flash again.
-    UIManager:nextTick(function() UIManager:show(self.shell, painted and "ui" or "flashui") end)
+    UIManager:nextTick(function() self:showShell() end)
+    -- The spinner's frames and the engine's start-up, done while Home sits idle rather than as a
+    -- book opens.
+    UIManager:scheduleIn(3, function()
+        if not self.shell then return end
+        require("lexeme/loading").prepare()
+        require("lexeme/engine").whileIdle()
+    end)
+end
+
+-- Plugins read their settings after KOReader's own reader modules, and before the book loads.
+function Lexeme:onReadSettings()
+    if self.ui.document then Reader.beforeLoad(self.ui) end
 end
 
 function Lexeme:onPreRenderDocument()
@@ -83,8 +126,15 @@ function Lexeme:onPreRenderDocument()
 end
 
 function Lexeme:onReaderReady()
+    self.forgetOpening()
     Reader.onReaderReady(self.ui)
     require("lexeme/loading").close()
+    require("lexeme/cachesave").start(self.ui)
+end
+
+-- A book laid out again (a font change) has its cache written again while it's read.
+function Lexeme:onDocumentRerendered()
+    if self.ui.document then require("lexeme/cachesave").start(self.ui) end
 end
 
 -- Lexeme gets what's new whenever the Kindle comes online, a book is put down,
@@ -101,13 +151,17 @@ function Lexeme:onAnnotationsModified()
 end
 
 function Lexeme:onCloseDocument()
+    require("lexeme/cachesave").stop()
     require("lexeme/highlight_positions").save(self.ui)
     require("lexeme/sync").soon()
 end
 
--- Each page read reaches Lexeme with the locations it covered.
+-- Each page read reaches Lexeme with the locations it covered, and the reader has settled there,
+-- for "Back to loc …" (lexeme/backstack.lua).
 function Lexeme:onPageUpdate(page)
-    if self.ui.document then require("lexeme/locations").notePage(self.ui, page) end
+    if not self.ui.document then return end
+    require("lexeme/locations").notePage(self.ui, page)
+    require("lexeme/backstack").onPageUpdate(self.ui)
 end
 
 -- Saved with the book's settings, so highlights and pages read reach Lexeme with their Kindle locations.
@@ -117,13 +171,13 @@ end
 
 function Lexeme:onSuspend()
     require("lexeme/network").beforeSleep()
-    require("lexeme/timer").pause()
+    require("lexeme/timer").sleep()
     require("lexeme/sync").beforeSleep()
 end
 
 function Lexeme:onResume()
     require("lexeme/network").afterWake()
-    require("lexeme/timer").resume()
+    require("lexeme/timer").wake()
     require("lexeme/sync").afterWake()
 end
 
@@ -150,6 +204,15 @@ function Lexeme:useClassicFileBrowser()
     coverbrowser:setupFileManagerDisplayMode(nil)
 end
 
+-- Home over the file browser. Once the browser has put Home on the screen, no second refresh.
+-- Home flashes up, as on a Kindle, and takes taps as soon as the flash starts (see lexeme/flash).
+function Lexeme:showShell()
+    if not self.shell or self.shell_shown then return end
+    self.shell_shown = true
+    UIManager:show(self.shell, not self.shell_painted and "flashui" or nil)
+    require("lexeme/flash").nextRepaint()
+end
+
 function Lexeme:createShell()
     self.shell = Shell:new{
         open_book = function(path) self:openBook(path) end,
@@ -166,6 +229,11 @@ end
 
 function Lexeme:onCloseWidget()
     if not self.shell then return end
+    local search = self.shell.search
+    if search then
+        search.quiet = true
+        UIManager:close(search)
+    end
     UIManager:close(self.shell)
     self.shell = nil
 end
@@ -174,17 +242,60 @@ function Lexeme:openSettings()
     require("lexeme/settings").show()
 end
 
--- Like the Kindle: the cover says "Opening", then a spinner holds the screen until the book is ready.
+-- KOReader reads a book's settings twice more as it opens it, for the document handler and for the
+-- reader. With many highlights the file is big (264 of them: 150 KB, 20-30 ms a read on a Kindle),
+-- so the copy read as the cover is tapped serves both, as long as the file hasn't changed since.
+local opening
+local openSettings = DocSettings.open
+DocSettings.open = function(self, path)
+    if opening and opening.path == path then
+        local file = lfs.attributes(opening.file)
+        if file and file.modification == opening.modification and file.size == opening.size then
+            return opening.settings
+        end
+        opening = nil
+    end
+    return openSettings(self, path)
+end
+
+-- The book's layout cache from last time, if it's there.
+local function layoutCache(path)
+    opening = nil
+    local settings = DocSettings:open(path)
+    local file = settings.source_candidate and lfs.attributes(settings.source_candidate)
+    if file then
+        opening = {
+            path = path, settings = settings, file = settings.source_candidate,
+            modification = file.modification, size = file.size,
+        }
+    end
+    local cache = settings:readSetting("cache_file_path")
+    if cache ~= nil and lfs.attributes(cache, "mode") == "file" then return cache end
+end
+
+-- Once the reader has the book's settings, they're its own.
+function Lexeme.forgetOpening()
+    opening = nil
+end
+
+-- Like the Kindle: the cover says "Opening" until the book shows. A book that takes longer, being
+-- laid out, gets the loading screen, a spinner holding the screen until the book is ready.
 function Lexeme:openBook(path)
     if path:find("^lexeme%-delivery:") then return end
+    local cache = layoutCache(path)
+    -- The cache starts coming into memory now, while the cover and the reader are drawn and set up.
+    require("lexeme/engine").readAhead(cache)
     if self.shell then
         G_reader_settings:saveSetting("lexeme_tab", self.shell.tab)
-        self.shell.opening = path
-        UIManager:setDirty(self.shell, "fast")
-        UIManager:forceRePaint()
+        self.shell:showOpening(path)
     end
-    UIManager:scheduleIn(0.5, function()
-        require("lexeme/loading").show()
+    -- Whether the book opens in about a second: it isn't big and its layout is cached.
+    local quick = cache ~= nil and (lfs.attributes(path, "size") or 0) <= BIG_BOOK_BYTES
+    -- Turning the spinner keeps a copy of KOReader's memory while the book is laid out; a book
+    -- this big needs it more than the spinner does.
+    local still = (lfs.attributes(path, "size") or 0) > BIG_BOOK_BYTES
+    UIManager:nextTick(function()
+        if not quick then require("lexeme/loading").show(nil, still) end
         UIManager:nextTick(function()
             require("apps/reader/readerui"):showReader(path, nil, true)
         end)

@@ -1,0 +1,2380 @@
+--- a/crengine/include/lvstream.h
++++ b/crengine/include/lvstream.h
+@@ -523,6 +523,18 @@
+     virtual ~LVContainerItemInfo() {}
+ };
+ 
++/// Prepares, ahead of their use, streams of a container's entries that are going to be
++/// opened one after the other (see LVContainer::createPrefetcher())
++class LVStreamPrefetcher
++{
++public:
++    /// the stream of the index-th of the entries given, with the same data, size and name
++    /// as OpenStream() gives, or a null ref if it couldn't be prepared (OpenStream() should
++    /// then be used); to be called with increasing indexes
++    virtual LVStreamRef take( int index ) = 0;
++    virtual ~LVStreamPrefetcher() { }
++};
++
+ class LVContainer : public LVStorageObject
+ {
+ public:
+@@ -533,6 +545,11 @@
+     virtual const LVContainerItemInfo * GetObjectInfo(lString32 name) = 0;
+     virtual int GetObjectCount() const = 0;
+     virtual LVStreamRef OpenStream( const lChar32 * fname, lvopen_mode_t mode ) = 0;
++    /// For entries ('names', empty ones being skipped) that are going to be opened in that
++    /// order: an object preparing their streams ahead (for an archive, decompressing them in
++    /// another thread while the caller works on the previous ones), to delete when done;
++    /// NULL when this container can't do it
++    virtual LVStreamPrefetcher * createPrefetcher( const lString32Collection & names ) { CR_UNUSED(names); return NULL; }
+     LVContainer() {}
+     virtual ~LVContainer() { }
+ };
+--- a/crengine/include/lvtinydom.h
++++ b/crengine/include/lvtinydom.h
+@@ -389,10 +389,14 @@
+ #if BUILD_LITE!=1
+     /// allocates new text node, return its address inside storage
+     lUInt32 allocText( lUInt32 dataIndex, lUInt32 parentIndex, const lString8 & text );
++    /// allocates a text item for text (len chars, utf8len bytes once UTF-8 encoded, -1 if not known)
++    lUInt32 allocText( lUInt32 dataIndex, lUInt32 parentIndex, const lChar32 * text, int len, int utf8len );
+     /// allocates storage for new element, returns address address inside storage
+     lUInt32 allocElem( lUInt32 dataIndex, lUInt32 parentIndex, lUInt32 childCount, lUInt32 attrCount );
+     /// get text by address
+     lString8 getText( lUInt32 address );
++    /// the UTF-8 bytes of the text item at address (pointing into its chunk), false if none
++    bool getTextBytes( lUInt32 address, const lChar8 * & text, int & length );
+     /// get pointer to text data
+     TextDataStorageItem * getTextItem( lUInt32 addr );
+     /// get pointer to element data
+@@ -463,10 +467,15 @@
+     int space();
+     /// adds new text item to buffer, returns offset inside chunk of stored data
+     int addText( lUInt32 dataIndex, lUInt32 parentIndex, const lString8 & text );
++    /// adds text (len chars, utf8len bytes once UTF-8 encoded, or -1 if not known yet: then set
++    /// when known), encoding it in place
++    int addText( lUInt32 dataIndex, lUInt32 parentIndex, const lChar32 * text, int len, int & utf8len );
+     /// adds new element item to buffer, returns offset inside chunk of stored data
+     int addElem( lUInt32 dataIndex, lUInt32 parentIndex, lUInt32 childCount, lUInt32 attrCount );
+     /// get text item from buffer by offset
+     lString8 getText( int offset );
++    /// the UTF-8 bytes of the text item at offset (pointing into this chunk), false if none
++    bool getTextBytes( int offset, const lChar8 * & text, int & length );
+     /// get node parent by offset
+     lUInt32 getParent( int offset );
+     /// set node parent by offset
+@@ -603,6 +612,8 @@
+     lUInt32 calcStyleHash(bool already_rendered, lUInt32 force_node_style_hash=0);
+     bool saveNodeData();
+     bool saveNodeData( lUInt16 type, ldomNode ** list, int nodecount );
++    /// copies count nodes of a node list part as saveNodeData() saves them
++    static void prepareNodeDataPart( void * dst, const void * src, int count );
+     bool loadNodeData();
+     bool loadNodeData( lUInt16 type, ldomNode ** list, int nodecount );
+ 
+@@ -1179,6 +1190,9 @@
+ 
+     /// returns text node text as wide string
+     lString32 getText( lChar32 blockDelimiter = 0, int maxSize=0 ) const;
++    /// whether getText() is only spaces, tabs and newlines (as IsEmptySpace() on it says),
++    /// telling it, for most text nodes, without decoding their text
++    bool isEmptySpaceText() const;
+     /// returns text node text as utf8 string
+     lString8 getText8( lChar8 blockDelimiter = 0, int maxSize=0 ) const;
+     /// sets text node text as wide string
+@@ -1254,6 +1268,8 @@
+     ldomNode * insertChildText( const lString32 & value );
+     /// inserts child text
+     ldomNode * insertChildText(const lString8 & value, bool before_last_child=false);
++    /// inserts child text, as insertChildText(UnicodeToUtf8(text, len), before_last_child) does
++    ldomNode * insertChildText(const lChar32 * text, int len, bool before_last_child=false);
+     /// remove child
+     ldomNode * removeChild( lUInt32 index );
+ 
+--- a/crengine/src/epubfmt.cpp
++++ b/crengine/src/epubfmt.cpp
+@@ -851,6 +851,12 @@
+         _container->SetName(name);
+     }
+ 
++    /// whether OpenStream() gives this item's stream through some decryption
++    bool isEncrypted( const lString32 & fname ) {
++        encryption_method_t encryption_method;
++        return _encrypted_items.get(fname, encryption_method);
++    }
++
+     virtual void addEncryptedItem(lString32 uri, lString32 algorithm) {
+         encryption_method_t encryption_method;
+         if (algorithm == U"http://ns.adobe.com/pdf/enc#RC") {
+@@ -1887,6 +1893,23 @@
+             //CRLog::trace("subst: %s => %s", LCSTR(name), LCSTR(subst));
+         }
+     }
++    // The spine items are read in order: have their streams decompressed ahead, in
++    // another thread, while this one parses the previous ones (items OpenStream()
++    // gives through some decryption are left to it).
++    LVStreamPrefetcher * prefetcher = NULL;
++    {
++        lString32Collection names;
++        for ( size_t i=0; i<spineItemsNb; i++ ) {
++            lString32 name;
++            if (relaxed_spine || spineItems[i]->is_xhtml) {
++                name = LVCombinePaths(codeBase, spineItems[i]->href);
++                if ( decryptor->isEncrypted(name) )
++                    name.clear();
++            }
++            names.add(name);
++        }
++        prefetcher = arc->createPrefetcher(names);
++    }
+     int lastProgressPercent = 5;
+     for ( size_t i=0; i<spineItemsNb; i++ ) {
+         if ( progressCallback ) {
+@@ -1910,7 +1933,11 @@
+                 appender.setNonLinearFlag(spineItems[i]->nonlinear);
+                 appender.setFragmentType(); // unset
+                 CRLog::debug("Checking fragment: %s", LCSTR(name));
+-                LVStreamRef stream = m_arc->OpenStream(name.c_str(), LVOM_READ);
++                LVStreamRef stream;
++                if ( prefetcher )
++                    stream = prefetcher->take(i);
++                if ( stream.isNull() )
++                    stream = m_arc->OpenStream(name.c_str(), LVOM_READ);
+                 if ( !stream.isNull() ) {
+                     lString32 base = name;
+                     LVExtractLastPathElement(base);
+@@ -1978,6 +2005,8 @@
+         }
+     }
+ 
++    delete prefetcher;
++
+     // Clear any toc items possibly added while parsing the HTML
+     m_doc->getToc()->clear();
+     bool has_toc = false;
+--- a/crengine/src/lvstream.cpp
++++ b/crengine/src/lvstream.cpp
+@@ -38,6 +38,20 @@
+ #include <zlib.h>
+ #endif
+ 
++// Let ZIP archives decompress, in another thread, the entries a caller is going to read one
++// after the other (see LVZipPrefetcher): unzipping is a fifth of loading an EPUB, and
++// e-readers have a second core sitting idle.
++#ifndef CR_BACKGROUND_UNZIP
++#if (USE_ZLIB==1) && (defined(__linux__) || defined(__APPLE__) || defined(__ANDROID__))
++#define CR_BACKGROUND_UNZIP 1
++#else
++#define CR_BACKGROUND_UNZIP 0
++#endif
++#endif
++#if CR_BACKGROUND_UNZIP == 1
++#include <pthread.h>
++#endif
++
+ #if (USE_UNRAR==1)
+ #include <rar.hpp>
+ #endif
+@@ -299,6 +313,9 @@
+ 
+ 
+ #define CRC_BUF_SIZE 16384
++// Larger reads, when the stream is large: books' files are read whole for this, and
++// small reads cost much more on some devices' storage
++#define CRC_BIG_BUF_SIZE 0x40000
+ 
+ /// calculate crc32 code for stream, if possible
+ lverror_t LVStream::getcrc32( lUInt32 & dst )
+@@ -307,6 +324,28 @@
+     if ( GetMode() == LVOM_READ || GetMode() == LVOM_APPEND ) {
+         lvpos_t savepos = GetPos();
+         lvsize_t size = GetSize();
++        if ( size > CRC_BIG_BUF_SIZE ) {
++            lUInt8 * big = (lUInt8 *)malloc( CRC_BIG_BUF_SIZE );
++            if ( big ) {
++                SetPos( 0 );
++                lvsize_t bytesRead = 0;
++                for ( lvpos_t pos = 0; pos<size; pos+=CRC_BIG_BUF_SIZE ) {
++                    lvsize_t sz = size - pos;
++                    if ( sz > CRC_BIG_BUF_SIZE )
++                        sz = CRC_BIG_BUF_SIZE;
++                    Read( big, sz, &bytesRead );
++                    if ( bytesRead!=sz ) {
++                        free( big );
++                        SetPos(savepos);
++                        return LVERR_FAIL;
++                    }
++                    dst = lStr_crc32( dst, big, sz );
++                }
++                free( big );
++                SetPos( savepos );
++                return LVERR_OK;
++            }
++        }
+         lUInt8 buf[CRC_BUF_SIZE];
+         SetPos( 0 );
+         lvsize_t bytesRead = 0;
+@@ -2488,6 +2527,414 @@
+     }
+ };
+ 
++/// Reads [start, end of stream) of another stream with a single read, and serves reads
++/// in it from memory (others go to that stream): for many small reads of a known region,
++/// as when reading a ZIP archive's central directory, entry by entry. Reads give what the
++/// other stream would give.
++class LVWindowedStream : public LVNamedStream
++{
++    LVStreamRef m_stream;
++    lUInt8 * m_buf;
++    lvpos_t m_start;
++    lvsize_t m_len;
++    lvpos_t m_pos;
++    LVWindowedStream( LVStreamRef stream, lUInt8 * buf, lvpos_t start, lvsize_t len )
++        : m_stream(stream), m_buf(buf), m_start(start), m_len(len), m_pos(start)
++    {
++        SetName( stream->GetName() );
++    }
++public:
++    /// NULL if the region can't be read
++    static LVStreamRef create( LVStreamRef stream, lvpos_t start )
++    {
++        lvsize_t size = stream->GetSize();
++        if ( start >= size || size - start > 0x1000000 )
++            return LVStreamRef();
++        lvsize_t len = size - start;
++        lUInt8 * buf = (lUInt8 *)malloc( len );
++        if ( !buf )
++            return LVStreamRef();
++        lvsize_t bytesRead = 0;
++        if ( stream->Seek( start, LVSEEK_SET, NULL ) != LVERR_OK
++                || stream->Read( buf, len, &bytesRead ) != LVERR_OK || bytesRead != len ) {
++            free( buf );
++            return LVStreamRef();
++        }
++        return LVStreamRef( new LVWindowedStream( stream, buf, start, len ) );
++    }
++    virtual ~LVWindowedStream()
++    {
++        free( m_buf );
++    }
++    virtual lverror_t Seek( lvoffset_t offset, lvseek_origin_t origin, lvpos_t * pNewPos )
++    {
++        lvoffset_t npos;
++        switch ( origin ) {
++        case LVSEEK_SET:
++            npos = offset;
++            break;
++        case LVSEEK_CUR:
++            npos = (lvoffset_t)m_pos + offset;
++            break;
++        case LVSEEK_END:
++            npos = (lvoffset_t)(m_start + m_len) + offset;
++            break;
++        default:
++            return LVERR_FAIL;
++        }
++        if ( npos < 0 )
++            return LVERR_FAIL;
++        // Past the end, the other stream decides, as some streams fail there and others don't.
++        if ( (lvpos_t)npos > m_start + m_len ) {
++            lverror_t res = m_stream->Seek( npos, LVSEEK_SET, NULL );
++            if ( res != LVERR_OK )
++                return res;
++        }
++        m_pos = (lvpos_t)npos;
++        if ( pNewPos )
++            *pNewPos = m_pos;
++        return LVERR_OK;
++    }
++    virtual lverror_t Read( void * buf, lvsize_t count, lvsize_t * nBytesRead )
++    {
++        if ( m_pos >= m_start && m_pos <= m_start + m_len ) {
++            lvsize_t n = m_start + m_len - m_pos;
++            if ( n > count )
++                n = count;
++            memcpy( buf, m_buf + (m_pos - m_start), n );
++            m_pos += n;
++            if ( nBytesRead )
++                *nBytesRead = n;
++            return LVERR_OK;
++        }
++        lvsize_t n = 0;
++        lverror_t res = m_stream->Seek( m_pos, LVSEEK_SET, NULL );
++        if ( res == LVERR_OK )
++            res = m_stream->Read( buf, count, &n );
++        m_pos += n;
++        if ( nBytesRead )
++            *nBytesRead = n;
++        return res;
++    }
++    virtual lverror_t Write( const void *, lvsize_t, lvsize_t * )
++    {
++        return LVERR_NOTIMPL;
++    }
++    virtual lvsize_t GetSize()
++    {
++        return m_start + m_len;
++    }
++    virtual lverror_t GetSize( lvsize_t * pSize )
++    {
++        if ( pSize )
++            *pSize = m_start + m_len;
++        return LVERR_OK;
++    }
++    virtual lverror_t SetSize( lvsize_t )
++    {
++        return LVERR_NOTIMPL;
++    }
++    virtual bool Eof()
++    {
++        return m_pos >= m_start + m_len;
++    }
++};
++
++#if CR_BACKGROUND_UNZIP == 1
++static LVStreamRef LVCreateOwnedMemoryStream( lUInt8 * buf, lvsize_t size );
++
++/// Prepares the streams of ZIP entries that are going to be opened one after the other: this
++/// thread reads the compressed data of the entries following the one asked for, and another
++/// thread decompresses them while this one works on the previous ones. The stream given is a
++/// memory stream with the data, size and name LVZipArc::OpenStream()'s stream would give.
++/// Anything unusual (an unknown method, data not decompressing to the size the archive's
++/// directory says, huge entries) is left to OpenStream().
++class LVZipPrefetcher : public LVStreamPrefetcher
++{
++    enum { SKIPPED, NOT_READ, READ, INFLATING, DONE, FAILED, TAKEN };
++    struct Entry {
++        lString32 name;     // the stream's name
++        lvpos_t pos;        // position of its local header
++        lvsize_t packSize;
++        lvsize_t unpSize;
++        int method;
++        lUInt8 * packed;    // compressed data, read by this thread (with the local header)
++        lvsize_t packedOffset; // where the data starts in it
++        lUInt8 * data;      // decompressed by the other one
++        lvsize_t held;      // memory this entry counts for in _heldBytes
++        int state;
++        Entry() : pos(0), packSize(0), unpSize(0), method(0), packed(NULL), packedOffset(0), data(NULL), held(0), state(SKIPPED) { }
++    };
++    // Entries prepared ahead are limited in number and in memory (compressed and
++    // decompressed data both count): enough to keep the other thread busy.
++    static const int MAX_AHEAD_ENTRIES = 16;
++    static const lvsize_t MAX_AHEAD_BYTES = 0x100000;
++    // Larger entries are left to OpenStream(), which doesn't need them whole in memory
++    static const lvsize_t MAX_ENTRY_SIZE = 0x100000;
++    // Room for the name and extra field of a local header, guessed for reading it with
++    // the data
++    static const lvsize_t READ_NAME_SLACK = 0x100;
++
++    LVStreamRef _stream;    // the archive
++    Entry * _entries;
++    int _count;
++    int _nextRead;          // next entry to read (this thread)
++    int _nextInflate;       // next entry to decompress (the other thread)
++    lvsize_t _heldBytes;
++    bool _stop;
++    bool _threadWaiting;    // the other thread waits for entries to be read
++    bool _takerWaiting;     // this thread waits for an entry to be decompressed
++    pthread_t _thread;
++    pthread_mutex_t _mutex;
++    pthread_cond_t _cond;
++
++    /// reads an entry's compressed data, checking what LVZipDecodeStream::Create() checks
++    bool readEntry( Entry & e )
++    {
++        ZipLocalFileHdr hdr;
++        unsigned hdr_size = 0x1E; //sizeof(hdr);
++        // Read the local header and the data that follows it at once, guessing the size
++        // of the name and extra field in between (reading the rest if more): one read
++        // rather than two, for the many small entries of some books.
++        lvsize_t fileSize = _stream->GetSize();
++        if ( e.pos >= fileSize )
++            return false;
++        lvsize_t span = hdr_size + READ_NAME_SLACK + e.packSize;
++        if ( span > fileSize - e.pos )
++            span = fileSize - e.pos;
++        // Both buffers are allocated here rather than in the other thread, which would
++        // have them come from (and go back to) a memory arena of its own.
++        e.packed = (lUInt8 *)malloc( span );
++        if ( !e.packed )
++            return false;
++        lvsize_t ReadSize = 0;
++        if ( _stream->Seek( e.pos, LVSEEK_SET, NULL )!=LVERR_OK
++                || _stream->Read( e.packed, span, &ReadSize )!=LVERR_OK || ReadSize < hdr_size ) {
++            free( e.packed );
++            e.packed = NULL;
++            return false;
++        }
++        memcpy( &hdr, e.packed, hdr_size );
++        hdr.byteOrderConv();
++        lvsize_t dataOffset = hdr_size + hdr.getNameLen() + hdr.getAddLen();
++        lvpos_t pos = e.pos + dataOffset;
++        bool ok = (lvpos_t)(pos + e.packSize) <= (lvpos_t)fileSize;
++        e.method = hdr.getMethod();
++        if ( e.method == 0 ) {
++            if ( e.packSize != e.unpSize )
++                ok = false;
++        } else if ( e.method != 8 ) {
++            ok = false;
++        }
++        if ( ok && dataOffset + e.packSize > ReadSize ) {
++            // More than guessed: read the rest
++            lUInt8 * buf = (lUInt8 *)realloc( e.packed, dataOffset + e.packSize );
++            if ( !buf ) {
++                ok = false;
++            } else {
++                e.packed = buf;
++                lvsize_t rest = dataOffset + e.packSize - ReadSize;
++                lvsize_t n = 0;
++                ok = _stream->Seek( e.pos + ReadSize, LVSEEK_SET, NULL )==LVERR_OK
++                        && _stream->Read( e.packed + ReadSize, rest, &n )==LVERR_OK && n==rest;
++            }
++        }
++        if ( !ok ) {
++            free( e.packed );
++            e.packed = NULL;
++            return false;
++        }
++        e.packedOffset = dataOffset;
++        if ( e.method == 0 ) {
++            memmove( e.packed, e.packed + dataOffset, e.packSize );
++            e.packedOffset = 0;
++            e.data = e.packed;
++            e.packed = NULL;
++        } else {
++            // (One byte more than expected, to notice data longer than said.)
++            e.data = (lUInt8 *)malloc( e.unpSize + 1 );
++            if ( !e.data ) {
++                free( e.packed );
++                e.packed = NULL;
++                return false;
++            }
++        }
++        return true;
++    }
++    /// decompresses an entry into its data buffer, true if it is exactly what the
++    /// archive's directory says (zs: an inflate state for raw deflate data)
++    static bool inflateEntry( Entry & e, z_stream * zs )
++    {
++        if ( e.method == 0 )
++            return true;
++        bool ok = false;
++        if ( inflateReset( zs ) == Z_OK ) {
++            zs->next_in = e.packed + e.packedOffset;
++            zs->avail_in = (uInt)e.packSize;
++            zs->next_out = e.data;
++            zs->avail_out = (uInt)(e.unpSize + 1);
++            int res = inflate( zs, Z_FINISH );
++            ok = res == Z_STREAM_END && zs->total_out == e.unpSize;
++        }
++        return ok;
++    }
++    /// reads entries ahead of index (and index itself) as far as the limits allow, once
++    /// those read ahead are down to half the limit: waking the other thread up for each
++    /// entry would cost more than decompressing the many small ones of some books
++    void readAhead( int index )
++    {
++        if ( _nextRead > index + MAX_AHEAD_ENTRIES / 2 )
++            return;
++        int first = _nextRead;
++        while ( _nextRead < _count && ( _nextRead <= index ||
++                ( _nextRead < index + MAX_AHEAD_ENTRIES && _heldBytes < MAX_AHEAD_BYTES ) ) ) {
++            Entry & e = _entries[_nextRead++];
++            if ( e.state != NOT_READ )
++                continue;
++            if ( readEntry( e ) ) {
++                e.held = e.packSize + e.unpSize;
++                _heldBytes += e.held;
++            }
++        }
++        pthread_mutex_lock( &_mutex );
++        for ( int i = first; i < _nextRead; i++ ) {
++            Entry & e = _entries[i];
++            if ( e.state == NOT_READ )
++                e.state = e.held ? READ : FAILED;
++        }
++        if ( _threadWaiting )
++            pthread_cond_broadcast( &_cond );
++        pthread_mutex_unlock( &_mutex );
++    }
++    void run()
++    {
++        z_stream zs;
++        memset( &zs, 0, sizeof(zs) );
++        bool zsOk = inflateInit2( &zs, -15 ) == Z_OK;
++        pthread_mutex_lock( &_mutex );
++        while ( !_stop && _nextInflate < _count ) {
++            Entry & e = _entries[_nextInflate];
++            if ( e.state == NOT_READ ) {
++                _threadWaiting = true;
++                pthread_cond_wait( &_cond, &_mutex );
++                _threadWaiting = false;
++                continue;
++            }
++            if ( e.state == READ ) {
++                e.state = INFLATING;
++                pthread_mutex_unlock( &_mutex );
++                bool ok = zsOk && inflateEntry( e, &zs );
++                pthread_mutex_lock( &_mutex );
++                e.state = ok ? DONE : FAILED;
++                if ( _takerWaiting )
++                    pthread_cond_broadcast( &_cond );
++            }
++            _nextInflate++;
++        }
++        pthread_mutex_unlock( &_mutex );
++        if ( zsOk )
++            inflateEnd( &zs );
++    }
++    static void * threadMain( void * arg )
++    {
++        ((LVZipPrefetcher *)arg)->run();
++        return NULL;
++    }
++    LVZipPrefetcher( LVStreamRef stream, int count )
++        : _stream(stream), _count(count), _nextRead(0), _nextInflate(0), _heldBytes(0)
++        , _stop(false)
++        , _threadWaiting(false), _takerWaiting(false)
++    {
++        _entries = new Entry[count];
++        pthread_mutex_init( &_mutex, NULL );
++        pthread_cond_init( &_cond, NULL );
++    }
++public:
++    static LVZipPrefetcher * create( LVContainer * arc, LVStreamRef stream, const lString32Collection & names )
++    {
++        int count = names.length();
++        if ( count <= 0 || stream.isNull() )
++            return NULL;
++        LVZipPrefetcher * res = new LVZipPrefetcher( stream, count );
++        for ( int i = 0; i < count; i++ ) {
++            const lChar32 * fname = names[i].c_str();
++            if ( !fname[0] )
++                continue;
++            if ( fname[0]=='/' )
++                fname++;
++            LVCommonContainerItemInfo * item = (LVCommonContainerItemInfo*)arc->GetObjectInfo(lString32(fname));
++            if ( !item || item->GetSize() == 0 || item->GetSize() > MAX_ENTRY_SIZE || item->GetSrcSize() > MAX_ENTRY_SIZE )
++                continue;
++            Entry & e = res->_entries[i];
++            e.name = item->GetName();
++            e.pos = item->GetSrcPos();
++            e.packSize = item->GetSrcSize();
++            e.unpSize = item->GetSize();
++            e.state = NOT_READ;
++        }
++        if ( pthread_create( &res->_thread, NULL, threadMain, res ) != 0 ) {
++            delete[] res->_entries; // (no thread to stop)
++            res->_entries = NULL;
++            res->_count = 0;
++            delete res;
++            return NULL;
++        }
++        return res;
++    }
++    virtual ~LVZipPrefetcher()
++    {
++        if ( _entries ) {
++            pthread_mutex_lock( &_mutex );
++            _stop = true;
++            pthread_cond_broadcast( &_cond );
++            pthread_mutex_unlock( &_mutex );
++            pthread_join( _thread, NULL );
++            for ( int i = 0; i < _count; i++ ) {
++                free( _entries[i].packed );
++                free( _entries[i].data );
++            }
++            delete[] _entries;
++        }
++        pthread_cond_destroy( &_cond );
++        pthread_mutex_destroy( &_mutex );
++    }
++    virtual LVStreamRef take( int index )
++    {
++        if ( index < 0 || index >= _count )
++            return LVStreamRef();
++        Entry & e = _entries[index];
++        pthread_mutex_lock( &_mutex );
++        int state = e.state;
++        pthread_mutex_unlock( &_mutex );
++        if ( state == SKIPPED || state == TAKEN )
++            return LVStreamRef();
++        readAhead( index );
++        pthread_mutex_lock( &_mutex );
++        while ( e.state == READ || e.state == INFLATING ) {
++            _takerWaiting = true;
++            pthread_cond_wait( &_cond, &_mutex );
++            _takerWaiting = false;
++        }
++        state = e.state;
++        e.state = TAKEN;
++        pthread_mutex_unlock( &_mutex );
++        _heldBytes -= e.held;
++        e.held = 0;
++        free( e.packed );
++        e.packed = NULL;
++        if ( state != DONE ) {
++            free( e.data );
++            e.data = NULL;
++            return LVStreamRef();
++        }
++        LVStreamRef res = LVCreateOwnedMemoryStream( e.data, e.unpSize );
++        e.data = NULL;
++        res->SetName( e.name.c_str() );
++        return res;
++    }
++};
++#endif
++
+ class LVZipArc : public LVArcContainerBase
+ {
+ protected:
+@@ -2497,6 +2944,16 @@
+     bool usedAltReadingMethod() { return m_alt_reading_method; }
+     void useAltReadingMethod() { m_alt_reading_method = true; }
+ 
++    virtual LVStreamPrefetcher * createPrefetcher( const lString32Collection & names )
++    {
++#if CR_BACKGROUND_UNZIP == 1
++        return LVZipPrefetcher::create( this, m_stream, names );
++#else
++        CR_UNUSED(names);
++        return NULL;
++#endif
++    }
++
+     virtual LVStreamRef OpenStream( const char32_t * fname, lvopen_mode_t /*mode*/ )
+     {
+         if ( fname[0]=='/' )
+@@ -2637,6 +3094,15 @@
+         if (truncated)
+             NextOffset = 0;
+ 
++        // The central directory is read entry by entry, in several small reads each:
++        // have it read at once (books may have thousands of entries).
++        LVStreamRef dirStream = m_stream;
++        if (!truncated && NextOffset > 0) {
++            LVStreamRef windowed = LVWindowedStream::create(m_stream, (lvpos_t)NextOffset);
++            if (!windowed.isNull())
++                dirStream = windowed;
++        }
++
+         //================================================================
+         // get file list
+ 
+@@ -2649,16 +3115,16 @@
+ 
+         for (;;) {
+ 
+-            if (m_stream->Seek(NextOffset, LVSEEK_SET, NULL) != LVERR_OK)
++            if (dirStream->Seek(NextOffset, LVSEEK_SET, NULL) != LVERR_OK)
+                 return 0;
+ 
+             if (truncated) {
+                 // The offset (that we don't find in a local header, but
+                 // that we will store in the ZipHeader we're building)
+                 // happens to be the current position here.
+-                lUInt32 offset = (lUInt32)m_stream->GetPos();
++                lUInt32 offset = (lUInt32)dirStream->GetPos();
+ 
+-                err = m_stream->Read(&ZipHd1, ZipHd1_size, &ReadSize);
++                err = dirStream->Read(&ZipHd1, ZipHd1_size, &ReadSize);
+                 ZipHd1.byteOrderConv();
+ 
+                 if (err != LVERR_OK || ReadSize != ZipHd1_size) {
+@@ -2685,7 +3151,7 @@
+                 // if (ZipHeader.NameLen == 0) break;
+             } else {
+ 
+-                err = m_stream->Read(&ZipHeader, ZipHeader_size, &ReadSize);
++                err = dirStream->Read(&ZipHeader, ZipHeader_size, &ReadSize);
+ 
+                 ZipHeader.byteOrderConv();
+                 if (err != LVERR_OK || ReadSize != ZipHeader_size) {
+@@ -2732,14 +3198,14 @@
+             lvsize_t fnameSizeToRead = (ZipHeader.NameLen < ZIPHDR_MAX_NM) ? ZipHeader.NameLen : ZIPHDR_MAX_NM;
+             lvoffset_t NM_skipped_sz = (ZipHeader.NameLen > ZIPHDR_MAX_NM) ? (lvoffset_t)(ZipHeader.NameLen - ZIPHDR_MAX_NM) : 0;
+             char fnbuf[ZIPHDR_MAX_NM + 1];
+-            err = m_stream->Read(fnbuf, fnameSizeToRead, &ReadSize);
++            err = dirStream->Read(fnbuf, fnameSizeToRead, &ReadSize);
+             if (err != LVERR_OK || ReadSize != fnameSizeToRead) {
+                 CRLog::error("error while reading zip entry name");
+                 return 0;
+             }
+             fnbuf[fnameSizeToRead] = 0;
+             if (NM_skipped_sz > 0) {
+-                if (m_stream->Seek(NM_skipped_sz, LVSEEK_CUR, NULL) != LVERR_OK) {
++                if (dirStream->Seek(NM_skipped_sz, LVSEEK_CUR, NULL) != LVERR_OK) {
+                     CRLog::error("error while skipping the long zip entry name");
+                     return 0;
+                 }
+@@ -2753,13 +3219,13 @@
+             lvsize_t extraSizeToRead = (ZipHeader.AddLen < ZIPHDR_MAX_XT) ? ZipHeader.AddLen : ZIPHDR_MAX_XT;
+             lvoffset_t XT_skipped_sz = (ZipHeader.AddLen > ZIPHDR_MAX_XT) ? (lvoffset_t)(ZipHeader.AddLen - ZIPHDR_MAX_XT) : 0;
+             lUInt8 extra[ZIPHDR_MAX_XT];
+-            err = m_stream->Read(extra, extraSizeToRead, &ReadSize);
++            err = dirStream->Read(extra, extraSizeToRead, &ReadSize);
+             if (err != LVERR_OK || ReadSize != extraSizeToRead) {
+                 CRLog::error("error while reading zip entry extra data");
+                 return 0;
+             }
+             if (XT_skipped_sz > 0) {
+-                if (m_stream->Seek(XT_skipped_sz, LVSEEK_CUR, NULL) != LVERR_OK) {
++                if (dirStream->Seek(XT_skipped_sz, LVSEEK_CUR, NULL) != LVERR_OK) {
+                     CRLog::error("error while skipping the long zip entry extra data");
+                     return 0;
+                 }
+@@ -2786,7 +3252,7 @@
+             if (truncated)
+                 SeekLen += ZipHeader.PackSize;
+ 
+-            NextOffset = (lvoffset_t)m_stream->GetPos();
++            NextOffset = (lvoffset_t)dirStream->GetPos();
+             NextOffset += SeekLen;
+             if (NextOffset >= (lvoffset_t)fileSize) {
+                 CRLog::error("invalid offset, stop to read contents.");
+@@ -3210,6 +3676,14 @@
+ 		if (mode==LVOM_APPEND)
+ 			m_pos = m_size;
+ 		return LVERR_OK;
++	}
++	/// reads from a buffer allocated with malloc(), that the stream frees when closed
++	lverror_t OpenOwned( lUInt8 * pBuf, lvsize_t size )
++	{
++		lverror_t res = Open( pBuf, size );
++		if ( res == LVERR_OK )
++			m_own_buffer = true;
++		return res;
+ 	}
+ 	lverror_t Open( lUInt8 * pBuf, lvsize_t size )
+ 	{
+@@ -3272,6 +3746,16 @@
+     return LVCreateStringStream( UnicodeToUtf8( data ) );
+ }
+ 
++#if CR_BACKGROUND_UNZIP == 1
++/// read-only stream of a buffer allocated with malloc(), which the stream frees
++static LVStreamRef LVCreateOwnedMemoryStream( lUInt8 * buf, lvsize_t size )
++{
++    LVMemoryStream * stream = new LVMemoryStream();
++    stream->OpenOwned( buf, size );
++    return LVStreamRef( stream );
++}
++#endif
++
+ LVStreamRef LVCreateMemoryStream( void * buf, int bufSize, bool createCopy, lvopen_mode_t mode )
+ {
+     LVMemoryStream * stream = new LVMemoryStream();
+@@ -4238,24 +4722,23 @@
+             if (offset > size || offset < 0 || (int)len > size || offset + (int)len > size) {
+                 CRLog::error("Unaligned access to block %x", (int)block_start);
+             }
+-            for (unsigned i = 0; i < len; i++ ) {
+-                lUInt8 ch1 = buf[offset+i];
+-                if ( pos+i>block_end || ch1!=ptr[i] ) {
+-                    buf[offset+i] = ptr[i];
+-                    if ( modified_start==(lvpos_t)-1 ) {
+-                        modified_start = pos + i;
+-                        modified_end = modified_start + 1;
+-                    } else {
+-                        if ( modified_start>pos+i )
+-                            modified_start = pos+i;
+-                        if ( modified_end<pos+i+1)
+-                            modified_end = pos+i+1;
+-                        if ( block_end<pos+i+1)
+-                            block_end = pos+i+1;
+-                    }
+-                }
++            if ( !len )
++                return;
++            // The whole range is marked as modified, even bytes that are already the same:
++            // they are rewritten with the same values, which leaves the file the same, and
++            // comparing each byte to skip them cost a tenth of writing a cache file.
++            memcpy( buf + offset, ptr, len );
++            if ( modified_start==(lvpos_t)-1 ) {
++                modified_start = pos;
++                modified_end = pos + len;
++            } else {
++                if ( modified_start>pos )
++                    modified_start = pos;
++                if ( modified_end<pos+len )
++                    modified_end = pos+len;
+             }
+-
++            if ( block_end<pos+len )
++                block_end = pos+len;
+         }
+ 
+         bool containsPos( lvpos_t pos )
+--- a/crengine/src/lvstring.cpp
++++ b/crengine/src/lvstring.cpp
+@@ -1296,7 +1296,9 @@
+ {
+     if ( count + space > size )
+     {
+-        size = count + space + 64;
++        // Grow by a quarter (at least 64): growing by 64 only made adding n strings cost
++        // n*n/64 copies, which showed in large books' attribute value tables
++        size = count + space + 64 + count / 4;
+         chunks = cr_realloc( chunks, size );
+     }
+ }
+@@ -1757,9 +1759,12 @@
+     }
+     else
+     {
+-        size_type len = _lStr_nlen(str, count);
++        // (What _lStr_nlen() and _lStr_ncpy() would do: up to the first 0, at most count)
++        const value_type * zero = (const value_type *)memchr(str, 0, count);
++        size_type len = zero ? (size_type)(zero - str) : count;
+         alloc(len);
+-        _lStr_ncpy( pchunk->buf8, str, len );
++        memcpy( pchunk->buf8, str, len );
++        pchunk->buf8[len] = 0;
+         pchunk->len = len;
+     }
+ }
+@@ -3051,11 +3056,59 @@
+ {
+     int count = 0;
+     lUInt32 ch;
++    // Most text is ASCII, a byte a char: check 4 chars at a time
++    while ( len >= 4 && (str[0] | str[1] | str[2] | str[3]) < 0x80 ) {
++        count += 4;
++        str += 4;
++        len -= 4;
++        if ( len < 4 )
++            break;
++    }
+     while ((len--) > 0) {
+         ch = *str++;
+         count += charUtf8ByteCount(ch);
+     }
+     return count;
++}
++
++/// UTF-8 encodes count chars into buf (Utf8ByteCount(s, count) bytes), returns its end
++static lChar8 * EncodeUtf8(const lChar32 * s, int count, lChar8 * buf)
++{
++    const lChar32 * end = s + count;
++    while ( s < end ) {
++        // ASCII runs, 4 chars at a time
++        while ( s + 4 <= end && (s[0] | s[1] | s[2] | s[3]) < 0x80 ) {
++            buf[0] = (lChar8)s[0];
++            buf[1] = (lChar8)s[1];
++            buf[2] = (lChar8)s[2];
++            buf[3] = (lChar8)s[3];
++            buf += 4;
++            s += 4;
++        }
++        if ( s >= end )
++            break;
++        lUInt32 ch = *s++;
++        if (!(ch & ~0x7F)) {
++            *buf++ = ( (lUInt8)ch );
++        } else if (!(ch & ~0x7FF)) {
++            *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x1F) | 0xC0 ) );
++            *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
++        } else if (!(ch & ~0xFFFF)) {
++            *buf++ = ( (lUInt8) ( ((ch >> 12) & 0x0F) | 0xE0 ) );
++            *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x3F) | 0x80 ) );
++            *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
++        } else if (!(ch & ~0x1FFFFF)) {
++            *buf++ = ( (lUInt8) ( ((ch >> 18) & 0x07) | 0xF0 ) );
++            *buf++ = ( (lUInt8) ( ((ch >> 12) & 0x3F) | 0x80 ) );
++            *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x3F) | 0x80 ) );
++            *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
++        } else {
++            // invalid codepoint
++            // In Unicode Standard codepoint must be in range U+0000 .. U+10FFFF
++            *buf++ = '?';
++        }
++    }
++    return buf;
+ }
+ 
+ lString32 Utf8ToUnicode( const lString8 & str )
+@@ -3111,6 +3164,19 @@
+         if ( (ch & 0x80) == 0 ) {
+             *p++ = (char)ch;
+             s++;
++            // Most text is plain ASCII: go on 4 bytes at a time while they all are
++            while ( p + 4 <= endp && s + 4 <= ends ) {
++                lUInt32 w;
++                memcpy( &w, s, 4 );
++                if ( w & 0x80808080 )
++                    break;
++                p[0] = s[0];
++                p[1] = s[1];
++                p[2] = s[2];
++                p[3] = s[3];
++                p += 4;
++                s += 4;
++            }
+             continue;
+         } else if ( (ch & 0xE0) == 0xC0 ) {
+             if (s + 2 > ends)
+@@ -3221,31 +3287,7 @@
+       return lString8::empty_str;
+     dst.append( len, ' ' );
+     lChar8 * buf = dst.modify();
+-    {
+-        lUInt32 ch;
+-        while ((count--) > 0) {
+-            ch = *s++;
+-            if (!(ch & ~0x7F)) {
+-                *buf++ = ( (lUInt8)ch );
+-            } else if (!(ch & ~0x7FF)) {
+-                *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x1F) | 0xC0 ) );
+-                *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
+-            } else if (!(ch & ~0xFFFF)) {
+-                *buf++ = ( (lUInt8) ( ((ch >> 12) & 0x0F) | 0xE0 ) );
+-                *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x3F) | 0x80 ) );
+-                *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
+-            } else if (!(ch & ~0x1FFFFF)) {
+-                *buf++ = ( (lUInt8) ( ((ch >> 18) & 0x07) | 0xF0 ) );
+-                *buf++ = ( (lUInt8) ( ((ch >> 12) & 0x3F) | 0x80 ) );
+-                *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x3F) | 0x80 ) );
+-                *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
+-            } else {
+-                // invalid codepoint
+-                // In Unicode Standard codepoint must be in range U+0000 .. U+10FFFF
+-                *buf++ = '?';
+-            }
+-        }
+-    }
++    EncodeUtf8(s, count, buf);
+     return dst;
+ }
+ 
+@@ -5611,6 +5653,19 @@
+ {
+ 	if ( check(2) )
+ 		return *this;
++	if ( _autoresize ) {
++		// The same bytes as below, encoded right into the buffer (growing as needed,
++		// which can't fail when auto-resizing)
++		lUInt32 len = (lUInt32)Utf8ByteCount(s.c_str(), s.length());
++		(*this) << len;
++		if ( len ) {
++			if ( check(len) )
++				return *this;
++			EncodeUtf8(s.c_str(), s.length(), (lChar8 *)_buf + _pos);
++			_pos += len;
++		}
++		return *this;
++	}
+ 	lString8 s8 = UnicodeToUtf8(s);
+ 	lUInt32 len = (lUInt32)s8.length();
+ 	(*this) << len;
+@@ -5627,6 +5682,16 @@
+ 		return *this;
+ 	lUInt32 len = (lUInt32)s8.length();
+ 	(*this) << len;
++	if ( _autoresize ) {
++		// The same bytes as below, at once
++		if ( len ) {
++			if ( check(len) )
++				return *this;
++			memcpy(_buf + _pos, s8.c_str(), len);
++			_pos += len;
++		}
++		return *this;
++	}
+ 	for ( unsigned i=0; i<len; i++ ) {
+ 		if ( check(1) )
+ 			return *this;
+--- a/crengine/src/lvstsheet.cpp
++++ b/crengine/src/lvstsheet.cpp
+@@ -6560,7 +6560,7 @@
+             return false;
+         }
+     }
+-    else if ( _id==0 && node->isBoxingNode() ) {
++    else if ( _id==0 && nodeId >= EL_BOXING_START && nodeId <= EL_BOXING_END ) { // node->isBoxingNode()
+         // Don't apply "... *" or '.classname' selectors to boxing nodes
+         // (but let those with our internal element names ("... autoBoxing") be applied)
+         return false;
+--- a/crengine/src/lvtinydom.cpp
++++ b/crengine/src/lvtinydom.cpp
+@@ -237,6 +237,20 @@
+ 
+ #define PACK_BUF_SIZE 0x10000
+ #define UNPACK_BUF_SIZE 0x40000
++#endif
++
++// When saving the document's storage chunks to the cache file, compress them in a second
++// thread while this one writes them (see CacheBlockPacker): compressing is most of the time
++// a first cache file write takes, and e-readers have a second core sitting idle.
++#ifndef CR_BACKGROUND_CACHE_PACKING
++#if (USE_ZSTD == 1) && (defined(__linux__) || defined(__APPLE__) || defined(__ANDROID__))
++#define CR_BACKGROUND_CACHE_PACKING 1
++#else
++#define CR_BACKGROUND_CACHE_PACKING 0
++#endif
++#endif
++#if CR_BACKGROUND_CACHE_PACKING == 1
++#include <pthread.h>
+ #endif
+ #include <xxhash.h>
+ #include <lvtextfm.h>
+@@ -558,6 +572,16 @@
+             memset((void*)&_indexBlock, 0, sizeof(CacheFileItem));
+         _fsize = fsize;
+     }
++};
++
++/// A block hashed and compressed ahead of its writing (see CacheBlockPacker)
++struct CachePackedBlock {
++    const lUInt8 * buf;   // the data to write
++    int size;
++    lUInt32 hash;         // calcHash() of the data
++    lUInt8 * packed;      // the data compressed, NULL if compressing failed
++    lUInt32 packedSize;
++    lUInt32 packedHash;   // calcHash() of the compressed data
+ };
+ 
+ /**
+@@ -607,6 +631,8 @@
+     bool readIndex();
+     // reads all blocks of index and checks CRCs
+     bool validateContents();
++    // writes block to file, using the hash and compressed data of 'prepared' if given
++    bool write( lUInt16 type, lUInt16 dataIndex, const lUInt8 * buf, int size, bool compress, const CachePackedBlock * prepared );
+ public:
+     // return current file size
+     int getSize() { return _size; }
+@@ -624,6 +650,12 @@
+     bool create( LVStreamRef stream );
+     /// writes block to file
+     bool write( lUInt16 type, lUInt16 dataIndex, const lUInt8 * buf, int size, bool compress );
++    /// writes block to file, from data already hashed and compressed by a CacheBlockPacker
++    /// (the block keeps its compressed data, for its owner to free)
++    bool write( lUInt16 type, lUInt16 dataIndex, const CachePackedBlock & block, bool compress )
++    {
++        return write( type, dataIndex, block.buf, block.size, compress, &block );
++    }
+     /// reads and allocates block in memory
+     bool read( lUInt16 type, lUInt16 dataIndex, lUInt8 * &buf, int &size );
+     /// reads and validates block
+@@ -653,6 +685,8 @@
+ #endif
+     /// pack data from buf to dstbuf
+     bool ldomPack( const lUInt8 * buf, size_t bufsize, lUInt8 * &dstbuf, lUInt32 & dstsize );
++    /// hashes and compresses block.buf, as write() would, for a later write() of the block
++    void packBlock( CachePackedBlock & block );
+     /// unpack data from compbuf to dstbuf
+     bool ldomUnpack( const lUInt8 * compbuf, size_t compsize, lUInt8 * &dstbuf, lUInt32 & dstsize );
+ 
+@@ -1092,9 +1126,16 @@
+ 
+ // writes block to file
+ bool CacheFile::write( lUInt16 type, lUInt16 dataIndex, const lUInt8 * buf, int size, bool compress )
++{
++    return write( type, dataIndex, buf, size, compress, NULL );
++}
++
++// writes block to file, using the hash and compressed data of 'prepared' if given (they are
++// what this would compute, done earlier in another thread), which stay owned by the caller
++bool CacheFile::write( lUInt16 type, lUInt16 dataIndex, const lUInt8 * buf, int size, bool compress, const CachePackedBlock * prepared )
+ {
+     // check whether data is changed
+-    lUInt32 newhash = calcHash( buf, size );
++    lUInt32 newhash = prepared ? prepared->hash : calcHash( buf, size );
+     CacheFileItem * existingblock = findBlock( type, dataIndex );
+ 
+     if (existingblock) {
+@@ -1115,12 +1156,23 @@
+     lUInt64 newpackedhash = newhash;
+     if (!_compressCachedData)
+         compress = false;
++    lUInt8 * packedToFree = NULL; // compressed data made here, to free when done
+     if ( compress ) {
+         lUInt8 * dstbuf = NULL;
+         lUInt32 dstsize = 0;
+-        if ( !ldomPack( buf, size, dstbuf, dstsize ) ) {
++        if ( prepared ) {
++            if ( !prepared->packed ) {
++                compress = false;
++            } else {
++                uncompressedSize = size;
++                size = prepared->packedSize;
++                buf = prepared->packed;
++                newpackedhash = prepared->packedHash;
++            }
++        } else if ( !ldomPack( buf, size, dstbuf, dstsize ) ) {
+             compress = false;
+         } else {
++            packedToFree = dstbuf;
+             uncompressedSize = size;
+             size = dstsize;
+             buf = dstbuf;
+@@ -1143,20 +1195,12 @@
+     }
+     if ( !block )
+     {
+-#if DOC_DATA_COMPRESSION_LEVEL!=0
+-        if ( compress ) {
+-            free( (void*)buf );
+-        }
+-#endif
++        free( packedToFree );
+         return false;
+     }
+     if ( (int)_stream->SetPos( block->_blockFilePos )!=block->_blockFilePos )
+     {
+-#if DOC_DATA_COMPRESSION_LEVEL!=0
+-        if ( compress ) {
+-            free( (void*)buf );
+-        }
+-#endif
++        free( packedToFree );
+         return false;
+     }
+     // assert: size == block->_dataSize
+@@ -1166,11 +1210,7 @@
+     _stream->Write(buf, size, &bytesWritten );
+     if ( (int)bytesWritten!=size )
+     {
+-#if DOC_DATA_COMPRESSION_LEVEL!=0
+-        if ( compress ) {
+-            free( (void*)buf );
+-        }
+-#endif
++        free( packedToFree );
+         return false;
+     }
+ #if CACHE_FILE_WRITE_BLOCK_PADDING==1
+@@ -1198,9 +1238,7 @@
+     block->_packedHash = newpackedhash;
+     block->_uncompressedSize = uncompressedSize;
+ 
+-    if ( compress ) {
+-        free( (void*)buf );
+-    }
++    free( packedToFree );
+     _indexChanged = true;
+ 
+     //CRLog::error("CacheFile::write: block %d:%d (pos %ds, size %ds) is written (crc=%08x)", type, dataIndex, (int)block->_blockFilePos/_sectorSize, (int)(size+_sectorSize-1)/_sectorSize, block->_dataCRC);
+@@ -1208,6 +1246,22 @@
+     return true;
+ }
+ 
++// hashes and compresses block.buf, as write() would
++void CacheFile::packBlock( CachePackedBlock & block )
++{
++    block.hash = calcHash( block.buf, block.size );
++    block.packed = NULL;
++    block.packedSize = 0;
++    block.packedHash = 0;
++    lUInt8 * dstbuf = NULL;
++    lUInt32 dstsize = 0;
++    if ( ldomPack( block.buf, block.size, dstbuf, dstsize ) ) {
++        block.packed = dstbuf;
++        block.packedSize = dstsize;
++        block.packedHash = calcHash( dstbuf, dstsize );
++    }
++}
++
+ /// writes content of serial buffer
+ bool CacheFile::write( lUInt16 type, lUInt16 index, SerialBuf & buf, bool compress )
+ {
+@@ -1297,45 +1351,56 @@
+ }
+ 
+ #if (USE_ZSTD == 1)
+-bool CacheFile::allocCompRess(void)
++/// sets up compression resources (also used by CacheBlockPacker, for its own)
++static bool initCompRess( zstd_comp_ress_t * ress )
+ {
+-    // printf("CacheFile::allocCompRess\n");
+-    _comp_ress = new zstd_comp_ress_t;
+-    _comp_ress->buffOut = nullptr;
+-    _comp_ress->cctx = nullptr;
++    ress->buffOut = nullptr;
++    ress->cctx = nullptr;
+ 
+-    _comp_ress->buffOutSize = ZSTD_CStreamOutSize();
+-    _comp_ress->buffOut = malloc(_comp_ress->buffOutSize);
+-    if (!_comp_ress->buffOut) {
++    ress->buffOutSize = ZSTD_CStreamOutSize();
++    ress->buffOut = malloc(ress->buffOutSize);
++    if (!ress->buffOut) {
+         return false;
+     }
+-    _comp_ress->cctx = ZSTD_createCCtx();
+-    if (_comp_ress->cctx == nullptr) {
++    ress->cctx = ZSTD_createCCtx();
++    if (ress->cctx == nullptr) {
+         return false;
+     }
+ 
+     // Parameters are sticky
+     // NOTE: ZSTD_CLEVEL_DEFAULT is currently 3, sane range is 1-19
+-    ZSTD_CCtx_setParameter(_comp_ress->cctx, ZSTD_c_compressionLevel, ZSTD_CLEVEL_DEFAULT);
++    ZSTD_CCtx_setParameter(ress->cctx, ZSTD_c_compressionLevel, ZSTD_CLEVEL_DEFAULT);
+     // This would be redundant with CRe's own calcHash, AFAICT?
+-    //ZSTD_CCtx_setParameter(_comp_ress->cctx, ZSTD_c_checksumFlag, 1);
++    //ZSTD_CCtx_setParameter(ress->cctx, ZSTD_c_checksumFlag, 1);
+ 
+     // Threading? (Requires libzstd built w/ threading support)
+     // NOTE: Since we always use ZSTD_e_end, which basically defers to ZSTD_compress2(), this will *not* make it async,
+     //       it'll still block.
+-    //ZSTD_CCtx_setParameter(_comp_ress->cctx, ZSTD_c_nbWorkers, 4);
++    //ZSTD_CCtx_setParameter(ress->cctx, ZSTD_c_nbWorkers, 4);
+ 
+     return true;
+ }
+ 
++static void releaseCompRess( zstd_comp_ress_t * ress )
++{
++    ZSTD_freeCCtx(ress->cctx);
++    ress->cctx = nullptr;
++    free(ress->buffOut);
++    ress->buffOut = nullptr;
++}
++
++bool CacheFile::allocCompRess(void)
++{
++    // printf("CacheFile::allocCompRess\n");
++    _comp_ress = new zstd_comp_ress_t;
++    return initCompRess(_comp_ress);
++}
++
+ bool CacheFile::freeCompRess(void)
+ {
+     // printf("CacheFile::freeCompRess\n");
+     if (_comp_ress) {
+-        ZSTD_freeCCtx(_comp_ress->cctx);
+-        _comp_ress->cctx = nullptr;
+-        free(_comp_ress->buffOut);
+-        _comp_ress->buffOut = nullptr;
++        releaseCompRess(_comp_ress);
+         delete _comp_ress;
+         _comp_ress = nullptr;
+ 
+@@ -1345,24 +1410,13 @@
+     return false;
+ }
+ 
+-/// pack data from buf to dstbuf
+-bool CacheFile::ldomPack( const lUInt8 * buf, size_t bufsize, lUInt8 * &dstbuf, lUInt32 & dstsize )
++/// compresses buf into a new zstd frame (one per block, as cache files always had),
++/// with a context set up by CacheFile::allocCompRess() or CacheBlockPacker
++static bool zstdPackBlock( ZSTD_CCtx * cctx, void * buffOut, size_t buffOutSize,
++                           const lUInt8 * buf, size_t bufsize, lUInt8 * &dstbuf, lUInt32 & dstsize )
+ {
+-    // printf("ldomPack() <- %p (%zu)\n", buf, bufsize);
+-
+-    // Lazy init our ressources, and keep 'em around
+-    if (!_comp_ress) {
+-        if(!allocCompRess()) {
+-            CRLog::error("ldomPack() failed to allocate ressources");
+-            return false;
+-        }
+-    }
+-
+     // c.f., ZSTD's examples/streaming_compression.c
+     // NOTE: We could probably gain much by training zstd and using a dictionary, here ;).
+-    size_t const buffOutSize = _comp_ress->buffOutSize;
+-    void*  const buffOut = _comp_ress->buffOut;
+-    ZSTD_CCtx* const cctx = _comp_ress->cctx;
+ 
+     // Reset the context
+     size_t const err = ZSTD_CCtx_reset(cctx, ZSTD_reset_session_only);
+@@ -1382,6 +1436,31 @@
+ 
+     ZSTD_EndDirective const mode = ZSTD_e_end;
+     ZSTD_inBuffer input = { buf, bufsize, 0 };
++    size_t const bound = ZSTD_compressBound(bufsize);
++    if ( bound <= buffOutSize ) {
++        // With room for the worst case, zstd compresses in a single pass straight into the
++        // output buffer (giving the same data it gives in buffOut): use the final buffer as
++        // output, rather than buffOut and a copy.
++        compressed_buf = (lUInt8 *)malloc(bound);
++        if (!compressed_buf)
++            return false;
++        ZSTD_outBuffer output = { compressed_buf, bound, 0 };
++        size_t const remaining = ZSTD_compressStream2(cctx, &output, &input, mode);
++        if (ZSTD_isError(remaining) || remaining != 0) {
++            CRLog::error("ZSTD_compressStream2() error: %s (%zu -> %zu)", ZSTD_isError(remaining) ? ZSTD_getErrorName(remaining) : "unfinished", bufsize, output.pos);
++            free(compressed_buf);
++            return false;
++        }
++        compressed_size = output.pos;
++        // Shrinking a block keeps it in place
++        lUInt8 * shrunk = (lUInt8 *)realloc(compressed_buf, compressed_size > 0 ? compressed_size : 1);
++        if (shrunk)
++            compressed_buf = shrunk;
++        dstsize = compressed_size;
++        dstbuf = compressed_buf;
++        return true;
++    }
++
+     int finished = 0;
+     do {
+         ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
+@@ -1408,6 +1487,39 @@
+     return true;
+ }
+ 
++/// pack data from buf to dstbuf
++bool CacheFile::ldomPack( const lUInt8 * buf, size_t bufsize, lUInt8 * &dstbuf, lUInt32 & dstsize )
++{
++    // printf("ldomPack() <- %p (%zu)\n", buf, bufsize);
++
++    // Lazy init our ressources, and keep 'em around
++    if (!_comp_ress) {
++        if(!allocCompRess()) {
++            CRLog::error("ldomPack() failed to allocate ressources");
++            return false;
++        }
++    }
++    return zstdPackBlock(_comp_ress->cctx, _comp_ress->buffOut, _comp_ress->buffOutSize, buf, bufsize, dstbuf, dstsize);
++}
++
++#if CR_BACKGROUND_CACHE_PACKING == 1
++/// hashes and compresses a block as CacheFile::write() does, with the given resources
++static void packBlockWith( zstd_comp_ress_t * ress, CachePackedBlock & block )
++{
++    block.hash = calcHash( block.buf, block.size );
++    block.packed = NULL;
++    block.packedSize = 0;
++    block.packedHash = 0;
++    lUInt8 * dstbuf = NULL;
++    lUInt32 dstsize = 0;
++    if ( zstdPackBlock( ress->cctx, ress->buffOut, ress->buffOutSize, block.buf, block.size, dstbuf, dstsize ) ) {
++        block.packed = dstbuf;
++        block.packedSize = dstsize;
++        block.packedHash = calcHash( dstbuf, dstsize );
++    }
++}
++#endif
++
+ bool CacheFile::allocDecompRess(void)
+ {
+     // printf("CacheFile::allocDecompRess\n");
+@@ -2764,26 +2876,32 @@
+             sz = nodecount - offs;
+         }
+         ldomNode buf[sz];
+-        memcpy(buf, list[i], sizeof(buf));
+-        for (int j = 0; j < sz; j++) {
+-            buf[j].setDocumentIndex(0);
+-            // On 64bits builds, this serialized ldomNode may have some
+-            // random data at the end, for being:
+-            //   union { [...] tinyElement * _elem_ptr; [...] lUInt32 _ptext_addr; [...] lUInt32 _nextFreeIndex }
+-            // To get "reproducible" cache files with a same file checksum, we'd
+-            // rather have the remains of the _elem_ptr sets to 0
+-#if __SIZEOF_POINTER__ == 8 // 64-bit
+-            lUInt32 tmp = buf[j]._data._nextFreeIndex; // save 32bits part
+-            buf[j]._data._elem_ptr = 0;                // clear 64bits area
+-            buf[j]._data._nextFreeIndex = tmp;         // restore 32bits part
+-#endif
+-        }
++        prepareNodeDataPart(buf, list[i], sz);
+         if (!_cacheFile->write(type, i, (lUInt8*)buf, sizeof(buf), COMPRESS_NODE_DATA))
+             crFatalError(-1, "Cannot write node data");
+     }
+     return true;
+ }
+ 
++void tinyNodeCollection::prepareNodeDataPart( void * dst, const void * src, int count )
++{
++    ldomNode * buf = (ldomNode *)dst;
++    memcpy(buf, src, sizeof(ldomNode) * count);
++    for (int j = 0; j < count; j++) {
++        buf[j].setDocumentIndex(0);
++        // On 64bits builds, this serialized ldomNode may have some
++        // random data at the end, for being:
++        //   union { [...] tinyElement * _elem_ptr; [...] lUInt32 _ptext_addr; [...] lUInt32 _nextFreeIndex }
++        // To get "reproducible" cache files with a same file checksum, we'd
++        // rather have the remains of the _elem_ptr sets to 0
++#if __SIZEOF_POINTER__ == 8 // 64-bit
++        lUInt32 tmp = buf[j]._data._nextFreeIndex; // save 32bits part
++        buf[j]._data._elem_ptr = 0;                // clear 64bits area
++        buf[j]._data._nextFreeIndex = tmp;         // restore 32bits part
++#endif
++    }
++}
++
+ #define NODE_INDEX_MAGIC 0x19283746
+ bool tinyNodeCollection::saveNodeData()
+ {
+@@ -3029,7 +3147,193 @@
+ 
+ 
+  */
++
++
++#if CR_BACKGROUND_CACHE_PACKING == 1
++/// Hashes and compresses the blocks a save is about to write, as CacheFile::write() would,
++/// in a second thread as well as in the writing one: the writer takes the blocks in order,
++/// compressing itself the next one if the other thread hasn't started it (or another one
++/// while waiting for it), while the other thread compresses the ones after it. Both use the
++/// same zstd settings, so the blocks and the cache file are the same as without it.
++/// The blocks' data must not change while the packer exists.
++class CacheBlockPacker
++{
++    enum { WAITING, PACKING, PACKED };
++    /// how many blocks past the one being written may be compressed ahead, which bounds
++    /// the memory held to that many compressed blocks
++    static const int MAX_AHEAD = 8;
++public:
++    /// makes a block's data: copies count items of src into dst
++    typedef void (*PrepareFunc)( void * dst, const void * src, int count );
++private:
++    struct Item {
++        CachePackedBlock block;
++        int state;
++        // For a block made when compressed (by either thread), into a buffer of its own
++        PrepareFunc prepare;
++        const void * src;
++        int count;
++        lUInt8 * made;
++    };
++    /// makes the block's data if it is to be made (by the thread that is to compress it)
++    static void prepare( Item & item )
++    {
++        if ( item.prepare && !item.made ) {
++            item.made = (lUInt8 *)malloc( item.block.size > 0 ? item.block.size : 1 );
++            if ( item.made )
++                item.prepare( item.made, item.src, item.count );
++            item.block.buf = item.made;
++        }
++    }
++    LVArray<Item> _items;
++    int _taken;          // blocks handed to the writer
++    bool _stop;
++    bool _threadStarted;
++    pthread_t _thread;
++    pthread_mutex_t _mutex;
++    pthread_cond_t _cond;
++    zstd_comp_ress_t _ress; // the other thread's compression resources
+ 
++    /// first block waiting that may be compressed now, or -1 (call with the mutex held)
++    int nextToPack()
++    {
++        int end = _taken + MAX_AHEAD;
++        if ( end > _items.length() )
++            end = _items.length();
++        for ( int i = _taken; i < end; i++ ) {
++            if ( _items[i].state == WAITING )
++                return i;
++        }
++        return -1;
++    }
++    void run()
++    {
++        pthread_mutex_lock( &_mutex );
++        while ( !_stop ) {
++            int i = nextToPack();
++            if ( i < 0 ) {
++                pthread_cond_wait( &_cond, &_mutex );
++                continue;
++            }
++            _items[i].state = PACKING;
++            pthread_mutex_unlock( &_mutex );
++            prepare( _items[i] );
++            if ( _items[i].block.buf )
++                packBlockWith( &_ress, _items[i].block );
++            pthread_mutex_lock( &_mutex );
++            _items[i].state = PACKED;
++            pthread_cond_broadcast( &_cond );
++        }
++        pthread_mutex_unlock( &_mutex );
++    }
++    static void * threadMain( void * arg )
++    {
++        ((CacheBlockPacker *)arg)->run();
++        return NULL;
++    }
++public:
++    CacheBlockPacker() : _taken(0), _stop(false), _threadStarted(false)
++    {
++        pthread_mutex_init( &_mutex, NULL );
++        pthread_cond_init( &_cond, NULL );
++        _ress.buffOut = nullptr;
++        _ress.cctx = nullptr;
++    }
++    ~CacheBlockPacker()
++    {
++        if ( _threadStarted ) {
++            pthread_mutex_lock( &_mutex );
++            _stop = true;
++            pthread_cond_broadcast( &_cond );
++            pthread_mutex_unlock( &_mutex );
++            pthread_join( _thread, NULL );
++        }
++        for ( int i = 0; i < _items.length(); i++ ) {
++            free( _items[i].block.packed );
++            free( _items[i].made );
++        }
++        releaseCompRess( &_ress );
++        pthread_cond_destroy( &_cond );
++        pthread_mutex_destroy( &_mutex );
++    }
++    /// adds a block to write (all must be added before start())
++    void add( const lUInt8 * buf, int size )
++    {
++        Item item;
++        item.block.buf = buf;
++        item.block.size = size;
++        item.block.hash = 0;
++        item.block.packed = NULL;
++        item.block.packedSize = 0;
++        item.block.packedHash = 0;
++        item.state = WAITING;
++        item.prepare = NULL;
++        item.src = NULL;
++        item.count = 0;
++        item.made = NULL;
++        _items.add( item );
++    }
++    /// adds a block to write, of size bytes made by prepare() when about to be compressed
++    void add( int size, PrepareFunc prepareFunc, const void * src, int count )
++    {
++        add( NULL, size );
++        Item & item = _items[_items.length() - 1];
++        item.prepare = prepareFunc;
++        item.src = src;
++        item.count = count;
++    }
++    /// starts the other thread; without it (if it can't be started), the writer does all
++    void start()
++    {
++        if ( _items.length() < 2 )
++            return;
++        if ( !initCompRess( &_ress ) )
++            return;
++        _threadStarted = pthread_create( &_thread, NULL, threadMain, this ) == 0;
++    }
++    /// the next block (in the order they were added) hashed and compressed, compressing
++    /// with the cache file's own resources what this thread does; the previous block's
++    /// compressed data is freed, as the writer is done with it
++    const CachePackedBlock & next( CacheFile * cache )
++    {
++        int i = _taken;
++        if ( i > 0 ) {
++            free( _items[i-1].block.packed );
++            _items[i-1].block.packed = NULL;
++            free( _items[i-1].made );
++            _items[i-1].made = NULL;
++        }
++        pthread_mutex_lock( &_mutex );
++        for (;;) {
++            int j = -1;
++            if ( _items[i].state == PACKED )
++                break;
++            if ( _items[i].state == WAITING )
++                j = i;
++            else
++                j = nextToPack(); // the other thread is on it: do another one meanwhile
++            if ( j < 0 ) {
++                pthread_cond_wait( &_cond, &_mutex );
++                continue;
++            }
++            _items[j].state = PACKING;
++            pthread_mutex_unlock( &_mutex );
++            prepare( _items[j] );
++            if ( _items[j].block.buf )
++                cache->packBlock( _items[j].block );
++            pthread_mutex_lock( &_mutex );
++            _items[j].state = PACKED;
++            pthread_cond_broadcast( &_cond );
++        }
++        _taken = i + 1;
++        pthread_cond_broadcast( &_cond ); // more may be compressed ahead now
++        pthread_mutex_unlock( &_mutex );
++        if ( !_items[i].block.buf )
++            crFatalError(-1, "Cannot allocate memory for cache block"); // (making it failed)
++        return _items[i].block;
++    }
++};
++#endif
+ 
+ /// saves all unsaved chunks to cache file
+ bool ldomDataStorageManager::save( CRTimerUtil & maxTime )
+@@ -3038,17 +3342,56 @@
+ #if BUILD_LITE!=1
+     if ( !_cache )
+         return true;
++#if CR_BACKGROUND_CACHE_PACKING == 1
++    // Have the chunks to write compressed ahead, by this thread and another one
++    CacheBlockPacker * packer = NULL;
++    if ( _compressCachedData && COMPRESS_NODE_STORAGE_DATA ) {
++        int unsaved = 0;
++        for ( int i=0; i<_chunks.length(); i++ ) {
++            if ( _chunks[i]->_buf && !_chunks[i]->_saved )
++                unsaved++;
++        }
++        if ( unsaved > 1 ) {
++            packer = new CacheBlockPacker();
++            for ( int i=0; i<_chunks.length(); i++ ) {
++                if ( _chunks[i]->_buf && !_chunks[i]->_saved )
++                    packer->add( _chunks[i]->_buf, _chunks[i]->_bufpos );
++            }
++            packer->start();
++        }
++    }
++#endif
+     for ( int i=0; i<_chunks.length(); i++ ) {
++#if CR_BACKGROUND_CACHE_PACKING == 1
++        ldomTextStorageChunk * chunk = _chunks[i];
++        if ( packer && chunk->_buf && !chunk->_saved ) {
++            // What chunk->save() does, with the data compressed ahead
++            if ( !_cache->write( cacheType(), chunk->_index, packer->next( _cache ), COMPRESS_NODE_STORAGE_DATA ) ) {
++                CRLog::error("Error while swapping of chunk %c%d to cache file", _type, chunk->_index);
++                crFatalError(-1, "Error while swapping of chunk to cache file");
++                res = false;
++                break;
++            }
++            chunk->_saved = true;
++        } else
++#endif
+         if ( !_chunks[i]->save() ) {
+             res = false;
+             break;
+         }
+         //CRLog::trace("time elapsed: %d", (int)maxTime.elapsed());
+-        if (maxTime.expired())
++        if (maxTime.expired()) {
++#if CR_BACKGROUND_CACHE_PACKING == 1
++            delete packer;
++#endif
+             return res;
++        }
+ //        if ( (i&3)==3 &&  maxTime.expired() )
+ //            return res;
+     }
++#if CR_BACKGROUND_CACHE_PACKING == 1
++    delete packer;
++#endif
+     if (!maxTime.infinite())
+         _cache->flush(false, maxTime); // intermediate flush
+     if ( maxTime.expired() )
+@@ -3241,6 +3584,29 @@
+     return offset | (_activeChunk->getIndex()<<16);
+ }
+ 
++lUInt32 ldomDataStorageManager::allocText( lUInt32 dataIndex, lUInt32 parentIndex, const lChar32 * text, int len, int utf8len )
++{
++    // As allocText() above, with the text encoded right into its chunk
++    if ( !_activeChunk ) {
++        _activeChunk = new ldomTextStorageChunk(this, _chunks.length());
++        _chunks.add( _activeChunk );
++        getChunk( (_chunks.length()-1)<<16 );
++        compact( 0 );
++    }
++    int offset = _activeChunk->addText( dataIndex, parentIndex, text, len, utf8len );
++    if ( offset<0 ) {
++        // no space in current chunk, add one more chunk
++        _activeChunk = new ldomTextStorageChunk(this, _chunks.length());
++        _chunks.add( _activeChunk );
++        getChunk( (_chunks.length()-1)<<16 );
++        compact( 0 );
++        offset = _activeChunk->addText( dataIndex, parentIndex, text, len, utf8len );
++        if ( offset<0 )
++            crFatalError(1001, "Unexpected error while allocation of text");
++    }
++    return offset | (_activeChunk->getIndex()<<16);
++}
++
+ lUInt32 ldomDataStorageManager::allocElem( lUInt32 dataIndex, lUInt32 parentIndex, lUInt32 childCount, lUInt32 attrCount )
+ {
+     if ( !_activeChunk ) {
+@@ -3292,6 +3658,12 @@
+     return chunk->getText(address&0xFFFF);
+ }
+ 
++bool ldomDataStorageManager::getTextBytes( lUInt32 address, const lChar8 * & text, int & length )
++{
++    ldomTextStorageChunk * chunk = getChunk(address);
++    return chunk->getTextBytes(address&0xFFFF, text, length);
++}
++
+ /// get pointer to element data
+ ElementDataStorageItem * ldomDataStorageManager::getElem( lUInt32 addr )
+ {
+@@ -3517,6 +3889,114 @@
+     p->type = LXML_TEXT_NODE;
+     p->length = (lUInt16)text.length();
+     memcpy(p->text, text.c_str(), p->length);
++    int res = _bufpos >> 4;
++    _bufpos += itemsize;
++    return res;
++}
++
++/// Bytes a char takes in UTF-8 beyond the first one, as UnicodeToUtf8() encodes it (code
++/// points above 0x1FFFFF taking a single byte, for the '?' it puts instead)
++static inline int utf8ExtraBytes( lUInt32 ch )
++{
++    return (ch >= 0x80) + (ch >= 0x800) + (ch >= 0x10000) - 3 * (ch > 0x1FFFFF);
++}
++
++/// Byte length of text once UTF-8 encoded, as UnicodeToUtf8() encodes it
++static inline int utf8EncodedLength( const lChar32 * text, int len )
++{
++    int count = len;
++    const lChar32 * end = text + len;
++    // Most text is ASCII, taking a byte per char: check 4 chars at a time
++    for ( ; text + 4 <= end; text += 4 ) {
++        if ( (text[0] | text[1] | text[2] | text[3]) >= 0x80 )
++            count += utf8ExtraBytes(text[0]) + utf8ExtraBytes(text[1]) + utf8ExtraBytes(text[2]) + utf8ExtraBytes(text[3]);
++    }
++    for ( ; text < end; text++ )
++        count += utf8ExtraBytes(*text);
++    return count;
++}
++
++/// UTF-8 encodes text into buf, exactly as UnicodeToUtf8() does; returns the end
++static inline lChar8 * utf8Encode( const lChar32 * text, int len, lChar8 * buf )
++{
++    const lChar32 * end = text + len;
++    while ( text < end ) {
++        // ASCII runs, 4 chars at a time
++        while ( text + 4 <= end && (text[0] | text[1] | text[2] | text[3]) < 0x80 ) {
++            buf[0] = (lChar8)text[0];
++            buf[1] = (lChar8)text[1];
++            buf[2] = (lChar8)text[2];
++            buf[3] = (lChar8)text[3];
++            buf += 4;
++            text += 4;
++        }
++        if ( text >= end )
++            break;
++        lUInt32 ch = *text++;
++        if (!(ch & ~0x7F)) {
++            *buf++ = ( (lUInt8)ch );
++        } else if (!(ch & ~0x7FF)) {
++            *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x1F) | 0xC0 ) );
++            *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
++        } else if (!(ch & ~0xFFFF)) {
++            *buf++ = ( (lUInt8) ( ((ch >> 12) & 0x0F) | 0xE0 ) );
++            *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x3F) | 0x80 ) );
++            *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
++        } else if (!(ch & ~0x1FFFFF)) {
++            *buf++ = ( (lUInt8) ( ((ch >> 18) & 0x07) | 0xF0 ) );
++            *buf++ = ( (lUInt8) ( ((ch >> 12) & 0x3F) | 0x80 ) );
++            *buf++ = ( (lUInt8) ( ((ch >> 6) & 0x3F) | 0x80 ) );
++            *buf++ = ( (lUInt8) ( ((ch ) & 0x3F) | 0x80 ) );
++        } else {
++            // invalid codepoint
++            *buf++ = '?';
++        }
++    }
++    return buf;
++}
++
++/// adds text, as addText(dataIndex, parentIndex, UnicodeToUtf8(text, len)) does, without
++/// making that string: encoding it right into the buffer (utf8len: its encoded length,
++/// which must fit the item's 16 bits length, or -1 if not known yet, len being at most
++/// 0x3FFF then: it is set when known)
++int ldomTextStorageChunk::addText( lUInt32 dataIndex, lUInt32 parentIndex, const lChar32 * text, int len, int & utf8len )
++{
++    if ( utf8len < 0 ) {
++        // With room for the longest it could be (4 bytes a char), it goes here whatever
++        // its length: encode it right away, getting its length as we go
++        lUInt32 maxsize = (sizeof(TextDataStorageItem)+4*len-2 + 15) & 0xFFFFFFF0;
++        if ( _buf && _bufsize - _bufpos >= maxsize ) {
++            TextDataStorageItem * p = (TextDataStorageItem*)(_buf + _bufpos);
++            utf8len = (int)(utf8Encode(text, len, p->text) - p->text);
++            lUInt32 itemsize = (sizeof(TextDataStorageItem)+utf8len-2 + 15) & 0xFFFFFFF0;
++            p->sizeDiv16 = (lUInt16)(itemsize >> 4);
++            p->dataIndex = dataIndex;
++            p->parentIndex = parentIndex;
++            p->type = LXML_TEXT_NODE;
++            p->length = (lUInt16)utf8len;
++            int res = _bufpos >> 4;
++            _bufpos += itemsize;
++            return res;
++        }
++        utf8len = utf8EncodedLength(text, len);
++    }
++    lUInt32 itemsize = (sizeof(TextDataStorageItem)+utf8len-2 + 15) & 0xFFFFFFF0;
++    if ( !_buf ) {
++        // create new buffer, if necessary
++        _bufsize = _manager->_chunkSize > itemsize ? _manager->_chunkSize : itemsize;
++        _buf = (lUInt8*)calloc(_bufsize, sizeof(*_buf));
++        _bufpos = 0;
++        _manager->_uncompressedSize += _bufsize;
++    }
++    if ( _bufsize - _bufpos < itemsize )
++        return -1;
++    TextDataStorageItem * p = (TextDataStorageItem*)(_buf + _bufpos);
++    p->sizeDiv16 = (lUInt16)(itemsize >> 4);
++    p->dataIndex = dataIndex;
++    p->parentIndex = parentIndex;
++    p->type = LXML_TEXT_NODE;
++    p->length = (lUInt16)utf8len;
++    utf8Encode(text, len, p->text);
+     int res = _bufpos >> 4;
+     _bufpos += itemsize;
+     return res;
+@@ -3628,6 +4108,19 @@
+     }
+     return lString8::empty_str;
+ }
++
++/// the UTF-8 bytes of the text item at offset, as getText() would copy them
++bool ldomTextStorageChunk::getTextBytes( int offset, const lChar8 * & text, int & length )
++{
++    offset <<= 4;
++    if ( _buf && offset>=0 && offset<(int)_bufpos ) {
++        TextDataStorageItem * item = (TextDataStorageItem *)(_buf+offset);
++        text = item->text;
++        length = item->length;
++        return true;
++    }
++    return false;
++}
+ #endif
+ 
+ void ldomTextStorageChunk::setunpacked( const lUInt8 * buf, int bufsize )
+@@ -6752,14 +7245,12 @@
+     // (Note: did not check how floats inside <PRE> are supposed to work)
+     if ( !pre ) {
+         while ( firstNonEmpty<=endIndex && getChildNode(firstNonEmpty)->isText() ) {
+-            lString32 s = getChildNode(firstNonEmpty)->getText();
+-            if ( !IsEmptySpace(s.c_str(), s.length() ) )
++            if ( !getChildNode(firstNonEmpty)->isEmptySpaceText() )
+                 break;
+             firstNonEmpty++;
+         }
+         while ( lastNonEmpty>=endIndex && getChildNode(lastNonEmpty)->isText() ) {
+-            lString32 s = getChildNode(lastNonEmpty)->getText();
+-            if ( !IsEmptySpace(s.c_str(), s.length() ) )
++            if ( !getChildNode(lastNonEmpty)->isEmptySpaceText() )
+                 break;
+             lastNonEmpty--;
+         }
+@@ -6770,8 +7261,7 @@
+                 hasInline = true;
+                 if ( !hasNonEmptyInline ) {
+                     if (node->isText()) {
+-                        lString32 s = node->getText();
+-                        if ( !IsEmptySpace(s.c_str(), s.length() ) ) {
++                        if ( !node->isEmptySpaceText() ) {
+                             hasNonEmptyInline = true;
+                         }
+                     }
+@@ -6902,8 +7392,7 @@
+     for ( ; i>=0; i-- ) {
+         ldomNode * node = getChildNode(i);
+         if ( node->isText() ) {
+-            lString32 s = node->getText();
+-            if ( !IsEmptySpace(s.c_str(), s.length() ) ) {
++            if ( !node->isEmptySpaceText() ) {
+                 return false;
+             }
+         }
+@@ -6941,8 +7430,7 @@
+     // padding top/bottom (and height if check ENSURE_STYLE_HEIGHT)
+     // if these will introduce some content.
+     if ( isText() ) {
+-        lString32 s = getText();
+-        return !IsEmptySpace(s.c_str(), s.length() );
++        return !isEmptySpaceText();
+     }
+     if (getNodeId() == el_br) {
+         return true;
+@@ -7015,14 +7503,12 @@
+     int lastNonEmpty = endIndex;
+     if (!pre) {
+         while ( firstNonEmpty<=endIndex && getChildNode(firstNonEmpty)->isText() ) {
+-            lString32 s = getChildNode(firstNonEmpty)->getText();
+-            if ( !IsEmptySpace(s.c_str(), s.length() ) )
++            if ( !getChildNode(firstNonEmpty)->isEmptySpaceText() )
+                 break;
+             firstNonEmpty++;
+         }
+         while ( lastNonEmpty>=endIndex && getChildNode(lastNonEmpty)->isText() ) {
+-            lString32 s = getChildNode(lastNonEmpty)->getText();
+-            if ( !IsEmptySpace(s.c_str(), s.length() ) )
++            if ( !getChildNode(lastNonEmpty)->isEmptySpaceText() )
+                 break;
+             lastNonEmpty--;
+         }
+@@ -7089,8 +7575,7 @@
+             if ( child->getNodeId() == el_autoBoxing && child->getChildCount() == 1 && child->getChildNode(0)->isText()) {
+                 // A text node wrapped in an <autoBoxing> because it was surrounded
+                 // by non-inline elements (the other table subelements)
+-                lString32 s = child->getChildNode(0)->getText();
+-                if ( IsEmptySpace(s.c_str(), s.length()) ) {
++                if ( child->getChildNode(0)->isEmptySpaceText() ) {
+                     is_whitespace = true;
+                 }
+             }
+@@ -7101,8 +7586,7 @@
+             // by the XML parsers, but we may see some when completing
+             // incomplete tables or when white-space:pre, or in case of
+             // style changes (inline > table) after a book has been loaded.
+-            lString32 s = child->getText();
+-            if ( IsEmptySpace(s.c_str(), s.length()) ) {
++            if ( child->isEmptySpaceText() ) {
+                 is_whitespace = true;
+             }
+         }
+@@ -7602,8 +8086,7 @@
+                     // are all empty text.
+                     for ( int i=0; i < getChildCount(); i++ ) {
+                         if ( getChildNode(i)->isText() ) {
+-                            lString32 s = getChildNode(i)->getText();
+-                            if ( !IsEmptySpace(s.c_str(), s.length() ) ) {
++                            if ( !getChildNode(i)->isEmptySpaceText() ) {
+                                 has_non_empty_text_nodes = true;
+                                 break;
+                             }
+@@ -7647,14 +8130,12 @@
+                             // Remove any preceeding or following empty text nodes (there can't
+                             // be consecutive text nodes) so we don't get spurious empty lines.
+                             if ( i < getChildCount()-1 && getChildNode(i+1)->isText() ) {
+-                                lString32 s = getChildNode(i+1)->getText();
+-                                if ( IsEmptySpace(s.c_str(), s.length() ) ) {
++                                if ( getChildNode(i+1)->isEmptySpaceText() ) {
+                                     removeChildren(i+1, i+1);
+                                 }
+                             }
+                             if ( i > 0 && getChildNode(i-1)->isText() ) {
+-                                lString32 s = getChildNode(i-1)->getText();
+-                                if ( IsEmptySpace(s.c_str(), s.length() ) ) {
++                                if ( getChildNode(i-1)->isEmptySpaceText() ) {
+                                     removeChildren(i-1, i-1);
+                                     i--; // update our position
+                                 }
+@@ -7907,8 +8388,7 @@
+                             int run_in_idx = inBetweenTextNode ? i-2 : i-1;
+                             int block_idx = i;
+                             if ( inBetweenTextNode ) {
+-                                lString32 text = inBetweenTextNode->getText();
+-                                if ( IsEmptySpace(text.c_str(), text.length() ) ) {
++                                if ( inBetweenTextNode->isEmptySpaceText() ) {
+                                     removeChildren(i-1, i-1);
+                                     block_idx = i-1;
+                                 }
+@@ -7997,8 +8477,7 @@
+                 int cm = child->getRendMethod();
+                 int is_whitespace = false;
+                 if ( child->getNodeId() == el_autoBoxing && child->getChildCount() == 1 && child->getChildNode(0)->isText() ) {
+-                    lString32 s = child->getChildNode(0)->getText();
+-                    if ( IsEmptySpace(s.c_str(), s.length()) )
++                    if ( child->getChildNode(0)->isEmptySpaceText() )
+                         is_whitespace = true;
+                 }
+                 if ( cd == css_d_table_cell ) {
+@@ -8089,8 +8568,7 @@
+             int cm = child->getRendMethod();
+             int is_whitespace = false;
+             if ( child->getNodeId() == el_autoBoxing && child->getChildCount() == 1 && child->getChildNode(0)->isText() ) {
+-                lString32 s = child->getChildNode(0)->getText();
+-                if ( IsEmptySpace(s.c_str(), s.length()) )
++                if ( child->getChildNode(0)->isEmptySpaceText() )
+                     is_whitespace = true;
+             }
+             bool is_misparented = false;
+@@ -8330,8 +8808,7 @@
+                         elemId = child->getNodeId();
+                     }
+                     else {
+-                        lString32 s = child->getText();
+-                        elemId = IsEmptySpace(s.c_str(), s.length()) ? -2 : -1;
++                        elemId = child->isEmptySpaceText() ? -2 : -1;
+                         // When meeting an empty space (elemId==-2), we'll delay wrapping
+                         // decision to when we process the next node.
+                         // We'll also not start a wrap with it.
+@@ -8419,8 +8896,7 @@
+                             elemId = child->getNodeId();
+                         }
+                         else {
+-                            lString32 s = child->getText();
+-                            elemId = IsEmptySpace(s.c_str(), s.length()) ? -2 : -1;
++                            elemId = child->isEmptySpaceText() ? -2 : -1;
+                             // When meeting an empty space (elemId==-2), we'll delay wrapping
+                             // decision to when we process the next node.
+                             // We'll also not start a wrap with it.
+@@ -8969,8 +9445,7 @@
+             }
+             _stripLeadingNewlineChar = false; // we won't need to care further
+         }
+-        lString8 s8 = UnicodeToUtf8(text, len);
+-        _element->insertChildText(s8, insert_before_last_child);
++        _element->insertChildText(text, len, insert_before_last_child);
+     }
+     //logfile << "}";
+ }
+@@ -18108,6 +18583,68 @@
+         // fall through
+     case 6:
+         _mapSavingStage = 6;
++#if CR_BACKGROUND_CACHE_PACKING == 1
++        if ( maxTime.infinite() && _compressCachedData ) {
++            // Stages 6 to 8 below, writing the same blocks (ID data, page data, node data)
++            // the same way, with the blocks compressed ahead by this thread and another one
++            // (see CacheBlockPacker), the node data blocks being made when compressed
++            CRLog::trace("ldomDocument::saveChanges() - ID data, page data and node data");
++            SerialBuf idbuf(4096);
++            serializeMaps( idbuf );
++            CacheBlockPacker packer;
++            packer.add( idbuf.buf(), idbuf.pos() );
++            if ( _pagesData.pos() )
++                packer.add( _pagesData.buf(), _pagesData.pos() );
++            ldomNode ** lists[2] = { _elemList, _textList };
++            int nodecounts[2] = { _elemCount+1, _textCount+1 };
++            lUInt16 types[2] = { CBT_ELEM_NODE, CBT_TEXT_NODE };
++            for ( int k=0; k<2; k++ ) {
++                int count = ((nodecounts[k]+TNC_PART_LEN-1) >> TNC_PART_SHIFT);
++                for ( int i=0; i<count; i++ ) {
++                    if ( !lists[k][i] )
++                        continue;
++                    int sz = TNC_PART_LEN;
++                    if ( i*TNC_PART_LEN + sz > nodecounts[k] )
++                        sz = nodecounts[k] - i*TNC_PART_LEN;
++                    packer.add( (int)sizeof(ldomNode) * sz, prepareNodeDataPart, lists[k][i], sz );
++                }
++            }
++            packer.start();
++            if ( !_cacheFile->write( CBT_MAPS_DATA, 0, packer.next( _cacheFile ), COMPRESS_MISC_DATA ) ) {
++                CRLog::error("Error while saving Id data");
++                return CR_ERROR;
++            }
++            if (progressCallback) progressCallback->OnSaveCacheFileProgress(50);
++            if ( _pagesData.pos() ) {
++                CRLog::trace("ldomDocument::saveChanges() - page data (%d bytes)", _pagesData.pos());
++                if ( !_cacheFile->write( CBT_PAGE_DATA, 0, packer.next( _cacheFile ), COMPRESS_PAGES_DATA ) ) {
++                    CRLog::error("Error while saving pages data");
++                    return CR_ERROR;
++                }
++            } else {
++                CRLog::trace("ldomDocument::saveChanges() - no page data");
++            }
++            if (progressCallback) progressCallback->OnSaveCacheFileProgress(60);
++            // As saveNodeData() does
++            SerialBuf nodeIndexBuf(12, true);
++            nodeIndexBuf << (lUInt32)NODE_INDEX_MAGIC << (lUInt32)_elemCount << (lUInt32)_textCount;
++            for ( int k=0; k<2; k++ ) {
++                int count = ((nodecounts[k]+TNC_PART_LEN-1) >> TNC_PART_SHIFT);
++                for ( lUInt16 i=0; i<count; i++ ) {
++                    if ( !lists[k][i] )
++                        continue;
++                    if ( !_cacheFile->write( types[k], i, packer.next( _cacheFile ), COMPRESS_NODE_DATA ) )
++                        crFatalError(-1, "Cannot write node data");
++                }
++            }
++            if ( !_cacheFile->write( CBT_NODE_INDEX, nodeIndexBuf, COMPRESS_NODE_DATA ) ) {
++                CRLog::error("Error while node instance data");
++                return CR_ERROR;
++            }
++            if (progressCallback) progressCallback->OnSaveCacheFileProgress(70);
++            goto save_render_info;
++        }
++#endif
+         CRLog::trace("ldomDocument::saveChanges() - ID data");
+         {
+             SerialBuf idbuf(4096);
+@@ -18152,6 +18689,9 @@
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(70);
+         // fall through
+     case 9:
++#if CR_BACKGROUND_CACHE_PACKING == 1
++    save_render_info:
++#endif
+         _mapSavingStage = 9;
+         CRLog::trace("ldomDocument::saveChanges() - render info");
+         {
+@@ -20093,6 +20633,37 @@
+         return _data._text_ptr->getText32();
+     }
+     return lString32::empty_str;
++}
++
++/// whether getText() is only spaces, tabs and newlines, as IsEmptySpace() on it says
++bool ldomNode::isEmptySpaceText() const
++{
++    ASSERT_NODE_NOT_NULL;
++#if BUILD_LITE!=1
++    if ( TNTYPE == NT_PTEXT ) {
++        // getText() decodes the UTF-8 bytes up to the first 0, and single byte
++        // chars decode as themselves: as long as there are only these, they tell.
++        const lChar8 * text;
++        int length;
++        if ( getDocument()->_textStorage.getTextBytes( _data._ptext_addr, text, length ) ) {
++            for ( int i = 0; i < length; i++ ) {
++                lUInt8 b = (lUInt8)text[i];
++                if ( b == ' ' || b == '\r' || b == '\n' || b == '\t' )
++                    continue;
++                if ( b == 0 )
++                    return true; // where decoding stops
++                if ( b < 0x80 )
++                    return false;
++                // A multi-byte char: decoding is needed to tell
++                lString32 s = getText();
++                return IsEmptySpace(s.c_str(), s.length());
++            }
++            return true;
++        }
++    }
++#endif
++    lString32 s = getText();
++    return IsEmptySpace(s.c_str(), s.length());
+ }
+ 
+ /// returns text node text as utf8 string
+@@ -21591,6 +22162,41 @@
+     return NULL;
+ }
+ 
++/// inserts child text, as insertChildText(UnicodeToUtf8(text, len), before_last_child) does,
++/// without making that string
++ldomNode * ldomNode::insertChildText(const lChar32 * text, int len, bool before_last_child)
++{
++    ASSERT_NODE_NOT_NULL;
++#if !defined(USE_PERSISTENT_TEXT) || BUILD_LITE==1
++    return insertChildText(UnicodeToUtf8(text, len), before_last_child);
++#else
++    // (Its UTF-8 length is found while encoding it, if it can't be more than a text
++    // item's length holds: otherwise, it's needed first)
++    int utf8len = -1;
++    if ( len <= 0 ) {
++        utf8len = 0;
++    } else if ( len > 0x3FFF ) {
++        utf8len = utf8EncodedLength(text, len);
++        if ( utf8len > 0xFFFF ) // more than a text item's length holds: as it always was
++            return insertChildText(UnicodeToUtf8(text, len), before_last_child);
++    }
++    if  ( isElement() ) {
++        if ( isPersistent() )
++            modify();
++        tinyElement * me = NPELEM;
++        ldomNode * node = getDocument()->allocTinyNode( NT_PTEXT );
++        node->_data._ptext_addr = getDocument()->_textStorage.allocText( node->_handle._dataIndex, _handle._dataIndex, text, len > 0 ? len : 0, utf8len );
++        int index = me->_children.length();
++        if ( before_last_child && index > 0 )
++            index--;
++        me->_children.insert( index, node->getDataIndex() );
++        return node;
++    }
++    readOnlyError();
++    return NULL;
++#endif
++}
++
+ /// remove child
+ ldomNode * ldomNode::removeChild( lUInt32 index )
+ {
+--- a/crengine/src/lvxml.cpp
++++ b/crengine/src/lvxml.cpp
+@@ -949,10 +949,8 @@
+         {
+             // just move
+             int sz = (int)(m_buf_len -  m_buf_pos);
+-            for (int i=0; i<sz; i++)
+-            {
+-                m_buf[i] = m_buf[i+m_buf_pos];
+-            }
++            if ( sz > 0 )
++                memmove( m_buf, m_buf + m_buf_pos, sz );
+             m_buf_len = sz;
+             m_buf_fpos += m_buf_pos;
+             m_buf_pos = 0;
+@@ -3185,6 +3183,19 @@
+                     }
+                     for ( ;!m_eof; )
+                     {
++                        // The chars this loop would add one by one, up to the next one
++                        // it handles otherwise or the end of the buffer: added at once
++                        int p = m_read_buffer_pos;
++                        while ( p < m_read_buffer_len ) {
++                            lChar32 c = m_read_buffer[p];
++                            if ( c=='>' || c==0 || (qChar ? c==qChar : IsSpaceChar(c)) )
++                                break;
++                            p++;
++                        }
++                        if ( p > m_read_buffer_pos ) {
++                            attrvalue.append( m_read_buffer + m_read_buffer_pos, p - m_read_buffer_pos );
++                            m_read_buffer_pos = p;
++                        }
+                         ch = PeekCharFromBuffer();
+                         if (ch=='>')
+                             break;
+@@ -5608,7 +5619,31 @@
+     const lChar32 *end = str + len;
+     lChar32 *dst = str;
+     bool ampersand = false;
+-    for (const lChar32 *src = str; src < end; ++src) {
++    const lChar32 *start = str;
++    if ( !pre && !attribute ) {
++        // Skip the leading part that the loop below would leave as it is (no entity, no
++        // newline or tab, no double space), which often is the whole text: chars stay,
++        // and a space stays if the previous char wasn't one (see nsp).
++        const lChar32 *p = str;
++        while ( p < end ) {
++            lChar32 ch = *p;
++            if ( ch > '&' ) {
++                nsp = 0;
++            } else if ( ch == ' ' ) {
++                if ( nsp )
++                    break;
++                nsp = 1;
++            } else if ( ch == '&' || ch == '\r' || ch == '\n' || ch == '\t' ) {
++                break;
++            } else {
++                nsp = 0;
++            }
++            p++;
++        }
++        start = p;
++        dst = str + (p - str);
++    }
++    for (const lChar32 *src = start; src < end; ++src) {
+         if (pre) {
+             if (ampersand)
+                 ampersand = PreProcessXmlString<true, true>(str, end, enc_table, src, dst, attribute, cdata, nsp, lch, nch);
+@@ -5714,6 +5749,24 @@
+     return m_read_buffer_len - m_read_buffer_pos;
+ }
+ 
++// Classes of chars for ReadText()'s scan of a text node
++// (chars from 63 on, '?' included, have none)
++enum {
++    TEXT_SCAN_END = 1,     // ends the scan: '<', or 0
++    TEXT_SCAN_SPACE = 2,   // ' ' (two in a row are made one by PreProcessXmlString())
++    TEXT_SCAN_CHANGED = 4  // changed by PreProcessXmlString(): '&', '\r', '\n', '\t'
++};
++static const lUInt8 textScanClass[64] = {
++    TEXT_SCAN_END, 0, 0, 0, 0, 0, 0, 0,
++    0, TEXT_SCAN_CHANGED, TEXT_SCAN_CHANGED, 0, 0, TEXT_SCAN_CHANGED, 0, 0,
++    0, 0, 0, 0, 0, 0, 0, 0,
++    0, 0, 0, 0, 0, 0, 0, 0,
++    TEXT_SCAN_SPACE, 0, 0, 0, 0, 0, TEXT_SCAN_CHANGED, 0,
++    0, 0, 0, 0, 0, 0, 0, 0,
++    0, 0, 0, 0, 0, 0, 0, 0,
++    0, 0, 0, 0, TEXT_SCAN_END, 0, 0, 0
++};
++
+ bool LVXMLParser::ReadText()
+ {
+     int tlen = 0;
+@@ -5762,6 +5815,85 @@
+                 }
+             }
+         }
++        if ( !tlen && !m_in_cdata && !m_in_html_style_tag && !m_in_html_script_tag && !pre_para_splitting ) {
++            // Usual case: the whole text node is in the buffer, ended by a '<'. Process it
++            // right there rather than copied to m_txt_buf, with that '<' replaced by the
++            // 0 m_txt_buf would have after it (PreProcessXmlString() and TrimDoubleSpaces()
++            // may look at the char after the text). Not when the text holds a 0, which
++            // m_txt_buf.append() would have stopped copying at.
++            lChar32 * tbegin = m_read_buffer + m_read_buffer_pos;
++            lChar32 * tend = tbegin + TEXT_SPLIT_SIZE;
++            if ( tend > m_read_buffer + m_read_buffer_len )
++                tend = m_read_buffer + m_read_buffer_len;
++            // While looking for the '<', check whether PreProcessXmlString() would leave
++            // the text as it is: no entity, newline or tab, nor double space (see nsp
++            // there). It doesn't need calling then (when not in PRE or attribute mode).
++            // (Branchless, but for the end: branching on spaces and punctuation cost more
++            // than the rest, as they come at unpredictable places.)
++            lChar32 * tptr = tbegin;
++            lUInt32 prevSpace = 0;
++            lUInt32 changed = 0;
++            while ( tptr < tend ) {
++                lUInt32 ch = *tptr;
++                lUInt32 cls = textScanClass[ch < 63 ? ch : 63];
++                if ( cls & TEXT_SCAN_END )
++                    break;
++                changed |= cls & (TEXT_SCAN_CHANGED | prevSpace);
++                prevSpace = cls & TEXT_SCAN_SPACE;
++                tptr++;
++            }
++            if ( tptr < tend && *tptr == '<' ) {
++                if ( tptr == tbegin ) {
++                    // empty text node
++                    m_read_buffer_pos += 1;
++                    return false;
++                }
++                *tptr = 0;
++                const lChar32 * enc_table = NULL;
++                if ( flags & TXTFLG_CONVERT_8BIT_ENTITY_ENCODING )
++                    enc_table = this->m_conv_table;
++                int nlen = (int)(tptr - tbegin);
++                if ( flags & (TXTFLG_PRE | TXTFLG_PROCESS_ATTRIBUTE) ) {
++                    nlen = PreProcessXmlString(tbegin, nlen, flags, enc_table);
++                } else if ( changed ) {
++                    const lChar32 * p = tbegin;
++                    while ( p < tptr && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') )
++                        p++;
++                    if ( p == tptr ) {
++                        // Only spaces, tabs and newlines (as between tags): PreProcessXmlString()
++                        // makes them a single space (put at the start, the rest left as is)
++                        tbegin[0] = ' ';
++                        nlen = 1;
++                    } else {
++                        nlen = PreProcessXmlString(tbegin, nlen, flags, enc_table);
++                    }
++                }
++                if ( (flags & TXTFLG_TRIM) && (!(flags & TXTFLG_PRE) || (flags & TXTFLG_PRE_PARA_SPLITTING)) ) {
++                    nlen = TrimDoubleSpaces(tbegin, nlen,
++                        ((flags & TXTFLG_TRIM_ALLOW_START_SPACE) || pre_para_splitting)?true:false,
++                        (flags & TXTFLG_TRIM_ALLOW_END_SPACE)?true:false,
++                        (flags & TXTFLG_TRIM_REMOVE_EOL_HYPHENS)?true:false );
++                }
++                if (flags & TXTFLG_PRE) {
++                    // check for tabs
++                    int tabCount = CalcTabCount(tbegin, nlen);
++                    if ( tabCount > 0 ) {
++                        // expand tabs
++                        lString32 tmp;
++                        tmp.reserve(nlen + tabCount * 8);
++                        ExpandTabs(tmp, tbegin, nlen);
++                        m_callback->OnText(tmp.c_str(), tmp.length(), flags);
++                    } else {
++                        m_callback->OnText(tbegin, nlen, flags);
++                    }
++                } else {
++                    m_callback->OnText(tbegin, nlen, flags);
++                }
++                *tptr = '<';
++                m_read_buffer_pos = (int)(tptr - m_read_buffer) + 1;
++                return (!m_eof);
++            }
++        }
+         // Walk buffer without updating m_read_buffer_pos
+         const lChar32 *begin = m_read_buffer + m_read_buffer_pos;
+         const lChar32 *ptr = begin;
+@@ -6000,7 +6132,23 @@
+         }
+         else
+         {
+-            name += ch;
++            // This char, and the plain ident chars following it in the buffer, that this
++            // loop would add one by one (PeekNextCharFromBuffer() giving them without
++            // refilling the buffer, which it only does at its end): added at once, the
++            // loop going on with the last one.
++            lChar32 run[64];
++            int n = 0;
++            run[n++] = ch;
++            int p = m_read_buffer_pos + 1;
++            while ( p < m_read_buffer_len && n < 64 ) {
++                lUInt16 c = (lUInt16)m_read_buffer[p];
++                if ( !isValidIdentChar(c) || c == ':' )
++                    break;
++                run[n++] = c;
++                p++;
++            }
++            name.append( run, n );
++            m_read_buffer_pos = p - 1;
+         }
+     }
+     lChar32 ch = PeekCharFromBuffer();
+@@ -6170,9 +6318,8 @@
+     const lUInt8 *end = m_buf + m_buf_len;
+     for (lUInt8 *ptr = m_buf; ptr < end; ++ptr) {
+         lUInt8 ch = *ptr;
+-        if (ch >= 'A' && ch <= 'Z') {
+-            *ptr = ch - 'A' + 'a';
+-        }
++        // (Branchless, so that it can be vectorized)
++        *ptr = ch + (((lUInt8)(ch - 'A') < 26) << 5);
+     }
+     lString8 s(reinterpret_cast<lChar8 *>(m_buf), m_buf_len);
+ 

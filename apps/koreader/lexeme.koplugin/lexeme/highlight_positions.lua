@@ -1,7 +1,10 @@
--- Highlight positions, kept per layout and saved when a book closes. KOReader otherwise looks up
--- every highlight before the page on each paint: half a second with a few hundred highlights.
+-- Highlight positions and the pages of annotations, kept per layout and saved when a book closes.
+-- KOReader otherwise looks up every highlight before the page on each paint (half a second with a
+-- few hundred highlights), and the pages of a dozen or more annotations, to find the page's
+-- bookmark, each time the page changes: 80 ms each time the book opens.
 local DataStorage = require("datastorage")
 local Screen = require("device").screen
+local UIManager = require("ui/uimanager")
 local dump = require("dump")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -28,11 +31,14 @@ local function load(key)
     if lfs.attributes(path, "mode") ~= "file" then return nil end
     local ok, saved = pcall(dofile, path)
     if not ok or type(saved) ~= "table" or saved.key ~= key or type(saved.pos) ~= "table" then return nil end
-    local pos = {}
+    local pos, pages = {}, {}
     for xp, y in pairs(saved.pos) do
         if type(xp) == "string" and type(y) == "number" then pos[xp] = y end
     end
-    return { key = key, pos = pos }
+    for xp, page in pairs(type(saved.pages) == "table" and saved.pages or {}) do
+        if type(xp) == "string" and type(page) == "number" then pages[xp] = page end
+    end
+    return { key = key, pos = pos, pages = pages }
 end
 
 function Positions.install(ui)
@@ -41,20 +47,38 @@ function Positions.install(ui)
     -- Saved positions are only trusted when the book opens; after that they're worked out again.
     local may_load = true
 
+    -- The memo for the layout now; nil until the book is laid out.
     local function current()
         local key = layoutKey(ui)
+        if not key then return nil end
         local memo = view.lexeme_positions
         if memo and memo.key == key then return memo end
-        memo = key and may_load and load(key) or { key = key, pos = {} }
+        memo = may_load and load(key) or { key = key, pos = {}, pages = {} }
         may_load = false
         view.lexeme_positions = memo
         return memo
     end
 
+    -- The page an xpointer is on is the layout's too.
+    local get_page = document.getPageFromXPointer
+    document.getPageFromXPointer = function(doc, xp)
+        local memo = type(xp) == "string" and current()
+        if not memo then return get_page(doc, xp) end
+        local page = memo.pages[xp]
+        if page == nil then
+            page = get_page(doc, xp)
+            if type(page) == "number" then
+                memo.pages[xp] = page
+                memo.changed = true
+            end
+        end
+        return page
+    end
+
     local draw = view.drawXPointerSavedHighlight
     view.drawXPointerSavedHighlight = function(v, bb, x, y)
         local memo = current()
-        if not memo.key then return draw(v, bb, x, y) end
+        if not memo then return draw(v, bb, x, y) end
         local own = rawget(document, "getPosFromXPointer")
         local get = document.getPosFromXPointer
         document.getPosFromXPointer = function(doc, xp)
@@ -88,22 +112,29 @@ function Positions.install(ui)
     end
 end
 
--- Keeps the positions for the next opening; called as the book closes.
-function Positions.save(ui)
-    local memo = ui.view and ui.view.lexeme_positions
-    if not (memo and memo.changed and memo.key and next(memo.pos)) then return end
+local function write(memo)
     if lfs.attributes(DIR, "mode") ~= "directory" and not lfs.mkdir(DIR) then return end
     local path = savedPath(memo.key)
     local file = io.open(path .. ".part", "w")
     if not file then return end
-    file:write("return ", dump({ key = memo.key, pos = memo.pos }), "\n")
+    file:write("return ", dump({ key = memo.key, pos = memo.pos, pages = memo.pages }), "\n")
     file:close()
     if not os.rename(path .. ".part", path) then
         logger.warn("Lexeme: can't save highlight positions to", path)
         os.remove(path .. ".part")
-        return
     end
+end
+
+-- Keeps the positions for the next opening; called as the book closes. They're written a moment
+-- later, once Home is up, rather than while the book closes.
+function Positions.save(ui)
+    -- The page where reading stopped: the first the next opening looks up.
+    local xp = ui.rolling and ui.rolling.xpointer
+    if type(xp) == "string" and ui.document then pcall(ui.document.getPageFromXPointer, ui.document, xp) end
+    local memo = ui.view and ui.view.lexeme_positions
+    if not (memo and memo.changed and memo.key and (next(memo.pos) or next(memo.pages))) then return end
     memo.changed = nil
+    UIManager:scheduleIn(1, function() write(memo) end)
 end
 
 return Positions

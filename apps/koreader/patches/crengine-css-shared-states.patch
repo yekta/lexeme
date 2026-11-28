@@ -1,0 +1,492 @@
+--- a/crengine/include/lvstsheet.h
++++ b/crengine/include/lvstsheet.h
+@@ -267,85 +267,110 @@
+     \sa LVCssSelector
+     \sa LVCssDeclaration
+ */
+-class LVStyleSheet {
+-    lxmlDocBase * _doc;
+-    bool _nested;
+-
+-    int _selector_count;
+-    LVArray <int> _selector_count_stack;
+-
+-    LVPtrVector <LVCssSelector> _selectors;
+-    LVPtrVector <LVPtrVector <LVCssSelector> > _stack;
++/// A stylesheet's selectors at one point. A stylesheet shares it with the states its push()
++/// saved, and once shared it doesn't change (a change goes to a copy): saving and restoring a
++/// state is keeping a reference to it, and merging the same stylesheet into the same state again
++/// gives the result of the first time. A book's chapters each save the stylesheet, merge their
++/// own and restore it: copying every selector for each, and indexing them again, took a tenth of
++/// a long book's loading.
++class LVStyleSheetState : public LVRefCounter {
+ public:
+     /// a selector in the index below, with its position in its chain
+     struct IndexEntry { lUInt32 hash; int pos; LVCssSelector * selector; };
+-private:
+-    // Each chain of _selectors indexed by the class its selectors require (see
++    /// a stylesheet merged into this state (its serial and version), and the state that made
++    struct Merge { lUInt32 serial; lUInt32 version; LVFastRef<LVStyleSheetState> result; };
++
++    /// chains of selectors by element name id, as LVStyleSheet::apply() explains
++    LVPtrVector <LVCssSelector> selectors;
++    /// selectors parsed so far, each getting the count as the start of its specificity
++    int selector_count;
++    // Each chain of selectors indexed by the class its selectors require (see
+     // LVCssSelector::getRequiredClassHash()), so that apply() only goes through the
+     // selectors an element can match: in a stylesheet with a thousand class selectors,
+     // checking them all against every element took half of a book's loading.
+-    // Per chain, _index_ranges holds 3 offsets into _index: where its selectors that
++    // Per chain, index_ranges holds 3 offsets into index: where its selectors that
+     // require no class start (in chain order), where those that do start (by class
+-    // hash, then chain order), and where they end. Built when first needed, dropped
+-    // when _selectors changes.
+-    mutable LVArray <IndexEntry> _index;
+-    mutable LVArray <int> _index_ranges;
+-    mutable bool _index_valid;
+-    void buildIndex() const;
+-    void applyUnindexed( const ldomNode * node, lUInt16 id, css_style_rec_t * style ) const;
+-    LVPtrVector <LVCssSelector> * dup()
+-    {
+-        LVPtrVector <LVCssSelector> * res = new LVPtrVector <LVCssSelector>();
+-        res->reserve( _selectors.length() );
+-        for ( int i=0; i<_selectors.length(); i++ ) {
+-            LVCssSelector * selector = _selectors[i];
+-            if ( selector )
+-                res->add( new LVCssSelector(*selector) );
+-            else
+-                res->add(NULL);
+-        }
+-        return res;
++    // hash, then chain order), and where they end. Built when first needed.
++    LVArray <IndexEntry> index;
++    LVArray <int> index_ranges;
++    bool index_valid;
++    /// merges done into this state while it was shared: the last MAX_MERGES, the oldest replaced
++    /// first (a book laid out again parses its stylesheets anew, as new sheets)
++    LVArray <Merge> merges;
++    int next_merge;
++    static const int MAX_MERGES = 16;
++
++    LVStyleSheetState() : selector_count(0), index_valid(false), next_merge(0) { }
++    /// a copy of the selectors and their count, to change
++    LVStyleSheetState * copy() const;
++    void buildIndex();
++    /// the selectors changed: what was worked out from them no longer holds
++    void changed() {
++        index_valid = false;
++        merges.clear();
++        next_merge = 0;
+     }
++private:
++    // Shared by reference count (not thread-safe, as crengine's styling isn't): never copied as a whole.
++    LVStyleSheetState( const LVStyleSheetState & );
++    LVStyleSheetState & operator = ( const LVStyleSheetState & );
++};
+ 
+-    void set(LVPtrVector<LVCssSelector> & v );
++class LVStyleSheet {
++    lxmlDocBase * _doc;
++    bool _nested;
+ 
++    LVFastRef <LVStyleSheetState> _state;
++    LVArray < LVFastRef <LVStyleSheetState> > _stack;
++    // Which stylesheet this is, and how many times its selectors changed: what a merge of
++    // it into a shared state is remembered by.
++    lUInt32 _serial;
++    lUInt32 _version;
++    static lUInt32 _last_serial;
++
++    /// this stylesheet's state, to change: copied first if it's shared
++    LVStyleSheetState * changeState();
++    void mergeInto( LVStyleSheetState * state, const LVStyleSheet &other );
++    void applyUnindexed( const ldomNode * node, lUInt16 id, css_style_rec_t * style ) const;
++    // Not assignable: two sheets would then share a serial and version, which merges are remembered by.
++    LVStyleSheet & operator = ( const LVStyleSheet & );
++
+ public:
+ 
+     // save current state of stylesheet
+     void push()
+     {
+-        _selector_count_stack.add( _selector_count );
+-        _stack.add( dup() );
++        _stack.add( _state );
+     }
+     // restore previously saved state
+     bool pop()
+     {
+-        // Restore original counter (so we don't overflow the 19 bits
+-        // of _specificity reserved for storing selector order, so up
+-        // to 524288, when we meet a book with 600 DocFragments each
+-        // including a 1000 selectors stylesheet).
+-        if ( !_selector_count_stack.empty() )
+-            _selector_count = _selector_count_stack.remove( _selector_count_stack.length()-1 );
+-        LVPtrVector <LVCssSelector> * v = _stack.pop();
+-        if ( !v )
++        // (The selector count comes back with the state, so we don't overflow the 19 bits
++        // of _specificity reserved for storing selector order, so up to 524288, when we
++        // meet a book with 600 DocFragments each including a 1000 selectors stylesheet.)
++        int last = _stack.length() - 1;
++        if ( last < 0 )
+             return false;
+-        set( *v );
+-        delete v;
++        _state = _stack[last];
++        _stack[last] = LVFastRef<LVStyleSheetState>(); // erase() leaves the item in its slot
++        _stack.erase( last, 1 );
++        _version++;
+         return true;
+     }
+ 
+     /// remove all rules from stylesheet
+     void clear() {
+-        _index_valid = false;
+-        _selector_count = 0;
+-        _selector_count_stack.clear();
+-        _selectors.clear();
++        _state = LVFastRef<LVStyleSheetState>( new LVStyleSheetState() );
++        for ( int i=0; i<_stack.length(); i++ )
++            _stack[i] = LVFastRef<LVStyleSheetState>();
+         _stack.clear();
++        _version++;
+     }
+     /// set document to retrieve ID values from
+     void setDocument( lxmlDocBase * doc ) { _doc = doc; }
+     /// constructor
+-    LVStyleSheet( lxmlDocBase * doc=NULL, bool nested=false ) : _doc(doc) , _nested(nested) , _selector_count(0) , _index_valid(false) { }
++    LVStyleSheet( lxmlDocBase * doc=NULL, bool nested=false )
++        : _doc(doc) , _nested(nested) , _state( new LVStyleSheetState() ) , _serial( ++_last_serial ) , _version(0) { }
+     /// copy constructor
+     LVStyleSheet( LVStyleSheet & sheet );
+     /// parse stylesheet, compile and add found rules to sheet
+--- a/crengine/src/lvstsheet.cpp
++++ b/crengine/src/lvstsheet.cpp
+@@ -7244,29 +7244,39 @@
+         _next = new LVCssSelector( *v._next );
+ }
+ 
+-void LVStyleSheet::set(LVPtrVector<LVCssSelector> & v  )
++lUInt32 LVStyleSheet::_last_serial = 0;
++
++LVStyleSheetState * LVStyleSheetState::copy() const
+ {
+-    _index_valid = false;
+-    _selectors.clear();
+-    if ( !v.size() )
+-        return;
+-    _selectors.reserve( v.size() );
+-    for ( int i=0; i<v.size(); i++ ) {
+-        LVCssSelector * selector = v[i];
+-        if ( selector )
+-            _selectors.add( new LVCssSelector( *selector ) );
+-        else
+-            _selectors.add( NULL );
++    LVStyleSheetState * state = new LVStyleSheetState();
++    state->selector_count = selector_count;
++    state->selectors.reserve( selectors.length() );
++    for ( int i=0; i<selectors.length(); i++ ) {
++        LVCssSelector * selector = selectors[i];
++        if ( selector )
++            state->selectors.add( new LVCssSelector( *selector ) );
++        else
++            state->selectors.add( NULL );
+     }
++    return state;
+ }
+ 
+ LVStyleSheet::LVStyleSheet( LVStyleSheet & sheet )
+ :   _doc( sheet._doc )
+ ,   _nested( sheet._nested )
+-,   _index_valid( false )
++,   _state( sheet._state )
++,   _serial( ++_last_serial )
++,   _version( 0 )
++{
++}
++
++LVStyleSheetState * LVStyleSheet::changeState()
+ {
+-    set( sheet._selectors );
+-    _selector_count = sheet._selector_count;
++    if ( _state->getRefCount() > 1 )
++        _state = LVFastRef<LVStyleSheetState>( _state->copy() );
++    _state->changed();
++    _version++;
++    return _state.get();
+ }
+ 
+ template<typename F>
+@@ -7290,12 +7300,12 @@
+ // The selectors of one chain an element can match, as ranges of the index: the chain's
+ // selectors that require no class, and those requiring each of the element's classes.
+ struct CssIndexCursor {
+-    const LVStyleSheet::IndexEntry * cur[CSS_INDEX_MAX_CLASSES + 1];
+-    const LVStyleSheet::IndexEntry * end[CSS_INDEX_MAX_CLASSES + 1];
++    const LVStyleSheetState::IndexEntry * cur[CSS_INDEX_MAX_CLASSES + 1];
++    const LVStyleSheetState::IndexEntry * end[CSS_INDEX_MAX_CLASSES + 1];
+     int n;
+     // The next selector in chain order, and which range it's in; NULL at the end.
+-    const LVStyleSheet::IndexEntry * peek( int & which ) const {
+-        const LVStyleSheet::IndexEntry * best = NULL;
++    const LVStyleSheetState::IndexEntry * peek( int & which ) const {
++        const LVStyleSheetState::IndexEntry * best = NULL;
+         for ( int i=0; i<n; i++ ) {
+             if ( cur[i] < end[i] && ( !best || cur[i]->pos < best->pos ) ) {
+                 best = cur[i];
+@@ -7306,7 +7316,7 @@
+     }
+ };
+ 
+-static void openCssIndexCursor( CssIndexCursor & c, const LVStyleSheet::IndexEntry * index,
++static void openCssIndexCursor( CssIndexCursor & c, const LVStyleSheetState::IndexEntry * index,
+         const int * ranges, int nranges, int chain, const lUInt32 * classes, int nclasses )
+ {
+     c.n = 0;
+@@ -7341,7 +7351,8 @@
+ 
+ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
+ {
+-    if (!_selectors.length())
++    LVStyleSheetState * state = _state.get();
++    if (!state->selectors.length())
+         return; // no rules!
+         
+     lUInt16 id = node->getNodeId();
+@@ -7423,19 +7434,19 @@
+         applyUnindexed( node, id, style );
+         return;
+     }
+-    if ( !_index_valid )
+-        buildIndex();
++    if ( !state->index_valid )
++        state->buildIndex();
+     // The same walk as applyUnindexed(), through only the selectors that pass quickClassCheck():
+     // each chain's in chain order, the two chains merged by specificity.
+-    const IndexEntry * index = _index.ptr();
++    const LVStyleSheetState::IndexEntry * index = state->index.ptr();
+     CssIndexCursor c0, cid;
+-    openCssIndexCursor( c0, index, _index_ranges.ptr(), _index_ranges.length(), 0, classes, nclasses );
+-    openCssIndexCursor( cid, index, _index_ranges.ptr(), _index_ranges.length(),
+-                        id>0 && id<_selectors.length() ? id : -1, classes, nclasses );
++    openCssIndexCursor( c0, index, state->index_ranges.ptr(), state->index_ranges.length(), 0, classes, nclasses );
++    openCssIndexCursor( cid, index, state->index_ranges.ptr(), state->index_ranges.length(),
++                        id>0 && id<state->selectors.length() ? id : -1, classes, nclasses );
+     for (;;) {
+         int w0, wid;
+-        const IndexEntry * e0 = c0.peek(w0);
+-        const IndexEntry * eid = cid.peek(wid);
++        const LVStyleSheetState::IndexEntry * e0 = c0.peek(w0);
++        const LVStyleSheetState::IndexEntry * eid = cid.peek(wid);
+         if ( e0 && ( !eid || e0->selector->getSpecificity() < eid->selector->getSpecificity() ) ) {
+             e0->selector->apply( node, style );
+             c0.cur[w0]++;
+@@ -7463,8 +7474,9 @@
+     // first checked agains all <p>).
+     // To see which selectors apply to a <p>, we must iterate thru both chains,
+     // checking and applying them in the order of specificity/parsed position.
+-    LVCssSelector * selector_0 = _selectors[0];
+-    LVCssSelector * selector_id = id>0 && id<_selectors.length() ? _selectors[id] : NULL;
++    const LVPtrVector <LVCssSelector> & selectors = _state->selectors;
++    LVCssSelector * selector_0 = selectors[0];
++    LVCssSelector * selector_id = id>0 && id<selectors.length() ? selectors[id] : NULL;
+ 
+     LVArray<lUInt32> class_hash_array;
+     const lString32 &v = node->getEffectiveAttributeValue(attr_class);
+@@ -7508,44 +7520,44 @@
+ 
+ static int compareCssIndexEntries( const void * a, const void * b )
+ {
+-    const LVStyleSheet::IndexEntry * x = (const LVStyleSheet::IndexEntry *)a;
+-    const LVStyleSheet::IndexEntry * y = (const LVStyleSheet::IndexEntry *)b;
++    const LVStyleSheetState::IndexEntry * x = (const LVStyleSheetState::IndexEntry *)a;
++    const LVStyleSheetState::IndexEntry * y = (const LVStyleSheetState::IndexEntry *)b;
+     if ( x->hash != y->hash )
+         return x->hash < y->hash ? -1 : 1;
+     return x->pos - y->pos;
+ }
+ 
+-void LVStyleSheet::buildIndex() const
++void LVStyleSheetState::buildIndex()
+ {
+-    _index.clear();
+-    _index_ranges.clear();
+-    for ( int i=0; i<_selectors.length(); i++ ) {
+-        int classless = _index.length();
++    index.reset();
++    index_ranges.reset();
++    for ( int i=0; i<selectors.length(); i++ ) {
++        int classless = index.length();
+         int pos = 0;
+-        for ( LVCssSelector * p = _selectors[i]; p; p = p->getNext(), pos++ ) {
++        for ( LVCssSelector * p = selectors[i]; p; p = p->getNext(), pos++ ) {
+             lUInt32 hash;
+             if ( !p->getRequiredClassHash(hash) ) {
+                 IndexEntry entry = { 0, pos, p };
+-                _index.add( entry );
++                index.add( entry );
+             }
+         }
+-        int classed = _index.length();
++        int classed = index.length();
+         pos = 0;
+-        for ( LVCssSelector * p = _selectors[i]; p; p = p->getNext(), pos++ ) {
++        for ( LVCssSelector * p = selectors[i]; p; p = p->getNext(), pos++ ) {
+             lUInt32 hash;
+             if ( p->getRequiredClassHash(hash) ) {
+                 IndexEntry entry = { hash, pos, p };
+-                _index.add( entry );
++                index.add( entry );
+             }
+         }
+-        int end = _index.length();
++        int end = index.length();
+         if ( end - classed > 1 )
+-            qsort( _index.ptr() + classed, end - classed, sizeof(IndexEntry), compareCssIndexEntries );
+-        _index_ranges.add( classless );
+-        _index_ranges.add( classed );
+-        _index_ranges.add( end );
++            qsort( index.ptr() + classed, end - classed, sizeof(IndexEntry), compareCssIndexEntries );
++        index_ranges.add( classless );
++        index_ranges.add( classed );
++        index_ranges.add( end );
+     }
+-    _index_valid = true;
++    index_valid = true;
+ }
+ 
+ lUInt32 LVCssSelectorRule::getHash() const
+@@ -7584,9 +7596,10 @@
+ lUInt32 LVStyleSheet::getHash() const
+ {
+     lUInt32 hash = 0;
+-    for ( int i=0; i<_selectors.length(); i++ ) {
+-        if ( _selectors[i] )
+-            hash = hash * 31 + _selectors[i]->getHash() + i*15324;
++    const LVPtrVector <LVCssSelector> & selectors = _state->selectors;
++    for ( int i=0; i<selectors.length(); i++ ) {
++        if ( selectors[i] )
++            hash = hash * 31 + selectors[i]->getHash() + i*15324;
+     }
+     return hash;
+ }
+@@ -7617,11 +7630,16 @@
+ 
+ bool LVStyleSheet::parseAndAdvance( const char * &str, bool useragent_sheet, lString32 codeBase )
+ {
+-    _index_valid = false;
+     if ( !_doc ) {
+         // We can't parse anything if no _doc to get element name ids from
+         return false;
+     }
++    if ( !*str ) {
++        // Nothing to parse (what's left of a stylesheet that only had @import rules): leave the
++        // state alone rather than copying it. (Not for blank text: a failed selector still counts.)
++        return _state->selectors.length() > 0;
++    }
++    LVStyleSheetState * state = changeState();
+     LVCssSelector * selector = NULL;
+     LVCssSelector * prev_selector;
+     for (;*str;)
+@@ -7635,8 +7653,8 @@
+             // Have selector count number make the initial value
+             // of _specificity, so order of selectors is preserved
+             // when applying selectors with the same CSS specificity.
+-            selector = new LVCssSelector(_selector_count);
+-            _selector_count += 1; // = +WEIGHT_SELECTOR_ORDER
++            selector = new LVCssSelector(state->selector_count);
++            state->selector_count += 1; // = +WEIGHT_SELECTOR_ORDER
+             selector->setNext( prev_selector );
+             if ( !selector->parse(str, _doc, useragent_sheet) )
+             {
+@@ -7688,6 +7706,7 @@
+             else if ( *str == '}' && _nested ) {
+                 // We're done parsing this nested CSS block
+                 str++; // skip it so upper stylesheet can continue from there
++                state->changed();
+                 return true;
+             }
+             else {
+@@ -7701,11 +7720,12 @@
+             // place rules to sheet
+             for (LVCssSelector * next, * p = selector; p; p = next) {
+                 next = p->getNext();
+-                insert_into_selectors(p, _selectors);
++                insert_into_selectors(p, state->selectors);
+             }
+         }
+     }
+-    return _selectors.length() > 0;
++    state->changed(); // (already done by changeState(); again here, next to the changes)
++    return state->selectors.length() > 0;
+ }
+ 
+ /// Gather snippets in the provided CSS that the provided node would match
+@@ -7784,18 +7804,44 @@
+ }
+ 
+ void LVStyleSheet::merge(const LVStyleSheet &other) {
+-    _index_valid = false;
+-    int length = other._selectors.length();
+-    if (length > _selectors.length())
+-        _selectors.set(length - 1, nullptr);
++    if ( _state->getRefCount() > 1 ) { // shared: it won't change
++        LVFastRef<LVStyleSheetState> base = _state; // (_state moves on to the result)
++        for ( int i=0; i<base->merges.length(); i++ ) {
++            const LVStyleSheetState::Merge & done = base->merges[i];
++            if ( done.serial == other._serial && done.version == other._version ) {
++                _state = done.result;
++                _version++;
++                return;
++            }
++        }
++        mergeInto( changeState(), other );
++        LVStyleSheetState::Merge done = { other._serial, other._version, _state };
++        if ( base->merges.length() < LVStyleSheetState::MAX_MERGES ) {
++            base->merges.add( done );
++        }
++        else {
++            base->merges[base->next_merge] = done;
++            base->next_merge = (base->next_merge + 1) % LVStyleSheetState::MAX_MERGES;
++        }
++        return;
++    }
++    mergeInto( changeState(), other );
++}
++
++void LVStyleSheet::mergeInto( LVStyleSheetState * state, const LVStyleSheet &other ) {
++    const LVPtrVector <LVCssSelector> & others = other._state->selectors;
++    LVPtrVector <LVCssSelector> & selectors = state->selectors;
++    int length = others.length();
++    if (length > selectors.length())
++        selectors.set(length - 1, nullptr);
+     for (int i = 0; i < length; ++i) {
+-        if (!other._selectors[i])
++        if (!others[i])
+             continue;
+         LVCssSelector *prev = NULL;
+-        LVCssSelector *next = _selectors[i];
+-        for (LVCssSelector *p = other._selectors[i]; p; p = p->getNext()) {
++        LVCssSelector *next = selectors[i];
++        for (LVCssSelector *p = others[i]; p; p = p->getNext()) {
+             LVCssSelector *item = p->getCopy();
+-            item->addSpecificity(_selector_count);
++            item->addSpecificity(state->selector_count);
+             while (next && next->getSpecificity() <= item->getSpecificity()) {
+                 prev = next;
+                 next = next->getNext();
+@@ -7804,11 +7850,12 @@
+             if (prev)
+                 prev->setNext(item);
+             else
+-                _selectors[i] = item;
++                selectors[i] = item;
+             prev = item;
+         }
+     }
+-    _selector_count += other._selector_count;
++    state->selector_count += other._state->selector_count;
++    state->changed();
+ }
+ 
+ /// extract @import filename from beginning of CSS

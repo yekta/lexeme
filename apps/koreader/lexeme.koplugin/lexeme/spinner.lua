@@ -1,5 +1,7 @@
 -- The spinner icon, turning, drawn straight to the screen by a child process: KOReader
--- can't paint while it's busy (laying out a book, syncing), and a child process can.
+-- can't paint while it's busy (laying out a book, syncing), and a child process can. The frames
+-- are drawn beforehand, in KOReader, so the child only copies them: drawing them in the child
+-- and turning ten times a second made opening a long book two seconds slower.
 local Blitbuffer = require("ffi/blitbuffer")
 local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
@@ -7,7 +9,7 @@ local ffiutil = require("ffi/util")
 
 local Spinner = {}
 
-local FRAMES, FRAME_SECONDS = 12, 0.1
+local FRAMES, FRAME_SECONDS = 12, 0.25
 -- The spinner icon's ring, in its 70-unit box: centre, radii and the gap's two ends in radians.
 local BOX, CENTRE, INNER, OUTER = 70, 35, 26, 35
 local GAP_FROM, GAP_TO = math.atan2(-28.66, 10.43), math.atan2(-10.43, 28.66)
@@ -46,9 +48,18 @@ local function frame(size, turn)
     return bb
 end
 
-local function spin(x, y, size)
+-- The frames for a spinner `size` pixels wide, drawn once.
+local prepared = {}
+
+function Spinner.prepare(size)
+    if prepared[size] then return prepared[size] end
     local frames = {}
     for i = 0, FRAMES - 1 do frames[i + 1] = frame(size, i * 2 * math.pi / FRAMES) end
+    prepared[size] = frames
+    return frames
+end
+
+local function spin(frames, x, y, size)
     local i = 0
     while true do
         Screen.bb:blitFrom(frames[i % FRAMES + 1], x, y, 0, 0, size, size)
@@ -61,7 +72,8 @@ end
 -- Turns the spinner already painted at (x, y) until `stop`; paint it first.
 function Spinner.start(x, y, size)
     Spinner.stop()
-    spinner_pid = ffiutil.runInSubProcess(function() spin(x, y, size) end) or nil
+    local frames = Spinner.prepare(size)
+    spinner_pid = ffiutil.runInSubProcess(function() spin(frames, x, y, size) end) or nil
 end
 
 function Spinner.stop()

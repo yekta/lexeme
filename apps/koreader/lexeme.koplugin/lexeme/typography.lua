@@ -3,7 +3,14 @@ The stylesheet that makes KOReader set a page the way the Kindle does. crengine
 floors lengths where the Kindle rounds, so line heights get half a pixel added.
 Books converted from KFX keep vertical margins in line heights, which KFX Input
 writes as em × 1.2; they're scaled back so they follow the line spacing.
+
+It's set before the book loads as well as after: crengine styles every element as it loads, and
+a stylesheet that changes once it has loaded makes it style them all again (a quarter of the time
+a first opening takes, and twice the memory). Before loading, the engine can't read the book's
+files, so its stylesheets are read from the EPUB itself; after, the engine's copy decides.
 ]]
+local ffi = require("ffi")
+
 local Typography = {}
 
 local KFX_LINE_HEIGHT_EM = 1.2
@@ -44,6 +51,23 @@ local function rules(css)
     return result
 end
 
+-- The OPF's stylesheets. Found by their media type rather than by going through every item: a
+-- long book lists thousands (Woolf's complete works took half a second at each open).
+local function cssHrefs(opf)
+    local hrefs, from = {}, 1
+    while true do
+        local at = opf:find('media-type="text/css"', from, true)
+        if not at then return hrefs end
+        local open = at
+        while open > 1 and opf:byte(open) ~= 60 do open = open - 1 end -- back to its "<"
+        local close = opf:find(">", at, true) or #opf
+        local item = opf:sub(open, close)
+        local href = item:find("^<item%s") and item:match('href="([^"]+)"')
+        if href then table.insert(hrefs, href) end
+        from = close + 1
+    end
+end
+
 -- The book's own stylesheets, as listed in its OPF.
 local function bookCss(document)
     if not document.getDocumentFileContent then return "" end
@@ -53,23 +77,159 @@ local function bookCss(document)
     if not opf then return "" end
     local base = opf_path:match("^(.*/)") or ""
     local parts = {}
-    for item in opf:gmatch("<item%s[^>]*>") do
-        local href = item:find('media%-type="text/css"') and item:match('href="([^"]+)"')
-        local css = href and document:getDocumentFileContent(base .. href)
+    for _, href in ipairs(cssHrefs(opf)) do
+        local css = document:getDocumentFileContent(base .. href)
         if css then table.insert(parts, css) end
     end
     return table.concat(parts, "\n")
 end
 
+-- Zip files -----------------------------------------------------------------------
+-- An EPUB's stylesheets are read straight from its zip's central directory, which says where each
+-- file is: going through the archive file by file took 1.7 s for a book of 5,000 files.
+
+local zlib_ok, libz = pcall(function()
+    require("ffi/zlib_h")
+    ffi.cdef[[
+typedef struct lexeme_z_stream {
+    const char *next_in; unsigned avail_in; unsigned long total_in;
+    uint8_t *next_out; unsigned avail_out; unsigned long total_out;
+    const char *msg; void *state; void *zalloc; void *zfree; void *opaque;
+    int data_type; unsigned long adler; unsigned long reserved;
+} lexeme_z_stream;
+int inflateInit2_(lexeme_z_stream *, int, const char *, int);
+int inflate(lexeme_z_stream *, int);
+int inflateEnd(lexeme_z_stream *);
+const char *zlibVersion(void);
+]]
+    return ffi.loadlib("z", 1)
+end)
+
+local Z_FINISH, Z_STREAM_END = 4, 1
+
+-- A zip entry's deflated data, inflated to its `size` bytes; nil if it doesn't come out so.
+local function inflateRaw(data, size)
+    local out = ffi.new("uint8_t[?]", math.max(size, 1))
+    local stream = ffi.new("lexeme_z_stream")
+    if libz.inflateInit2_(stream, -15, libz.zlibVersion(), ffi.sizeof(stream)) ~= 0 then return nil end
+    stream.next_in, stream.avail_in = data, #data
+    stream.next_out, stream.avail_out = out, size
+    local result = libz.inflate(stream, Z_FINISH)
+    local total = tonumber(stream.total_out)
+    libz.inflateEnd(stream)
+    if result ~= Z_STREAM_END or total ~= size then return nil end
+    return ffi.string(out, size)
+end
+
+local function u16(s, i)
+    local a, b = s:byte(i, i + 1)
+    return a + b * 256
+end
+
+local function u32(s, i)
+    local a, b, c, d = s:byte(i, i + 3)
+    return a + b * 256 + c * 65536 + d * 16777216
+end
+
+-- The files of the zip at `path` whose names `wanted` accepts, by name; nil when the zip can't be
+-- read this way (zip64, encrypted or unexpected entries).
+local function zipFiles(path, wanted)
+    if not zlib_ok then return nil end
+    local f = io.open(path, "rb")
+    if not f then return nil end
+    local files = {}
+    local ok = pcall(function()
+        local size = f:seek("end")
+        local tail_size = math.min(size, 65557) -- the end record, and a comment up to 64 KB
+        f:seek("set", size - tail_size)
+        local tail = f:read(tail_size)
+        local at
+        for i = #tail - 21, 1, -1 do
+            if tail:byte(i) == 0x50 and tail:sub(i, i + 3) == "PK\5\6" then at = i break end
+        end
+        assert(at, "no end record")
+        local count, directory_size, directory_at = u16(tail, at + 10), u32(tail, at + 12), u32(tail, at + 16)
+        assert(count ~= 0xFFFF and directory_at ~= 0xFFFFFFFF, "zip64")
+        f:seek("set", directory_at)
+        local directory = f:read(directory_size)
+        assert(directory and #directory == directory_size, "short directory")
+        local i = 1
+        for _ = 1, count do
+            assert(directory:sub(i, i + 3) == "PK\1\2", "bad entry")
+            local flags, method = u16(directory, i + 8), u16(directory, i + 10)
+            local packed, unpacked = u32(directory, i + 20), u32(directory, i + 24)
+            local name_size = u16(directory, i + 28)
+            local name = directory:sub(i + 46, i + 45 + name_size)
+            local header_at = u32(directory, i + 42)
+            i = i + 46 + name_size + u16(directory, i + 30) + u16(directory, i + 32)
+            if wanted(name) then
+                assert(flags % 2 == 0, "encrypted")
+                f:seek("set", header_at)
+                local header = f:read(30)
+                assert(header and header:sub(1, 4) == "PK\3\4", "bad local header")
+                f:seek("set", header_at + 30 + u16(header, 27) + u16(header, 29))
+                local data = f:read(packed) or ""
+                assert(#data == packed, "short data")
+                if method == 0 then
+                    files[name] = data
+                else
+                    assert(method == 8, "unknown method")
+                    files[name] = assert(inflateRaw(data, unpacked), "bad data")
+                end
+            end
+        end
+    end)
+    f:close()
+    return ok and files or nil
+end
+
+local function stylesheetFile(name)
+    return name == "META-INF/container.xml" or name:match("%.[Oo][Pp][Ff]$") or name:match("%.[Cc][Ss][Ss]$")
+end
+
+-- The same files gone through entry by entry, for a zip the above can't read.
+local function archiveFiles(path)
+    local ok, Archiver = pcall(require, "ffi/archiver")
+    if not ok then return nil end
+    local reader = Archiver.Reader:new()
+    if not reader:open(path) then return nil end
+    local files = {}
+    for entry in reader:iterate() do
+        if stylesheetFile(entry.path) then files[entry.path] = reader:extractToMemory(entry.path) end
+    end
+    reader:close()
+    return files
+end
+
+-- The book's container.xml, OPF and stylesheets read from the EPUB file, as a document whose
+-- getDocumentFileContent serves them; nil when it isn't an EPUB or can't be read.
+local function epubFiles(path)
+    if not (path and path:lower():match("%.epub$")) then return nil end
+    local files = zipFiles(path, stylesheetFile) or archiveFiles(path)
+    if not files then return nil end
+    local function decoded(name)
+        return (name:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
+    end
+    return { getDocumentFileContent = function(_, name) return files[name] or files[decoded(name)] end }
+end
+
+-- Parsed rules by document: "early" from the file before the engine has loaded it, "loaded" after.
 local cache = setmetatable({}, { __mode = "k" })
 
 local function bookRules(document)
-    if cache[document] then return cache[document] end
-    local ok, css = pcall(bookCss, document)
-    local parsed = { rules = rules(ok and css or "") }
-    parsed.kfx = (ok and css or ""):find("%.class_s%w+%s*{") ~= nil
-    cache[document] = parsed
-    return parsed
+    -- Only KOReader's documents say whether they're loaded; anything else can read its files.
+    local loaded = document._loaded ~= false
+    local kept = cache[document] or {}
+    cache[document] = kept
+    local key = loaded and "loaded" or "early"
+    if kept[key] then return kept[key] end
+    local source = document
+    if not loaded then source = epubFiles(document.file) end
+    local ok, css = false, ""
+    if source then ok, css = pcall(bookCss, source) end
+    css = ok and css or ""
+    kept[key] = { rules = rules(css), kfx = css:find("%.class_s%w+%s*{") ~= nil }
+    return kept[key]
 end
 
 local function number(n)

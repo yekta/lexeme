@@ -101,7 +101,7 @@ function Quick:render(bb, x, y, w, h)
         UIManager:broadcastEvent(Event:new("LexemeSync"))
     end)
     local running = Timer.isRunning()
-    local timer_label = running and Timer.shortLabel(Timer.minutesLeft()) .. " left" or "Timer"
+    local timer_label = running and Timer.statusLabel(true) or "Timer"
     local tx, ty = spot()
     self:button(bb, tx, ty, "timer", timer_label, running, function()
         self:chooseTimer(x + w - D.s(37), y + D.s(400) + shift)
@@ -119,7 +119,7 @@ function Quick:render(bb, x, y, w, h)
         C.slider(self, bb, {
             x0 = x + D.s(177), x1 = x + D.s(1096), cy = y + D.s(652) + shift,
             min = power.fl_min, max = power.fl_max, value = power:frontlightIntensity(),
-            knob = D.s(69), thick = D.s(10), thin = D.s(3), label = true, buttons = true,
+            knob = D.s(69), thick = D.s(10), thin = D.s(3), label = true, buttons = true, drag = true,
             on_change = function(v)
                 power:setIntensity(math.floor(v + 0.5))
                 self:refresh()
@@ -132,7 +132,7 @@ function Quick:render(bb, x, y, w, h)
         C.slider(self, bb, {
             x0 = x + D.s(177), x1 = x + D.s(1096), cy = y + D.s(888) + shift,
             min = 0, max = 24, value = warmth,
-            knob = D.s(69), thick = D.s(10), thin = D.s(3), label = true, buttons = true,
+            knob = D.s(69), thick = D.s(10), thin = D.s(3), label = true, buttons = true, drag = true,
             on_change = function(v)
                 power:setWarmth(math.floor(math.floor(v + 0.5) * 100 / 24 + 0.5))
                 self:refresh()
@@ -155,10 +155,7 @@ end
 function Quick:chooseTimer(right, top)
     local items = {}
     if Timer.isRunning() then
-        table.insert(items, { text = "Stop timer", callback = function()
-            Timer.stop()
-            self:refresh()
-        end })
+        for _, item in ipairs(Timer.controlItems(function() self:refresh() end)) do table.insert(items, item) end
         table.insert(items, "-")
     end
     for _, m in ipairs(Timer.choices()) do

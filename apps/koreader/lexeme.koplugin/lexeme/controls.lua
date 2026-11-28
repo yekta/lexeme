@@ -5,7 +5,8 @@ local C = {}
 
 --[[
 A track from x0 to x1 at centre line cy. `value` runs from min to max in steps of `step` (1
-unless given); tapping the track or the -/+ buttons calls on_change with the new value.
+unless given); tapping the track or the -/+ buttons calls on_change with the new value, and with
+`drag`, so does dragging the knob along it, at each new value it passes.
 ]]
 function C.slider(view, bb, opts)
     local x0, x1, cy = opts.x0, opts.x1, opts.cy
@@ -35,14 +36,26 @@ function C.slider(view, bb, opts)
             if opts.value < opts.max then opts.on_change(math.min(opts.max, opts.value + step)) end
         end, D.around(plus_x + D.s(16), cy, D.s(94), D.s(94)))
     end
+    local function valueAt(pos)
+        local f = math.max(0, math.min(1, (pos.x - x0) / (x1 - x0)))
+        return opts.min + (opts.continuous and f * steps or math.floor(f * steps / step + 0.5) * step)
+    end
     view:hit(x0 - D.s(10), cy - D.s(45), x1 - x0 + D.s(20), D.s(90), nil)
     local target = view.hits[#view.hits]
     target.tap = function()
         local pos = view.last_tap
         if not pos then return end
-        local f = math.max(0, math.min(1, (pos.x - x0) / (x1 - x0)))
-        local value = opts.min + (opts.continuous and f * steps or math.floor(f * steps / step + 0.5) * step)
-        opts.on_change(value)
+        opts.on_change(valueAt(pos))
+    end
+    if opts.drag then
+        local last = opts.value
+        view:draggable(x0 - D.s(10), cy - D.s(45), x1 - x0 + D.s(20), D.s(90), function(pos)
+            local value = valueAt(pos)
+            if value ~= last then
+                last = value
+                opts.on_change(value)
+            end
+        end)
     end
 end
 

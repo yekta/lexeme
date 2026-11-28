@@ -1,0 +1,279 @@
+diff --git a/crengine/include/lvstsheet.h b/crengine/include/lvstsheet.h
+index ae88cffd..b5ddd1b2 100644
+--- a/crengine/include/lvstsheet.h
++++ b/crengine/include/lvstsheet.h
+@@ -165,6 +165,13 @@ public:
+     ~LVCssSelectorRule() { if (_next) delete _next; }
+     // A fail-fast check, returning false to rule out a match.
+     bool quickClassCheck(const lUInt32 *classHashes, size_t size) const;
++    /// the class an element must have for quickClassCheck() to pass, when this is a class rule
++    bool getRequiredClassHash( lUInt32 & hash ) const {
++        if ( _type != cssrt_class )
++            return false;
++        hash = _valueHash;
++        return true;
++    }
+     /// check condition for node
+     bool check( const ldomNode * & node, bool allow_cache=true ) const;
+     /// check next rules for node
+@@ -203,6 +210,12 @@ public:
+     lUInt16 getElementNameId() const { return _id; }
+     bool check( const ldomNode * node, bool allow_cache=true ) const;
+     bool quickClassCheck(const lUInt32 *classHashes, size_t size) const;
++    /// the class an element must have for quickClassCheck() to pass, if there is one
++    bool getRequiredClassHash( lUInt32 & hash ) const {
++        if ( !_rules || _pseudo_elem )
++            return false;
++        return _rules->getRequiredClassHash(hash);
++    }
+     void applyToPseudoElement( const ldomNode * node, css_style_rec_t * style ) const;
+     void apply( const ldomNode * node, css_style_rec_t * style ) const
+     {
+@@ -263,6 +276,23 @@ class LVStyleSheet {
+ 
+     LVPtrVector <LVCssSelector> _selectors;
+     LVPtrVector <LVPtrVector <LVCssSelector> > _stack;
++public:
++    /// a selector in the index below, with its position in its chain
++    struct IndexEntry { lUInt32 hash; int pos; LVCssSelector * selector; };
++private:
++    // Each chain of _selectors indexed by the class its selectors require (see
++    // LVCssSelector::getRequiredClassHash()), so that apply() only goes through the
++    // selectors an element can match: in a stylesheet with a thousand class selectors,
++    // checking them all against every element took half of a book's loading.
++    // Per chain, _index_ranges holds 3 offsets into _index: where its selectors that
++    // require no class start (in chain order), where those that do start (by class
++    // hash, then chain order), and where they end. Built when first needed, dropped
++    // when _selectors changes.
++    mutable LVArray <IndexEntry> _index;
++    mutable LVArray <int> _index_ranges;
++    mutable bool _index_valid;
++    void buildIndex() const;
++    void applyUnindexed( const ldomNode * node, lUInt16 id, css_style_rec_t * style ) const;
+     LVPtrVector <LVCssSelector> * dup()
+     {
+         LVPtrVector <LVCssSelector> * res = new LVPtrVector <LVCssSelector>();
+@@ -306,6 +336,7 @@ public:
+ 
+     /// remove all rules from stylesheet
+     void clear() {
++        _index_valid = false;
+         _selector_count = 0;
+         _selector_count_stack.clear();
+         _selectors.clear();
+@@ -314,7 +345,7 @@ public:
+     /// set document to retrieve ID values from
+     void setDocument( lxmlDocBase * doc ) { _doc = doc; }
+     /// constructor
+-    LVStyleSheet( lxmlDocBase * doc=NULL, bool nested=false ) : _doc(doc) , _nested(nested) , _selector_count(0) { }
++    LVStyleSheet( lxmlDocBase * doc=NULL, bool nested=false ) : _doc(doc) , _nested(nested) , _selector_count(0) , _index_valid(false) { }
+     /// copy constructor
+     LVStyleSheet( LVStyleSheet & sheet );
+     /// parse stylesheet, compile and add found rules to sheet
+diff --git a/crengine/src/lvstsheet.cpp b/crengine/src/lvstsheet.cpp
+index 2eeb9d1f..d4a33caa 100644
+--- a/crengine/src/lvstsheet.cpp
++++ b/crengine/src/lvstsheet.cpp
+@@ -7246,6 +7246,7 @@ LVCssSelector::LVCssSelector( LVCssSelector & v )
+ 
+ void LVStyleSheet::set(LVPtrVector<LVCssSelector> & v  )
+ {
++    _index_valid = false;
+     _selectors.clear();
+     if ( !v.size() )
+         return;
+@@ -7262,6 +7263,7 @@ void LVStyleSheet::set(LVPtrVector<LVCssSelector> & v  )
+ LVStyleSheet::LVStyleSheet( LVStyleSheet & sheet )
+ :   _doc( sheet._doc )
+ ,   _nested( sheet._nested )
++,   _index_valid( false )
+ {
+     set( sheet._selectors );
+     _selector_count = sheet._selector_count;
+@@ -7282,6 +7284,61 @@ static void for_each_split(const lChar32 *begin, F functor) {
+         functor(begin, end);
+ }
+ 
++// An element with more classes than this goes through LVStyleSheet::applyUnindexed().
++#define CSS_INDEX_MAX_CLASSES 16
++
++// The selectors of one chain an element can match, as ranges of the index: the chain's
++// selectors that require no class, and those requiring each of the element's classes.
++struct CssIndexCursor {
++    const LVStyleSheet::IndexEntry * cur[CSS_INDEX_MAX_CLASSES + 1];
++    const LVStyleSheet::IndexEntry * end[CSS_INDEX_MAX_CLASSES + 1];
++    int n;
++    // The next selector in chain order, and which range it's in; NULL at the end.
++    const LVStyleSheet::IndexEntry * peek( int & which ) const {
++        const LVStyleSheet::IndexEntry * best = NULL;
++        for ( int i=0; i<n; i++ ) {
++            if ( cur[i] < end[i] && ( !best || cur[i]->pos < best->pos ) ) {
++                best = cur[i];
++                which = i;
++            }
++        }
++        return best;
++    }
++};
++
++static void openCssIndexCursor( CssIndexCursor & c, const LVStyleSheet::IndexEntry * index,
++        const int * ranges, int nranges, int chain, const lUInt32 * classes, int nclasses )
++{
++    c.n = 0;
++    if ( chain < 0 || chain*3 + 2 >= nranges )
++        return;
++    int classless = ranges[chain*3], classed = ranges[chain*3 + 1], end = ranges[chain*3 + 2];
++    if ( classless < classed ) {
++        c.cur[c.n] = index + classless;
++        c.end[c.n] = index + classed;
++        c.n++;
++    }
++    for ( int k=0; k<nclasses; k++ ) {
++        lUInt32 hash = classes[k];
++        int lo = classed, hi = end; // first entry with this hash
++        while ( lo < hi ) {
++            int mid = (lo + hi) / 2;
++            if ( index[mid].hash < hash )
++                lo = mid + 1;
++            else
++                hi = mid;
++        }
++        int stop = lo;
++        while ( stop < end && index[stop].hash == hash )
++            stop++;
++        if ( lo < stop ) {
++            c.cur[c.n] = index + lo;
++            c.end[c.n] = index + stop;
++            c.n++;
++        }
++    }
++}
++
+ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
+ {
+     if (!_selectors.length())
+@@ -7345,6 +7402,58 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
+         }
+     }
+     
++    // The element's classes, each once (a class listed twice must not bring its selectors twice).
++    lUInt32 classes[CSS_INDEX_MAX_CLASSES];
++    int nclasses = 0;
++    bool too_many = false;
++    const lString32 &v = node->getEffectiveAttributeValue(attr_class);
++    for_each_split(v.c_str(), [&](const lChar32 *begin, const lChar32 *end) {
++        lUInt32 hash = lString32::getHash(begin, end);
++        for ( int i=0; i<nclasses; i++ ) {
++            if ( classes[i] == hash )
++                return;
++        }
++        if ( nclasses == CSS_INDEX_MAX_CLASSES ) {
++            too_many = true;
++            return;
++        }
++        classes[nclasses++] = hash;
++    });
++    if ( too_many ) {
++        applyUnindexed( node, id, style );
++        return;
++    }
++    if ( !_index_valid )
++        buildIndex();
++    // The same walk as applyUnindexed(), through only the selectors that pass quickClassCheck():
++    // each chain's in chain order, the two chains merged by specificity.
++    const IndexEntry * index = _index.ptr();
++    CssIndexCursor c0, cid;
++    openCssIndexCursor( c0, index, _index_ranges.ptr(), _index_ranges.length(), 0, classes, nclasses );
++    openCssIndexCursor( cid, index, _index_ranges.ptr(), _index_ranges.length(),
++                        id>0 && id<_selectors.length() ? id : -1, classes, nclasses );
++    for (;;) {
++        int w0, wid;
++        const IndexEntry * e0 = c0.peek(w0);
++        const IndexEntry * eid = cid.peek(wid);
++        if ( e0 && ( !eid || e0->selector->getSpecificity() < eid->selector->getSpecificity() ) ) {
++            e0->selector->apply( node, style );
++            c0.cur[w0]++;
++        }
++        else if ( eid ) {
++            eid->selector->apply( node, style );
++            cid.cur[wid]++;
++        }
++        else {
++            break;
++        }
++    }
++}
++
++// Goes through every selector of the element's chains (the selectors with no element name, and
++// those with its own), as crengine did before the index.
++void LVStyleSheet::applyUnindexed( const ldomNode * node, lUInt16 id, css_style_rec_t * style ) const
++{
+     // _selectors[0] holds the ordered chain of selectors starting (from
+     // the right of the selector) with a rule with no element name attached
+     // (eg. "div p .quote1", class name .quote1 should be checked against
+@@ -7396,6 +7505,49 @@ void LVStyleSheet::apply( const ldomNode * node, css_style_rec_t * style ) const
+     }
+ }
+ 
++
++static int compareCssIndexEntries( const void * a, const void * b )
++{
++    const LVStyleSheet::IndexEntry * x = (const LVStyleSheet::IndexEntry *)a;
++    const LVStyleSheet::IndexEntry * y = (const LVStyleSheet::IndexEntry *)b;
++    if ( x->hash != y->hash )
++        return x->hash < y->hash ? -1 : 1;
++    return x->pos - y->pos;
++}
++
++void LVStyleSheet::buildIndex() const
++{
++    _index.clear();
++    _index_ranges.clear();
++    for ( int i=0; i<_selectors.length(); i++ ) {
++        int classless = _index.length();
++        int pos = 0;
++        for ( LVCssSelector * p = _selectors[i]; p; p = p->getNext(), pos++ ) {
++            lUInt32 hash;
++            if ( !p->getRequiredClassHash(hash) ) {
++                IndexEntry entry = { 0, pos, p };
++                _index.add( entry );
++            }
++        }
++        int classed = _index.length();
++        pos = 0;
++        for ( LVCssSelector * p = _selectors[i]; p; p = p->getNext(), pos++ ) {
++            lUInt32 hash;
++            if ( p->getRequiredClassHash(hash) ) {
++                IndexEntry entry = { hash, pos, p };
++                _index.add( entry );
++            }
++        }
++        int end = _index.length();
++        if ( end - classed > 1 )
++            qsort( _index.ptr() + classed, end - classed, sizeof(IndexEntry), compareCssIndexEntries );
++        _index_ranges.add( classless );
++        _index_ranges.add( classed );
++        _index_ranges.add( end );
++    }
++    _index_valid = true;
++}
++
+ lUInt32 LVCssSelectorRule::getHash() const
+ {
+     lUInt32 hash = 0;
+@@ -7465,6 +7617,7 @@ static void insert_into_selectors(LVCssSelector *item, LVPtrVector<LVCssSelector
+ 
+ bool LVStyleSheet::parseAndAdvance( const char * &str, bool useragent_sheet, lString32 codeBase )
+ {
++    _index_valid = false;
+     if ( !_doc ) {
+         // We can't parse anything if no _doc to get element name ids from
+         return false;
+@@ -7631,6 +7784,7 @@ bool LVStyleSheet::gatherNodeMatchingRulesets(ldomNode * node, const char * str,
+ }
+ 
+ void LVStyleSheet::merge(const LVStyleSheet &other) {
++    _index_valid = false;
+     int length = other._selectors.length();
+     if (length > _selectors.length())
+         _selectors.set(length - 1, nullptr);

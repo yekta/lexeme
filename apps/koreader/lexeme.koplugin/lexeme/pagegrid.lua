@@ -61,7 +61,7 @@ function PageGrid:render(bb, x, y, w, h)
         D.text(bb, cx + D.s(10), cy + D.s(34), face, label, D.WHITE)
         self:hit(cx, cy, D.s(CELL_W), D.s(CELL_H), function()
             self:close("flashui")
-            Progress.goToPage(self.ui, page)
+            require("lexeme/backstack").jump(self.ui, function() Progress.goToPage(self.ui, page) end)
         end)
     end
 

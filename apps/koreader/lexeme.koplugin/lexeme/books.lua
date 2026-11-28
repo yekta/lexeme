@@ -10,6 +10,7 @@ local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 
 local AmazonLibrary = require("lexeme/amazon_library")
+local LibraryCache = require("lexeme/library_cache")
 
 local Books = {}
 
@@ -104,34 +105,142 @@ function Books.description(path)
     return (text:gsub("\n%s*\n%s*\n+", "\n\n"):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+-- Whether a MOBI-family file (.mobi, .azw, .azw3, .prc) is locked to a Kindle: its first record's
+-- encryption field isn't 0. KOReader can't open those, so the library leaves them out; an
+-- unlocked copy, if there is one, lives in Converted. Kept per path while the file is unchanged.
+local MOBI_KINDS = { mobi = true, azw = true, azw3 = true, prc = true }
+local locked_files = {}
+
+local function mobiLocked(path, mtime)
+    local known = locked_files[path]
+    if known and known.mtime == mtime then return known.locked end
+    local locked = false
+    local f = io.open(path, "rb")
+    if f then
+        local head = f:read(86)
+        if head and #head == 86 and head:sub(61, 68) == "BOOKMOBI" then
+            local a, b, c, d = head:byte(79, 82)
+            f:seek("set", ((a * 256 + b) * 256 + c) * 256 + d)
+            local record = f:read(14)
+            if record and #record == 14 then
+                local hi, lo = record:byte(13, 14)
+                locked = hi * 256 + lo ~= 0
+            end
+        end
+        f:close()
+    end
+    locked_files[path] = { mtime = mtime, locked = locked }
+    return locked
+end
+
 -- Folders the library never lists from; they hold most of a Kindle's files.
 local function skipsFolder(path, name)
     return name:sub(1, 1) == "." or name:find("%.sdr$") or name == "dictionaries"
         or name == "Kindle Reference" or path:find("/Downloads/Items01$")
 end
 
--- util.findFiles, without going into the folders above.
-local function findFiles(dir, callback)
-    local ok, iter, dir_obj = pcall(lfs.dir, dir)
-    if not ok then return end
-    for name in iter, dir_obj do
-        if name ~= "." and name ~= ".." then
-            local path = dir .. "/" .. name
-            local attr = lfs.attributes(path) or {}
-            if attr.mode == "directory" then
-                if not skipsFolder(path, name) then findFiles(path, callback) end
-            elseif attr.mode == "file" or attr.mode == "link" then
-                callback(path, name, attr)
+-- util.findFiles, without going into the folders above, as a walk that can stop and go on:
+-- walk(deadline) calls callback(path, name, attributes) for each file, in the order a recursive
+-- walk would, until time.now() passes deadline (nil: to the end), and returns true when done.
+local function fileWalker(dir, callback)
+    local time = require("ui/time")
+    local stack = {}
+    local function enter(path)
+        local ok, iter, dir_obj = pcall(lfs.dir, path)
+        if ok then table.insert(stack, { path = path, iter = iter, dir_obj = dir_obj }) end
+    end
+    enter(dir)
+    return function(deadline)
+        while #stack > 0 do
+            local top = stack[#stack]
+            local name = top.iter(top.dir_obj)
+            if name == nil then
+                table.remove(stack)
+            elseif name ~= "." and name ~= ".." then
+                local path = top.path .. "/" .. name
+                -- An entry of such a name isn't looked up at all (through the Kindle's FUSE layer,
+                -- with a .sdr folder beside most books): a folder of that name is skipped, and a
+                -- file of that name isn't one the library lists (hidden, or not a book's extension).
+                if not skipsFolder(path, name) then
+                    local attr = lfs.attributes(path) or {}
+                    if attr.mode == "directory" then
+                        enter(path)
+                    elseif attr.mode == "file" or attr.mode == "link" then
+                        callback(path, name, attr)
+                    end
+                end
+                if deadline and time.now() > deadline then return false end
             end
         end
+        return true
     end
 end
 
-function Books.scan()
+-- The library as last scanned.
+local last_scan
+-- What the library cache file held when it was read (on the first scan), and each listed book's
+-- settings file key from the last scan.
+local stored
+local sidecar_keys = {}
+
+-- The first scan starts from the library cache file: titles, authors and locks are the in-memory
+-- caches' starting points (each checked against the file's time as usual), reading states are
+-- handed to KOReader's book list for books whose settings file hasn't changed.
+local function loadStored()
+    stored = LibraryCache.load()
+    for path, known in pairs(stored.metadata or {}) do
+        if metadata[path] == nil then metadata[path] = known end
+    end
+    for path, known in pairs(stored.locked or {}) do
+        if locked_files[path] == nil then locked_files[path] = known end
+    end
+end
+
+local function primeInfo(path)
+    local key = LibraryCache.sidecarKey(path)
+    local previous = sidecar_keys[path]
+    sidecar_keys[path] = key
+    if BookList.hasBookInfoCache(path) then
+        -- Known since a scan that saw the settings file as it is now; otherwise it's read again,
+        -- as KOReader only updates parts of it when a book closes.
+        if previous == key then return end
+        BookList.resetBookInfoCache(path)
+    end
+    local entry = stored.info and stored.info[path]
+    if entry and entry.sidecar == key then BookList.book_info_cache[path] = entry.info end
+end
+
+-- What the next first scan starts from. A reading state is kept only if it can be checked: it came
+-- from a settings file where KOReader keeps them, or the book has none.
+local function storeScan(list)
+    local data = { metadata = {}, locked = {}, info = {} }
+    for _, book in ipairs(list) do
+        local path = book.path
+        local known = metadata[path]
+        if known and known.meta then data.metadata[path] = known end
+        local info = BookList.book_info_cache[path]
+        local key = sidecar_keys[path]
+        if info and key ~= nil and (key or not info.been_opened) then
+            data.info[path] = { sidecar = key, info = info }
+        end
+    end
+    for path, known in pairs(locked_files) do data.locked[path] = known end
+    LibraryCache.save(data)
+end
+
+function Books.scanned()
+    return last_scan ~= nil
+end
+
+-- The scan as steps: step(seconds) works for about that long and returns the library once it's
+-- all scanned (nil until then), so the UI can take input in between. Books.scan() is one step.
+function Books.scanInSteps()
+    if not stored then loadStored() end
+    local time = require("ui/time")
     local manager = infoManager()
     local read_times = lastReadTimes()
     local list = {}
-    findFiles(Books.homeDir(), function(path, file, attr)
+    local walk = fileWalker(Books.homeDir(), function(path, file, attr)
         -- Amazon's own downloads (Downloads/Items01) are its copies; KOReader keeps converted ones in Books.
         if file:sub(1, 1) == "." or path:find("/%.") or path:find("%.sdr/") or path:find("/dictionaries/")
             or path:find("/Kindle Reference/") or path:find("/Downloads/Items01/") then
@@ -140,9 +249,43 @@ function Books.scan()
         local ext = file:match("%.([^.]+)$")
         if not ext or not KINDS[ext:lower()] then return end
         if not DocumentRegistry:hasProvider(path) then return end
+        if MOBI_KINDS[ext:lower()] and mobiLocked(path, attr.modification) then return end
+        primeInfo(path)
         table.insert(list, describe(path, file, attr.modification, read_times, manager))
     end)
+    return function(seconds)
+        if not walk(seconds and time.now() + time.s(seconds)) then return nil end
+        last_scan = list
+        storeScan(list)
+        return list
+    end
+end
+
+function Books.scan()
+    return Books.scanInSteps()()
+end
+
+-- The last scan, with the book read last described again: all that closing a book changes. Shown
+-- while the library is scanned again in case files came or went. nil before the first scan.
+function Books.lastScan()
+    if not last_scan then return nil end
+    local recent = ReadHistory.hist[1] and ReadHistory.hist[1].file
+    local list = {}
+    for i, book in ipairs(last_scan) do
+        list[i] = book.path == recent and Books.forPath(book.path) or book
+    end
+    last_scan = list
     return list
+end
+
+-- What the library shows of each book, to tell whether a new scan changed anything.
+function Books.signature(list)
+    local parts = {}
+    for i, book in ipairs(list) do
+        parts[i] = table.concat({ book.path, book.title, book.authors or "", book.added, book.last_read,
+            book.recent or "", book.status, book.percent or "" }, "\1")
+    end
+    return table.concat(parts, "\2")
 end
 
 -- Each sort in ascending order: oldest, A to Z.
@@ -206,10 +349,13 @@ function Books.query(list, filters, sort, descending)
 end
 
 local cover_cache = {}
+-- The paint each cover was last drawn in, counted by Books.nextPaint.
+local cover_paint, paint = {}, 0
 
 -- Returns the cover scaled to fit w x h, or nil when there is none (yet).
 function Books.cover(book, w, h)
     local key = book.path .. "|" .. w .. "|" .. h
+    cover_paint[key] = paint
     local cached = cover_cache[key]
     if cached ~= nil then return cached or nil end
     local manager = infoManager()
@@ -246,11 +392,21 @@ function Books.fill(image, w, h)
     return cropped
 end
 
-function Books.clearCovers()
-    for _, bb in pairs(cover_cache) do
-        if bb then bb:free() end
+-- Home starts painting its covers.
+function Books.nextPaint()
+    paint = paint + 1
+end
+
+-- Frees the covers; with `keep_shown`, all but the ones Home painted last, which it shows again
+-- when a book closes (scaling them anew took most of its first paint).
+function Books.clearCovers(keep_shown)
+    for key, bb in pairs(cover_cache) do
+        if not (keep_shown and cover_paint[key] == paint) then
+            if bb then bb:free() end
+            cover_cache[key] = nil
+            cover_paint[key] = nil
+        end
     end
-    cover_cache = {}
 end
 
 local extracting = false

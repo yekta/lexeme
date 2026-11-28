@@ -62,6 +62,11 @@ Layout.BOTTOM_MARGIN = 70
 local FONT_HINTING, FONT_GAMMA = 2, 15
 -- crengine won't draw a font bigger than this, so bigger sizes are scaled up in CSS.
 local MAX_ENGINE_SIZE = 72
+-- Kerning, as crengine's font.kerning.mode: 3 shapes text with HarfBuzz (KOReader's Best and its
+-- default), which applies the font's OpenType kerning and ligatures. 1 lays a book out about three
+-- times faster but reads only a legacy 'kern' table, which Bookerly and most recent fonts don't
+-- have, so they aren't kerned at all.
+Layout.KERNING_FAST, Layout.KERNING_BEST = 1, 3
 
 local DEFAULTS = {
     lexeme_font = "Bookerly",
@@ -73,6 +78,7 @@ local DEFAULTS = {
     lexeme_character_spacing = 0,
     lexeme_margins = 1,
     lexeme_align = "justify",
+    lexeme_kerning = Layout.KERNING_BEST,
 }
 
 function Layout.get(key)
@@ -177,6 +183,26 @@ local function applyBold(ui)
     G_reader_settings:saveSetting("copt_font_base_weight", weight)
 end
 
+function Layout.kerning()
+    return Layout.get("lexeme_kerning")
+end
+
+local function applyKerning(ui)
+    local mode = Layout.kerning()
+    ui.document.configurable.font_kerning = mode
+    ui.document:setFontKerning(mode)
+    G_reader_settings:saveSetting("copt_font_kerning", mode)
+end
+
+-- Lays the open book out again, as every book will be.
+function Layout.setKerning(ui, mode)
+    set("lexeme_kerning", mode)
+    if ui and ui.document and ui.rolling then
+        applyKerning(ui)
+        updatePos(ui)
+    end
+end
+
 function Layout.setBold(ui, level)
     set("lexeme_bold", level)
     applyBold(ui)
@@ -267,11 +293,32 @@ end
 -- Reading settings follow the reader, not the book, as on a Kindle: a book
 -- opened with other settings is brought in line with the current ones.
 -- Our stylesheet rides along with KOReader's style tweaks, so every relayout includes it.
+-- KOReader's in-page footnotes (on by default) set a book's notes at the foot of the pages that
+-- refer to them, smaller, and run note files together; the Kindle's reader keeps notes where the book
+-- has them, at the text's size, each file on a page of its own.
+local function withoutInpageFootnotes(tweaks, css)
+    if not css then return css end
+    for id, tweak in pairs(tweaks.tweaks_by_id or {}) do
+        if type(id) == "string" and (id:find("^footnote%-inpage_") or id:find("^inpage_footnote_"))
+                and type(tweak.css) == "string" then
+            -- KOReader trims each tweak's CSS before joining them.
+            local snippet = tweak.css:match("^%s*(.-)%s*$")
+            local s, e
+            if snippet ~= "" then s, e = css:find(snippet, 1, true) end
+            while s do
+                css = css:sub(1, s - 1) .. css:sub(e + 1)
+                s, e = css:find(snippet, 1, true)
+            end
+        end
+    end
+    return css
+end
+
 local function installCss(ui)
     if ui.styletweak.lexeme_css then return end
     local original = ui.styletweak.getCssText
     ui.styletweak.getCssText = function(tweaks)
-        local css = original(tweaks)
+        local css = withoutInpageFootnotes(tweaks, original(tweaks))
         local ours = Layout.css(ui)
         return css and css ~= "" and css .. "\n" .. ours or ours
     end
@@ -297,6 +344,7 @@ function Layout.applyBeforeRender(ui)
     document:setInterlineSpacePercent(100)
     G_reader_settings:saveSetting("copt_line_spacing", 100)
     applyWordSpacing(ui)
+    applyKerning(ui)
     Layout.applyMargins(ui)
     -- Edges as sharp as the Kindle's at its weight: native hinting, contrast a step under 1.45.
     document.configurable.font_hinting = FONT_HINTING

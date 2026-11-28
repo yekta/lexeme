@@ -3,7 +3,8 @@
 # everything reading leaves behind (statistics, look-ups, highlights, positions,
 # history, the sync outbox) and pauses syncing; `off` puts the snapshot back, so
 # nothing done in between counts, and syncing resumes. While it's on, the
-# frontlight is off and the Kindle doesn't sleep; `off` restores both.
+# frontlight is off and the Kindle doesn't go to sleep on its own (the power button
+# still works); `off` restores both.
 # `status` says which.
 # With LEXEME_SERVER and LEXEME_TOKEN set, `on` points the Kindle at that Lexeme
 # (a dev stack) instead, and syncing to it stays on.
@@ -73,14 +74,15 @@ case "$MODE" in
     lipc-get-prop com.lab126.powerd flIntensity > "$SNAP.partial/brightness"
     mv "$SNAP.partial" "$SNAP"
     lipc-set-prop com.lab126.powerd flIntensity 0
-    lipc-set-prop com.lab126.powerd preventScreenSaver 1
+    # Not asleep on its own, while the power button still works (lexeme/devrestart.lua).
+    touch /mnt/us/lexeme-dev/stay-awake
     set_flag true
     if [ -n "$LEXEME_SERVER" ] && [ -n "$LEXEME_TOKEN" ]; then
       use_server
       echo "Using Lexeme at $LEXEME_SERVER"
     fi
     start_koreader
-    echo "Dev mode on: syncing paused, reading data saved, frontlight off, sleep prevented"
+    echo "Dev mode on: syncing paused, reading data saved, frontlight off, no sleeping on its own"
     ;;
   off)
     if [ ! -d "$SNAP" ]; then echo "Dev mode is already off"; exit 0; fi
@@ -90,6 +92,7 @@ case "$MODE" in
     (cd / && tar -xf "$SNAP/data.tar")
     if [ -s "$SNAP/brightness" ]; then lipc-set-prop com.lab126.powerd flIntensity "$(cat "$SNAP/brightness")"; fi
     lipc-set-prop com.lab126.powerd preventScreenSaver 0
+    rm -f /mnt/us/lexeme-dev/stay-awake
     rm -rf "$SNAP"
     set_flag false
     start_koreader

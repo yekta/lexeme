@@ -159,7 +159,7 @@ end
 function Notebook:goTo(item)
     self:close("flashui")
     self.ui.link:addCurrentLocationToStack()
-    self.ui.bookmark:gotoBookmark(item.page, item.pos0)
+    require("lexeme/backstack").jump(self.ui, function() self.ui.bookmark:gotoBookmark(item.page, item.pos0) end)
 end
 
 function Notebook:openFilter()

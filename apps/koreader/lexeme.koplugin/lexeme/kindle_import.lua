@@ -33,14 +33,24 @@ local function rows(path, sql)
     return result
 end
 
--- The KOReader copy of an Amazon book, in documents/Converted: named after the Amazon file at
+-- A copy in documents/Books named after the title. Amazon keeps titles in decomposed Unicode.
+local function copyByTitle(title)
+    local ok, composed = pcall(utf8proc.normalize_NFC, title)
+    title = ok and composed or title
+    local name = title:gsub('[\\/:*?"<>|]+', ""):gsub("^%s+", ""):gsub("[%s%.]+$", ""):sub(1, 150)
+    local path = Books.homeDir() .. "/Books/" .. name .. ".epub"
+    if lfs.attributes(path, "mode") == "file" then return path end
+end
+
+-- The KOReader copy of an Amazon book. In documents/Converted it's named after the Amazon file at
 -- `location` without the Kindle's "_<key>" suffix, in composed Unicode and without the space Amazon
--- sometimes puts in front (as the conversion names them), else with its whole name.
+-- sometimes puts in front (as the conversion names them), else with its whole name; failing that,
+-- it's the copy in documents/Books named after the title.
 local CONVERTED_TYPES = { "epub", "azw3", "azw", "mobi" }
 
-local function convertedPath(location)
+local function convertedPath(location, title)
     local name = type(location) == "string" and location:match("([^/]+)%.[^./]+$")
-    if not name then return nil end
+    if not name then return copyByTitle(title) end
     local names = { name }
     local key = name:match("_([%dA-Z]+)$")
     if key and #key >= 10 then table.insert(names, 1, name:sub(1, #name - #key - 1)) end
@@ -55,6 +65,7 @@ local function convertedPath(location)
             if lfs.attributes(path, "mode") == "file" then return path end
         end
     end
+    return copyByTitle(title)
 end
 
 local function authorsOf(credits)
@@ -81,7 +92,7 @@ local function amazonBooks()
         local percent = tonumber(row[4])
         local opened = (tonumber(row[5]) or 0) > 0 and (percent or 0) > 0
         if not books[cde] or opened then
-            local path = convertedPath(row[7])
+            local path = convertedPath(row[7], title)
             -- The key KOReader keeps for the copy, as syncing sends it; the file's checksum can since differ.
             local settings = path and DocSettings:hasSidecarFile(path) and DocSettings:open(path) or nil
             local key = path and Reading.bookKey(path, settings) or "kindle:" .. cde

@@ -107,8 +107,22 @@ set afterwards, they made crengine style the whole book again.
 the class they require, so each element is checked only against the selectors
 it can match. Books converted from KFX carry a thousand class selectors, and
 checking them all against every element took half of a long book's loading.
-Pages come out the same; Virginia Woolf's complete works (23.6 million
-characters) first opened in 77 seconds and now in 47.
+`crengine-css-shared-states.patch` shares the style states elements inherit
+instead of copying them; `crengine-faster-loading*.patch` unzips and checksums
+the book on other threads and parses it faster. `crengine-text-layout*.patch`
+lays paragraphs out in fewer passes, and `crengine-text-shaping.patch` keeps
+what HarfBuzz returns for each word, so with best kerning a word is shaped
+once rather than every time it appears. Pages come out pixel for pixel as
+KOReader's own engine draws them (checked on five books and two made-up ones
+covering other scripts and MathML, with and without HarfBuzz). Virginia
+Woolf's complete works (23.6 million characters) first opened in 103 seconds
+with best kerning and now in 47. The loading patch also fixes a crengine bug
+that could draw MathML limits off to the side, depending on what memory held.
+
+With `base-cre-update-cache.patch`, crengine writes a book's layout cache in
+short slices while it is being read (`lexeme/cachesave.lua`), so the first
+close of a long book no longer waits for it: Woolf's took 5.7 seconds and now
+takes 0.4.
 
 ### Vocabulary Builder
 

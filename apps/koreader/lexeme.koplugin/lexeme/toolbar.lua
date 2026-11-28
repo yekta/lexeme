@@ -226,6 +226,7 @@ function Toolbar:paintStrip(bb, x, y, w, h)
     local box_w = tw + 2 * border
     local cx = x + math.floor((w - box_w) / 2 + 0.5)
     local page, count = Progress.page(ui), Progress.pageCount(ui)
+    self.strip = { x = x, y = y, w = w, h = h }
     local slots = {
         { page = page, left = cx },
         { page = page - 1, left = cx - gap - box_w, tap = function() self:turn(-1) end },
@@ -255,6 +256,19 @@ function Toolbar:turn(by)
     local Event = require("ui/event")
     self.ui:handleEvent(Event:new("GotoViewRel", by))
     self:refresh()
+end
+
+-- Swiping across the strip turns the page, as on the Kindle: left to the next, right to the one before.
+function Toolbar:onSwipe(direction, ges)
+    local strip = self.strip
+    if not (strip and self.ui.rolling) then return end
+    local pos = ges.pos
+    if pos.x < strip.x or pos.x >= strip.x + strip.w or pos.y < strip.y or pos.y >= strip.y + strip.h then return end
+    local by = direction == "west" and 1 or direction == "east" and -1 or nil
+    if not by then return end
+    local page = Progress.page(self.ui) + by
+    if page >= 1 and page <= Progress.pageCount(self.ui) then self:turn(by) end
+    return true
 end
 
 -- "Back to loc 2,147", just above the progress panel: on the left when that place is behind the

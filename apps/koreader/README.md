@@ -82,14 +82,41 @@ copy them over the dictionary's and delete its `.oft` caches.
 
 ### Kindle locations
 
-A book whose conversion marked each of the Kindle's locations in its text
-(`<span id="lexeme_loc_N"/>`, or where a file or an element with an id starts,
-listed by spine item in `META-INF/lexeme-locations.txt`) takes its locations
-from those marks: a page's location is the last one marked before it, found by
-a binary search in reading order, without laying anything out. A book
-converted from Amazon's copy in `Downloads/Items01` takes them from that copy's
-location map instead, and any other book gets Amazon's rule of one location
-per 150 bytes of HTML (see `lexeme/locations.lua`).
+A place in a book is in the last location starting at or before it, where
+Amazon's location map has them start: so many visible characters into the
+text (see `lexeme/locations.lua`).
+
+- A book whose conversion marked each of the Kindle's locations in its text
+  (`<span id="lexeme_loc_N"/>`, or where a file or an element with an id
+  starts, listed by spine item in `META-INF/lexeme-locations.txt`) takes its
+  locations from those marks, found by a binary search in reading order,
+  without laying anything out. The conversion also leaves
+  `lexeme_kindle_locations.txt` beside the book's settings: the location
+  count, the marks it moved back to the start of their word (a long press
+  takes an element for a word's edge) and by how many characters, and in a
+  long book that marks every few locations only, where the others start. A
+  place's location then takes counting a few characters at most, and comes out
+  as Amazon's map has it on every page but those that start with a picture,
+  which get the picture's own location.
+- A book converted from Amazon's copy in `Downloads/Items01` takes them from
+  that copy's location map, read once and kept beside the book's settings.
+- Any other book gets Amazon's rule of one location per 150 bytes of HTML.
+
+Measuring where a place is in those two takes reading the text before it, so a
+book keeps its size and a few places with the measure up to them in its
+settings, and a measure starts from the nearest. Reopening a long book, or
+jumping in it, doesn't read it from the start again.
+
+Amazon's map gives a paragraph's position past a block set inside it (a boxed
+line in a diary, say) as one position, though the block's text is read where it
+stands: `kfx.lua` counts that text, which Woolf's diaries have 121 of.
+
+Syncing gives the books not open their location counts and highlights' and
+pages' locations, each book measured in a child process, never on the
+screen's thread. A converted book's count comes from its marks file without
+opening it; a book with marks is loaded but not laid out, a book over 8 MB
+waits until it's next opened, and none is closed in the child, which would
+write its layout to crengine's cache.
 
 ### Opening long books
 

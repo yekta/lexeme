@@ -11,8 +11,13 @@ function Progress.pageCount(ui)
 end
 
 -- The page as the Kindle numbers it: the print edition's page when the book
--- carries a page map, the screen page otherwise.
+-- carries a page map, the screen page otherwise. A page map of Kindle locations
+-- isn't pages; a converted book may keep its print pages beside it.
 function Progress.pageLabel(ui)
+    local Locations = require("lexeme/locations")
+    if Locations.replacesPages(ui) then
+        return Locations.printPage(ui) or tostring(Progress.page(ui))
+    end
     local pagemap = ui.pagemap
     if pagemap and pagemap.has_pagemap then
         local label = pagemap:getCurrentPageLabel(true)
@@ -22,6 +27,10 @@ function Progress.pageLabel(ui)
 end
 
 function Progress.pageCountLabel(ui)
+    local Locations = require("lexeme/locations")
+    if Locations.replacesPages(ui) then
+        return select(2, Locations.printPage(ui)) or tostring(Progress.pageCount(ui))
+    end
     local pagemap = ui.pagemap
     if pagemap and pagemap.has_pagemap then
         local label = pagemap:getLastPageLabel(true)

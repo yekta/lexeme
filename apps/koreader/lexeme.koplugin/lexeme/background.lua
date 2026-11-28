@@ -52,18 +52,24 @@ end
 
 --[[
 Returns what `fn` returns, run in a child process so the screen isn't held up.
-`on_poll` is called while it runs. Outside a task it just calls `fn`. Results
-must be plain data: strings, numbers, booleans, tables of them.
+`on_poll` is called while it runs. Outside a task it just calls `fn`, and so it
+does when no child process can be started, unless `apart` says `fn` is too heavy
+to run on the screen's thread: then it fails instead. Results must be plain
+data: strings, numbers, booleans, tables of them.
 ]]
-function Background.await(fn, on_poll)
+function Background.await(fn, on_poll, apart)
     local co = coroutine.running()
-    if not co or co ~= current then return fn() end
+    if not co or co ~= current then
+        if apart then error("Not in a background task.", 0) end
+        return fn()
+    end
     local pid, fd = ffiutil.runInSubProcess(function(_, write_fd)
         local ok, encoded = pcall(buffer.encode, pack(pcall(fn)))
         ffiutil.writeToFD(write_fd, ok and encoded or "", true)
     end, true)
     if not pid then
         logger.warn("Lexeme: couldn't start a background process:", fd)
+        if apart then error("No background process.", 0) end
         return fn()
     end
     local function poll()

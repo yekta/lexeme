@@ -209,14 +209,154 @@ local function fileStamp(path)
     return attr and (attr.modification .. ":" .. attr.size) or "-"
 end
 
+--[[
+Seconds read on each day, from KOReader's page visits. Adding up tens of thousands of visits takes a
+while on a Kindle, so the days are kept, though nothing is taken to stay as it was: visits are
+deleted and changed as well as added (a statistics reset or sync, an import replaced, days cleared).
+- Every day is counted afresh each time KOReader starts, and when the time zone changes.
+- When the statistics file changes, the visits added since (KOReader gives each a higher rowid) are
+  counted on their own, which keeps Home quick after a book.
+- A moment later, while the Kindle is idle, the kept days are checked against every visit: their
+  number, total time and start times. If they differ, every day is counted again and Home repaints.
+]]
+local counted
+
+-- The statistics file and its write-ahead log, as they last changed.
+local function statisticsStamp()
+    local path = statisticsPath()
+    return fileStamp(path) .. "/" .. fileStamp(path .. "-wal")
+end
+
+-- Runs `f` on the statistics in one snapshot, so a visit KOReader writes meanwhile isn't counted twice.
+local function withStatistics(f)
+    local conn = require("lua-ljsqlite3/init").open(statisticsPath(), "ro")
+    local ok, result, more = pcall(function()
+        conn:exec("BEGIN;")
+        return f(conn)
+    end)
+    pcall(conn.exec, conn, "COMMIT;")
+    conn:close()
+    return ok, result, more
+end
+
+local function numberOf(conn, sql)
+    local columns = conn:exec(sql)
+    return columns and tonumber(columns[1][1]) or 0
+end
+
+-- The newest visit counted, as "start:duration", or nil once it's gone.
+local function visitAt(conn, rowid)
+    local columns = conn:exec("SELECT start_time || ':' || duration FROM page_stat_data WHERE rowid = "
+        .. rowid .. ";")
+    return columns and columns[1][1] or nil
+end
+
+-- The imported Amazon books as they stand, to tell when finishedBooks must read them again.
+local function importedStamp(conn)
+    local ok, columns = pcall(conn.exec, conn, [[SELECT count(*), coalesce(max(rowid), 0), total(finished_at),
+        total(last_read_at), (SELECT count(*) FROM book), (SELECT coalesce(max(id), 0) FROM book)
+        FROM lexeme_amazon_book;]])
+    if not ok or not columns then return nil end
+    local parts = {}
+    for c = 1, #columns do parts[c] = tostring(tonumber(columns[c][1])) end
+    return table.concat(parts, ":")
+end
+
+-- Every day counted afresh, with what the check compares: the visits' number, time and start times.
+local function countAll(conn, version)
+    local fresh = { zone = utcOffsetMinutes(), seconds = {}, rows = 0, time = 0, starts = 0, version = version }
+    local columns = conn:exec([[SELECT date(start_time, 'unixepoch', 'localtime'), total(duration), count(*),
+        total(start_time) FROM page_stat_data GROUP BY 1;]])
+    for i = 1, columns and #columns[1] or 0 do
+        local seconds = tonumber(columns[2][i]) or 0
+        fresh.seconds[columns[1][i]] = seconds
+        fresh.time = fresh.time + seconds
+        fresh.rows = fresh.rows + tonumber(columns[3][i])
+        fresh.starts = fresh.starts + (tonumber(columns[4][i]) or 0)
+    end
+    fresh.last = numberOf(conn, "SELECT coalesce(max(rowid), 0) FROM page_stat_data;")
+    fresh.newest = visitAt(conn, fresh.last)
+    fresh.imported = importedStamp(conn)
+    return fresh
+end
+
+-- Counts the visits added since `kept` was counted into it; false when its newest visit is gone.
+local function addNew(conn, kept)
+    local last = numberOf(conn, "SELECT coalesce(max(rowid), 0) FROM page_stat_data;")
+    if last < kept.last or visitAt(conn, kept.last) ~= kept.newest then return false end
+    if last > kept.last then
+        local added = conn:exec(string.format(
+            "SELECT start_time, duration FROM page_stat_data WHERE rowid > %d;", kept.last))
+        for i = 1, added and #added[1] or 0 do
+            local at, seconds = tonumber(added[1][i]) or 0, tonumber(added[2][i]) or 0
+            local key = os.date("%Y-%m-%d", at)
+            kept.seconds[key] = (kept.seconds[key] or 0) + seconds
+            kept.rows, kept.time, kept.starts = kept.rows + 1, kept.time + seconds, kept.starts + at
+        end
+        kept.last, kept.newest = last, visitAt(conn, last)
+        kept.version = kept.version + 1
+    end
+    kept.imported = importedStamp(conn)
+    return true
+end
+
+-- Whether the kept days still add up to every visit.
+local function matches(conn, kept)
+    local columns = conn:exec(
+        "SELECT count(*), total(duration), total(start_time), coalesce(max(rowid), 0) FROM page_stat_data;")
+    return tonumber(columns[1][1]) == kept.rows and tonumber(columns[2][1]) == kept.time
+        and tonumber(columns[3][1]) == kept.starts and tonumber(columns[4][1]) == kept.last
+end
+
+local function checkDays()
+    local kept = counted
+    if not kept or lfs.attributes(statisticsPath(), "mode") ~= "file" then return end
+    local version = kept.version
+    local ok, fresh = withStatistics(function(conn)
+        if kept.zone == utcOffsetMinutes() and addNew(conn, kept) and matches(conn, kept) then return kept end
+        return countAll(conn, version + 1)
+    end)
+    if not ok or counted ~= kept then return end
+    fresh.stamp, fresh.checked = statisticsStamp(), os.time()
+    counted = fresh
+    if fresh.version ~= version then
+        local Event = require("ui/event")
+        require("ui/uimanager"):broadcastEvent(Event:new("LexemeStreakChanged"))
+    end
+end
+
+-- The kept days, brought up to date with KOReader's statistics.
+local function daysCounted()
+    if lfs.attributes(statisticsPath(), "mode") ~= "file" then
+        counted = nil
+        return { seconds = {}, version = 0 }
+    end
+    local stamp, now, kept = statisticsStamp(), os.time(), counted
+    if kept and kept.stamp == stamp and now - kept.checked < 60 then return kept end
+    local ok, result, quick = withStatistics(function(conn)
+        if kept and kept.zone == utcOffsetMinutes() and addNew(conn, kept) then return kept, true end
+        return countAll(conn, (kept and kept.version or 0) + 1), false
+    end)
+    if not ok then
+        counted = nil
+        return { seconds = {}, version = 0 }
+    end
+    local changed = not kept or kept.stamp ~= stamp
+    result.stamp, result.checked = stamp, now
+    counted = result
+    if quick and changed then
+        local UIManager = require("ui/uimanager")
+        UIManager:unschedule(checkDays)
+        UIManager:scheduleIn(2, checkDays)
+    end
+    return result
+end
+
 -- Seconds read on each day ("YYYY-MM-DD"), only the days that pass MIN_DAY_SECONDS.
 local function readingDays()
     local days = {}
-    local columns = columnsOf(
-        "SELECT date(start_time, 'unixepoch', 'localtime'), SUM(duration) FROM page_stat_data GROUP BY 1;")
-    for i = 1, columns and #columns[1] or 0 do
-        local seconds = tonumber(columns[2][i]) or 0
-        if seconds >= Streak.MIN_DAY_SECONDS then days[columns[1][i]] = seconds end
+    for key, seconds in pairs(daysCounted().seconds) do
+        if seconds >= Streak.MIN_DAY_SECONDS then days[key] = seconds end
     end
     return days
 end
@@ -250,11 +390,22 @@ local function finishedInKOReader()
     return books
 end
 
+local kept_imported
+
+-- The imported Amazon books, read again only once they've changed (as the kept days last saw them).
+local function importedBooks()
+    local stamp = counted and counted.imported
+    if stamp and kept_imported and kept_imported.stamp == stamp then return kept_imported.books end
+    local books = require("lexeme/amazon_history").books()
+    kept_imported = stamp and { stamp = stamp, books = books } or nil
+    return books
+end
+
 -- Finished books by key: KOReader's, and those the imported history finished that KOReader hasn't.
 local function finishedBooks()
     local books = {}
     for key, book in pairs(finishedInKOReader()) do books[key] = book end
-    for _, book in ipairs(require("lexeme/amazon_history").books()) do
+    for _, book in ipairs(importedBooks()) do
         if book.finished_at and not books[book.key] then
             books[book.key] = { title = book.title, authors = book.authors, at = book.finished_at }
         end
@@ -267,7 +418,8 @@ local cached
 -- Streak.summary's fields, counted on this Kindle; `streak` is the days read in a row up to today.
 function Streak.localSummary()
     local now = os.time()
-    local stamp = dayKey(now, 0) .. "/" .. (lfs.attributes(statisticsPath(), "modification") or 0)
+    local stamp = table.concat({ dayKey(now, 0), lfs.attributes(statisticsPath(), "modification") or 0,
+        counted and counted.version or 0 }, "/")
     if cached and cached.stamp == stamp and now - cached.at < 60 then return cached.summary end
     local read = readingDays()
     local total = 0
@@ -307,31 +459,57 @@ is midnight to 1 AM, in seconds; `total` and `days` are the time and the reading
 the range. A stretch running past the hour is split between the hours, and days that
 don't pass MIN_DAY_SECONDS are left out, as on Home.
 ]]
+local kept_hours = {}
+
 function Streak.hours(days)
     local since = 0
     if days then since = noonOf(dayKey(os.time(), 0)) - (days - 1) * 86400 - 12 * 3600 end
     local read = readingDays()
+    -- Kept until the days change, or the range moves on with a new day.
+    local stamp = daysCounted().version .. "/" .. since
+    local kept = kept_hours[days or "all"]
+    if kept and kept.stamp == stamp then return kept.result end
     local result = { hours = {}, total = 0, days = 0 }
     for h = 1, 24 do result.hours[h] = 0 end
+    -- Day names sort as dates: no clock lookup for each.
+    local first = since > 0 and os.date("%Y-%m-%d", since + 12 * 3600) or ""
     for key, seconds in pairs(read) do
-        if noonOf(key) >= since then
+        if key >= first then
             result.total = result.total + seconds
             result.days = result.days + 1
         end
     end
     local columns = columnsOf(string.format(
-        "SELECT start_time, duration FROM page_stat_data WHERE start_time >= %d;", since))
+        "SELECT start_time, duration FROM page_stat_data WHERE start_time >= %d ORDER BY start_time;", since))
+    -- Within a day of 24 hours, a visit's hour comes from the day's start: only a new day asks the clock.
+    local key, start, stop, regular
     for i = 1, columns and #columns[1] or 0 do
         local at, left = tonumber(columns[1][i]), tonumber(columns[2][i]) or 0
-        if at and read[dayKey(at, 0)] then
-            while left > 0 do
+        if at then
+            if not key or at < start or at >= stop then
                 local t = os.date("*t", at)
-                local part = math.min(left, 3600 - t.min * 60 - t.sec)
-                result.hours[t.hour + 1] = result.hours[t.hour + 1] + part
-                at, left = at + part, left - part
+                key = string.format("%04d-%02d-%02d", t.year, t.month, t.day)
+                start = os.time{ year = t.year, month = t.month, day = t.day, hour = 0 }
+                stop = os.time{ year = t.year, month = t.month, day = t.day + 1, hour = 0 }
+                regular = stop - start == 86400
+            end
+            if read[key] then
+                while left > 0 do
+                    local hour, part
+                    if regular and at < stop then
+                        hour = math.floor((at - start) / 3600)
+                        part = math.min(left, start + (hour + 1) * 3600 - at)
+                    else
+                        local t = os.date("*t", at)
+                        hour, part = t.hour, math.min(left, 3600 - t.min * 60 - t.sec)
+                    end
+                    result.hours[hour + 1] = result.hours[hour + 1] + part
+                    at, left = at + part, left - part
+                end
             end
         end
     end
+    kept_hours[days or "all"] = { stamp = stamp, result = result }
     return result
 end
 

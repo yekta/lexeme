@@ -6,7 +6,8 @@ local Blitbuffer = require("ffi/blitbuffer")
 local Font = require("ui/font")
 local RenderImage = require("ui/renderimage")
 local RenderText = require("ui/rendertext")
-local Screen = require("device").screen
+local Device = require("device")
+local Screen = Device.screen
 local lfs = require("libs/libkoreader-lfs")
 
 local D = {}
@@ -32,6 +33,24 @@ function D.px(n)
     local dpi = Screen:getDPI()
     if dpi and dpi >= 280 and dpi <= 320 then return math.floor(n + 0.5) end
     return D.s(n)
+end
+
+-- Home and the library were measured on a Paperwhite 5 on firmware 5.19.2, whose covers carry how far
+-- they're read (lexeme/cover_marks.lua). On it they're drawn as measured, in its own pixels; every other
+-- Kindle keeps the look measured on a Paperwhite 12, scaled to its screen, until its own is measured.
+function D.measuredHere()
+    return Device.model == "KindlePaperWhite5"
+end
+
+-- A size in Home's and the library's layout (see D.measuredHere): the Kindle's pixels on the Kindle
+-- they were measured on, else scaled from the Paperwhite 12's. The same on a Paperwhite 12 either way.
+function D.shell(n)
+    return D.measuredHere() and D.px(n) or D.s(n)
+end
+
+-- A face in Home's and the library's layout, `em` sized as D.shell sizes.
+function D.shellFace(kind, em)
+    return D.measuredHere() and D.nface(kind, em) or D.face(kind, em)
 end
 
 -- Measurements taken on a Paperwhite 5 (1236 x 1648), pinned to the right or bottom edge.

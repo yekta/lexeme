@@ -25,10 +25,14 @@ local Shell = View:extend{
     open_settings = nil,
 }
 
--- The Kindle's library grid on a Paperwhite 5, in its pixels (D.px): each cover fitted whole into a
--- 330 x 511 box, on the box's bottom, with how far it's read on the cover itself; the first box 30 px
--- under the rule, and a third row peeking in under the second.
-local GRID = { x = 60, pitch_x = 363, top = 30, pitch_y = 544, cover_w = 330, cover_h = 511, cols = 3 }
+local GRID = { x = 109, pitch_x = 357, top = 361, pitch_y = 632, cover_w = 310, cover_h = 512, cols = 3 }
+-- The library grid where it was measured (D.measuredHere), in the Kindle's pixels: each cover fitted whole
+-- into a 330 x 511 box, on the box's bottom, with how far it's read on the cover itself; the first box
+-- 30 px under the rule, and a third row peeking in under the second.
+local MEASURED_GRID = { x = 60, pitch_x = 363, top = 30, pitch_y = 544, cover_w = 330, cover_h = 511, cols = 3 }
+-- Home's "From Your Library" row there: 293 x 453 boxes 325.5 px apart, the row clipped 115 px from
+-- the right edge; the title's baseline 59 px under the row's top, the boxes 88 px under it.
+local MEASURED_ROW = { x = 37, pitch = 325.5, cover_w = 293, cover_h = 453, top = 88, title = 59, clip = 115 }
 local LIST = { top = 345, pitch = 265 }
 local DECKS = { top = 345, pitch = 206, per_page = 6 }
 -- Seconds after a book closes before the library is scanned again.
@@ -245,57 +249,63 @@ function Shell:render(bb, x, y, w, h)
 end
 
 function Shell:paintSearchRow(bb, x, y, w)
-    local pill_w = w - D.s(36 + 122)
-    D.border(bb, x + D.s(36), y + D.s(108), pill_w, D.s(101), D.s(2), D.BLACK, D.s(50))
-    D.icon(bb, "search", x + D.s(86), y + D.s(136), D.s(42), D.s(42))
-    D.text(bb, x + D.s(164), y + D.s(170), D.face("medium", 35), "Search Kindle")
-    self:hit(x + D.s(36), y + D.s(108), pill_w, D.s(101), function() self:openSearch() end)
+    local S = D.shell
+    local pill_w = w - S(36 + 122)
+    D.border(bb, x + S(36), y + S(108), pill_w, S(101), S(2), D.BLACK, S(50))
+    D.icon(bb, "search", x + S(86), y + S(136), S(42), S(42))
+    D.text(bb, x + S(164), y + S(170), D.shellFace("medium", 35), "Search Kindle")
+    self:hit(x + S(36), y + S(108), pill_w, S(101), function() self:openSearch() end)
 
-    local more_x = x + w - D.s(77)
-    D.icon(bb, "ellipsis-vertical", more_x, y + D.s(139), D.s(38), D.s(38))
-    self:pressable(more_x - D.s(20), y + D.s(108), D.s(78), D.s(101), function()
-        Menu:new{ items = self.menu_items(), right = x + w - D.s(37), top = y + D.s(215) }:show()
-    end, D.around(more_x + D.s(19), y + D.s(158), D.s(101), D.s(101)))
+    local more_x = x + w - S(77)
+    D.icon(bb, "ellipsis-vertical", more_x, y + S(139), S(38), S(38))
+    self:pressable(more_x - S(20), y + S(108), S(78), S(101), function()
+        Menu:new{ items = self.menu_items(), right = x + w - S(37), top = y + S(215) }:show()
+    end, D.around(more_x + S(19), y + S(158), S(101), S(101)))
 end
 
 -- Library -------------------------------------------------------------------
 
 function Shell:paintLibrary(bb, x, y, w, h)
-    D.icon(bb, "settings-2", x + D.s(25), y + D.s(253), D.s(52), D.s(52))
-    self:pressable(x, y + D.s(240), D.s(90), D.s(80), function()
+    local S = D.shell
+    local measured = D.measuredHere()
+    -- The right-hand icons, measured on a 1272 px screen: kept as far from the right edge where measured.
+    local function right(n) return measured and x + w - D.px(1272 - n) or x + D.s(n) end
+    D.icon(bb, "settings-2", x + S(25), y + S(253), S(52), S(52))
+    self:pressable(x, y + S(240), S(90), S(80), function()
         LibrarySheets.FilterSheet:new{ shell = self }:show()
-    end, D.around(x + D.s(50), y + D.s(279), D.s(86), D.s(86)))
-    local chip_x = x + D.s(93)
-    local face = D.face("regular", 32)
+    end, D.around(x + S(50), y + S(279), S(86), S(86)))
+    local chip_x = x + S(93)
+    local face = D.shellFace("regular", 32)
     for _, filter in ipairs(FILTERS) do
-        local chip_w = D.width(face, filter.label) + D.s(66)
+        local chip_w = D.width(face, filter.label) + S(66)
         local selected = self.filters.status[filter.key] == true
         if selected then
-            D.roundRect(bb, chip_x, y + D.s(241), chip_w, D.s(78), D.BLACK, D.s(39))
+            D.roundRect(bb, chip_x, y + S(241), chip_w, S(78), D.BLACK, S(39))
         else
-            D.border(bb, chip_x, y + D.s(241), chip_w, D.s(78), D.s(2), D.BLACK, D.s(39))
+            D.border(bb, chip_x, y + S(241), chip_w, S(78), S(2), D.BLACK, S(39))
         end
-        D.text(bb, chip_x + D.s(33), y + D.s(291), face, filter.label, selected and D.WHITE or D.BLACK)
-        self:hit(chip_x, y + D.s(241), chip_w, D.s(78), function() self:toggleFilter("status", filter.key) end)
-        chip_x = chip_x + chip_w + D.s(15)
+        D.text(bb, chip_x + S(33), y + S(291), face, filter.label, selected and D.WHITE or D.BLACK)
+        self:hit(chip_x, y + S(241), chip_w, S(78), function() self:toggleFilter("status", filter.key) end)
+        chip_x = chip_x + chip_w + S(15)
     end
 
     local layout_icon = self.layout == "grid" and "list" or "layout-grid"
-    D.icon(bb, layout_icon, x + D.s(1112), y + D.s(257), D.s(47), D.s(47))
-    self:pressable(x + D.s(1095), y + D.s(240), D.s(80), D.s(80), function()
+    D.icon(bb, layout_icon, right(1112), y + S(257), S(47), S(47))
+    self:pressable(right(1095), y + S(240), S(80), S(80), function()
         self.layout = self.layout == "grid" and "list" or "grid"
         G_reader_settings:saveSetting("lexeme_library_layout", self.layout)
         self.page = 1
         self:refresh("flashui")
-    end, D.around(x + D.s(1135), y + D.s(279), D.s(86), D.s(86)))
-    D.icon(bb, "arrow-down-up", x + D.s(1193), y + D.s(253), D.s(55), D.s(55))
-    self:pressable(x + D.s(1180), y + D.s(240), D.s(85), D.s(80), function()
+    end, D.around(right(1135), y + S(279), S(86), S(86)))
+    D.icon(bb, "arrow-down-up", right(1193), y + S(253), S(55), S(55))
+    self:pressable(right(1180), y + S(240), S(85), S(80), function()
         LibrarySheets.SortSheet:new{ shell = self }:show()
-    end, D.around(x + D.s(1220), y + D.s(279), D.s(86), D.s(86)))
+    end, D.around(right(1220), y + S(279), S(86), S(86)))
 
-    D.rect(bb, x, y + D.s(342), w, D.s(3), D.gray(119))
+    -- The rule under the header: 4 px where measured, 3 as measured on a Paperwhite 12.
+    D.rect(bb, x, y + S(342), w, measured and D.px(4) or D.s(3), D.gray(119))
 
-    local area_top, area_bottom = y + D.s(345), y + h - D.s(111)
+    local area_top, area_bottom = y + (measured and D.px(346) or D.s(345)), y + h - D.s(111)
     local area = bb:viewport(x, area_top, w, area_bottom - area_top)
     local per_page, pages
     if self.layout == "grid" then
@@ -329,7 +339,7 @@ local function paintOpening(area, ox, oy, dx, dy, dw, dh, label)
     local bx, by, bw, bh = openingBand(dx, dy, dw, dh)
     D.rect(area, bx - ox, by - oy, bw, bh)
     D.textCenter(area, dx - ox + math.floor(dw / 2), by - oy + D.s(44), D.face("regular", 29), label or "Opening",
-        D.WHITE, dw - D.s(16))
+        D.WHITE, label and dw - D.s(16) or nil)
 end
 
 -- "Opening" on a cover just tapped. Drawn straight onto the screen, with only that band refreshed,
@@ -358,7 +368,8 @@ end
 -- it's read on it (lexeme/cover_marks.lua) rather than beside it.
 function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu, marked)
     -- The Kindle's cover for a book without one is as tall as its grid's boxes, elsewhere 2:3.
-    local generic_h = math.min(ch, math.floor(cw * (marked and GRID.cover_h / GRID.cover_w or 1.5) + 0.5))
+    local generic_h = math.min(ch, math.floor(cw * (marked and MEASURED_GRID.cover_h / MEASURED_GRID.cover_w or 1.5)
+        + 0.5))
     if book.delivery then
         local dh = generic_h
         local dy = cy + ch - dh
@@ -454,19 +465,43 @@ local function pressedCoverMenu(dx, dy, dw, dh)
     return { x = x, y = y, w = w, h = h, paint = function(bb) D.icon(bb, "cover-menu-pressed", x, y, w, h) end }
 end
 
-function Shell:paintGrid(area, ox, oy, first)
-    local cw, ch = D.px(GRID.cover_w), D.px(GRID.cover_h)
-    for i = 0, GRID.cols * 3 - 1 do
+-- Where the library was measured (D.measuredHere): covers with how far they're read on them.
+function Shell:paintMeasuredGrid(area, ox, oy, first)
+    local grid = MEASURED_GRID
+    local cw, ch = D.px(grid.cover_w), D.px(grid.cover_h)
+    for i = 0, grid.cols * 3 - 1 do
         local book = self.books[first + i + 1]
         if not book then break end
-        local col, row = i % GRID.cols, math.floor(i / GRID.cols)
-        local cx = ox + D.px(GRID.x + col * GRID.pitch_x)
-        local cy = oy + D.px(GRID.top + row * GRID.pitch_y)
+        local col, row = i % grid.cols, math.floor(i / grid.cols)
+        local cx = ox + D.px(grid.x + col * grid.pitch_x)
+        local cy = oy + D.px(grid.top + row * grid.pitch_y)
         local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, cx, cy, cw, ch, true, true)
         if row < 2 then
             local function menu() self:openBookMenu(book, dx + dw, dy + dh) end
             self:hit(dx, dy, dw, dh, function() self.open_book(book.path) end, menu)
             self:pressable(dx + dw - D.px(50), dy + dh - D.px(80), D.px(50), D.px(80), menu,
+                pressedCoverMenu(dx, dy, dw, dh))
+        end
+    end
+end
+
+function Shell:paintGrid(area, ox, oy, first)
+    if D.measuredHere() then return self:paintMeasuredGrid(area, ox, oy, first) end
+    for i = 0, GRID.cols * 3 - 1 do
+        local book = self.books[first + i + 1]
+        if not book then break end
+        local col, row = i % GRID.cols, math.floor(i / GRID.cols)
+        local cx = ox + D.s(GRID.x + col * GRID.pitch_x)
+        local cy = oy + D.s(GRID.top - 345 + row * GRID.pitch_y)
+        local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h), true)
+        self:paintBadge(area, ox, oy, book, cx, cy + D.s(GRID.cover_h + 41))
+        if row < 2 then
+            self:hit(cx, cy, D.s(GRID.cover_w), D.s(GRID.cover_h + 60),
+                function() self.open_book(book.path) end,
+                function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end)
+            local menu_x = cx + D.s(GRID.cover_w - 50)
+            self:pressable(menu_x, cy + D.s(GRID.cover_h - 80), D.s(60), D.s(80),
+                function() self:openBookMenu(book, cx + D.s(GRID.cover_w), cy + D.s(GRID.cover_h)) end,
                 pressedCoverMenu(dx, dy, dw, dh))
         end
     end
@@ -632,7 +667,49 @@ end
 -- A titled row of covers. As on the Kindle, covers share a bottom edge and the
 -- row is as tall as its tallest cover, and it scrolls sideways when swiped.
 -- Returns the y where the row ends.
+-- Home's row where it was measured (D.measuredHere): fixed boxes, the covers fitted whole into them
+-- with how far they're read on them, nothing underneath.
+local function paintMeasuredCarousel(self, bb, x, top, w, title, books, on_more)
+    local row = MEASURED_ROW
+    local first = math.min(self.carousel_first[title] or 1, math.max(1, #books))
+    D.text(bb, x + D.px(57), top + D.px(row.title), D.nface("display", 55), title)
+    if on_more then
+        D.icon(bb, "chevron-right-thin", x + w - D.px(161), top + D.px(1), D.px(70), D.px(70))
+        self:pressable(x, top - D.px(30), w, D.px(110), on_more,
+            { x = x + D.px(36), y = top - D.px(8), w = w - D.px(36 + row.clip), h = D.px(88) })
+    end
+    local cell_w, cell_h = D.px(row.cover_w), D.px(row.cover_h)
+    local clip = x + w - D.px(row.clip)
+    local visible, whole = {}, 0
+    for i = first, #books do
+        local cx = x + D.px(math.floor(row.x + (i - first) * row.pitch + 0.5))
+        if cx > clip then break end
+        if cx + cell_w <= clip then whole = whole + 1 end
+        table.insert(visible, { book = books[i], cx = cx })
+    end
+    local cover_top = top + D.px(row.top)
+    table.insert(self.carousels, {
+        title = title, top = top - D.px(30), bottom = cover_top + cell_h + D.px(2),
+        count = #books, step = math.max(1, whole),
+    })
+    local area = bb:viewport(x, cover_top - D.px(10), clip - x, cell_h + D.px(14))
+    local ox, oy = x, cover_top - D.px(10)
+    for _, item in ipairs(visible) do
+        local book = item.book
+        local dx, dy, dw, dh = self:paintCover(area, ox, oy, book, item.cx, cover_top, cell_w, cell_h, true, true)
+        local function menu() self:openBookMenu(book) end
+        self:hit(dx, dy, math.min(dw, clip - dx), dh, function() self.open_book(book.path) end, menu)
+        if dx + dw <= clip then
+            self:pressable(dx + dw - D.px(50), dy + dh - D.px(80), D.px(50), D.px(80), menu,
+                pressedCoverMenu(dx, dy, dw, dh))
+        end
+    end
+    -- The next heading's baseline 107 px under the boxes, as on the Kindle.
+    return cover_top + cell_h + D.px(12)
+end
+
 local function paintCarousel(self, bb, x, top, w, title, books, on_more)
+    if D.measuredHere() then return paintMeasuredCarousel(self, bb, x, top, w, title, books, on_more) end
     local first = math.min(self.carousel_first[title] or 1, math.max(1, #books))
     D.text(bb, x + D.s(57), top + D.s(58), D.face("display", 55), title)
     if on_more then
@@ -834,7 +911,7 @@ function Shell:paintHome(bb, x, y, w, h)
         D.textCenter(bb, x + w / 2, y + D.s(800), D.face("regular", 36), "No books found in " .. Books.homeDir())
         return
     end
-    local bottom = paintCarousel(self, bb, x, y + D.s(243), w, "From Your Library", recent,
+    local bottom = paintCarousel(self, bb, x, y + D.shell(243), w, "From Your Library", recent,
         function() self:setTab("library") end)
     local connected = Sync.isConnected()
     local reading = G_reader_settings:nilOrTrue("lexeme_home_stats") and (require("lexeme/stats_page").summary())

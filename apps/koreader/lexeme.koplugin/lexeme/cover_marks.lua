@@ -1,9 +1,9 @@
 --[[
-What the Kindle's library draws on a cover, measured on a Paperwhite 5 (see the Library grid notes in
-amazon-reference): how far into the book, on a ribbon at the cover's top right; "New" or "Read" on a
-band across that corner; a ✓ at its bottom left for a book on the device. Each has a thin gray
-outline, which shows on a dark cover. Sizes are the Kindle's own pixels (D.px), and the shapes are
-icons drawn once at their size.
+What the Kindle's library and Home draw on a cover, measured on a Paperwhite 5 on firmware 5.19.2
+(D.measuredHere; the Library grid notes in amazon-reference): how far into the book, on a ribbon at
+the cover's top right; "New" or "Read" on a band across that corner; a ✓ at its bottom left for a
+book on the device. Each has a thin gray outline, which shows on a dark cover. Sizes are the
+Kindle's own pixels (D.px), and the shapes are icons drawn once at their size.
 ]]
 local Blitbuffer = require("ffi/blitbuffer")
 
@@ -84,7 +84,8 @@ end
 
 -- Where the cover's ⋮ goes: three dots up the bottom right corner.
 function CoverMarks.menuBox(x, y, w, h)
-    return x + w - D.px(28), y + h - D.px(61), D.px(14), D.px(50)
+    if D.measuredHere() then return x + w - D.px(28), y + h - D.px(61), D.px(14), D.px(50) end
+    return x + w - D.s(29), y + h - D.s(60), D.s(13), D.s(49)
 end
 
 return CoverMarks

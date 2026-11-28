@@ -54,6 +54,19 @@ says so and the Kindle keeps the engine it has), and HarfBuzz only on a Kindle
 whose FreeType lacks `FT_Get_Transform`. A KOReader update replaces them; build
 again for the new version.
 
+### The stylesheet
+
+`lexeme.koplugin/kindle.css` holds KOReader's `html5.css` (the rules books use)
+and `epub.css` in one file, with the Kindle's own rules last. crengine follows
+only one `@import`, so a stylesheet importing `epub.css` loses the `html5.css`
+that `epub.css` imports, and with it each EPUB file starting on a new page,
+italics for `<i>`, bold for `<b>` and headings, `align` attributes and more.
+Leaving out the rest of `html5.css` (form controls, frames, colours) keeps it
+quick to parse, which crengine does at every opening. `python3
+scripts/kindle_css.py <KOReader's data folder>` builds it; run it again when
+KOReader's stylesheets change. A book read from crengine's cache keeps its
+styles, so no stylesheet is set while it loads, saving a parse.
+
 ### Verb forms in the dictionary
 
 The dictionary sheet says which conjugation a French word is, in French

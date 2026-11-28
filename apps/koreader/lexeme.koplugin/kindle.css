@@ -1,12 +1,163 @@
-/* KOReader's defaults, then the two places the Kindle differs: paragraphs
-   indent 1em unless the book says otherwise, and the book's own body margins
-   don't add to the reader's. */
-@import url("../../data/epub.css");
-
-p {
-  text-indent: 1em;
+/* Built by scripts/kindle_css.py from KOReader's html5.css (the rules books use) and
+   epub.css, with the Kindle's own rules last. Edit the script, not this file. */
+DocFragment { page-break-before: always; }
+empty-line { height: 1em; }
+DocFragment[NonLinear] { -cr-hint: non-linear; }
+section[type=footnotes] { -cr-hint: non-linear; }
+aside[type=footnote] { -cr-hint: non-linear-combining; }
+span[type=pagebreak] { display: none; }
+area, base, basefont, datalist, head, link, meta, noembed, param, script, style, template, title { display: none; }
+[hidden] { -cr-hint: presentational-hint; display: none; }
+p[align=left i] { -cr-hint: presentational-hint; text-align: left; }
+p[align=right i] { -cr-hint: presentational-hint; text-align: right; }
+p[align=center i] { -cr-hint: presentational-hint; text-align: center; }
+p[align=justify i] { -cr-hint: presentational-hint; text-align: justify; }
+figure { margin-top: 1em; margin-bottom: 1em; margin-left: 40px; margin-right: 40px; }
+address { font-style: italic; }
+listing, plaintext, xmp, pre { font-family: monospace; white-space: pre; margin-top: 1em; margin-bottom: 1em; }
+pre[wrap] { -cr-hint: presentational-hint; white-space: pre-wrap; }
+center { -cr-hint: presentational-hint; text-align: -cr-html-align-center; }
+div[align=left i] { -cr-hint: presentational-hint; text-align: -cr-html-align-left; }
+div[align=right i] { -cr-hint: presentational-hint; text-align: -cr-html-align-right; }
+div[align=middle i], div[align=center i] { -cr-hint: presentational-hint; text-align: -cr-html-align-center; }
+div[align=justify i] { -cr-hint: presentational-hint; text-align: justify; }
+cite, dfn, var, em, i { font-style: italic; }
+strong, b { font-weight: bolder; }
+samp, tt, kbd, code { font-family: monospace; }
+big { font-size: larger; }
+small { font-size: smaller; }
+sub { vertical-align: sub; line-height: normal; font-size: smaller; }
+sup { vertical-align: super; line-height: normal; font-size: smaller; }
+ruby { display: ruby; text-align: center; text-align-last: initial; text-indent: 0; }
+rb, rubyBox[T=rb] { line-height: 1; }
+rt, rubyBox[T=rt] { line-height: 1.6; font-size: 42%; font-variant-east-asian: ruby; -cr-hint: text-selection-skip; }
+a[href] { color: #00E; text-decoration: underline; }
+mark { background: yellow; color: black; }
+ins, u { text-decoration: underline; }
+del, s, strike { text-decoration: line-through; }
+q::before { content: open-quote; }
+q::after { content: close-quote; }
+nobr { white-space: nowrap; hyphens: none; }
+nobr wbr { white-space: normal; }
+br[clear=left i] { -cr-hint: presentational-hint; clear: left; }
+br[clear=right i] { -cr-hint: presentational-hint; clear: right; }
+br[clear=all i], br[clear=both i] { -cr-hint: presentational-hint; clear: both; }
+font[size] { -cr-hint: presentational-hint; -cr-apply-func: css-font-size-from-size-attribute; }
+h6[align=left i], h5[align=left i], h4[align=left i], h3[align=left i], h2[align=left i], h1[align=left i] { -cr-hint: presentational-hint; text-align: left; }
+h6[align=right i], h5[align=right i], h4[align=right i], h3[align=right i], h2[align=right i], h1[align=right i] { -cr-hint: presentational-hint; text-align: right; }
+h6[align=center i], h5[align=center i], h4[align=center i], h3[align=center i], h2[align=center i], h1[align=center i] { -cr-hint: presentational-hint; text-align: center; }
+h6[align=justify i], h5[align=justify i], h4[align=justify i], h3[align=justify i], h2[align=justify i], h1[align=justify i] { -cr-hint: presentational-hint; text-align: justify; }
+dl { margin-top: 1em; margin-bottom: 1em; }
+dir, menu, ul { margin-top: 1em; margin-bottom: 1em; padding-left: -cr-special; padding-right: -cr-special; list-style-type: disc; }
+ol { margin-top: 1em; margin-bottom: 1em; padding-left: -cr-special; padding-right: -cr-special; list-style-type: decimal; }
+ol[type=1], li[type=1] { -cr-hint: presentational-hint; list-style-type: decimal; }
+ol[type=a], li[type=a] { -cr-hint: presentational-hint; list-style-type: lower-alpha; }
+ol[type=A], li[type=A] { -cr-hint: presentational-hint; list-style-type: upper-alpha; }
+ol[type=i], li[type=i] { -cr-hint: presentational-hint; list-style-type: lower-roman; }
+ol[type=I], li[type=I] { -cr-hint: presentational-hint; list-style-type: upper-roman; }
+ul[type=none i], li[type=none i] { -cr-hint: presentational-hint; list-style-type: none; }
+ul[type=disc i], li[type=disc i] { -cr-hint: presentational-hint; list-style-type: disc; }
+ul[type=circle i], li[type=circle i] { -cr-hint: presentational-hint; list-style-type: circle; }
+ul[type=square i], li[type=square i] { -cr-hint: presentational-hint; list-style-type: square; }
+table { box-sizing: border-box; border-spacing: 2px; border-collapse: separate; text-indent: initial; }
+caption { text-align: center; }
+thead, tbody, tfoot { border-color: inherit; }
+tr { vertical-align: inherit; border-color: inherit; }
+thead, tbody, tfoot, table > tr { vertical-align: middle; }
+th { vertical-align: inherit; padding: 1px; font-weight: bold; -cr-apply-func: css-text-align-center-if-parent-text-align-initial; }
+td { vertical-align: inherit; padding: 1px; }
+table[align=left i] { -cr-hint: presentational-hint; float: left; }
+table[align=right i] { -cr-hint: presentational-hint; float: right; }
+table[align=center i] { -cr-hint: presentational-hint; margin-left: auto; margin-right: auto; }
+thead[align=left i], tbody[align=left i], tfoot[align=left i], tr[align=left i], th[align=left i], td[align=left i] { -cr-hint: presentational-hint; text-align: -cr-html-align-left; }
+thead[align=justify i], tbody[align=justify i], tfoot[align=justify i], tr[align=justify i], th[align=justify i], td[align=justify i] { -cr-hint: presentational-hint; text-align: justify; }
+thead[align=right i], tbody[align=right i], tfoot[align=right i], tr[align=right i], th[align=right i], td[align=right i] { -cr-hint: presentational-hint; text-align: -cr-html-align-right; }
+thead[align=center i], tbody[align=center i], tfoot[align=center i], thead[align=middle i], tbody[align=middle i], tfoot[align=middle i], tr[align=center i], th[align=center i], td[align=center i], tr[align=middle i], th[align=middle i], td[align=middle i] { -cr-hint: presentational-hint; text-align: -cr-html-align-center; }
+thead[align=absmiddle i], tbody[align=absmiddle i], tfoot[align=absmiddle i], tr[align=absmiddle i], th[align=absmiddle i], td[align=absmiddle i] { -cr-hint: presentational-hint; text-align: center; }
+caption[align=bottom i] { -cr-hint: presentational-hint; caption-side: bottom; }
+thead[valign=top i], tbody[valign=top i], tfoot[valign=top i], tr[valign=top i], th[valign=top i], td[valign=top i] { -cr-hint: presentational-hint; vertical-align: top; }
+thead[valign=middle i], tbody[valign=middle i], tfoot[valign=middle i], tr[valign=middle i], th[valign=middle i], td[valign=middle i] { -cr-hint: presentational-hint; vertical-align: middle; }
+thead[valign=bottom i], tbody[valign=bottom i], tfoot[valign=bottom i], tr[valign=bottom i], th[valign=bottom i], td[valign=bottom i] { -cr-hint: presentational-hint; vertical-align: bottom; }
+thead[valign=baseline i], tbody[valign=baseline i], tfoot[valign=baseline i], tr[valign=baseline i], th[valign=baseline i], td[valign=baseline i] { -cr-hint: presentational-hint; vertical-align: baseline; }
+th[nowrap], td[nowrap] { -cr-hint: presentational-hint; white-space: nowrap; }
+table[border] { -cr-hint: presentational-hint; -cr-apply-func: css-border-from-table-border-attribute; }
+table[border] > :where(thead, tbody, tfoot) > tr > th, table[border] > :where(thead, tbody, tfoot) > tr > td, table[border] > tr > th, table[border] > tr > td { -cr-hint: presentational-hint; -cr-apply-func: css-border-from-table-border-attribute; }
+table[cellspacing] { -cr-hint: presentational-hint; -cr-apply-func: css-border-spacing-from-cellspacing-attribute; }
+table[cellpadding] > :where(thead, tbody, tfoot) > tr > th, table[cellpadding] > :where(thead, tbody, tfoot) > tr > td, table[cellpadding] > tr > th, table[cellpadding] > tr > td { -cr-hint: presentational-hint; -cr-apply-func: css-padding-from-parent-table-cellpadding-attribute; }
+table[height], thead[height], tbody[height], tfoot[height], tr[height] { -cr-hint: presentational-hint; -cr-apply-func: css-height-from-height-attribute; }
+th[height], td[height] { -cr-hint: presentational-hint; -cr-apply-func: css-height-from-height-attribute-ignoring-zero; }
+table[width], th[width], td[width] { -cr-hint: presentational-hint; -cr-apply-func: css-width-from-width-attribute-ignoring-zero; }
+col[width] { -cr-hint: presentational-hint; -cr-apply-func: css-width-from-width-attribute; }
+hr { color: gray; border-style: inset; border-width: 1px; margin: 0.5em auto; }
+hr[align=left i] { -cr-hint: presentational-hint; margin-left: 0; margin-right: auto; }
+hr[align=right i] { -cr-hint: presentational-hint; margin-left: auto; margin-right: 0; }
+hr[align=center i] { -cr-hint: presentational-hint; margin-left: auto; margin-right: auto; }
+hr[color], hr[noshade] { -cr-hint: presentational-hint; border-style: solid; }
+hr[size] { -cr-hint: presentational-hint; -cr-apply-func: css-various-from-hr-size-attribute; }
+hr[width] { -cr-hint: presentational-hint; -cr-apply-func: css-width-from-width-attribute; }
+img[align=left i] { -cr-hint: presentational-hint; float: left; }
+img[align=right i] { -cr-hint: presentational-hint; float: right; }
+img[align=top i] { -cr-hint: presentational-hint; vertical-align: top; }
+img[align=baseline i] { -cr-hint: presentational-hint; vertical-align: baseline; }
+img[align=texttop i] { -cr-hint: presentational-hint; vertical-align: text-top; }
+img[align=middle i], img[align=center i], img[align=absmiddle i], img[align=abscenter i] { -cr-hint: presentational-hint; vertical-align: middle; }
+img[align=bottom i] { -cr-hint: presentational-hint; vertical-align: bottom; }
+img[hspace] { -cr-hint: presentational-hint; -cr-apply-func: css-margin-from-hspace-attribute; }
+img[vspace] { -cr-hint: presentational-hint; -cr-apply-func: css-margin-from-vspace-attribute; }
+img[border] { -cr-hint: presentational-hint; -cr-apply-func: css-border-from-border-attribute; }
+img[width] { -cr-hint: presentational-hint; -cr-apply-func: css-width-from-width-attribute; }
+img[height] { -cr-hint: presentational-hint; -cr-apply-func: css-height-from-height-attribute; }
+h1, h2, h3, h4, h5, h6 { font-weight: bold; }
+ul ul, ol ul { list-style-type: circle; }
+ul ul ul, ul ol ul, ol ul ul, ol ol ul { list-style-type: square; }
+body { text-align: justify; }
+h6, h5, h4, h3, h2, h1 { margin-top: 0.7em; margin-bottom: 0.5em; hyphens: none; }
+h1 { font-size: 150%; }
+h2 { font-size: 140%; }
+h3 { font-size: 130%; }
+h4 { font-size: 120%; }
+h5 { font-size: 110%; }
+h6 { font-size: 100%; }
+:where(article, aside, nav, section) h1 { font-size: 140%; }
+:where(article, aside, nav, section) :where(article, aside, nav, section) h1 { font-size: 130%; }
+:where(article, aside, nav, section) :where(article, aside, nav, section) :where(article, aside, nav, section) h1 { font-size: 120%; }
+:where(article, aside, nav, section) :where(article, aside, nav, section) :where(article, aside, nav, section) :where(article, aside, nav, section) h1 { font-size: 110%; }
+:where(article, aside, nav, section) :where(article, aside, nav, section) :where(article, aside, nav, section) :where(article, aside, nav, section) :where(article, aside, nav, section) h1 { font-size: 100%; }
+p { text-indent: 1.2em; margin-top: 0; margin-bottom: 0; }
+blockquote { margin-top: 0.5em; margin-bottom: 0.5em; margin-left: 2em; margin-right: 1em; }
+blockquote:dir(rtl) { margin-left: 1em; margin-right: 2em; }
+hr { border-style: solid; }
+ol, ul { margin-left: 1em; margin-top: 0; margin-bottom: 0; }
+ol:dir(rtl), ul:dir(rtl) { margin-left: unset; margin-right: 1em; }
+dl { margin-left: 0; }
+dt { margin-left: 0; margin-top: 0.3em; font-weight: bold; }
+dd { margin-left: 1.3em; }
+dd:dir(rtl) { margin-left: unset; margin-right: 1.3em; }
+table { font-size: 80%; margin: 3px 0; border-spacing: 1px; }
+table table { font-size: 100%; }
+td { padding: 3px; }
+th { padding: 3px; background-color: #DDD; text-align: center; }
+table caption { padding: 4px; background-color: #EEE; }
+xmp, pre { text-align: left; margin-top: 0.5em; margin-bottom: 0.5em; }
+sup { font-size: 70%; }
+sub { font-size: 70%; }
+a[href] { color: navy; }
+h3, h2 { -cr-only-if: legacy html-document; page-break-before: always; }
+section h3, section h2 { -cr-only-if: legacy html-document; page-break-before: auto; }
+@media (-cr-max-cre-dom-version: 20180527) {
+  img { text-align: center; text-indent: 0; display: block; }
+  sup img { display: inline; }
+  sub img { display: inline; }
+  a img { display: inline; }
+  p img { display: inline; }
+  p image { display: inline; }
+  b, strong, i, em, dfn, var, q, u, del, s, strike, small, big, sub, sup, acronym, tt, samp, kbd, code { display: inline; }
+  form { display: none; }
+  .title, .title1, .title2, .title3, .title4, .title5, .subtitle { display: block; }
+  .fb2_info { display: block; }
+  .code { display: block; }
 }
-
-body {
-  margin: 0 !important;
-}
+/* The Kindle: paragraphs indent 1em unless the book says otherwise, and the book's own body
+   margins don't add to the reader's. */
+p { text-indent: 1em; }
+body { margin: 0 !important; }

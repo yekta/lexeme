@@ -187,7 +187,13 @@ function Reader.beforeLoad(ui)
     -- A book laid out before loads its styles with it from crengine's cache: nothing to gain, and
     -- reading the stylesheets out of the EPUB would only slow its opening down.
     local cache = ui.doc_settings:readSetting("cache_file_path")
-    if cache and lfs.attributes(cache, "mode") == "file" then return end
+    if cache and lfs.attributes(cache, "mode") == "file" then
+        -- crengine parses the stylesheet set as the book loads, though a book read from its cache
+        -- keeps its styles, and Lexeme sets the one it's laid out with before the layout: no
+        -- stylesheet now saves parsing KOReader's for nothing.
+        ui.document:setStyleSheet()
+        return
+    end
     Layout.applyBeforeRender(ui)
 end
 

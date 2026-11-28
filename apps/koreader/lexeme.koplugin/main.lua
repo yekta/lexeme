@@ -205,6 +205,11 @@ end
 -- or KOReader keeps running when the file browser exits.
 function Lexeme:onCloseWidget()
     if not self.shell then return end
+    local search = self.shell.search
+    if search then
+        search.quiet = true
+        UIManager:close(search)
+    end
     UIManager:close(self.shell)
     self.shell = nil
 end

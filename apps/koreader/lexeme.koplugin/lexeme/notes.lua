@@ -194,8 +194,8 @@ end
 function Sheet:render(bb, x, y, w, h)
     local screen_h = y + h
     D.rect(bb, x, y, w, D.px(9))
-    local hw, hh = D.px(159), D.px(21)
-    D.icon(bb, "handle", x + math.floor((w - hw) / 2), self.rule - D.px(146), hw, hh)
+    local hw, hh = D.px(160), D.px(22)
+    D.icon(bb, "popup-handle", x + math.floor((w - hw) / 2) - D.px(1), self.rule - D.px(146), hw, hh)
     self:hit(x, y, w, self.rule - D.px(60) - y, function() self:close() end)
     D.text(bb, x + D.px(80), self.rule - D.px(30), D.nface("bold", 39), "Footnote " .. self.number)
     D.rect(bb, x, self.rule, w, D.px(4))

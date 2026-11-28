@@ -2,8 +2,13 @@
 --
 -- Drawn as the Kindle's reader draws it, at its own sizes (D.px) and with its own icons; positions
 -- are a Paperwhite 5's, pinned to the screen's edges (D.right, D.bottom).
+local Blitbuffer = require("ffi/blitbuffer")
+local Geom = require("ui/geometry")
+local RenderImage = require("ui/renderimage")
+local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
+local logger = require("logger")
 
 local Back = require("lexeme/backstack")
 local D = require("lexeme/draw")
@@ -67,6 +72,7 @@ function Toolbar:render(bb, x, y, w, h)
     local bottom = y + D.bottom(h, BOTTOM_TOP)
     -- Tapping the page between the two bars closes them.
     self:hit(x, y + D.px(TOP_HEIGHT), w, bottom - y - D.px(TOP_HEIGHT), function() self:close() end)
+    self:paintStrip(bb, x, y + D.px(TOP_HEIGHT), w, bottom - y - D.px(TOP_HEIGHT))
     self:paintBack(bb, x, y, w, h)
     self:paintBottom(bb, x, bottom, w, h)
 end
@@ -149,6 +155,98 @@ function Toolbar:openMore(right)
         end
     end
     Menu:new{ items = items, right = right - D.px(37), top = D.px(223) }:show()
+end
+
+-- The pages either side of the one being read, small, between the two bars: the page itself in the
+-- middle, the end of the one before at the left edge, the start of the next at the right, as the
+-- Kindle's reader shows them. They're drawn as crengine draws the book, with its highlights, and
+-- scaled down; a tap on the page before or after turns to it, one on the page itself closes the bars.
+local thumbs = setmetatable({}, { __mode = "k" })
+
+local function thumbnail(ui, page, tw, th)
+    local doc = ui.document
+    local layout = doc:getPageCount()
+    local cache = thumbs[doc]
+    if not cache or cache.layout ~= layout or cache.w ~= tw then
+        if cache then for _, t in pairs(cache.pages) do t:free() end end
+        cache = { layout = layout, w = tw, pages = {} }
+        thumbs[doc] = cache
+    end
+    if cache.pages[page] then return cache.pages[page] end
+    local w, h = Screen:getWidth(), Screen:getHeight()
+    local full = Blitbuffer.new(w, h, Screen.bb:getType())
+    full:fill(Blitbuffer.COLOR_WHITE)
+    local shown = doc:getCurrentPage()
+    local ok, err = pcall(function()
+        doc:drawCurrentViewByPage(full, 0, 0, Geom:new{ x = 0, y = 0, w = w, h = h }, page)
+        for _, item in ipairs(ui.annotation and ui.annotation.annotations or {}) do
+            if item.drawer and type(item.pos0) == "string" and type(item.pos1) == "string"
+                    and doc:getPageFromXPointer(item.pos0) <= page and doc:getPageFromXPointer(item.pos1) >= page then
+                for _, box in ipairs(doc:getScreenBoxesFromPositions(item.pos0, item.pos1, true)) do
+                    if box.y >= 0 and box.y < h then
+                        full:darkenRect(box.x + 1, box.y, math.max(1, box.w - 2), box.h, 71 / 255)
+                    end
+                end
+            end
+        end
+    end)
+    doc:gotoPage(shown)
+    if not ok then
+        logger.warn("Lexeme: page thumbnail", err)
+        full:free()
+        return nil
+    end
+    local thumb = RenderImage:scaleBlitBuffer(full, tw, th, true)
+    -- Only the pages around the one being read are kept.
+    for p, t in pairs(cache.pages) do
+        if math.abs(p - page) > 3 then t:free(); cache.pages[p] = nil end
+    end
+    cache.pages[page] = thumb
+    return thumb
+end
+
+function Toolbar:paintStrip(bb, x, y, w, h)
+    local ui = self.ui
+    if not ui.rolling then return end
+    D.rect(bb, x, y, w, h, D.WHITE)
+    -- 34 px under the top bar and over the progress panel, a 2 px border, 43 px apart.
+    local border, gap = D.px(2), D.px(43)
+    local box_y = y + D.px(34)
+    local box_h = h - D.px(34) - D.px(34)
+    local th = box_h - 2 * border
+    local tw = math.floor(th * Screen:getWidth() / Screen:getHeight() + 0.5)
+    local box_w = tw + 2 * border
+    local cx = x + math.floor((w - box_w) / 2 + 0.5)
+    local page, count = Progress.page(ui), Progress.pageCount(ui)
+    local slots = {
+        { page = page, left = cx },
+        { page = page - 1, left = cx - gap - box_w, tap = function() self:turn(-1) end },
+        { page = page + 1, left = cx + box_w + gap, tap = function() self:turn(1) end },
+    }
+    for _, slot in ipairs(slots) do
+        if slot.page >= 1 and slot.page <= count then
+            local thumb = thumbnail(ui, slot.page, tw, th)
+            D.border(bb, slot.left, box_y, box_w, box_h, border)
+            if thumb then
+                local sx, dx = 0, slot.left + border
+                if dx < x then sx, dx = x - dx, x end
+                local vw = math.min(tw - sx, x + w - dx)
+                if vw > 0 then bb:blitFrom(thumb, dx, box_y + border, sx, 0, vw, th) end
+            end
+            if slot.tap then
+                local hx = math.max(x, slot.left)
+                local hw = math.min(x + w, slot.left + box_w) - hx
+                if hw > 0 then self:hit(hx, box_y, hw, box_h, slot.tap) end
+            end
+        end
+    end
+end
+
+-- A page turned from the strip: not a jump, so nothing to go back to.
+function Toolbar:turn(by)
+    local Event = require("ui/event")
+    self.ui:handleEvent(Event:new("GotoViewRel", by))
+    self:refresh()
 end
 
 -- "Back to loc 2,147", just above the progress panel: on the left when that place is behind the

@@ -148,8 +148,14 @@ function Cursor:charsBefore(position)
     while self.position < position do
         local segment = self.segments[self.segment]
         if segment == nil then break end
-        if segment == false or self.byte > #segment then
-            if segment == false then self.position = self.position + 1 end
+        if type(segment) ~= "string" or self.byte > #segment then
+            if segment == false then
+                self.position = self.position + 1
+            elseif type(segment) == "table" then
+                -- A block set inside the paragraph: one position, and the characters it holds.
+                self.position = self.position + 1
+                self.chars = self.chars + segment.chars
+            end
             self.segment, self.byte = self.segment + 1, 1
         else
             local c = segment:byte(self.byte)
@@ -217,8 +223,18 @@ function Kfx.locationStarts(path)
                             if type(part) == "table" and part[ID] and not start[part[ID]] then
                                 start[part[ID]] = total
                             end
-                            table.insert(segments, part_text or false)
-                            if part_text then total = total + Kfx.length(part_text) end
+                            if part_text then
+                                table.insert(segments, part_text)
+                                total = total + Kfx.length(part_text)
+                            elseif type(part) == "table" and (part[ITEMS] or stories[part[STORY_NAME]]) then
+                                -- A block inside the paragraph, such as a boxed line: its text is read
+                                -- where it stands, and takes one position in the paragraph.
+                                local before = total
+                                walk({ part })
+                                table.insert(segments, { chars = total - before })
+                            else
+                                table.insert(segments, false)
+                            end
                         end
                     elseif text then
                         total = total + Kfx.length(text)

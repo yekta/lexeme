@@ -30,6 +30,7 @@ local Toolbar = View:extend{
 local TOP_HEIGHT = 338
 local BOTTOM_TOP = 1425 -- the progress panel's top border, on a Paperwhite 5
 local ICON = 40
+local TIMER_FROM_RIGHT = 540 -- the Aa icon's left edge (480) and a gap as wide as the buttons'
 
 -- Amazon's icons, from its reader; Lexeme's look-alikes off a Kindle.
 local KINDLE_ICONS = "/app/KPPMainApp/res/KPPUIComponents/internal/icons/"
@@ -110,7 +111,7 @@ function Toolbar:paintTop(bb, x, y, w)
             end
         end, box)
     end
-    self:paintTimer(bb, x, y)
+    self:paintTimer(bb, x, y, w)
     D.rect(bb, x, y + D.px(212), w, D.px(4), D.gray(170))
 
     local title = self.ui.doc_props and self.ui.doc_props.display_title or ""
@@ -118,16 +119,15 @@ function Toolbar:paintTop(bb, x, y, w)
     D.rect(bb, x, y + D.px(334), w, D.px(4))
 end
 
--- A set reading timer shows in the gap between Home and the buttons: the time left (or that
--- it's paused), and a line under it that fills as the time passes. Tapping it opens Pause or
--- Resume, and Stop.
-function Toolbar:paintTimer(bb, x, y)
+-- A set reading timer shows left of the buttons: the time left (or that it's paused), and a
+-- line under it that fills as the time passes. Tapping it opens Pause or Resume, and Stop.
+function Toolbar:paintTimer(bb, x, y, w)
     if not Timer.isRunning() then return end
     local face = D.nface("regular", 32)
     local label = Timer.statusLabel()
     local icon_w, gap = D.px(40), D.px(12)
     local group_w = icon_w + gap + D.width(face, label)
-    local left = x + D.px(497) - math.floor(group_w / 2)
+    local left = x + w - D.px(TIMER_FROM_RIGHT) - group_w
     D.icon(bb, "timer", left, y + D.px(132), icon_w, icon_w)
     D.text(bb, left + icon_w + gap, y + D.px(164), face, label)
     local line_y = y + D.px(186)

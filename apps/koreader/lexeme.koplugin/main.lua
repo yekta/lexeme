@@ -44,6 +44,24 @@ local plugins_disabled = G_reader_settings:readSetting("plugins_disabled") or {}
 plugins_disabled.externalkeyboard = true
 G_reader_settings:saveSetting("plugins_disabled", plugins_disabled)
 require("lexeme/engine").install()
+-- Home always covers KOReader's file browser (Lexeme:init paints Home in its place), so the
+-- browser needn't list the home folder each time it's built, as every book closes: for a
+-- Kindle's 500 entries through its FUSE layer that took 0.15 s. Other file choosers still list.
+local FileChooser = require("ui/widget/filechooser")
+local listFolder = FileChooser.genItemTableFromPath
+FileChooser.genItemTableFromPath = function(chooser, path)
+    if chooser.name == "filemanager" then return {} end
+    return listFolder(chooser, path)
+end
+-- Home shows in the same pass as the file browser it covers, rather than a tick later: a tick
+-- later, the browser had painted Home already, and Home was painted all over again (0.35 s).
+local FileManager = require("apps/filemanager/filemanager")
+local showFiles = FileManager.showFiles
+FileManager.showFiles = function(...)
+    showFiles(...)
+    local lexeme = FileManager.instance and FileManager.instance.lexeme
+    if lexeme and lexeme.showShell then lexeme:showShell() end
+end
 -- A book file this big opens without the spinner turning (see Lexeme:openBook).
 local BIG_BOOK_BYTES = 8 * 1024 * 1024
 -- The Kindle's FreeType never kerns, and errors when asked before a font has drawn a glyph,
@@ -71,16 +89,15 @@ function Lexeme:init()
     end
     self:useClassicFileBrowser()
     self:createShell()
-    -- The file browser paints Home in its place, so its own screen never shows
-    -- before Home opens on top of it.
-    local painted = false
+    -- Home goes up with the file browser, as FileManager:showFiles shows it (see showShell), and
+    -- covers all of it: the browser itself is never painted, and Home is painted once. Should the
+    -- browser show before Home does, it paints Home in its place, so its own screen never shows.
     self.ui.paintTo = function(_, bb, x, y)
-        if not self.shell then return end
+        if not self.shell or self.shell_shown then return end
         self.shell:paintTo(bb, x, y)
-        painted = true
+        self.shell_painted = true
     end
-    -- Back from a book, the file browser has already put Home on the screen: no second refresh.
-    UIManager:nextTick(function() UIManager:show(self.shell, not painted and "flashui" or nil) end)
+    UIManager:nextTick(function() self:showShell() end)
     -- The spinner's frames and the engine's start-up, done while Home sits idle rather than as a
     -- book opens.
     UIManager:scheduleIn(3, function()
@@ -157,6 +174,13 @@ function Lexeme:useClassicFileBrowser()
     coverbrowser:setupFileManagerDisplayMode(nil)
 end
 
+-- Home over the file browser. Once the browser has put Home on the screen, no second refresh.
+function Lexeme:showShell()
+    if not self.shell or self.shell_shown then return end
+    self.shell_shown = true
+    UIManager:show(self.shell, not self.shell_painted and "flashui" or nil)
+end
+
 function Lexeme:createShell()
     self.shell = Shell:new{
         open_book = function(path) self:openBook(path) end,
@@ -190,9 +214,7 @@ function Lexeme:openBook(path)
     if path:find("^lexeme%-delivery:") then return end
     if self.shell then
         G_reader_settings:saveSetting("lexeme_tab", self.shell.tab)
-        self.shell.opening = path
-        UIManager:setDirty(self.shell, "fast")
-        UIManager:forceRePaint()
+        self.shell:showOpening(path)
     end
     local quick = opensQuickly(path)
     -- Turning the spinner keeps a copy of KOReader's memory while the book is laid out; a book

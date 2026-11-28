@@ -141,20 +141,40 @@ local function skipsFolder(path, name)
         or name == "Kindle Reference" or path:find("/Downloads/Items01$")
 end
 
--- util.findFiles, without going into the folders above.
-local function findFiles(dir, callback)
-    local ok, iter, dir_obj = pcall(lfs.dir, dir)
-    if not ok then return end
-    for name in iter, dir_obj do
-        if name ~= "." and name ~= ".." then
-            local path = dir .. "/" .. name
-            local attr = lfs.attributes(path) or {}
-            if attr.mode == "directory" then
-                if not skipsFolder(path, name) then findFiles(path, callback) end
-            elseif attr.mode == "file" or attr.mode == "link" then
-                callback(path, name, attr)
+-- util.findFiles, without going into the folders above, as a walk that can stop and go on:
+-- walk(deadline) calls callback(path, name, attributes) for each file, in the order a recursive
+-- walk would, until time.now() passes deadline (nil: to the end), and returns true when done.
+local function fileWalker(dir, callback)
+    local time = require("ui/time")
+    local stack = {}
+    local function enter(path)
+        local ok, iter, dir_obj = pcall(lfs.dir, path)
+        if ok then table.insert(stack, { path = path, iter = iter, dir_obj = dir_obj }) end
+    end
+    enter(dir)
+    return function(deadline)
+        while #stack > 0 do
+            local top = stack[#stack]
+            local name = top.iter(top.dir_obj)
+            if name == nil then
+                table.remove(stack)
+            elseif name ~= "." and name ~= ".." then
+                local path = top.path .. "/" .. name
+                -- An entry of such a name isn't looked up at all (through the Kindle's FUSE layer,
+                -- with a .sdr folder beside most books): a folder of that name is skipped, and a
+                -- file of that name isn't one the library lists (hidden, or not a book's extension).
+                if not skipsFolder(path, name) then
+                    local attr = lfs.attributes(path) or {}
+                    if attr.mode == "directory" then
+                        enter(path)
+                    elseif attr.mode == "file" or attr.mode == "link" then
+                        callback(path, name, attr)
+                    end
+                end
+                if deadline and time.now() > deadline then return false end
             end
         end
+        return true
     end
 end
 
@@ -214,12 +234,15 @@ function Books.scanned()
     return last_scan ~= nil
 end
 
-function Books.scan()
+-- The scan as steps: step(seconds) works for about that long and returns the library once it's
+-- all scanned (nil until then), so the UI can take input in between. Books.scan() is one step.
+function Books.scanInSteps()
     if not stored then loadStored() end
+    local time = require("ui/time")
     local manager = infoManager()
     local read_times = lastReadTimes()
     local list = {}
-    findFiles(Books.homeDir(), function(path, file, attr)
+    local walk = fileWalker(Books.homeDir(), function(path, file, attr)
         -- Amazon's own downloads (Downloads/Items01) are its copies; KOReader keeps converted ones in Books.
         if file:sub(1, 1) == "." or path:find("/%.") or path:find("%.sdr/") or path:find("/dictionaries/")
             or path:find("/Kindle Reference/") or path:find("/Downloads/Items01/") then
@@ -232,9 +255,16 @@ function Books.scan()
         primeInfo(path)
         table.insert(list, describe(path, file, attr.modification, read_times, manager))
     end)
-    last_scan = list
-    storeScan(list)
-    return list
+    return function(seconds)
+        if not walk(seconds and time.now() + time.s(seconds)) then return nil end
+        last_scan = list
+        storeScan(list)
+        return list
+    end
+end
+
+function Books.scan()
+    return Books.scanInSteps()()
 end
 
 -- The last scan, with the book read last described again: all that closing a book changes. Shown

@@ -1,4 +1,6 @@
 -- Home and Library: the screens shown instead of KOReader's file browser.
+local Geom = require("ui/geometry")
+local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 
 local Books = require("lexeme/books")
@@ -27,6 +29,9 @@ local LIST = { top = 345, pitch = 265 }
 local DECKS = { top = 345, pitch = 206, per_page = 6 }
 -- Seconds after a book closes before the library is scanned again.
 local RESCAN_AFTER = 2
+-- That scan goes a slice at a time, taps and swipes handled in between: it takes half a second
+-- to two seconds on a Kindle, too long to hold the screen still.
+local RESCAN_SLICE, RESCAN_PAUSE = 0.03, 0.001
 
 local FILTERS = {
     { key = "in_progress", label = "In progress" },
@@ -74,16 +79,31 @@ function Shell:onLexemeDecksChanged()
 end
 
 -- `quick`: back from a book, show the last scan at once and scan again once Home is up.
-function Shell:reload(quick)
+-- quick: the last scan, scanned again shortly. scanned: a scan just done.
+function Shell:reload(quick, scanned)
     self.carousel_first, self.carousel_h = {}, {}
-    self.all = quick and Books.lastScan() or Books.scan()
+    if scanned then
+        self.all = scanned
+    else
+        self.all = quick and Books.lastScan() or Books.scan()
+    end
     self:query()
     if quick then
-        UIManager:unschedule(self.rescan)
+        self:cancelRescan()
         self.rescan = function()
-            local shown = Books.signature(self.all)
-            self:reload()
-            if Books.signature(self.all) ~= shown then self:refresh() end
+            local step = Books.scanInSteps()
+            self.rescan_step = function()
+                local list = step(RESCAN_SLICE)
+                if not list then
+                    UIManager:scheduleIn(RESCAN_PAUSE, self.rescan_step)
+                    return
+                end
+                self.rescan_step = nil
+                local shown = Books.signature(self.all)
+                self:reload(false, list)
+                if Books.signature(self.all) ~= shown then self:refresh() end
+            end
+            self.rescan_step()
         end
         UIManager:scheduleIn(RESCAN_AFTER, self.rescan)
         return
@@ -192,13 +212,20 @@ function Shell:onShowingReader()
     UIManager:close(self, "fast")
 end
 
-function Shell:onCloseWidget()
+function Shell:cancelRescan()
     UIManager:unschedule(self.rescan)
+    if self.rescan_step then UIManager:unschedule(self.rescan_step) end
+    self.rescan_step = nil
+end
+
+function Shell:onCloseWidget()
+    self:cancelRescan()
     Books.clearCovers(true)
 end
 
 function Shell:render(bb, x, y, w, h)
     self.scrollbar = nil
+    self.cover_boxes = {}
     Books.nextPaint()
     Status.paint(self, bb, x, y, w, function() self:openQuick() end)
     self:paintSearchRow(bb, x, y, w)
@@ -287,6 +314,41 @@ function Shell:paintLibrary(bb, x, y, w, h)
 end
 
 -- Covers are painted into `area`, a viewport whose origin is (ox, oy) on screen.
+-- The band across a cover's foot saying "Opening", as the Kindle shows while a book opens: the
+-- cover at dx, dy, dw, dh on the screen, drawn into area, whose top left is at ox, oy.
+local function openingBand(dx, dy, dw, dh)
+    local band = math.min(D.s(70), dh)
+    return dx - D.s(2), dy + dh + D.s(2) - band, dw + D.s(4), band
+end
+
+local function paintOpening(area, ox, oy, dx, dy, dw, dh)
+    local bx, by, bw, bh = openingBand(dx, dy, dw, dh)
+    D.rect(area, bx - ox, by - oy, bw, bh)
+    D.textCenter(area, dx - ox + math.floor(dw / 2), by - oy + D.s(44), D.face("regular", 29), "Opening", D.WHITE)
+end
+
+-- "Opening" on a cover just tapped. Drawn straight onto the screen, with only that band refreshed,
+-- when Home is on top and the cover was drawn: Home as a whole takes a tenth of a second to draw.
+function Shell:showOpening(path)
+    self.opening = path
+    local box = self.cover_boxes and self.cover_boxes[path]
+    local stack = UIManager._window_stack
+    local top = stack and stack[#stack] and stack[#stack].widget
+    if not box or top ~= self then
+        UIManager:setDirty(self, "fast")
+        UIManager:forceRePaint()
+        return
+    end
+    -- Whatever was waiting to be drawn goes first, or it would draw over the band.
+    UIManager:forceRePaint()
+    local a = box.area
+    paintOpening(Screen.bb:viewport(a.x, a.y, a.w, a.h), a.x, a.y, box.x, box.y, box.w, box.h)
+    local bx, by, bw, bh = openingBand(box.x, box.y, box.w, box.h)
+    local region = Geom:new{ x = bx, y = by, w = bw, h = bh }:intersect(Geom:new{ x = a.x, y = a.y, w = a.w, h = a.h })
+    UIManager:setDirty(nil, "fast", region)
+    UIManager:forceRePaint()
+end
+
 function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu)
     if book.delivery then
         local dh = math.min(ch, math.floor(cw * 1.5 + 0.5))
@@ -331,11 +393,10 @@ function Shell:paintCover(area, ox, oy, book, cx, cy, cw, ch, with_menu)
         end
     end
     D.border(area, dx - ox - D.s(2), dy - oy - D.s(2), dw + D.s(4), dh + D.s(4), D.s(2), D.gray(102))
+    self.cover_boxes[book.path] = { x = dx, y = dy, w = dw, h = dh,
+        area = { x = ox, y = oy, w = area:getWidth(), h = area:getHeight() } }
     if self.opening == book.path then
-        local band = math.min(D.s(70), dh)
-        local by = dy - oy + dh + D.s(2) - band
-        D.rect(area, dx - ox - D.s(2), by, dw + D.s(4), band)
-        D.textCenter(area, dx - ox + math.floor(dw / 2), by + D.s(44), D.face("regular", 29), "Opening", D.WHITE)
+        paintOpening(area, ox, oy, dx, dy, dw, dh)
         return dx, dy, dw, dh
     end
     if with_menu then

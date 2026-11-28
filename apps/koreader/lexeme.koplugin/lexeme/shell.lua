@@ -616,15 +616,20 @@ function TILE.rows_height()
     return rows * D.s(TILE.height) + (rows - 1) * D.s(TILE.gap)
 end
 
--- The same six figures as Lexeme's reading page, three to a row. Returns the y where they end.
-local function paintTiles(bb, x, top, w, reading, sync_failed)
+local function openStreak() require("lexeme/streak_screen").open() end
+
+-- The same six figures as Lexeme's reading page, three to a row, each opening its own screen.
+-- Returns the y where they end.
+local function paintTiles(view, bb, x, top, w, reading, sync_failed)
     local tiles = {
-        { "Today", readingTime(reading.today) },
-        { "This week", readingTime(reading.week) },
-        { "Total", readingTime(reading.total) },
-        { "Streak", count(reading.streak, "day", "days") },
-        { "Finished (this year)", count(reading.finished_this_year, "book", "books") },
-        { "Finished (all time)", count(reading.finished, "book", "books") },
+        { "Today", readingTime(reading.today), function() require("lexeme/stats_screen").open() end },
+        { "This week", readingTime(reading.week), function() require("lexeme/days_screen").open() end },
+        { "Total", readingTime(reading.total), function() require("lexeme/books_screen").open("time") end },
+        { "Streak", count(reading.streak, "day", "days"), openStreak },
+        { "Finished (this year)", count(reading.finished_this_year, "book", "books"),
+            function() require("lexeme/books_screen").open("finished", 1) end },
+        { "Finished (all time)", count(reading.finished, "book", "books"),
+            function() require("lexeme/books_screen").open("finished", 2) end },
     }
     local per_row, gap, h = TILE.per_row, D.s(TILE.gap), D.s(TILE.height)
     local left, right = x + D.s(HOME_MARGIN), x + w - D.s(HOME_MARGIN)
@@ -642,6 +647,7 @@ local function paintTiles(bb, x, top, w, reading, sync_failed)
         local value_w = D.text(bb, tx + D.s(TILE.inset), ty + D.s(TILE.value), D.face("bold", 36), tile[2], D.BLACK,
             sync_failed and text_w - syncWarningWidth(warning) or text_w)
         if sync_failed then paintSyncWarning(bb, tx + D.s(TILE.inset) + value_w, ty + D.s(TILE.value), warning) end
+        view:hit(tx, ty, tile_w, h, tile[3])
     end
     return top + TILE.rows_height()
 end
@@ -716,6 +722,13 @@ local function paintCalendar(bb, x, top, w, label, reading, sync_failed)
     end
 end
 
+-- Home's calendar with its label, from `top`, for the streak screen. Returns its height.
+function Shell.paintReadingCalendar(bb, x, top, w, reading)
+    local label = calendarLabel(reading.days, reading.goal_minutes)
+    paintCalendar(bb, x, top, w, label, reading, false)
+    return calendarHeight(x, w, label, reading.days)
+end
+
 function Shell:paintHome(bb, x, y, w, h)
     self.carousels = {}
     local recent = Books.query(self.all, nil, "recent", true)
@@ -726,8 +739,7 @@ function Shell:paintHome(bb, x, y, w, h)
     local bottom = paintCarousel(self, bb, x, y + D.s(243), w, "From Your Library", recent,
         function() self:setTab("library") end)
     local connected = Sync.isConnected()
-    local reading = G_reader_settings:nilOrTrue("lexeme_home_stats")
-        and (connected and Streak.summary() or Streak.localSummary())
+    local reading = G_reader_settings:nilOrTrue("lexeme_home_stats") and (require("lexeme/stats_page").summary())
     local sync_failed = connected and Sync.lastFailure() ~= nil
     self.shows_sync_warning = sync_failed
     if reading then
@@ -738,10 +750,9 @@ function Shell:paintHome(bb, x, y, w, h)
         local calendar_h = calendarHeight(x, w, label, reading.days)
         local gap = math.max(D.s(40), math.floor((space_bottom - space_top - TILE.rows_height() - calendar_h) / 3))
         local tiles_top = space_top + gap
-        local tiles_bottom = paintTiles(bb, x, tiles_top, w, reading, sync_failed)
+        local tiles_bottom = paintTiles(self, bb, x, tiles_top, w, reading, sync_failed)
         paintCalendar(bb, x, tiles_bottom + gap, w, label, reading, sync_failed)
-        self:hit(x, tiles_top, w, tiles_bottom + gap + calendar_h - tiles_top,
-            function() require("lexeme/stats_screen").open() end)
+        self:hit(x, tiles_bottom + gap, w, calendar_h, openStreak)
         return
     end
     -- The next heading's baseline sits 94 px under the badges, as on the Kindle.

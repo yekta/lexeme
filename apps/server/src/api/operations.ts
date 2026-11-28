@@ -612,7 +612,7 @@ export const operations: TOperation[] = [
   defineOperation({
     name: "list-books",
     title: "List books",
-    description: "Books from the user's e-readers, most recently read first. key is the e-reader's id for the book's file, which sync-reading matches books on.",
+    description: "Books from the user's e-readers, most recently read first, with the time read in each. key is the e-reader's id for the book's file, which sync-reading matches books on.",
     role: "viewer",
     method: "GET",
     path: "/books",
@@ -623,6 +623,12 @@ export const operations: TOperation[] = [
         .from(books)
         .where(eq(books.user_id, caller.userId))
         .orderBy(sql`${books.last_read_at} desc nulls last`, asc(books.title));
+      const timeRead = await db
+        .select({ book_id: pageReads.book_id, seconds: sql<number>`coalesce(sum(${pageReads.seconds}), 0)::int` })
+        .from(pageReads)
+        .where(eq(pageReads.user_id, caller.userId))
+        .groupBy(pageReads.book_id);
+      const secondsByBook = new Map(timeRead.map((row) => [row.book_id, row.seconds]));
       return {
         books: rows.map((book) => ({
           id: book.id,
@@ -633,6 +639,7 @@ export const operations: TOperation[] = [
           progress: book.progress,
           pages: book.pages,
           locations: book.locations,
+          seconds_read: secondsByBook.get(book.id) ?? 0,
           last_read_at: book.last_read_at?.toISOString() ?? null,
           finished_at: book.finished_at?.toISOString() ?? null,
         })),

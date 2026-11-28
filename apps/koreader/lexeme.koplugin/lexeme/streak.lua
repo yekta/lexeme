@@ -341,4 +341,79 @@ function Streak.hours(days)
     return result
 end
 
+-- Books ------------------------------------------------------------------------
+-- Each book as { title, authors, seconds read, finished, finished_at in epoch seconds or nil }.
+
+-- "2026-11-12T18:20:00.000Z" as epoch seconds.
+local function isoTime(text)
+    if type(text) ~= "string" then return nil end
+    local y, mo, d, h, mi, s = text:match("^(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+    if not y then return nil end
+    return os.time{ year = y, month = mo, day = d, hour = h, min = mi, sec = s } + utcOffsetMinutes() * 60
+end
+
+local function stringOr(value, fallback)
+    return type(value) == "string" and value ~= "" and value or fallback
+end
+
+-- Lexeme's books, kept for when they can't be fetched. Nil when Lexeme didn't answer.
+function Streak.fetchBooks()
+    local ok, body = Api.get("/api/v1/books")
+    if not ok or type(body) ~= "table" or type(body.books) ~= "table" then return nil end
+    local books = {}
+    for _, book in ipairs(body.books) do
+        table.insert(books, {
+            title = stringOr(book.title, "Untitled"),
+            authors = stringOr(book.authors, nil),
+            seconds = tonumber(book.seconds_read) or 0,
+            finished = book.status == "finished",
+            finished_at = isoTime(book.finished_at),
+        })
+    end
+    local settings = store()
+    settings:saveSetting("books", books)
+    settings:flush()
+    return books
+end
+
+-- What `fetchBooks` last got, or nil.
+function Streak.keptBooks()
+    return store():readSetting("books")
+end
+
+-- This Kindle's books: KOReader's reading and finished books, and the Amazon reader's history
+-- when it's imported. A book in both is one book.
+function Streak.localBooks()
+    local books, by_title = {}, {}
+    local function add(title, authors, seconds, finished_at)
+        title = stringOr(title, "Untitled")
+        local book = by_title[title:lower()]
+        if not book then
+            book = { title = title, seconds = 0, finished = false }
+            by_title[title:lower()] = book
+            table.insert(books, book)
+        end
+        book.authors = book.authors or stringOr(authors, nil)
+        book.seconds = book.seconds + (tonumber(seconds) or 0)
+        if finished_at then
+            book.finished = true
+            book.finished_at = math.max(book.finished_at or 0, finished_at)
+        end
+    end
+    local stats = columnsOf(settingsFile("statistics.sqlite3"), "SELECT title, authors, total_read_time FROM book;")
+    for i = 1, stats and #stats[1] or 0 do add(stats[1][i], stats[2][i], stats[3][i]) end
+    local history = settingsFile("lexeme_history.sqlite3")
+    local sessions = columnsOf(history, "SELECT b.title, SUM(s.seconds) FROM sessions s "
+        .. "LEFT JOIN books b ON b.asin = s.asin GROUP BY s.asin;")
+    for i = 1, sessions and #sessions[1] or 0 do add(sessions[1][i], nil, sessions[2][i]) end
+    for _, book in ipairs(require("lexeme/reading").books()) do
+        if book.status == "finished" and book.finished_at then
+            add(book.title, book.authors, 0, math.floor(book.finished_at / 1000))
+        end
+    end
+    local finished = columnsOf(history, "SELECT title, finished_at FROM books WHERE finished_at IS NOT NULL;")
+    for i = 1, finished and #finished[1] or 0 do add(finished[1][i], nil, 0, tonumber(finished[2][i])) end
+    return books
+end
+
 return Streak

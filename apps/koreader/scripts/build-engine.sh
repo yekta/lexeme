@@ -15,6 +15,7 @@ docker run --rm --platform linux/amd64 -v "$PWD/patches:/patches:ro" -v "$OUT:/o
     git clone -q --depth 1 --branch '$VERSION' https://github.com/koreader/koreader.git ~/koreader
     cd ~/koreader && git submodule update -q --init --depth 1 base
     cd base && git submodule update -q --init thirdparty/kpvcrlib/crengine
+    for p in /patches/base-*.patch; do git apply \"\$p\"; done
     for p in /patches/crengine-*.patch; do git -C thirdparty/kpvcrlib/crengine apply \"\$p\"; done
     for p in /patches/mupdf-*.patch; do
       cp \"\$p\" thirdparty/mupdf/

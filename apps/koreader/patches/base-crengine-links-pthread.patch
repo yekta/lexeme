@@ -1,0 +1,12 @@
+diff --git a/thirdparty/cmake_modules/koreader_thirdparty_libs.cmake b/thirdparty/cmake_modules/koreader_thirdparty_libs.cmake
+index e69b742..00c3e1b 100644
+--- a/thirdparty/cmake_modules/koreader_thirdparty_libs.cmake
++++ b/thirdparty/cmake_modules/koreader_thirdparty_libs.cmake
+@@ -55,6 +55,7 @@ target_link_libraries(
+     xxhash::xxhash
+     zlib::z
+     zstd::zstd
++    pthread
+ )
+ target_compile_options(_crengine__crengine INTERFACE -include ${OUTPUT_DIR}/thirdparty/crengine/build/crsetup.h)
+ target_include_directories(_crengine__crengine INTERFACE ${THIRDPARTY_DIR}/kpvcrlib/crengine/crengine/include)

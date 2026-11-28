@@ -35,14 +35,20 @@ local function lipc(args)
 end
 
 local function stayAwake(on)
-    if on and (not last_reset or os.time() - last_reset >= T1_RESET) then
-        last_reset = os.time()
-        lipc("-i com.lab126.powerd touchScreenSaverTimeout 1")
+    if on then
+        -- Set again at every check: KOReader's AutoTurn clears it whenever a book opens or closes.
+        PluginShare.pause_auto_suspend = true
+        if not last_reset or os.time() - last_reset >= T1_RESET then
+            last_reset = os.time()
+            lipc("-i com.lab126.powerd touchScreenSaverTimeout 1")
+        end
     end
     if on == awake then return end
     awake = on
-    PluginShare.pause_auto_suspend = on
-    if not on then last_reset = nil end
+    if not on then
+        PluginShare.pause_auto_suspend = false
+        last_reset = nil
+    end
     -- An earlier stay-awake held powerd's screensaver off; that ends here.
     if on then lipc("com.lab126.powerd preventScreenSaver 0") end
 end

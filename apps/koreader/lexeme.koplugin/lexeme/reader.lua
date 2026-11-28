@@ -7,6 +7,7 @@ local Footer = require("lexeme/footer")
 local HighlightPositions = require("lexeme/highlight_positions")
 local Layout = require("lexeme/layout")
 local Marks = require("lexeme/marks")
+local Notes = require("lexeme/notes")
 local Quick = require("lexeme/quick")
 local Reading = require("lexeme/reading")
 local Selection = require("lexeme/selection")
@@ -172,6 +173,8 @@ function Reader.install(ui)
         Selection.show(ui, { boxes = boxes, highlight_index = index })
         return true
     end
+    -- Footnotes in a sheet, links with a bar to go back, note numbers that can't be selected.
+    Notes.install(ui)
 end
 
 -- The reading settings go in before the book loads too, after KOReader's own: crengine styles the
@@ -224,6 +227,11 @@ function Reader.onReaderReady(ui)
     end)
     require("lexeme/locations").setup(ui)
     require("lexeme/amazon_import").apply(ui)
+    -- Where the book opened is its reading spot, for "Back to loc …" (lexeme/backstack.lua); after
+    -- the tick on which amazon_import may move to where Amazon's reader left the book.
+    UIManager:nextTick(function()
+        UIManager:nextTick(function() require("lexeme/backstack").start(ui) end)
+    end)
 end
 
 return Reader

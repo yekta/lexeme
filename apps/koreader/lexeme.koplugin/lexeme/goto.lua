@@ -3,6 +3,7 @@ local Geom = require("ui/geometry")
 local Screen = require("device").screen
 local UIManager = require("ui/uimanager")
 
+local Back = require("lexeme/backstack")
 local D = require("lexeme/draw")
 local NumberEntry = require("lexeme/numberentry")
 local Progress = require("lexeme/progress")
@@ -67,7 +68,7 @@ function GoTo:render(bb, x, y, w, h)
             w - indent - D.s(60))
         self:hit(x, baseline - D.s(70), w, D.s(ENTRY_PITCH), function()
             self:close()
-            Progress.goToPage(self.ui, entry.page)
+            GoTo.jump(self.ui, function() Progress.goToPage(self.ui, entry.page) end)
         end)
     end
     if #self.entries == 0 then
@@ -99,7 +100,7 @@ function GoTo:askPage()
             legend = "Location",
             ok_text = "Go",
             max = locations,
-            on_ok = function(location) Locations.goTo(ui, location) end,
+            on_ok = function(location) GoTo.jump(ui, function() Locations.goTo(ui, location) end) end,
         }, "ui")
         return
     end
@@ -110,8 +111,15 @@ function GoTo:askPage()
         legend = "Page number",
         ok_text = "Go",
         max = count,
-        on_ok = function(page) Progress.goToPage(ui, page) end,
+        on_ok = function(page) GoTo.jump(ui, function() Progress.goToPage(ui, page) end) end,
     }, "ui")
+end
+
+-- As on the Kindle, a jump from Go To keeps where it left for "Back to", and the toolbar comes back
+-- over the new page with that button on it.
+function GoTo.jump(ui, go)
+    Back.jump(ui, go)
+    require("lexeme/toolbar").show(ui)
 end
 
 function GoTo.show(ui)

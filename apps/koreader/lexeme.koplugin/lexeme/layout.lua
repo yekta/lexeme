@@ -289,11 +289,32 @@ end
 -- Reading settings follow the reader, not the book, as on a Kindle: a book
 -- opened with other settings is brought in line with the current ones.
 -- Our stylesheet rides along with KOReader's style tweaks, so every relayout includes it.
+-- KOReader's in-page footnotes (on by default) set a book's notes at the foot of the pages that
+-- refer to them, smaller, and run note files together; the Kindle's reader keeps notes where the book
+-- has them, at the text's size, each file on a page of its own.
+local function withoutInpageFootnotes(tweaks, css)
+    if not css then return css end
+    for id, tweak in pairs(tweaks.tweaks_by_id or {}) do
+        if type(id) == "string" and (id:find("^footnote%-inpage_") or id:find("^inpage_footnote_"))
+                and type(tweak.css) == "string" then
+            -- KOReader trims each tweak's CSS before joining them.
+            local snippet = tweak.css:match("^%s*(.-)%s*$")
+            local s, e
+            if snippet ~= "" then s, e = css:find(snippet, 1, true) end
+            while s do
+                css = css:sub(1, s - 1) .. css:sub(e + 1)
+                s, e = css:find(snippet, 1, true)
+            end
+        end
+    end
+    return css
+end
+
 local function installCss(ui)
     if ui.styletweak.lexeme_css then return end
     local original = ui.styletweak.getCssText
     ui.styletweak.getCssText = function(tweaks)
-        local css = original(tweaks)
+        local css = withoutInpageFootnotes(tweaks, original(tweaks))
         local ours = Layout.css(ui)
         return css and css ~= "" and css .. "\n" .. ours or ours
     end

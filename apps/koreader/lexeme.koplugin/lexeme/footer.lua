@@ -75,10 +75,13 @@ local function leftText(ui)
     if mode == "location" then
         -- "Loc 120", as the Kindle's reader puts it under the page; the toolbar gives the count.
         local location = Locations.current(ui)
-        if location then return "Loc " .. location end
+        if location then return "Loc " .. require("lexeme/backstack").group(location) end
         mode = "page"
     end
-    if mode == "page" then return "Page " .. Progress.pageLabel(ui) end
+    if mode == "page" then
+        local label = Progress.pageLabel(ui)
+        return "Page " .. (tonumber(label) and require("lexeme/backstack").group(tonumber(label)) or label)
+    end
     if mode == "chapter_time" then return Progress.chapterTimeLeft(ui) .. " left in chapter" end
     if mode == "book_time" then return Progress.bookTimeLeft(ui) .. " left in book" end
 end
@@ -99,13 +102,17 @@ function Footer:paintTo(bb)
     if not self.ui.document then return end
     self:recordProgress()
     local w, h = Screen:getWidth(), Screen:getHeight()
-    local face = D.face("bold", 29)
-    local baseline = h - D.s(1696 - 1673)
+    -- After a link, the bar to go back takes the line's place (lexeme/notes.lua).
+    local Notes = require("lexeme/notes")
+    if Notes.barActive(self.ui) then return Notes.paintBar(bb, self.ui) end
+    -- As the Kindle draws it: bold 29 px, 80 px in from the edges, on a baseline 22 px up.
+    local face = D.nface("bold", 29)
+    local baseline = h - D.px(22)
     local text = leftText(self.ui)
-    if text then D.text(bb, D.s(84), baseline, face, text) end
-    D.textRight(bb, w - D.s(84), baseline, face, Progress.percent(self.ui) .. "%")
+    if text then D.text(bb, D.px(80), baseline, face, text) end
+    D.textRight(bb, w - D.px(81), baseline, face, Progress.percent(self.ui) .. "%")
     if G_reader_settings:isTrue("lexeme_show_clock") then
-        D.textCenter(bb, w / 2, D.s(48), D.face("bold", 26), Status.clock())
+        D.textCenter(bb, w / 2, D.px(48), D.nface("bold", 26), Status.clock())
     end
 end
 

@@ -25,6 +25,19 @@ function D.s(n)
     return math.floor(n * k + 0.5)
 end
 
+-- Pixels as the Kindle's own reader draws them. On its 300 dpi screens (a Paperwhite 5 as a
+-- Paperwhite 12) it draws the same sizes and pins things to the screen's edges, rather than scaling
+-- them to the screen's width as D.s does. Other screens scale.
+function D.px(n)
+    local dpi = Screen:getDPI()
+    if dpi and dpi >= 280 and dpi <= 320 then return math.floor(n + 0.5) end
+    return D.s(n)
+end
+
+-- Measurements taken on a Paperwhite 5 (1236 x 1648), pinned to the right or bottom edge.
+function D.right(w, x) return w - D.px(1236 - x) end
+function D.bottom(h, y) return h - D.px(1648 - y) end
+
 local FACE_FILES = {
     regular = { "Amazon-Ember-Regular.ttf", "NotoSans-Regular.ttf" },
     medium = { "Amazon-Ember-Medium.ttf", "NotoSans-Regular.ttf" },
@@ -54,9 +67,17 @@ local face_cache = {}
 
 -- `kind` is one of FACE_FILES or a font file of the Kindle's; `em` is the font size in reference pixels.
 function D.face(kind, em)
-    local key = kind .. em
+    return D.faceAt(kind, D.s(em))
+end
+
+-- A face `px` pixels as the Kindle's reader sizes its own text (see D.px).
+function D.nface(kind, px)
+    return D.faceAt(kind, D.px(px))
+end
+
+function D.faceAt(kind, px)
+    local key = kind .. "@" .. px
     if face_cache[key] then return face_cache[key] end
-    local px = D.s(em)
     local size = (px - 0.5) / (Screen:scaleBySize(10000) / 10000)
     local files = FACE_FILES[kind] or { kind }
     local face

@@ -132,6 +132,11 @@ function Lexeme:onReaderReady()
     require("lexeme/cachesave").start(self.ui)
 end
 
+-- A page turned: the reader has settled there, for "Back to loc …" (lexeme/backstack.lua).
+function Lexeme:onPageUpdate()
+    if self.ui.document then require("lexeme/backstack").onPageUpdate(self.ui) end
+end
+
 -- A book laid out again (a font change) has its cache written again while it's read.
 function Lexeme:onDocumentRerendered()
     if self.ui.document then require("lexeme/cachesave").start(self.ui) end

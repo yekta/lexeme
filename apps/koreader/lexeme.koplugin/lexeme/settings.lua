@@ -175,15 +175,6 @@ function Settings:readingPage()
                     end,
                 },
                 {
-                    title = "Footnotes in a pop-up",
-                    subtitle = "Show a footnote over the page instead of jumping to it.",
-                    toggle = G_reader_settings:isTrue("footnote_link_in_popup"),
-                    tap = function()
-                        G_reader_settings:flipNilOrFalse("footnote_link_in_popup")
-                        self:refresh()
-                    end,
-                },
-                {
                     title = "Vocabulary Builder",
                     subtitle = "Keep the words you look up, with the sentence you read them in.",
                     toggle = G_reader_settings:nilOrTrue("lexeme_vocabulary_builder"),

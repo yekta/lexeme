@@ -1,0 +1,44 @@
+--- a/cre.cpp
++++ b/cre.cpp
+@@ -732,6 +732,33 @@
+ 	}
+ 
+ 	return 0;
++}
++
++// Writes to the cache file what it lacks, for about the given number of milliseconds
++// (default 100, at least 20): so the cache can be written in slices, while the document is
++// being read, and closing it has little or nothing left to write. A slice goes on where the
++// previous one stopped (or starts over if the document changed since). The cache file is
++// only marked complete by the slice that finishes: until then, it stays marked dirty, and
++// is not used if the document isn't closed normally.
++// Nothing is written once parts of the document have been laid out again on their own
++// (partial rerendering): the cache must not get that partial layout.
++// Returns true when there's nothing left to write (or no cache file to write to, or
++// nothing to write now), false when it should be called again, and "done", "timeout" or
++// "error".
++static int updateCache(lua_State *L) {
++	CreDocument *doc = (CreDocument*) luaL_checkudata(L, 1, "credocument");
++	int ms = luaL_optint(L, 2, 100);
++	if (ms < 20)
++		ms = 20;
++	ContinuousOperationResult res = CR_DONE;
++	if (doc->text_view != NULL && doc->dom_doc != NULL
++			&& !(doc->dom_doc->isPartialRerenderingEnabled() && doc->dom_doc->getPartialRerenderingsCount() > 0)) {
++		CRTimerUtil maxTime(ms);
++		res = doc->text_view->updateCache(maxTime);
++	}
++	lua_pushboolean(L, res != CR_TIMEOUT);
++	lua_pushstring(L, res == CR_TIMEOUT ? "timeout" : (res == CR_ERROR ? "error" : "done"));
++	return 2;
+ }
+ 
+ static int isBuiltDomStale(lua_State *L) {
+@@ -4490,6 +4517,7 @@
+     {"readDefaults", readDefaults},
+     {"saveDefaults", saveDefaults},
+     {"close", closeDocument},
++    {"updateCache", updateCache},
+     {"__gc", closeDocument},
+     {NULL, NULL}
+ };

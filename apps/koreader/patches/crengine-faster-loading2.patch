@@ -1,0 +1,1333 @@
+--- a/crengine/src/epubfmt.cpp
++++ b/crengine/src/epubfmt.cpp
+@@ -1415,6 +1415,8 @@
+         // less expensive than loading the full cache file).
+         if (!metadataOnly) {
+             CRLog::debug("Trying loading from cache");
++            if ( formatCallback )
++                formatCallback->OnCacheFileLookup();
+             if ( m_doc->openFromCache(formatCallback, progressCallback) ) {
+                 CRLog::debug("Loaded from cache");
+                 if ( progressCallback ) {
+--- a/crengine/src/lstridmap.cpp
++++ b/crengine/src/lstridmap.cpp
+@@ -163,6 +163,7 @@
+     m_by_name = new LDOMNameIdMapItem * [m_size]();
+     m_sorted = true;
+     m_changed = false;
++    clearRecent();
+ }
+ 
+ /// Copy constructor
+@@ -187,6 +188,7 @@
+             m_by_name[i] = NULL;
+     }
+     m_sorted = map.m_sorted;
++    clearRecent();
+ }
+ 
+ LDOMNameIdMap::~LDOMNameIdMap()
+@@ -214,6 +216,14 @@
+         return NULL;
+     if (!m_sorted)
+         Sort();
++    // The same few names are looked for over and over: the item the search below gave
++    // for this name may be at hand (the search gives the same until the items change)
++    lUInt32 h = 0;
++    for ( const lChar32 * p = name; *p; p++ )
++        h = h * 31 + *p;
++    const LDOMNameIdMapItem * & recent = m_recent[ (h ^ (h >> 7)) & (RECENT_SIZE - 1) ];
++    if ( recent && lStr_cmp( name, recent->value.c_str() )==0 )
++        return recent;
+     lUInt16 a, b, c;
+     int r;
+     a = 0;
+@@ -221,8 +231,10 @@
+     for (;;) {
+         c = (a + b)>>1;
+         r = lStr_cmp( name, m_by_name[c]->value.c_str() );
+-        if (r == 0)
++        if (r == 0) {
++            recent = m_by_name[c];
+             return m_by_name[c]; // found
++        }
+         if (b==a+1)
+             return NULL; // not found
+         if (r>0) {
+@@ -287,6 +299,7 @@
+     m_by_id[item->id] = item;
+     m_by_name[m_count++] = item;
+     m_sorted = false;
++    clearRecent();
+     if (!m_changed) {
+         m_changed = true;
+         //CRLog::trace("new ID for %s is %d", LCSTR(item->value), item->id);
+@@ -311,6 +324,7 @@
+     }
+     memset( m_by_id, 0, sizeof(LDOMNameIdMapItem *)*m_size);
+     m_count = 0;
++    clearRecent();
+ }
+ 
+ void LDOMNameIdMap::dumpUnknownItems( FILE * f, int start_id )
+--- a/crengine/src/lvdocview.cpp
++++ b/crengine/src/lvdocview.cpp
+@@ -169,6 +169,7 @@
+ 			 #endif
+ 			 )
+ 			 */
++			, m_pendingCrc(NULL)
+ 			, m_stream(NULL), m_doc(NULL), m_stylesheet(def_stylesheet),
+             m_backgroundTiled(true),
+             m_stylesheetUseMacros(true),
+@@ -230,7 +231,24 @@
+ }
+ 
+ LVDocView::~LVDocView() {
++	finishPendingCrc();
+ 	Clear();
++}
++
++/// waits for the document file's crc32 code computed in another thread, and sets it
++/// in the document properties, as LoadDocument() used to do right away
++void LVDocView::finishPendingCrc() {
++	if (!m_pendingCrc)
++		return;
++	lUInt32 crc = 0;
++	if (m_pendingCrc->wait(crc))
++		m_pendingCrcStream->setcrc32(crc);
++	else
++		crc = m_pendingCrcStream->getcrc32(); // as before, when it couldn't be read there
++	delete m_pendingCrc;
++	m_pendingCrc = NULL;
++	m_pendingCrcStream.Clear();
++	m_doc_props->setHex(DOC_PROP_FILE_CRC32, crc);
+ }
+ 
+ /// get text format options
+@@ -4252,10 +4270,20 @@
+     m_doc_props->setString(DOC_PROP_FILE_NAME, fn);
+ 	m_doc_props->setString(DOC_PROP_FILE_SIZE, lString32::itoa(
+ 			(int) stream->GetSize()));
+-	if (!metadataOnly)
+-		m_doc_props->setHex(DOC_PROP_FILE_CRC32, stream->getcrc32());
++	if (!metadataOnly) {
++		// Reading the whole file for its crc32 code takes a while on slow storage: when
++		// possible, it's done in another thread while loading starts, and waited for
++		// before anything needs it (see finishPendingCrc()).
++		m_pendingCrc = LVStartStreamCrc32(stream);
++		if (m_pendingCrc)
++			m_pendingCrcStream = stream;
++		else
++			m_doc_props->setHex(DOC_PROP_FILE_CRC32, stream->getcrc32());
++	}
+ 
+-	if (LoadDocument(stream, metadataOnly)) {
++	bool loaded = LoadDocument(stream, metadataOnly);
++	finishPendingCrc();
++	if (loaded) {
+ 		m_filename = lString32(fname);
+ 		m_stream.Clear();
+ 
+@@ -4445,6 +4473,7 @@
+         if ( DetectPDBFormat(m_stream, pdbFormat) ) {
+             // PDB
+             CRLog::info("PDB format detected");
++            finishPendingCrc();
+             createEmptyDocument();
+             m_doc->setProps( m_doc_props );
+             setRenderProps( 0, 0 ); // to allow apply styles and rend method while loading
+@@ -4487,6 +4516,7 @@
+             // See epubfmt.cpp's ExtractCoverFilenameFromCoverPageFragment()
+             // for why we need to pass fb2_elem_table and such.
+             bool res = ImportEpubDocument( m_stream, m_doc, m_callback, this, metadataOnly, fb2_elem_table, fb2_attr_table, fb2_ns_table );
++            finishPendingCrc(); // (if not already done, see OnCacheFileLookup())
+ 			if ( !res ) {
+ 				setDocFormat( doc_format_none );
+                 createDefaultDocument( cs32("ERROR: Error reading EPUB format"), cs32("Cannot open document") );
+@@ -4514,6 +4544,7 @@
+ 				return true;
+ 			}
+ 		}
++		finishPendingCrc(); // the other formats may need it anywhere
+ 
+         if( DetectFb3Format(m_stream) ) {
+             CRLog::info("FB3 format detected");
+@@ -4804,6 +4835,7 @@
+ 
+ #endif //USE_ZLIB
+ 		{
++			finishPendingCrc();
+ #if 1
+ 			//m_stream = LVCreateBufferedStream( m_stream, FILE_STREAM_BUFFER_SIZE );
+ #else
+--- a/crengine/src/lvstream.cpp
++++ b/crengine/src/lvstream.cpp
+@@ -1142,7 +1142,32 @@
+             *nBytesRead = 0;
+         return LVERR_FAIL;
+ #endif
++    }
++#ifndef _WIN32
++    /// reads at pos with pread(), which doesn't use the file position: fine from another thread
++    virtual lverror_t ReadAt( lvpos_t pos, void * buf, lvsize_t count, lvsize_t * nBytesRead )
++    {
++        if (nBytesRead)
++            *nBytesRead = 0;
++        if (m_fd == -1)
++            return LVERR_FAIL;
++        lvsize_t done = 0;
++        while ( done < count ) {
++            ssize_t res = pread( m_fd, (lUInt8 *)buf + done, count - done, (off_t)(pos + done) );
++            if ( res == (ssize_t)-1 ) {
++                if ( errno == EINTR )
++                    continue;
++                return LVERR_FAIL;
++            }
++            if ( res == 0 )
++                break; // end of file
++            done += res;
++        }
++        if (nBytesRead)
++            *nBytesRead = done;
++        return LVERR_OK;
+     }
++#endif
+     virtual lverror_t GetSize( lvsize_t * pSize )
+     {
+ #ifdef _WIN32
+@@ -2660,10 +2685,11 @@
+         int method;
+         lUInt8 * packed;    // compressed data, read by this thread (with the local header)
+         lvsize_t packedOffset; // where the data starts in it
++        lvsize_t span;      // bytes read into packed (see fetchEntry())
+         lUInt8 * data;      // decompressed by the other one
+         lvsize_t held;      // memory this entry counts for in _heldBytes
+         int state;
+-        Entry() : pos(0), packSize(0), unpSize(0), method(0), packed(NULL), packedOffset(0), data(NULL), held(0), state(SKIPPED) { }
++        Entry() : pos(0), packSize(0), unpSize(0), method(0), packed(NULL), packedOffset(0), span(0), data(NULL), held(0), state(SKIPPED) { }
+     };
+     // Entries prepared ahead are limited in number and in memory (compressed and
+     // decompressed data both count): enough to keep the other thread busy.
+@@ -2676,6 +2702,8 @@
+     static const lvsize_t READ_NAME_SLACK = 0x100;
+ 
+     LVStreamRef _stream;    // the archive
++    LVStream * _readStream; // the same, read by the other thread with ReadAt(), if it can
++    lvsize_t _fileSize;
+     Entry * _entries;
+     int _count;
+     int _nextRead;          // next entry to read (this thread)
+@@ -2758,7 +2786,58 @@
+                 e.packed = NULL;
+                 return false;
+             }
++        }
++        return true;
++    }
++    /// makes the buffers for the other thread to read an entry's local header and
++    /// compressed data at once into, and to decompress into (see fetchEntry()): allocated
++    /// here rather than there, where they would come from a memory arena of its own
++    bool prepareEntry( Entry & e )
++    {
++        if ( e.pos >= _fileSize )
++            return false;
++        e.span = 0x1E + READ_NAME_SLACK + e.packSize;
++        if ( e.span > _fileSize - e.pos )
++            e.span = _fileSize - e.pos;
++        e.packed = (lUInt8 *)malloc( e.span );
++        // (One byte more than expected, to notice data longer than said.)
++        e.data = (lUInt8 *)malloc( e.unpSize + 1 );
++        if ( !e.packed || !e.data ) {
++            free( e.packed );
++            e.packed = NULL;
++            free( e.data );
++            e.data = NULL;
++            return false;
++        }
++        return true;
++    }
++    /// in the other thread: reads an entry's local header and compressed data, checking
++    /// what LVZipDecodeStream::Create() checks (anything else, such as a name and extra
++    /// field longer than guessed, is left to LVZipArc::OpenStream())
++    bool fetchEntry( Entry & e )
++    {
++        ZipLocalFileHdr hdr;
++        unsigned hdr_size = 0x1E; //sizeof(hdr);
++        lvsize_t n = 0;
++        if ( _readStream->ReadAt( e.pos, e.packed, e.span, &n )!=LVERR_OK || n < hdr_size )
++            return false;
++        memcpy( &hdr, e.packed, hdr_size );
++        hdr.byteOrderConv();
++        lvsize_t dataOffset = hdr_size + hdr.getNameLen() + hdr.getAddLen();
++        if ( (lvpos_t)(e.pos + dataOffset + e.packSize) > (lvpos_t)_fileSize )
++            return false;
++        e.method = hdr.getMethod();
++        if ( e.method == 0 ) {
++            if ( e.packSize != e.unpSize )
++                return false;
++        } else if ( e.method != 8 ) {
++            return false;
+         }
++        if ( dataOffset + e.packSize > n )
++            return false;
++        e.packedOffset = dataOffset;
++        if ( e.method == 0 )
++            memcpy( e.data, e.packed + dataOffset, e.packSize );
+         return true;
+     }
+     /// decompresses an entry into its data buffer, true if it is exactly what the
+@@ -2791,7 +2870,7 @@
+             Entry & e = _entries[_nextRead++];
+             if ( e.state != NOT_READ )
+                 continue;
+-            if ( readEntry( e ) ) {
++            if ( _readStream ? prepareEntry( e ) : readEntry( e ) ) {
+                 e.held = e.packSize + e.unpSize;
+                 _heldBytes += e.held;
+             }
+@@ -2823,7 +2902,7 @@
+             if ( e.state == READ ) {
+                 e.state = INFLATING;
+                 pthread_mutex_unlock( &_mutex );
+-                bool ok = zsOk && inflateEntry( e, &zs );
++                bool ok = ( !_readStream || fetchEntry( e ) ) && zsOk && inflateEntry( e, &zs );
+                 pthread_mutex_lock( &_mutex );
+                 e.state = ok ? DONE : FAILED;
+                 if ( _takerWaiting )
+@@ -2841,7 +2920,7 @@
+         return NULL;
+     }
+     LVZipPrefetcher( LVStreamRef stream, int count )
+-        : _stream(stream), _count(count), _nextRead(0), _nextInflate(0), _heldBytes(0)
++        : _stream(stream), _readStream(NULL), _fileSize(stream->GetSize()), _count(count), _nextRead(0), _nextInflate(0), _heldBytes(0)
+         , _stop(false)
+         , _threadWaiting(false), _takerWaiting(false)
+     {
+@@ -2856,6 +2935,11 @@
+         if ( count <= 0 || stream.isNull() )
+             return NULL;
+         LVZipPrefetcher * res = new LVZipPrefetcher( stream, count );
++        // Have the other thread read the entries too, if the archive's stream allows it
++        lUInt8 probe[4];
++        lvsize_t probed = 0;
++        if ( stream->ReadAt( 0, probe, 4, &probed )==LVERR_OK && probed==4 )
++            res->_readStream = stream.get();
+         for ( int i = 0; i < count; i++ ) {
+             const lChar32 * fname = names[i].c_str();
+             if ( !fname[0] )
+@@ -3785,6 +3869,94 @@
+     if ( fs.isNull() )
+         return fs;
+     return LVCreateMemoryStream( fs );
++}
++
++#if CR_BACKGROUND_UNZIP == 1
++/// Computes a stream's crc32 code as LVStream::getcrc32() does, reading it with ReadAt()
++/// in another thread
++class LVStreamCrc32Thread : public LVStreamCrc32Task
++{
++    LVStreamRef _stream;   // keeps the stream alive (taken and dropped by the thread that made this)
++    LVStream * _readStream; // what the other thread reads, with ReadAt() only
++    lvsize_t _size;
++    lUInt32 _crc;
++    bool _ok;
++    pthread_t _thread;
++    bool _joined;
++    void run()
++    {
++        lUInt8 * buf = (lUInt8 *)malloc( CRC_BIG_BUF_SIZE );
++        if ( !buf )
++            return;
++        lUInt32 crc = 0;
++        bool ok = true;
++        for ( lvpos_t pos = 0; pos < _size; pos += CRC_BIG_BUF_SIZE ) {
++            lvsize_t sz = _size - pos;
++            if ( sz > CRC_BIG_BUF_SIZE )
++                sz = CRC_BIG_BUF_SIZE;
++            lvsize_t bytesRead = 0;
++            if ( _readStream->ReadAt( pos, buf, sz, &bytesRead )!=LVERR_OK || bytesRead!=sz ) {
++                ok = false;
++                break;
++            }
++            crc = lStr_crc32( crc, buf, sz );
++        }
++        free( buf );
++        _crc = crc;
++        _ok = ok;
++    }
++    static void * threadMain( void * arg )
++    {
++        ((LVStreamCrc32Thread *)arg)->run();
++        return NULL;
++    }
++public:
++    LVStreamCrc32Thread( LVStreamRef stream ) : _stream(stream), _readStream(stream.get()), _size(stream->GetSize()), _crc(0), _ok(false), _joined(true) { }
++    bool start()
++    {
++        _joined = pthread_create( &_thread, NULL, threadMain, this ) != 0;
++        return !_joined;
++    }
++    virtual bool wait( lUInt32 & crc )
++    {
++        if ( !_joined ) {
++            pthread_join( _thread, NULL );
++            _joined = true;
++        }
++        crc = _crc;
++        return _ok;
++    }
++    virtual ~LVStreamCrc32Thread()
++    {
++        lUInt32 crc;
++        wait( crc );
++    }
++};
++#endif
++
++LVStreamCrc32Task * LVStartStreamCrc32( LVStreamRef stream )
++{
++#if CR_BACKGROUND_UNZIP == 1
++    if ( stream.isNull() )
++        return NULL;
++    lvopen_mode_t mode = stream->GetMode();
++    if ( mode != LVOM_READ && mode != LVOM_APPEND ) // (what getcrc32() requires)
++        return NULL;
++    // Worth it for files only large enough to take time, readable from another thread
++    lUInt8 probe[4];
++    lvsize_t probed = 0;
++    if ( stream->GetSize() <= CRC_BIG_BUF_SIZE || stream->ReadAt( 0, probe, 4, &probed )!=LVERR_OK || probed!=4 )
++        return NULL;
++    LVStreamCrc32Thread * task = new LVStreamCrc32Thread( stream );
++    if ( !task->start() ) {
++        delete task;
++        return NULL;
++    }
++    return task;
++#else
++    CR_UNUSED(stream);
++    return NULL;
++#endif
+ }
+ 
+ LVStreamRef LVCreateBufferedStream( LVStreamRef stream, int bufSize )
+@@ -4356,13 +4528,12 @@
+     s += newPath;
+     //LVAppendPathDelimiter( s );
+     LVReplacePathSeparator( s, separator );
+-    lString32 pattern;
+-    pattern << separator << ".." << separator;
++    const int patternLength = 4; // separator, "..", separator
+     bool changed;
+     do {
+         changed = false;
+         int lastElementStart = 0;
+-        for ( int i=0; i<(int)(s.length()-pattern.length()); i++ ) {
++        for ( int i=0; i<(int)(s.length()-patternLength); i++ ) {
+             if ( s[i]==separator && s[i+1]!='.' )
+                 lastElementStart = i + 1;
+             else if ( s[i]==separator && s[i+1]=='.' && s[i+2]=='.' && s[i+3]==separator ) {
+@@ -4377,13 +4548,22 @@
+                 }
+             }
+         }
+-    } while ( changed && s.length()>=pattern.length() );
+-    // Replace "/./" inside with "/"
+-    pattern.clear();
+-    pattern << separator << "." << separator;
+-    lString32 replacement;
+-    replacement << separator;
+-    while ( s.replace( pattern, replacement ) ) ;
++    } while ( changed && s.length()>=patternLength );
++    // Replace "/./" inside with "/" (if there's any: most paths have none)
++    bool hasDotElement = false;
++    for ( int i=0; i+2<s.length(); i++ ) {
++        if ( s[i]==separator && s[i+1]=='.' && s[i+2]==separator ) {
++            hasDotElement = true;
++            break;
++        }
++    }
++    if ( hasDotElement ) {
++        lString32 pattern;
++        pattern << separator << "." << separator;
++        lString32 replacement;
++        replacement << separator;
++        while ( s.replace( pattern, replacement ) ) ;
++    }
+     // Remove "./" at start
+     if ( s.length()>2 && s[0]=='.' && s[1]==separator )
+         s.erase(0, 2);
+--- a/crengine/src/lvstring.cpp
++++ b/crengine/src/lvstring.cpp
+@@ -1564,7 +1564,12 @@
+ : lString32Collection( v )
+ , hashSize( v.hashSize )
+ , hash( NULL )
++, itemHashes( NULL )
++, itemHashesSize( 0 )
++, itemHashesCount( 0 )
+ {
++    for ( int i=0; i<length(); i++ )
++        setItemHash( i, v.itemHash( i ) );
+     hash = (HashPair *)malloc( sizeof(HashPair) * hashSize );
+     for ( int i=0; i<hashSize; i++ ) {
+         hash[i].clear();
+@@ -1606,7 +1611,7 @@
+ }
+ 
+ lString32HashedCollection::lString32HashedCollection( lUInt32 hash_size )
+-: hashSize(hash_size), hash(NULL)
++: hashSize(hash_size), hash(NULL), itemHashes(NULL), itemHashesSize(0), itemHashesCount(0)
+ {
+ 
+     hash = (HashPair *)malloc( sizeof(HashPair) * hashSize );
+@@ -1617,6 +1622,28 @@
+ lString32HashedCollection::~lString32HashedCollection()
+ {
+     clearHash();
++    free( itemHashes );
++}
++
++void lString32HashedCollection::setItemHash( int index, lUInt32 h )
++{
++    // Kept only without gaps (items are added one after the other): if one can't be
++    // stored, none after it is, and itemHash() computes them
++    if ( index > itemHashesCount )
++        return;
++    if ( index >= itemHashesSize ) {
++        int sz = itemHashesSize ? itemHashesSize : 64;
++        while ( sz <= index )
++            sz <<= 1;
++        lUInt32 * p = (lUInt32 *)realloc( itemHashes, sz * sizeof(lUInt32) );
++        if ( !p )
++            return;
++        itemHashes = p;
++        itemHashesSize = sz;
++    }
++    itemHashes[index] = h;
++    if ( index == itemHashesCount )
++        itemHashesCount++;
+ }
+ 
+ int lString32HashedCollection::find( const lChar32 * s )
+@@ -1627,13 +1654,12 @@
+     lUInt32 n = h % hashSize;
+     if ( hash[n].index!=-1 )
+     {
+-        const lString32 & str = at( hash[n].index );
+-        if ( str == s )
++        // (items with another hash can't be equal)
++        if ( itemHash( hash[n].index )==h && at( hash[n].index )==s )
+             return hash[n].index;
+         HashPair * p = hash[n].next;
+         for ( ;p ;p = p->next ) {
+-            const lString32 & str = at( p->index );
+-            if ( str==s )
++            if ( itemHash( p->index )==h && at( p->index )==s )
+                 return p->index;
+         }
+     }
+@@ -1652,7 +1678,7 @@
+             hash[i].clear();
+     }
+     for ( int i=0; i<length(); i++ ) {
+-        lUInt32 h = calcStringHash( at(i).c_str() );
++        lUInt32 h = itemHash( i );
+         lUInt32 n = h % hashSize;
+         addHashItem( n, i );
+     }
+@@ -1671,17 +1697,17 @@
+     lUInt32 n = h % hashSize;
+     if ( hash[n].index!=-1 )
+     {
+-        const lString32 & str = at( hash[n].index );
+-        if ( str == s )
++        // (items with another hash can't be equal)
++        if ( itemHash( hash[n].index )==h && at( hash[n].index )==s )
+             return hash[n].index;
+         HashPair * p = hash[n].next;
+         for ( ;p ;p = p->next ) {
+-            const lString32 & str = at( p->index );
+-            if ( str==s )
++            if ( itemHash( p->index )==h && at( p->index )==s )
+                 return p->index;
+         }
+     }
+     lUInt32 i = lString32Collection::add( lString32(s) );
++    setItemHash( i, h );
+     addHashItem( n, i );
+     return i;
+ }
+@@ -2774,6 +2800,12 @@
+     for ( int i=0; i<len; i++ ) {
+         lChar32 ch = str[i];
+ #if (USE_UTF8PROC==1)
++        if ( ch < 0x80 ) {
++            // What utf8proc_tolower() gives for ASCII (tag and attribute names, mostly)
++            if ( ch>='A' && ch<='Z' )
++                str[i] = ch + 0x20;
++            continue;
++        }
+         str[i] = utf8proc_tolower(ch);
+ #else
+         if ( ch>='A' && ch<='Z' ) {
+--- a/crengine/src/lvtinydom.cpp
++++ b/crengine/src/lvtinydom.cpp
+@@ -676,6 +676,8 @@
+     }
+     /// reads block as a stream
+     LVStreamRef readStream(lUInt16 type, lUInt16 index);
++    /// true if the file has that block
++    bool hasBlock( lUInt16 type, lUInt16 index ) { return findBlock( type, index ) != NULL; }
+ 
+ #if (USE_ZSTD == 1)
+     bool allocCompRess(void);
+@@ -2503,6 +2505,8 @@
+ , _renderedBlockCache( 256 )
+ , _cacheFile(NULL)
+ , _cacheFileStale(true)
++, _cacheFileStaleCount(0)
++, _mapSavingStaleCount(0)
+ , _cacheFileLeaveAsDirty(false)
+ , _mapped(false)
+ , _maperror(false)
+@@ -2549,6 +2553,8 @@
+ , _renderedBlockCache( 256 )
+ , _cacheFile(NULL)
+ , _cacheFileStale(true)
++, _cacheFileStaleCount(0)
++, _mapSavingStaleCount(0)
+ , _cacheFileLeaveAsDirty(false)
+ , _mapped(false)
+ , _maperror(false)
+@@ -2777,6 +2783,18 @@
+     return res;
+ }
+ 
++const css_style_rec_t * tinyNodeCollection::peekNodeStyle( lUInt32 dataIndex )
++{
++    // As getNodeStyle(), without copying the reference (the style cache keeps it)
++    ldomNodeStyleInfo info;
++    _styleStorage.getStyleData( dataIndex, &info );
++    const css_style_ref_t * res = _styles.peek( info._styleIndex );
++    if ( !res || res->isNull() )
++        return NULL;
++    _styles.addIndexRef(info._styleIndex);
++    return res->get();
++}
++
+ font_ref_t tinyNodeCollection::getNodeFont( lUInt32 dataIndex )
+ {
+     ldomNodeStyleInfo info;
+@@ -2864,7 +2882,7 @@
+     return true;
+ }
+ 
+-bool tinyNodeCollection::saveNodeData( lUInt16 type, ldomNode ** list, int nodecount )
++bool tinyNodeCollection::saveNodeData( lUInt16 type, ldomNode ** list, int nodecount, bool fatalOnError )
+ {
+     int count = ((nodecount+TNC_PART_LEN-1) >> TNC_PART_SHIFT);
+     for (lUInt16 i=0; i<count; i++) {
+@@ -2877,8 +2895,11 @@
+         }
+         ldomNode buf[sz];
+         prepareNodeDataPart(buf, list[i], sz);
+-        if (!_cacheFile->write(type, i, (lUInt8*)buf, sizeof(buf), COMPRESS_NODE_DATA))
+-            crFatalError(-1, "Cannot write node data");
++        if (!_cacheFile->write(type, i, (lUInt8*)buf, sizeof(buf), COMPRESS_NODE_DATA)) {
++            if ( fatalOnError )
++                crFatalError(-1, "Cannot write node data");
++            return false;
++        }
+     }
+     return true;
+ }
+@@ -2903,13 +2924,13 @@
+ }
+ 
+ #define NODE_INDEX_MAGIC 0x19283746
+-bool tinyNodeCollection::saveNodeData()
++bool tinyNodeCollection::saveNodeData( bool fatalOnError )
+ {
+     SerialBuf buf(12, true);
+     buf << (lUInt32)NODE_INDEX_MAGIC << (lUInt32)_elemCount << (lUInt32)_textCount;
+-    if ( !saveNodeData( CBT_ELEM_NODE, _elemList, _elemCount+1 ) )
++    if ( !saveNodeData( CBT_ELEM_NODE, _elemList, _elemCount+1, fatalOnError ) )
+         return false;
+-    if ( !saveNodeData( CBT_TEXT_NODE, _textList, _textCount+1 ) )
++    if ( !saveNodeData( CBT_TEXT_NODE, _textList, _textCount+1, fatalOnError ) )
+         return false;
+     if ( !_cacheFile->write(CBT_NODE_INDEX, buf, COMPRESS_NODE_DATA) )
+         return false;
+@@ -3088,9 +3109,10 @@
+ 
+ #if BUILD_LITE!=1
+ /// put all objects into persistent storage
+-void tinyNodeCollection::persist( CRTimerUtil & maxTime )
++bool tinyNodeCollection::persist( CRTimerUtil & maxTime )
+ {
+     CRLog::info("lxmlDocBase::persist() invoked - converting all nodes to persistent objects");
++    bool persisted = false;
+     // elements
+     for ( int partindex = 0; partindex<=(_elemCount>>TNC_PART_SHIFT); partindex++ ) {
+         ldomNode * part = _elemList[partindex];
+@@ -3099,14 +3121,17 @@
+             for ( int i=0; i<TNC_PART_LEN && n0+i<=_elemCount; i++ )
+                 if ( !part[i].isNull() && !part[i].isPersistent() ) {
+                     part[i].persist();
++                    persisted = true;
+                     if (maxTime.expired())
+-                        return;
++                        return false;
+                 }
+         }
+     }
+     //_cacheFile->flush(false); // intermediate flush
+-    if ( maxTime.expired() )
+-        return;
++    // (Stop here only if this call persisted something: otherwise, with slices shorter than
++    // the walk over the elements, a save made in slices would never get past it)
++    if ( persisted && maxTime.expired() )
++        return false;
+     // texts
+     for ( int partindex = 0; partindex<=(_textCount>>TNC_PART_SHIFT); partindex++ ) {
+         ldomNode * part = _textList[partindex];
+@@ -3118,11 +3143,12 @@
+                     part[i].persist();
+                     //CRLog::trace("after persist");
+                     if (maxTime.expired())
+-                        return;
++                        return false;
+                 }
+         }
+     }
+     //_cacheFile->flush(false); // intermediate flush
++    return true;
+ }
+ #endif
+ 
+@@ -3160,8 +3186,9 @@
+ {
+     enum { WAITING, PACKING, PACKED };
+     /// how many blocks past the one being written may be compressed ahead, which bounds
+-    /// the memory held to that many compressed blocks
+-    static const int MAX_AHEAD = 8;
++    /// the memory held to that many compressed blocks (fewer for a save made in slices,
++    /// where those compressed ahead of where a slice stops are wasted)
++    int _maxAhead;
+ public:
+     /// makes a block's data: copies count items of src into dst
+     typedef void (*PrepareFunc)( void * dst, const void * src, int count );
+@@ -3197,7 +3224,7 @@
+     /// first block waiting that may be compressed now, or -1 (call with the mutex held)
+     int nextToPack()
+     {
+-        int end = _taken + MAX_AHEAD;
++        int end = _taken + _maxAhead;
+         if ( end > _items.length() )
+             end = _items.length();
+         for ( int i = _taken; i < end; i++ ) {
+@@ -3232,7 +3259,7 @@
+         return NULL;
+     }
+ public:
+-    CacheBlockPacker() : _taken(0), _stop(false), _threadStarted(false)
++    CacheBlockPacker( int maxAhead = 8 ) : _maxAhead(maxAhead), _taken(0), _stop(false), _threadStarted(false)
+     {
+         pthread_mutex_init( &_mutex, NULL );
+         pthread_cond_init( &_cond, NULL );
+@@ -3352,7 +3379,7 @@
+                 unsaved++;
+         }
+         if ( unsaved > 1 ) {
+-            packer = new CacheBlockPacker();
++            packer = new CacheBlockPacker( maxTime.infinite() ? 8 : 2 );
+             for ( int i=0; i<_chunks.length(); i++ ) {
+                 if ( _chunks[i]->_buf && !_chunks[i]->_saved )
+                     packer->add( _chunks[i]->_buf, _chunks[i]->_bufpos );
+@@ -3368,14 +3395,17 @@
+             // What chunk->save() does, with the data compressed ahead
+             if ( !_cache->write( cacheType(), chunk->_index, packer->next( _cache ), COMPRESS_NODE_STORAGE_DATA ) ) {
+                 CRLog::error("Error while swapping of chunk %c%d to cache file", _type, chunk->_index);
+-                crFatalError(-1, "Error while swapping of chunk to cache file");
++                // (Fatal as it always was, but not in a save made in slices while reading:
++                // that one fails, and the document stays usable)
++                if ( maxTime.infinite() )
++                    crFatalError(-1, "Error while swapping of chunk to cache file");
+                 res = false;
+                 break;
+             }
+             chunk->_saved = true;
+         } else
+ #endif
+-        if ( !_chunks[i]->save() ) {
++        if ( !_chunks[i]->save( maxTime.infinite() ) ) {
+             res = false;
+             break;
+         }
+@@ -3786,10 +3816,10 @@
+ 
+ #if BUILD_LITE!=1
+ /// saves data to cache file, if unsaved
+-bool ldomTextStorageChunk::save()
++bool ldomTextStorageChunk::save( bool fatalOnError )
+ {
+     if ( !_saved )
+-        return swapToCache(false);
++        return swapToCache(false, fatalOnError);
+     return true;
+ }
+ #endif
+@@ -3802,7 +3832,7 @@
+ 
+ #if BUILD_LITE!=1
+ /// pack data, and remove unpacked, put packed data to cache file
+-bool ldomTextStorageChunk::swapToCache( bool removeFromMemory )
++bool ldomTextStorageChunk::swapToCache( bool removeFromMemory, bool fatalOnError )
+ {
+     if ( !_manager->_cache )
+         return true;
+@@ -3813,7 +3843,8 @@
+ #endif
+             if ( !_manager->_cache->write( _manager->cacheType(), _index, _buf, _bufpos, COMPRESS_NODE_STORAGE_DATA) ) {
+                 CRLog::error("Error while swapping of chunk %c%d to cache file", _type, _index);
+-                crFatalError(-1, "Error while swapping of chunk to cache file");
++                if ( fatalOnError )
++                    crFatalError(-1, "Error while swapping of chunk to cache file");
+                 return false;
+             }
+             _saved = true;
+@@ -3897,6 +3928,7 @@
+     memcpy(p->text, text.c_str(), p->length);
+     int res = _bufpos >> 4;
+     _bufpos += itemsize;
++    _saved = false; // (it may have been saved already, by a save made in slices)
+     return res;
+ }
+ 
+@@ -3982,6 +4014,7 @@
+             p->length = (lUInt16)utf8len;
+             int res = _bufpos >> 4;
+             _bufpos += itemsize;
++            _saved = false; // (it may have been saved already, by a save made in slices)
+             return res;
+         }
+         utf8len = utf8EncodedLength(text, len);
+@@ -4005,6 +4038,7 @@
+     utf8Encode(text, len, p->text);
+     int res = _bufpos >> 4;
+     _bufpos += itemsize;
++    _saved = false; // (it may have been saved already, by a save made in slices)
+     return res;
+ }
+ 
+@@ -4033,6 +4067,7 @@
+     }
+     int res = _bufpos >> 4;
+     _bufpos += itemsize;
++    _saved = false; // (it may have been saved already, by a save made in slices)
+     return res;
+ }
+ 
+@@ -6626,12 +6661,12 @@
+ {
+     if ( node->isText() )
+         return false;
+-    return node->getStyle()->float_ > css_f_none;
++    return node->peekStyle()->float_ > css_f_none;
+ }
+ 
+ static bool isNotBoxWrappingNode( ldomNode * node )
+ {
+-    if ( BLOCK_RENDERING_N(node, PREPARE_FLOATBOXES) && node->getStyle()->float_ > css_f_none )
++    if ( BLOCK_RENDERING_N(node, PREPARE_FLOATBOXES) && node->peekStyle()->float_ > css_f_none )
+         return false; // floatBox
+     // isBoxingInlineBox() already checks for BLOCK_RENDERING_BOX_INLINE_BLOCKS)
+     return !node->isBoxingInlineBox();
+@@ -7484,12 +7519,12 @@
+             // text
+             hasInline = true;
+         }
+-        else if ( detectFloating && node->getStyle()->float_ > css_f_none ) {
++        else if ( detectFloating && node->peekStyle()->float_ > css_f_none ) {
+             hasFloating = true;
+         }
+         else {
+             // element
+-            int d = node->getStyle()->display;
++            int d = node->peekStyle()->display;
+             int m = node->getRendMethod();
+             if ( d==css_d_none || m==erm_invisible )
+                 continue;
+@@ -7883,7 +7918,7 @@
+ bool hasInvisibleParent( ldomNode * node )
+ {
+     for ( ; !node->isRoot(); node = node->getParentNode() )
+-        if ( node->getStyle()->display==css_d_none )
++        if ( node->peekStyle()->display==css_d_none )
+             return true;
+     return false;
+ }
+@@ -16645,7 +16680,11 @@
+ lString32 ldomDocumentFragmentWriter::convertId( lString32 id )
+ {
+     if ( !codeBasePrefix.empty() ) {
+-        return codeBasePrefix + "_" + " " + id;//add a space for later
++        // codeBasePrefix + "_" + " " + id, made at once
++        lString32 res;
++        res.reserve( codeBasePrefix.length() + 2 + id.length() );
++        res << codeBasePrefix << "_" << " " << id;//add a space for later
++        return res;
+     }
+     return id;
+ }
+@@ -18491,6 +18530,12 @@
+ 
+ #define CHECK_EXPIRATION(s) \
+     if ( maxTime.expired() ) { CRLog::info("timer expired while " s); return CR_TIMEOUT; }
++// After a stage that is done at once: a save made in slices that stops there goes on with
++// the next stage (and doesn't do this one again, which, for a stage taking longer than a
++// slice, would never end)
++#define CHECK_EXPIRATION_AFTER(next, s) \
++    _mapSavingStage = (next); \
++    CHECK_EXPIRATION(s)
+ 
+ /// saves changes to cache file, limited by time interval (can be called again to continue after TIMEOUT)
+ ContinuousOperationResult ldomDocument::saveChanges( CRTimerUtil & maxTime, LVDocViewCallback * progressCallback )
+@@ -18507,10 +18552,18 @@
+         //CRLog::trace("setting autosync");
+         _cacheFile->setAutoSyncSize(STREAM_AUTO_SYNC_SIZE);
+         //CRLog::trace("setting autosync - done");
++        // A save made in slices goes on with the stage where the previous slice stopped,
++        // unless something set the cache file stale since (a new rendering, an updated
++        // TOC...): the stages done may have saved data that has changed since, and that
++        // the stages left wouldn't save again. Start over then (unchanged blocks are not
++        // written again).
++        if ( _mapSavingStage != 0 && _cacheFileStaleCount != _mapSavingStaleCount )
++            _mapSavingStage = 0;
+     }
+ 
+     CRLog::trace("ldomDocument::saveChanges(timeout=%d stage=%d)", maxTime.interval(), _mapSavingStage);
+-    setCacheFileStale(true);
++    _cacheFileStale = true; // (not counted as a change)
++    _mapSavingStaleCount = _cacheFileStaleCount;
+ 
+     switch (_mapSavingStage) {
+     default:
+@@ -18520,8 +18573,11 @@
+             _cacheFile->flush(false, maxTime);
+         CHECK_EXPIRATION("flushing of stream")
+ 
+-        persist( maxTime );
+-        CHECK_EXPIRATION("persisting of node data")
++        if ( !persist( maxTime ) ) {
++            CRLog::info("timer expired while persisting of node data");
++            return CR_TIMEOUT;
++        }
++        CHECK_EXPIRATION_AFTER(1, "persisting of node data")
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(0);
+ 
+         // fall through
+@@ -18596,16 +18652,22 @@
+         }
+         if (!maxTime.infinite())
+             _cacheFile->flush(false, maxTime); // intermediate flush
+-        CHECK_EXPIRATION("saving props data")
++        CHECK_EXPIRATION_AFTER(6, "saving props data")
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(45);
+         // fall through
+     case 6:
+         _mapSavingStage = 6;
+ #if CR_BACKGROUND_CACHE_PACKING == 1
+-        if ( maxTime.infinite() && _compressCachedData ) {
++        if ( _compressCachedData && !_cacheFile->hasBlock( CBT_NODE_INDEX, 0 ) ) {
+             // Stages 6 to 8 below, writing the same blocks (ID data, page data, node data)
+             // the same way, with the blocks compressed ahead by this thread and another one
+-            // (see CacheBlockPacker), the node data blocks being made when compressed
++            // (see CacheBlockPacker), the node data blocks being made when compressed.
++            // (In a save made in slices, they are then one step that can't be cut, but
++            // the node data, that was already one, is most of it, and it takes half as long.)
++            // Only when these blocks are written for the first time: when saving again
++            // (a save started over, or a cache file being updated), most of them are
++            // unchanged, and the stages below don't compress those (CacheFile::write()
++            // compares hashes first), where the packer would compress them all.
+             CRLog::trace("ldomDocument::saveChanges() - ID data, page data and node data");
+             SerialBuf idbuf(4096);
+             serializeMaps( idbuf );
+@@ -18651,8 +18713,13 @@
+                 for ( lUInt16 i=0; i<count; i++ ) {
+                     if ( !lists[k][i] )
+                         continue;
+-                    if ( !_cacheFile->write( types[k], i, packer.next( _cacheFile ), COMPRESS_NODE_DATA ) )
+-                        crFatalError(-1, "Cannot write node data");
++                    if ( !_cacheFile->write( types[k], i, packer.next( _cacheFile ), COMPRESS_NODE_DATA ) ) {
++                        // (fatal as it always was, but not in a save made in slices)
++                        if ( maxTime.infinite() )
++                            crFatalError(-1, "Cannot write node data");
++                        CRLog::error("Error while writing node data");
++                        return CR_ERROR;
++                    }
+                 }
+             }
+             if ( !_cacheFile->write( CBT_NODE_INDEX, nodeIndexBuf, COMPRESS_NODE_DATA ) ) {
+@@ -18660,6 +18727,10 @@
+                 return CR_ERROR;
+             }
+             if (progressCallback) progressCallback->OnSaveCacheFileProgress(70);
++            if (!maxTime.infinite()) {
++                _cacheFile->flush(false, maxTime); // intermediate flush
++                CHECK_EXPIRATION_AFTER(9, "saving ID data, page data and node data")
++            }
+             goto save_render_info;
+         }
+ #endif
+@@ -18674,7 +18745,7 @@
+         }
+         if (!maxTime.infinite())
+             _cacheFile->flush(false, maxTime); // intermediate flush
+-        CHECK_EXPIRATION("saving ID data")
++        CHECK_EXPIRATION_AFTER(7, "saving ID data")
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(50);
+         // fall through
+     case 7:
+@@ -18690,20 +18761,20 @@
+         }
+         if (!maxTime.infinite())
+             _cacheFile->flush(false, maxTime); // intermediate flush
+-        CHECK_EXPIRATION("saving page data")
++        CHECK_EXPIRATION_AFTER(8, "saving page data")
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(60);
+         // fall through
+     case 8:
+         _mapSavingStage = 8;
+ 
+         CRLog::trace("ldomDocument::saveChanges() - node data");
+-        if ( !saveNodeData() ) {
++        if ( !saveNodeData( maxTime.infinite() ) ) {
+             CRLog::error("Error while node instance data");
+             return CR_ERROR;
+         }
+         if (!maxTime.infinite())
+             _cacheFile->flush(false, maxTime); // intermediate flush
+-        CHECK_EXPIRATION("saving node data")
++        CHECK_EXPIRATION_AFTER(9, "saving node data")
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(70);
+         // fall through
+     case 9:
+@@ -18752,7 +18823,7 @@
+         }
+         if (!maxTime.infinite())
+             _cacheFile->flush(false, maxTime); // intermediate flush
+-        CHECK_EXPIRATION("saving TOC data")
++        CHECK_EXPIRATION_AFTER(10, "saving TOC data")
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(80);
+         // fall through
+     case 10:
+@@ -18774,7 +18845,7 @@
+                 CRLog::error("Error while saving embedded font data");
+                 return CR_ERROR;
+             }
+-            CHECK_EXPIRATION("saving embedded fonts")
++            CHECK_EXPIRATION_AFTER(12, "saving embedded fonts")
+         }
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(95);
+         // fall through
+@@ -18787,7 +18858,7 @@
+                 CRLog::error("Error while updating index of cache file");
+                 return CR_ERROR;
+             }
+-            CHECK_EXPIRATION("flushing")
++            CHECK_EXPIRATION_AFTER(13, "flushing")
+         }
+         if (progressCallback) progressCallback->OnSaveCacheFileProgress(100);
+         // fall through
+@@ -21362,6 +21433,14 @@
+         return css_style_ref_t();
+     css_style_ref_t res = getDocument()->getNodeStyle( _handle._dataIndex );
+     return res;
++}
++
++const css_style_rec_t * ldomNode::peekStyle() const
++{
++    ASSERT_NODE_NOT_NULL;
++    if ( !isElement() )
++        return NULL;
++    return getDocument()->peekNodeStyle( _handle._dataIndex );
+ }
+ 
+ /// returns element font
+--- a/crengine/src/lvxml.cpp
++++ b/crengine/src/lvxml.cpp
+@@ -6316,9 +6316,22 @@
+     // U+212A. It's quite unlikely that they are used in tags or encoding
+     // declarations.
+     const lUInt8 *end = m_buf + m_buf_len;
+-    for (lUInt8 *ptr = m_buf; ptr < end; ++ptr) {
++    lUInt8 *ptr = m_buf;
++    // 8 bytes at a time: the bytes that are 'A'...'Z' (top bit clear, 7 low bits in range)
++    // get 0x20 added (or'ed, as these have it clear), the others are left as is
++    const lUInt64 ones = 0x0101010101010101ULL;
++    for (; ptr + 8 <= end; ptr += 8) {
++        lUInt64 x;
++        memcpy(&x, ptr, 8);
++        lUInt64 low7 = x & (0x7F * ones);
++        lUInt64 geA = low7 + ((0x80 - 'A') * ones); // top bit set if >= 'A' (no carry out)
++        lUInt64 gtZ = low7 + ((0x7F - 'Z') * ones); // top bit set if > 'Z'
++        lUInt64 upper = geA & ~gtZ & ~x & (0x80 * ones);
++        x |= upper >> 2;
++        memcpy(ptr, &x, 8);
++    }
++    for (; ptr < end; ++ptr) {
+         lUInt8 ch = *ptr;
+-        // (Branchless, so that it can be vectorized)
+         *ptr = ch + (((lUInt8)(ch - 'A') < 26) << 5);
+     }
+     lString8 s(reinterpret_cast<lChar8 *>(m_buf), m_buf_len);
+--- a/crengine/src/mathml_table_ext.h
++++ b/crengine/src/mathml_table_ext.h
+@@ -526,7 +526,8 @@
+             if ( mo_node ) {
+                 LVFontRef font = mo_node->getFont();
+                 lString32 txt = mo_node->getText();
+-                int italic_correction;
++                // (Left as is when the font has no OpenType MATH data: start from no correction)
++                int italic_correction = 0;
+                 font->getGlyphExtraMetric(glyph_metric_math_italics_correction, txt.lastChar(), italic_correction, true);
+                 italic_correction_over = italic_correction / 2;
+                 italic_correction_under = italic_correction / 2;
+--- a/crengine/include/lstridmap.h
++++ b/crengine/include/lstridmap.h
+@@ -18,6 +18,7 @@
+ #define __LSTR_ID_MAP_H__INCLUDED__
+ 
+ #include <stdio.h>
++#include <string.h>
+ #include "lvtypes.h"
+ #include "lvstring.h"
+ 
+@@ -59,6 +60,11 @@
+     lUInt16 m_size;  // max number of ids
+     bool    m_sorted;
+     bool    m_changed;
++    /// items recently found by name, by a hash of that name: what the binary search in
++    /// findItem() gave for it, until an item is added or removed (which empties it)
++    enum { RECENT_SIZE = 64 };
++    const LDOMNameIdMapItem * m_recent[RECENT_SIZE];
++    void    clearRecent() { memset( m_recent, 0, sizeof(m_recent) ); }
+ 
+     void    Sort();
+ public:
+--- a/crengine/include/lvdocview.h
++++ b/crengine/include/lvdocview.h
+@@ -362,6 +362,12 @@
+     CRPropRef m_alt_doc_props;
+ 
+     bool m_swapDone;
++
++    /// the document file's crc32 code being computed in another thread while loading
++    /// starts (see LoadDocument()), set in m_doc_props by finishPendingCrc()
++    LVStreamCrc32Task * m_pendingCrc;
++    LVStreamRef m_pendingCrcStream;
++    void finishPendingCrc();
+ 
+     /// edit cursor position
+     ldomXPointer m_cursorPos;
+@@ -386,6 +392,8 @@
+     bool ParseDocument( );
+     /// format of document from cache is known
+     virtual void OnCacheFileFormatDetected( doc_format_t fmt );
++    /// cache file about to be looked for: its properties must be complete
++    virtual void OnCacheFileLookup() { finishPendingCrc(); }
+     void insertBookmarkPercentInfo(int start_page, int end_y, int percent);
+ 
+     void updateDocStyleSheet();
+--- a/crengine/include/lvrefcache.h
++++ b/crengine/include/lvrefcache.h
+@@ -229,6 +229,14 @@
+         if ( n>0 && n<=nextindex && index[n].item )
+             return index[n].item->style;
+         return ref_t();
++    }
++
++    // get by index, without copying the reference (NULL if get(n) would give none)
++    const ref_t * peek( int n )
++    {
++        if ( n>0 && n<=nextindex && index[n].item )
++            return &index[n].item->style;
++        return NULL;
+     }
+ 
+     // check whether equal object already exists if cache
+--- a/crengine/include/lvstream.h
++++ b/crengine/include/lvstream.h
+@@ -212,6 +212,14 @@
+         \return lverror_t status: LVERR_OK if success
+     */
+     virtual lverror_t Read( void * buf, lvsize_t count, lvsize_t * nBytesRead ) = 0;
++
++    /// Reads count bytes at pos without using or moving the stream position, like Read()
++    /// after a Seek() (fewer bytes at the end): streams that implement it (files) allow
++    /// calling it from another thread, while this one uses the stream. LVERR_NOTIMPL if not.
++    virtual lverror_t ReadAt( lvpos_t pos, void * buf, lvsize_t count, lvsize_t * nBytesRead ) {
++        CR_UNUSED4(pos, buf, count, nBytesRead);
++        return LVERR_NOTIMPL;
++    }
+ 
+     virtual bool Read( lUInt8 * buf )
+ 	{
+@@ -278,6 +286,9 @@
+     virtual lverror_t getcrc32( lUInt32 & dst );
+     /// calculate crc32 code for stream, returns 0 for error or empty stream
+     inline lUInt32 getcrc32() { lUInt32 res = 0; getcrc32( res ); return res; }
++    /// gives the crc32 code getcrc32() is to return, computed elsewhere (see
++    /// LVStartStreamCrc32()): ignored by streams that don't keep it
++    virtual void setcrc32( lUInt32 crc ) { CR_UNUSED(crc); }
+ 
+     /// set write bytes limit to call flush(true) automatically after writing of each sz bytes
+     virtual void setAutoSyncSize(lvsize_t /*sz*/) { }
+@@ -450,6 +461,7 @@
+ 
+ public:
+     LVNamedStream() : m_mode(LVOM_ERROR), _crc(0), _crcFailed(false), _autosyncLimit(0), _bytesWritten(0) { }
++    virtual void setcrc32( lUInt32 crc ) { _crc = crc; }
+     /// set write bytes limit to call flush(true) automatically after writing of each sz bytes
+     virtual void setAutoSyncSize(lvsize_t sz) { _autosyncLimit = sz; }
+     /// returns stream/container name, may be NULL if unknown
+@@ -912,6 +924,18 @@
+ 
+ /// creates buffered stream object for stream
+ LVStreamRef LVCreateBufferedStream( LVStreamRef stream, int bufSize );
++
++/// The crc32 code of a stream (what getcrc32() gives), computed in another thread
++class LVStreamCrc32Task
++{
++public:
++    /// waits for it: false if it couldn't be computed there (getcrc32() should be used)
++    virtual bool wait( lUInt32 & crc ) = 0;
++    virtual ~LVStreamCrc32Task() { }
++};
++/// Starts computing the stream's crc32 code in another thread, while this one goes on
++/// using the stream: NULL if the stream can't be read from another thread (see ReadAt())
++LVStreamCrc32Task * LVStartStreamCrc32( LVStreamRef stream );
+ /// creates TCR decoder stream for stream
+ LVStreamRef LVCreateTCRDecoderStream( LVStreamRef stream );
+ 
+--- a/crengine/include/lvstring.h
++++ b/crengine/include/lvstring.h
+@@ -1057,6 +1057,13 @@
+         void clear() { index=-1; next=NULL; }
+     };
+     HashPair * hash;
++    /// calcStringHash() of each item, by index (so that it's not computed again when
++    /// rehashing, and so that items with another hash are told apart without comparing them)
++    lUInt32 * itemHashes;
++    int itemHashesSize;
++    int itemHashesCount; // itemHashes[0...itemHashesCount-1] are set (no gap)
++    void setItemHash( int index, lUInt32 h );
++    inline lUInt32 itemHash( int index ) { return index < itemHashesCount ? itemHashes[index] : calcStringHash( at(index).c_str() ); }
+     void addHashItem( int hashIndex, int storageIndex );
+     void clearHash();
+     void reHash( int newSize );
+--- a/crengine/include/lvtinydom.h
++++ b/crengine/include/lvtinydom.h
+@@ -325,6 +325,8 @@
+ public:
+     /// called when format of document being loaded from cache became known
+     virtual void OnCacheFileFormatDetected( doc_format_t ) = 0;
++    /// called before looking for the document's cache file (which needs its properties)
++    virtual void OnCacheFileLookup() { }
+     virtual ~CacheLoadingCallback() { }
+ };
+ 
+@@ -448,7 +450,8 @@
+     void compact();
+ #if BUILD_LITE!=1
+     /// pack data, and remove unpacked, put packed data to cache file
+-    bool swapToCache( bool removeFromMemory );
++    /// (fatalOnError: a write error is fatal, as it always was; else, returns false)
++    bool swapToCache( bool removeFromMemory, bool fatalOnError=true );
+     /// read packed data from cache
+     bool restoreFromCache();
+ #endif
+@@ -458,7 +461,7 @@
+     /// free data item
+     void freeNode( int offset );
+     /// saves data to cache file, if unsaved
+-    bool save();
++    bool save( bool fatalOnError=true );
+ #endif
+ public:
+     /// call to invalidate chunk if content is modified
+@@ -562,6 +565,10 @@
+     CVRendBlockCache _renderedBlockCache;
+     CacheFile * _cacheFile;
+     bool _cacheFileStale;
++    /// how many times the cache file was set stale (see saveChanges()), and that count
++    /// when a save made in slices was started or went on
++    lUInt32 _cacheFileStaleCount;
++    lUInt32 _mapSavingStaleCount;
+     bool _cacheFileLeaveAsDirty;
+     bool _mapped;
+     bool _maperror;
+@@ -614,8 +621,9 @@
+     bool loadStylesData();
+     bool updateLoadedStyles( bool enabled );
+     lUInt32 calcStyleHash(bool already_rendered, lUInt32 force_node_style_hash=0);
+-    bool saveNodeData();
+-    bool saveNodeData( lUInt16 type, ldomNode ** list, int nodecount );
++    /// (fatalOnError: a write error is fatal, as it always was; else, returns false)
++    bool saveNodeData( bool fatalOnError=true );
++    bool saveNodeData( lUInt16 type, ldomNode ** list, int nodecount, bool fatalOnError=true );
+     /// copies count nodes of a node list part as saveNodeData() saves them
+     static void prepareNodeDataPart( void * dst, const void * src, int count );
+     bool loadNodeData();
+@@ -630,6 +638,8 @@
+     lUInt16 getNodeStyleIndex( lUInt32 dataIndex );
+     lUInt16 getNodeFontIndex( lUInt32 dataIndex );
+     css_style_ref_t getNodeStyle( lUInt32 dataIndex );
++    /// what getNodeStyle() gives, as a plain pointer (with the same effect on the style cache)
++    const css_style_rec_t * peekNodeStyle( lUInt32 dataIndex );
+     font_ref_t getNodeFont( lUInt32 dataIndex );
+     void setNodeStyle( lUInt32 dataIndex, css_style_ref_t & v );
+     void setNodeFont( lUInt32 dataIndex, font_ref_t & v  );
+@@ -691,7 +701,7 @@
+     }
+ 
+     /// add named BLOB data to document
+-    bool addBlob(lString32 name, const lUInt8 * data, int size) { _cacheFileStale = true ; return _blobCache.addBlob(data, size, name); }
++    bool addBlob(lString32 name, const lUInt8 * data, int size) { setCacheFileStale(true); return _blobCache.addBlob(data, size, name); }
+     /// get BLOB by name
+     LVStreamRef getBlob(lString32 name) { return _blobCache.getBlob(name); }
+ 
+@@ -770,7 +780,11 @@
+     /// is cache file stale
+     bool isCacheFileStale() { return _cacheFileStale; }
+     /// set cache file stale flag
+-    void setCacheFileStale( bool stale ) { _cacheFileStale = stale; }
++    void setCacheFileStale( bool stale ) {
++        _cacheFileStale = stale;
++        if ( stale )
++            _cacheFileStaleCount++;
++    }
+ 
+     /// is built (and cached) DOM possibly invalid (can happen when some nodes have changed display style)
+     bool isBuiltDomStale() {
+@@ -812,7 +826,8 @@
+ 
+ #if BUILD_LITE!=1
+     /// put all object into persistent storage
+-    virtual void persist( CRTimerUtil & maxTime );
++    /// (returns false if stopped by the time limit before going through all nodes)
++    virtual bool persist( CRTimerUtil & maxTime );
+ #endif
+ 
+ 
+@@ -1243,6 +1258,8 @@
+ #if BUILD_LITE!=1
+     /// returns element style record
+     css_style_ref_t getStyle() const;
++    /// what getStyle() gives, as a plain pointer to read it right away (cheaper)
++    const css_style_rec_t * peekStyle() const;
+     /// returns element font
+     font_ref_t getFont();
+     /// sets element font

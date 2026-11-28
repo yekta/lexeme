@@ -1,0 +1,231 @@
+--- a/crengine/include/lvstring.h
++++ b/crengine/include/lvstring.h
+@@ -680,8 +680,8 @@
+     ~lString32() { release(); }
+ 
+     /// Takes this string's buffer (its z-string, allocated with malloc(), to be released with
+-    /// free()), leaving this string empty, or returns NULL (and leaves the string unchanged)
+-    /// if the string is empty or shared
++    /// free(), and shrunk to the string's length if it was much larger), leaving this string
++    /// empty, or returns NULL (and leaves the string unchanged) if the string is empty or shared
+     value_type * detachBuffer();
+ 
+     /// assignment from string
+--- a/crengine/include/lvtextfm.h
++++ b/crengine/include/lvtextfm.h
+@@ -330,6 +330,10 @@
+    // Avoid some work when formatting to only get the block height
+    // (e.g. when full rerendering). This will make is_reusable=true too.
+    bool                  light_formatting;
++   // With light_formatting, when the result is only used for the document layout (lines
++   // heights and what page splitting needs), and not drawn nor used to get positions in
++   // the text: words can then be made coarser (see LVFormatter::addLine()).
++   bool                  light_formatting_layout_only;
+ 
+ } formatted_text_fragment_t;
+ 
+@@ -565,7 +569,10 @@
+     void Draw( LVDrawBuf * buf, int x, int y, ldomMarkedRangeList * marks = NULL,  ldomMarkedRangeList *bookmarks = NULL );
+ 
+     bool isReusable() { return m_pbuffer->is_reusable; }
+-    void requestLightFormatting() { m_pbuffer->light_formatting = true; }
++    void requestLightFormatting( bool layout_only=false ) {
++        m_pbuffer->light_formatting = true;
++        m_pbuffer->light_formatting_layout_only = layout_only;
++    }
+ 
+     LFormattedText() { m_pbuffer = lvtextAllocFormatter( 0 ); }
+ 
+--- a/crengine/src/lvstring.cpp
++++ b/crengine/src/lvstring.cpp
+@@ -533,6 +533,13 @@
+     if ( pchunk==EMPTY_STR_32 || pchunk->nref!=1 )
+         return NULL;
+     lChar32 * buf = pchunk->buf32;
++    if ( pchunk->size > pchunk->len + 16 ) {
++        // Much larger than needed (as when reserved for the UTF-8 bytes of non-ASCII text):
++        // don't keep the unused part, as the caller may keep it for long
++        lChar32 * shrunk = (lChar32 *) ::realloc( buf, sizeof(lChar32) * (pchunk->len + 1) );
++        if ( shrunk )
++            buf = shrunk;
++    }
+     // As free(), without freeing buf
+ #if (LDOM_USE_OWN_MEM_MAN == 1)
+     bool chunk_freed = false;
+--- a/crengine/src/lvtextfm.cpp
++++ b/crengine/src/lvtextfm.cpp
+@@ -194,6 +194,7 @@
+     pbuffer->strut_baseline = 0;
+     pbuffer->is_reusable = true;
+     pbuffer->light_formatting = false;
++    pbuffer->light_formatting_layout_only = false;
+     int defMode = MAX_IMAGE_SCALE_MUL > 1 ? (ARBITRARY_IMAGE_SCALE_ENABLED==1 ? 2 : 1) : 0;
+     int defMult = MAX_IMAGE_SCALE_MUL;
+     // mode: 0=disabled, 1=integer scaling factors, 2=free scaling
+@@ -371,10 +372,14 @@
+ // hb_unicode_script() with the default Unicode functions (hb_unicode_funcs_get_default(),
+ // that must be what is passed here), as used below for each char when measuring with
+ // Harfbuzz. Its results for the chars below 0x250 (Basic Latin to Latin Extended-B),
+-// which make up most of many texts, are kept in a table (filled by the main thread, the
+-// only one laying out text).
++// which make up most of many texts, and for the General Punctuation chars (quotes, dashes...
++// met in many texts too) are kept in tables (filled by the main thread, the only one laying
++// out text).
+ #define HB_SCRIPT_TABLE_SIZE 0x250
++#define HB_SCRIPT_TABLE2_START 0x2000
++#define HB_SCRIPT_TABLE2_SIZE 0x70
+ static hb_script_t hb_script_table[HB_SCRIPT_TABLE_SIZE];
++static hb_script_t hb_script_table2[HB_SCRIPT_TABLE2_SIZE];
+ static bool hb_script_table_ready = false;
+ // Set if all these chars are of the Latin script, or of no specific script (common, inherited
+ // or unknown)
+@@ -387,13 +392,18 @@
+         if ( script != HB_SCRIPT_LATIN && script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED && script != HB_SCRIPT_UNKNOWN )
+             hb_script_table_latin_only = false;
+     }
++    for ( lChar32 k=0; k < HB_SCRIPT_TABLE2_SIZE; k++ ) {
++        hb_script_table2[k] = hb_unicode_script(default_hb_unicode_funcs, HB_SCRIPT_TABLE2_START + k);
++    }
+     hb_script_table_ready = true;
+ }
+ static inline hb_script_t getCharHBScript( hb_unicode_funcs_t * default_hb_unicode_funcs, lChar32 c ) {
+-    if ( c >= HB_SCRIPT_TABLE_SIZE )
++    if ( c >= HB_SCRIPT_TABLE_SIZE && c - HB_SCRIPT_TABLE2_START >= HB_SCRIPT_TABLE2_SIZE )
+         return hb_unicode_script(default_hb_unicode_funcs, c);
+     if ( !hb_script_table_ready )
+         initHBScriptTable(default_hb_unicode_funcs);
++    if ( c >= HB_SCRIPT_TABLE_SIZE )
++        return hb_script_table2[c - HB_SCRIPT_TABLE2_START];
+     return hb_script_table[c];
+ }
+ #endif
+@@ -2204,17 +2214,26 @@
+                 #if (USE_HARFBUZZ==1)
+                 else if ( usingHarfbuzz && !m_has_ctrl_or_ignorable && prevScript == HB_SCRIPT_LATIN
+                                 && !prevSpecificScriptIsCursive ) {
+-                    // The same with Harfbuzz, for the next chars of this text node that are below
+-                    // HB_SCRIPT_TABLE_SIZE, if these are all Latin or of no specific script: the
+-                    // current script being Latin, they don't change it (or flag anything).
++                    // The same with Harfbuzz, for the next chars of this text node that are Latin
++                    // or of no specific script: the current script being Latin, they don't change
++                    // it (or flag anything), as the loop below would find. The chars below
++                    // HB_SCRIPT_TABLE_SIZE are all such chars, if hb_script_table_latin_only.
+                     if ( !hb_script_table_ready )
+                         initHBScriptTable(_hb_unicode_funcs);
+                     if ( hb_script_table_latin_only ) {
+                         int src_end = i - m_charindex[i] + (lastSrc->t.len - lastSrc->t.offset);
+                         if ( src_end > skip_end )
+                             src_end = skip_end;
+-                        while ( i < src_end && m_text[i] < HB_SCRIPT_TABLE_SIZE )
++                        while ( i < src_end ) {
++                            lChar32 c = m_text[i];
++                            if ( c >= HB_SCRIPT_TABLE_SIZE ) {
++                                hb_script_t script = getCharHBScript(_hb_unicode_funcs, c);
++                                if ( script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED
++                                        && script != HB_SCRIPT_UNKNOWN && script != HB_SCRIPT_LATIN )
++                                    break; // (left to the loop below)
++                            }
+                             i++;
++                        }
+                     }
+                 }
+                 #endif
+@@ -3579,6 +3598,11 @@
+             light_formatting = false;
+         }
+ 
++        // When the result is only used for the document layout, some more work can be avoided
++        // (light_formatting alone is also used for results that are drawn, see lvtinydom.cpp
++        // ldomNode::renderFinalBlock()).
++        bool layout_only = light_formatting && m_pbuffer->light_formatting_layout_only;
++
+         // todo: we can avoid some more work below when light_formatting (and
+         // possibly the BiDi re-ordering we need for ordering footnotes, as
+         // if we don't re-order, we'll always have them in the logical order,
+@@ -3993,7 +4017,7 @@
+         // footnote links (only flagged on a text node's first word): the words in a same
+         // text node can be made as a single one. (Without CJK and bidi, so that each word
+         // made that way is always made from successive words in the logical order.)
+-        bool single_word_per_src = can_skip_word_chars && light_formatting && !m_has_cjk && !m_has_bidi;
++        bool single_word_per_src = can_skip_word_chars && layout_only && !m_has_cjk && !m_has_bidi;
+         for ( int i=start; i<=end; i++ ) { // loop thru each char
+             if ( single_word_per_src && i > wstart && i < end ) {
+                 int i0 = i;
+@@ -4524,7 +4548,7 @@
+                     // (The trailing spaces are walked first, then the other chars, without any
+                     // per-char branching, as these loops run for every word.)
+                     // Not needed with light formatting, which won't be used by alignLine().
+-                    int j = light_formatting ? wstart-1 : i-1;
++                    int j = layout_only ? wstart-1 : i-1;
+                     bool locked_spacing = false;
+                     int tailing_spaces = 0;
+                     for ( ; j >= wstart; j-- ) {
+@@ -4570,7 +4594,7 @@
+                         }
+                     }
+ 
+-                    if ( firstWord && (align == LTEXT_ALIGN_LEFT || align == LTEXT_ALIGN_WIDTH) && !light_formatting ) {
++                    if ( firstWord && (align == LTEXT_ALIGN_LEFT || align == LTEXT_ALIGN_WIDTH) && !layout_only ) {
+                         // Adjust line start x if needed (not needed with light formatting, where
+                         // lines are not positioned for drawing)
+                         // No need to do it when line is centered or right aligned (doing so
+@@ -4652,7 +4676,7 @@
+                     word->width = m_widths[i>0 ? i-1 : 0] - (wstart>0 ? m_widths[wstart-1] : 0);
+                     word->min_width = word->width;
+                     TR("addLine - word(%d, %d) x=%d (%d..%d)[%d] |%s|", wstart, i, frmline->width, wstart>0 ? m_widths[wstart-1] : 0, m_widths[i-1], word->width, LCSTR(lString32(m_text+wstart, i-wstart)));
+-                    if ( (m_flags[wstart] & LCHAR_IS_CLUSTER_TAIL) && !light_formatting ) { // (width not needed if light)
++                    if ( (m_flags[wstart] & LCHAR_IS_CLUSTER_TAIL) && !layout_only ) { // (width not needed if layout only)
+                         // The start of this word is part of a ligature that started
+                         // in a previous word: some hyphenation wrap happened on
+                         // this ligature, which will not be rendered as such.
+@@ -4666,7 +4690,7 @@
+                         }
+                     }
+                     if ( m_flags[i-1] & LCHAR_ALLOW_HYPH_WRAP_AFTER ) {
+-                        if ( (m_flags[i] & LCHAR_IS_CLUSTER_TAIL) && !light_formatting ) {
++                        if ( (m_flags[i] & LCHAR_IS_CLUSTER_TAIL) && !layout_only ) {
+                             // The end of this word is part of a ligature that, because
+                             // of hyphenation, has been splitted onto next word.
+                             // We are the first part of the hyphenated word, and
+@@ -4697,7 +4721,7 @@
+                         if ( !(m_flags[i-1] & LCHAR_LOCKED_SPACING) ) {
+                             word->flags |= LTEXT_WORD_CAN_ADD_SPACE_AFTER;
+                             // (min_width is only used by alignLine(), not used with light formatting)
+-                            int dw = light_formatting ? 0 : getMaxCondensedSpaceTruncation(i-1);
++                            int dw = layout_only ? 0 : getMaxCondensedSpaceTruncation(i-1);
+                             if (dw>0) {
+                                 word->min_width = word->width - dw;
+                             }
+@@ -4818,7 +4842,7 @@
+                         }
+                     }
+ 
+-                    if ( lastWord && (align == LTEXT_ALIGN_RIGHT || align == LTEXT_ALIGN_WIDTH) && !light_formatting ) {
++                    if ( lastWord && (align == LTEXT_ALIGN_RIGHT || align == LTEXT_ALIGN_WIDTH) && !layout_only ) {
+                         // Adjust line end if needed (not needed with light formatting, where
+                         // lines are not positioned for drawing).
+                         // If we need to adjust last word's last char, we need to put the delta
+--- a/crengine/src/lvtinydom.cpp
++++ b/crengine/src/lvtinydom.cpp
+@@ -22783,15 +22783,16 @@
+         float_footprint = &restored_float_footprint;
+         float_footprint->restore( this, (lUInt16)width );
+     }
+-    if ( for_rendering && !getDocument()->isRendered() ) {
++    if ( !getDocument()->isRendered() ) {
+         // Full rendering in progress: avoid some uneeded work that
+         // is only needed when we'll be drawing the formatted text
+         // (like alignLign()): this will mark it as not reusable, and
+         // one that is on a page to be drawn will be reformatted .
+-        // (Only when called by the rendering code: other callers, like
+-        // the ones getting positions in the text, need it fully
+-        // formatted, even when the document is not rendered.)
+-        f->requestLightFormatting();
++        // When called by the rendering code, the result is only used for
++        // the document layout, and some more work can be avoided. (Other
++        // callers may draw it, as getInkOffsets() does while rendering
++        // MathML, or get positions in the text.)
++        f->requestLightFormatting( for_rendering );
+     }
+     int usable_left_overflow = fmt->getUsableLeftOverflow();
+     int usable_right_overflow = fmt->getUsableRightOverflow();

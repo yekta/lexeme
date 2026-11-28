@@ -60,52 +60,53 @@ end
 -- Amazon's battery, measured off its status bar: the outline and the charging bolt are icons,
 -- the level fills 35.5 px inside them, starting 7.15 px in from the corner.
 function Status.paintBattery(bb, x, y, level, charging)
-    D.icon(bb, charging and "battery-charging" or "battery", x, y, D.s(58), D.s(29))
+    D.icon(bb, charging and "battery-charging" or "battery", x, y, D.px(58), D.px(29))
     if charging or level <= 0 then return end
-    local k = D.s(1000) / 1000
+    local k = D.px(1000) / 1000
     local left, top = x + 7.15 * k, y + 7.15 * k
     paintCovered(bb, left, top, left + 35.5 * k * math.min(level, 100) / 100, y + 21.35 * k)
 end
 
--- Paints the status line across the top of a view and returns its height.
+-- Paints the status line across the top of a view and returns its height. It's drawn at the Kindle's
+-- own sizes (D.px), as on every screen of Amazon's.
 function Status.paint(view, bb, x, y, w, on_handle)
-    local clock_w = D.text(bb, x + D.s(32), y + D.s(59), D.face("regular", 28), Status.clock())
+    local clock_w = D.text(bb, x + D.px(32), y + D.px(59), D.nface("regular", 28), Status.clock())
     -- Dev mode (scripts/dev-mode.sh) pauses syncing; it says so, so it isn't left on.
     if G_reader_settings:isTrue("lexeme_dev_mode") then
-        local face = D.face("bold", 28)
-        local bx, bw = x + D.s(32) + clock_w + D.s(18), D.width(face, "Dev Mode") + D.s(16)
-        D.roundRect(bb, bx, y + D.s(29), bw, D.s(42), D.BLACK, D.s(8))
-        D.text(bb, bx + D.s(8), y + D.s(59), face, "Dev Mode", D.WHITE)
+        local face = D.nface("bold", 28)
+        local bx, bw = x + D.px(32) + clock_w + D.px(18), D.width(face, "Dev Mode") + D.px(16)
+        D.roundRect(bb, bx, y + D.px(29), bw, D.px(42), D.BLACK, D.px(8))
+        D.text(bb, bx + D.px(8), y + D.px(59), face, "Dev Mode", D.WHITE)
     end
 
-    local hw, hh = D.s(130), D.s(22)
+    local hw, hh = D.px(130), D.px(22)
     local hx = x + math.floor((w - hw) / 2)
-    D.icon(bb, "handle", hx, y + D.s(23), hw, hh)
-    if on_handle then view:hit(hx - D.s(60), y, hw + D.s(120), D.s(Status.HEIGHT), on_handle) end
+    D.icon(bb, "handle", hx, y + D.px(23), hw, hh)
+    if on_handle then view:hit(hx - D.px(60), y, hw + D.px(120), D.px(Status.HEIGHT), on_handle) end
 
     local power = Device:getPowerDevice()
     local level = power:getCapacity()
-    Status.paintBattery(bb, x + w - D.s(86), y + D.s(37), level, power:isCharging())
-    D.textRight(bb, x + w - D.s(93), y + D.s(60), D.face("regular", 28), level .. "%")
+    Status.paintBattery(bb, x + w - D.px(86), y + D.px(37), level, power:isCharging())
+    D.textRight(bb, x + w - D.px(93), y + D.px(60), D.nface("regular", 28), level .. "%")
     -- Amazon keeps the Wi-Fi icon in place however wide the percentage is, Bluetooth beside it, and a
     -- speaker beside that while a Bluetooth audio device is connected.
     local bluetooth = Bluetooth.stateCached()
     if bluetooth > 0 then
         local icon = kindleIcon("Bluetooth")
         if icon then
-            D.icon(bb, icon, x + w - D.s(268.5), y + D.s(35), D.s(19.5), D.s(33))
+            D.icon(bb, icon, x + w - D.px(268.5), y + D.px(35), D.px(19.5), D.px(33))
         else
-            D.icon(bb, "bluetooth", x + w - D.s(282), y + D.s(31), D.s(38), D.s(38))
+            D.icon(bb, "bluetooth", x + w - D.px(282), y + D.px(31), D.px(38), D.px(38))
         end
     end
     local speaker = bluetooth == CONNECTED and kindleIcon("Volume")
-    if speaker then D.icon(bb, speaker, x + w - D.s(337.5), y + D.s(33), D.s(37), D.s(37)) end
+    if speaker then D.icon(bb, speaker, x + w - D.px(337.5), y + D.px(33), D.px(37), D.px(37)) end
     if NetworkMgr:isConnected() then
-        D.icon(bb, "status-wifi", x + w - D.s(216), y + D.s(33), D.s(44), D.s(34))
+        D.icon(bb, "status-wifi", x + w - D.px(216), y + D.px(33), D.px(44), D.px(34))
     elseif NetworkMgr:isWifiOn() then
-        D.icon(bb, "wifi-off", x + w - D.s(216), y + D.s(30), D.s(44), D.s(44))
+        D.icon(bb, "wifi-off", x + w - D.px(216), y + D.px(30), D.px(44), D.px(44))
     end
-    return D.s(Status.HEIGHT)
+    return D.px(Status.HEIGHT)
 end
 
 return Status

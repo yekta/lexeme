@@ -311,7 +311,9 @@ function Search:paintBookResults(bb, x, y, w, h)
         self:hit(x, top, w - D.s(110), D.s(180), function()
             self:close()
             self.ui.link:addCurrentLocationToStack()
-            self.ui:handleEvent(Event:new("GotoXPointer", item.start, item.start))
+            require("lexeme/backstack").jump(self.ui, function()
+                self.ui:handleEvent(Event:new("GotoXPointer", item.start, item.start))
+            end)
         end)
     end
     local pages = math.max(1, math.ceil(total / per_page))
@@ -342,11 +344,18 @@ function Search:onSwipe(direction)
 end
 
 function Search:onCloseWidget()
-    if self.shell then self.shell:refresh("flashui") end
+    if not self.shell then return end
+    if self.shell.search == self then self.shell.search = nil end
+    if not self.quiet then self.shell:refresh("flashui") end
 end
 
+-- Library search sits over Home; a book opened from it leaves it on screen until the book shows,
+-- and it goes with Home (see Lexeme:onCloseWidget): left behind, it showed again for a moment
+-- the next time a book opened, once Home had gone.
 function Search.showLibrary(shell)
-    UIManager:show(Search:new{ mode = "library", shell = shell }, "flashui")
+    local search = Search:new{ mode = "library", shell = shell }
+    shell.search = search
+    UIManager:show(search, "flashui")
 end
 
 function Search.showBook(ui)

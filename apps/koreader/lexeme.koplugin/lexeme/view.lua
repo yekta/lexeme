@@ -11,6 +11,10 @@ local UIManager = require("ui/uimanager")
 
 local D = require("lexeme/draw")
 
+local time = require("ui/time")
+
+local paintPressed
+
 local View = InputContainer:extend{
     -- Geom of the painted area; nil covers the whole screen.
     region = nil,
@@ -25,19 +29,31 @@ function View:init()
     self.dimen = self.region or full
     self.covers_fullscreen = self.region == nil
     self.hits = {}
+    self.drags = {}
     local range = self.takes_all_taps and full or self.dimen
     self.ges_events = {
+        -- A finger touching down: what it's on shows pressed at once, as on the Kindle.
+        LexemeTouch = { GestureRange:new{ ges = "touch", range = range } },
         LexemeTap = { GestureRange:new{ ges = "tap", range = range } },
         LexemeHold = { GestureRange:new{ ges = "hold", range = range } },
         LexemeSwipe = { GestureRange:new{ ges = "swipe", range = range } },
+        -- Dragging (see draggable()): a finger that moves at once makes a pan, one that rests first a hold.
+        LexemePan = { GestureRange:new{ ges = "pan", range = range } },
+        LexemePanRelease = { GestureRange:new{ ges = "pan_release", range = range } },
+        LexemeHoldPan = { GestureRange:new{ ges = "hold_pan", range = range } },
+        LexemeHoldRelease = { GestureRange:new{ ges = "hold_release", range = range } },
     }
 end
 
 function View:paintTo(bb)
     self.hits = {}
+    self.drags = {}
     local r = self.dimen
     if self.background then D.rect(bb, r.x, r.y, r.w, r.h, self.background) end
     self:render(bb, r.x, r.y, r.w, r.h)
+    -- What was tapped stays pressed a moment after the finger lifts, through what the tap redraws.
+    local lingering = self.lingering
+    if lingering and time.now() < lingering.untill then paintPressed(bb, lingering.pressed) end
 end
 
 function View:render() end
@@ -45,6 +61,12 @@ function View:render() end
 -- Registers a tap target; later registrations win when targets overlap.
 function View:hit(x, y, w, h, on_tap, on_hold)
     table.insert(self.hits, { x = x, y = y, w = w, h = h, tap = on_tap, hold = on_hold })
+end
+
+-- Registers a drag target: a finger put down in it and moved calls on_drag(pos, done) as it moves,
+-- `done` once it lifts. Painted like tap targets, so what's on screen is what can be dragged.
+function View:draggable(x, y, w, h, on_drag)
+    table.insert(self.drags, { x = x, y = y, w = w, h = h, drag = on_drag })
 end
 
 -- A tap target that shows itself pressed when tapped, as on the Kindle. `pressed` ({ x, y, w, h },
@@ -59,10 +81,66 @@ function View:pressable(x, y, w, h, on_tap, pressed)
     }
 end
 
-local function paintPressed(bb, p)
+function paintPressed(bb, p)
     if p.paint then return p.paint(bb) end
     if p.outline then return D.border(bb, p.x, p.y, p.w, p.h, p.outline) end
     D.invert(bb, p.x, p.y, p.w, p.h, p.radius)
+end
+
+local function shown(widget)
+    for _, window in ipairs(UIManager._window_stack or {}) do
+        if window.widget == widget then return true end
+    end
+    return false
+end
+
+-- How long the pressed look stays after the finger lifts: the Kindle's key outlines last about that.
+local LINGER = time.ms(250)
+
+-- Shows `p` pressed now, on the screen, while the finger is still down.
+function View:pressNow(p)
+    UIManager:forceRePaint()
+    paintPressed(Screen.bb, p)
+    UIManager:setDirty(nil, "fast", Geom:new{ x = p.x, y = p.y, w = p.w, h = p.h })
+    UIManager:forceRePaint()
+end
+
+-- What to redraw to take a pressed look away: a view that doesn't paint its whole area (the toolbar
+-- over the page) needs what's under it drawn too.
+function View:redrawTarget()
+    return self.background and self or "all"
+end
+
+-- A touch that didn't end in a tap: whatever showed pressed is drawn as it was.
+function View:releaseTouch()
+    local p = self.touched
+    self.touched = nil
+    if not (p and shown(self)) then return end
+    UIManager:setDirty(self:redrawTarget(), "fast", Geom:new{ x = p.x, y = p.y, w = p.w, h = p.h })
+end
+
+function View:onLexemeTouch(_, ges)
+    self.touched = nil
+    local target = self:findHit(ges.pos)
+    if target and target.tap and target.pressed then
+        self:pressNow(target.pressed)
+        self.touched = target.pressed
+    end
+    -- Like a tap, a touch goes no further than a view that takes every tap.
+    return self.takes_all_taps or self:isInside(ges.pos)
+end
+
+
+-- Keeps `p` pressed through the redraws the tap causes, for LINGER after it, then draws it plain.
+function View:linger(p)
+    local region = Geom:new{ x = p.x, y = p.y, w = p.w, h = p.h }
+    local lingering = { pressed = p, untill = time.now() + LINGER }
+    self.lingering = lingering
+    UIManager:scheduleIn(time.to_s(LINGER), function()
+        if self.lingering ~= lingering then return end
+        self.lingering = nil
+        if shown(self) then UIManager:setDirty(self:redrawTarget(), "fast", region) end
+    end)
 end
 
 -- As on the Kindle, the pressed look stays until the screen is next drawn, after the tap has done its work.
@@ -93,10 +171,19 @@ end
 function View:onLexemeTap(_, ges)
     self.last_tap = ges.pos
     local target = self:findHit(ges.pos)
+    local touched = self.touched
+    self.touched = nil
     if target and target.tap then
-        if target.pressed then self:showPressed(target.pressed) end
+        if target.pressed then
+            if touched ~= target.pressed then self:showPressed(target.pressed) end
+            self:linger(target.pressed)
+        end
         target.tap()
         return true
+    end
+    if touched then
+        self.touched = touched
+        self:releaseTouch()
     end
     if not self:isInside(ges.pos) then
         self:onTapOutside(ges)
@@ -105,15 +192,69 @@ function View:onLexemeTap(_, ges)
 end
 
 function View:onLexemeHold(_, ges)
+    self:releaseTouch()
     local target = self:findHit(ges.pos)
     if target and target.hold then
         target.hold()
         return true
     end
+    -- A finger resting on a drag target before it moves.
+    local drag = self:findDrag(ges.pos)
+    if drag then
+        self.dragging, self.drag_start = drag, nil
+        drag.drag(ges.pos, false)
+        return true
+    end
     return self.takes_all_taps
 end
 
+function View:findDrag(pos)
+    for i = #self.drags, 1, -1 do
+        local t = self.drags[i]
+        if pos.x >= t.x and pos.x < t.x + t.w and pos.y >= t.y and pos.y < t.y + t.h then return t end
+    end
+end
+
+-- Moves the drag under way to `pos`; whether there was one.
+function View:dragTo(pos, done)
+    local drag = self.dragging
+    if not drag then return false end
+    if done then self.dragging, self.drag_start = nil, nil end
+    drag.drag(pos, done)
+    return true
+end
+
+function View:onLexemePan(_, ges)
+    self:releaseTouch()
+    local start = ges.start_pos or ges.pos
+    local same = self.drag_start and self.drag_start.x == start.x and self.drag_start.y == start.y
+    if not (self.dragging and same) then
+        self.dragging, self.drag_start = self:findDrag(start), start
+    end
+    if self:dragTo(ges.pos, false) then return true end
+end
+
+function View:onLexemePanRelease(_, ges)
+    if self:dragTo(ges.pos, true) then return true end
+end
+
+function View:onLexemeHoldPan(_, ges)
+    if self:dragTo(ges.pos, false) then return true end
+end
+
+function View:onLexemeHoldRelease(_, ges)
+    if self:dragTo(ges.pos, true) then return true end
+end
+
 function View:onLexemeSwipe(_, ges)
+    self:releaseTouch()
+    -- A quick drag ends as a swipe, from where the finger went down to where it lifted.
+    local drag = self.dragging or self:findDrag(ges.pos)
+    if drag then
+        self.dragging = drag
+        self:dragTo(ges.end_pos or ges.pos, true)
+        return true
+    end
     if not self:isInside(ges.pos) then return self.takes_all_taps end
     local handled = self:onSwipe(ges.direction, ges)
     return handled or self.takes_all_taps

@@ -1,0 +1,1250 @@
+--- a/crengine/include/lvstring.h
++++ b/crengine/include/lvstring.h
+@@ -337,11 +337,15 @@
+ #define CONST_STRING_BUFFER_SIZE 4096
+ #define CONST_STRING_BUFFER_MASK (CONST_STRING_BUFFER_SIZE - 1)
+ #define CONST_STRING_BUFFER_HASH_MULT 31
++
++class lString32;
++lString32 Utf8ToUnicodeUpToZero( const char * s, int sz );
+ 
+ struct lstring_chunk_t {
+     friend class lString8;
+     friend class lString32;
+     friend struct lstring_chunk_slice_t;
++    friend lString32 Utf8ToUnicodeUpToZero( const char * s, int sz );
+ public:
+     lstring_chunk_t(lChar8 * _buf8) : buf8(_buf8), size(1), len(0), nref(1) {}
+     const lChar8 * data8() const { return buf8; }
+@@ -638,6 +642,7 @@
+ {
+     friend const lString32 & cs32(const char * str);
+     friend const lString32 & cs32(const lChar32 * str);
++    friend lString32 Utf8ToUnicodeUpToZero( const char * s, int sz );
+ public:
+     // typedefs for STL compatibility
+     typedef lChar32             value_type;
+@@ -1224,6 +1229,9 @@
+ lString32 Utf8ToUnicode( const char * s );
+ /// converts utf-8 string fragment to wide unicode string
+ lString32 Utf8ToUnicode( const char * s, int sz );
++/// converts the first sz bytes of a utf-8 string, or the bytes before a zero byte if any:
++/// the same as Utf8ToUnicode( lString8(s, sz) ), without making that copy
++lString32 Utf8ToUnicodeUpToZero( const char * s, int sz );
+ /// converts utf-8 string fragment to wide unicode string
+ void Utf8ToUnicode(const lUInt8 * src,  int &srclen, lChar32 * dst, int &dstlen);
+ /// decodes path like "file%20name" to "file name"
+--- a/crengine/include/lvtinydom.h
++++ b/crengine/include/lvtinydom.h
+@@ -395,6 +395,8 @@
+     lUInt32 allocElem( lUInt32 dataIndex, lUInt32 parentIndex, lUInt32 childCount, lUInt32 attrCount );
+     /// get text by address
+     lString8 getText( lUInt32 address );
++    /// get text by address, as unicode (the same as Utf8ToUnicode( getText(address) ))
++    lString32 getText32( lUInt32 address );
+     /// the UTF-8 bytes of the text item at address (pointing into its chunk), false if none
+     bool getTextBytes( lUInt32 address, const lChar8 * & text, int & length );
+     /// get pointer to text data
+@@ -474,6 +476,8 @@
+     int addElem( lUInt32 dataIndex, lUInt32 parentIndex, lUInt32 childCount, lUInt32 attrCount );
+     /// get text item from buffer by offset
+     lString8 getText( int offset );
++    /// get text item from buffer by offset, as unicode (the same as Utf8ToUnicode( getText(offset) ))
++    lString32 getText32( int offset );
+     /// the UTF-8 bytes of the text item at offset (pointing into this chunk), false if none
+     bool getTextBytes( int offset, const lChar8 * & text, int & length );
+     /// get node parent by offset
+--- a/crengine/include/textlang.h
++++ b/crengine/include/textlang.h
+@@ -231,6 +231,8 @@
+ };
+ 
+ #define MAX_NB_LB_PROPS_ITEMS 20 // for our statically sized array (increase if needed)
++#define LB_ASCII_BITS 7
++#define LB_ASCII_SIZE (1 << LB_ASCII_BITS) // results kept by state for these first chars
+ 
+ #if USE_LIBUNIBREAK==1
+ typedef lChar32 (*lb_char_sub_func_t)(struct LineBreakContext *lbpCtx, const lChar32 * text, int pos, int next_usable);
+@@ -254,7 +256,15 @@
+ 
+     #if USE_LIBUNIBREAK==1
+     lb_char_sub_func_t _lb_char_sub_func;
++    // The lowest char _lb_char_sub_func may substitute: it returns any char below
++    // this one unchanged, and doesn't need to be called for it.
++    lChar32 _lb_char_sub_func_min_char;
+     struct LineBreakProperties _lb_props[MAX_NB_LB_PROPS_ITEMS];
++    // Results of lb_process_next_char() with _lb_props (see lbProcessNextChar() and textlang.cpp)
++    struct LBNextCharResults;
++    LBNextCharResults * _lb_results;
++    lUInt16 * _lb_ascii_results; // (in _lb_results, for lbProcessNextChar())
++    int lbProcessNextCharAndKeep( struct LineBreakContext * lbpCtx, int & state_id, lChar32 ch );
+     #endif
+ 
+     bool _duplicate_real_hyphen_on_next_line;
+@@ -299,6 +309,24 @@
+     #if USE_LIBUNIBREAK==1
+     bool hasLBCharSubFunc() const { return _lb_char_sub_func != NULL; }
+     lb_char_sub_func_t getLBCharSubFunc() const { return _lb_char_sub_func; }
++    lChar32 getLBCharSubFuncMinChar() const { return _lb_char_sub_func_min_char; }
++    /// Same as lb_process_next_char( lbpCtx, ch ), for a context using getLBProps(), with
++    /// the context state that changes from char to char kept as 'state_id' (that must start
++    /// at -1) instead of in lbpCtx: lbSyncContext() must be called before any other use
++    /// of lbpCtx, or before lbpCtx->lbpLang is changed.
++    inline int lbProcessNextChar( struct LineBreakContext * lbpCtx, int & state_id, lChar32 ch ) {
++        if ( state_id >= 0 && ch < LB_ASCII_SIZE ) {
++            // (_lb_ascii_results is allocated when state_id is set)
++            lUInt16 next = _lb_ascii_results[ (state_id << LB_ASCII_BITS) + ch ];
++            if ( next ) {
++                state_id = (next & 0xFF) - 1;
++                return (next >> 8) - 1;
++            }
++        }
++        return lbProcessNextCharAndKeep( lbpCtx, state_id, ch );
++    }
++    /// Updates lbpCtx with the state kept by lbProcessNextChar(), and resets state_id
++    void lbSyncContext( struct LineBreakContext * lbpCtx, int & state_id );
+     struct LineBreakProperties * getLBProps() const { return (struct LineBreakProperties *)_lb_props; }
+     lChar32 getCssLbCharSub(css_line_break_t css_linebreak, css_word_break_t css_wordbreak,
+                 struct LineBreakContext *lbpCtx, const lChar32 * text, int pos, int next_usable, lChar32 tweaked_ch);
+--- a/crengine/src/hyphman.cpp
++++ b/crengine/src/hyphman.cpp
+@@ -75,9 +75,13 @@
+     lUInt32 _hash;
+     lUInt32 _pattern_count;
+     lString32 _supported_modifiers;
++    // What matching the patterns gave for words met recently (see matchWord()).
++    struct MatchCacheItem;
++    MatchCacheItem * _match_cache;
+ public:
+     int largest_overflowed_word;
+     bool match( const lChar32 * str, char * mask );
++    bool matchWord( const lChar32 * word, int wlen, char * mask );
+     virtual bool hyphenate( const lChar32 * str, int len, lUInt16 * widths, lUInt8 * flags, lUInt16 hyphCharWidth, lUInt16 maxWidth, size_t flagSize );
+     void addPattern( TexPattern * pattern );
+     void checkForModifiers( lString32 str );
+@@ -703,6 +707,22 @@
+         return false;
+     }
+ 
++};
++
++// Matching the patterns against a word gives a result that depends only on that word
++// (and the patterns, which don't change once loaded). The same words are often met again
++// at the end of lines, where hyphenation is tried: TexHyph keeps the results for the
++// words met recently, in MATCH_CACHE_SETS sets of 2 slots, a word going in the set given
++// by its hash, in the slot least recently used (only words not longer than
++// MATCH_CACHE_MAX_WORD_LEN are kept).
++#define MATCH_CACHE_SETS 1024 // (a power of 2)
++#define MATCH_CACHE_MAX_WORD_LEN 28
++struct TexHyph::MatchCacheItem {
++    lUInt8 wlen; // 0 if not used
++    bool found;
++    bool recent; // used more recently than the other slot of its set
++    lChar32 word[MATCH_CACHE_MAX_WORD_LEN];
++    char mask[MATCH_CACHE_MAX_WORD_LEN+3];
+ };
+ 
+ TexHyph::TexHyph(lString32 id, int leftHyphenMin, int rightHyphenMin) : HyphMethod(id, leftHyphenMin, rightHyphenMin)
+@@ -710,11 +730,14 @@
+     memset( table, 0, sizeof(table) );
+     _hash = 123456;
+     _pattern_count = 0;
++    _match_cache = NULL;
+     largest_overflowed_word = 0;
+ }
+ 
+ TexHyph::~TexHyph()
+ {
++    if ( _match_cache )
++        free( _match_cache );
+     for ( int i=0; i<PATTERN_HASH_SIZE; i++ ) {
+         TexPattern * p = table[i];
+         while (p) {
+@@ -898,6 +921,46 @@
+ }
+ 
+ 
++/// Matches the patterns at any position in word (wlen chars between a leading and a trailing
++/// space), setting the wlen+3 first bytes of mask; returns true if any pattern matched
++bool TexHyph::matchWord( const lChar32 * word, int wlen, char * mask )
++{
++    MatchCacheItem * item = NULL;
++    if ( wlen <= MATCH_CACHE_MAX_WORD_LEN ) {
++        if ( !_match_cache )
++            _match_cache = (MatchCacheItem *)calloc( MATCH_CACHE_SETS * 2, sizeof(MatchCacheItem) );
++        if ( _match_cache ) {
++            lUInt32 h = (lUInt32)wlen;
++            for ( int i=1; i<=wlen; i++ )
++                h = h * 31 + (lUInt32)word[i];
++            MatchCacheItem * set = &_match_cache[ ((h ^ (h >> 16)) & (MATCH_CACHE_SETS-1)) * 2 ];
++            for ( int k=0; k<2; k++ ) {
++                if ( set[k].wlen == wlen && memcmp( set[k].word, word+1, wlen * sizeof(lChar32) ) == 0 ) {
++                    set[k].recent = true;
++                    set[1-k].recent = false;
++                    memcpy( mask, set[k].mask, wlen+3 );
++                    return set[k].found;
++                }
++            }
++            item = set[0].recent ? &set[1] : &set[0];
++            item->recent = true;
++            (item == set ? set[1] : set[0]).recent = false;
++        }
++    }
++    memset( mask, '0', wlen+3 );	// 0x30!
++    bool found = false;
++    for ( int i=0; i<=wlen; i++ ) {
++        found = match( word + i, mask + i ) || found;
++    }
++    if ( item ) {
++        item->wlen = (lUInt8)wlen;
++        item->found = found;
++        memcpy( item->word, word+1, wlen * sizeof(lChar32) );
++        memcpy( item->mask, mask, wlen+3 );
++    }
++    return found;
++}
++
+ bool TexHyph::match( const lChar32 * str, char * mask )
+ {
+     bool found = false;
+@@ -994,11 +1057,7 @@
+ 
+     // Find matches from dict patterns, at any position in word.
+     // Places where hyphenation is allowed are put into 'mask'.
+-    memset( mask, '0', wlen+3 );	// 0x30!
+-    bool found = false;
+-    for ( int i=0; i<=wlen; i++ ) {
+-        found = match( word + i, mask + i ) || found;
+-    }
++    bool found = matchWord( word, wlen, mask );
+     if ( !found )
+         return false;
+ 
+--- a/crengine/src/lvfntman.cpp
++++ b/crengine/src/lvfntman.cpp
+@@ -1446,7 +1446,11 @@
+ // have since been upgraded to be lUInt16)
+ // (LCHAR_DEPRECATED_WRAP_AFTER for '-' and '/', as they may be used to
+ // separate words.)
+-static const lUInt16 char_flags[] = {
++// The table covers all of Latin-1, so that the flags of most chars in most
++// texts are a single lookup: with a smaller table, text measurement went
++// through the chain of tests below for every letter, and mispredicted the
++// branch between both paths at every space.
++static const lUInt16 char_flags[256] = {
+     0, 0, 0, 0, 0, 0, 0, 0, // 0    00
+     0, 0, LCHAR_IS_SPACE | LCHAR_ALLOW_WRAP_AFTER, 0, // 8    08
+     0, LCHAR_IS_SPACE | LCHAR_ALLOW_WRAP_AFTER, 0, 0, // 12   0C
+@@ -1455,19 +1459,33 @@
+     LCHAR_IS_SPACE | LCHAR_ALLOW_WRAP_AFTER, 0, 0, 0, 0, 0, 0, 0, // 32   20
+     0, 0, 0, 0, 0, LCHAR_DEPRECATED_WRAP_AFTER, 0, LCHAR_DEPRECATED_WRAP_AFTER, // 40   28
+     0, 0, 0, 0, 0, 0, 0, 0, // 48   30
++    0, 0, 0, 0, 0, 0, 0, 0, // 56   38
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 64   40
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 80   50
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 96   60
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 112  70
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 128  80
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 144  90
++    LCHAR_IS_SPACE, 0, 0, 0, 0, 0, 0, 0, // 160  A0 (UNICODE_NO_BREAK_SPACE)
++    0, 0, 0, 0, 0, 0, 0, 0, // 168  A8
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 176  B0
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 192  C0
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 208  D0
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 224  E0
++    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 240  F0
+ };
+ 
+ // removed, as soft hyphens are now exclusively handled by hyphman:
+ //      (ch==UNICODE_SOFT_HYPHEN_CODE?LCHAR_ALLOW_WRAP_AFTER:
++// (UNICODE_NO_BREAK_SPACE, below 256, is in the table)
+ #define GET_CHAR_FLAGS(ch) \
+-     (ch<48?char_flags[ch]: \
+-        (ch==UNICODE_NO_BREAK_SPACE ? LCHAR_IS_SPACE: \
++     (ch<256?char_flags[ch]: \
+         (ch==UNICODE_NO_BREAK_HYPHEN ? 0: \
+         (ch>=UNICODE_HYPHEN && ch<=UNICODE_EM_DASH ? LCHAR_DEPRECATED_WRAP_AFTER: \
+         (ch==UNICODE_ARMENIAN_HYPHEN ? LCHAR_DEPRECATED_WRAP_AFTER: \
+         (ch==UNICODE_FIGURE_SPACE ? 0: \
+         (ch>=UNICODE_EN_QUAD && ch<=UNICODE_ZERO_WIDTH_SPACE ? LCHAR_ALLOW_WRAP_AFTER: \
+-         0)))))))
++         0))))))
+ 
+ #if USE_HARFBUZZ==1
+ // For use with Harfbuzz light
+--- a/crengine/src/lvstring.cpp
++++ b/crengine/src/lvstring.cpp
+@@ -3276,6 +3276,54 @@
+     return dst;
+ }
+ 
++
++lString32 Utf8ToUnicodeUpToZero( const char * s, int sz ) {
++    // The same as Utf8ToUnicode( const char * s ) does on a copy of these sz bytes (which
++    // stops at its first zero byte): it counts the chars as Utf8CharCount( const lChar8 * str ),
++    // then decodes them as DecodeUtf8(). Both are done here in a single pass, with s[sz] taken
++    // as that copy's terminating zero.
++    if ( !s || sz <= 0 || !s[0] )
++        return lString32::empty_str;
++    lString32 dst;
++    dst.reserve(sz); // (there are at most sz chars)
++    lChar32 * p = dst.pchunk->buf32;
++    const lUInt8 * str = (const lUInt8 *)s;
++    const lUInt8 * endp = str + sz;
++    int len = 0;
++    lUInt8 ch;
++    while ( str < endp && (ch=*str) ) {
++        if ( (ch & 0x80) == 0 ) {
++            p[len] = ch;
++            str += 1;
++        } else if ( (ch & 0xE0) == 0xC0 ) {
++            if ( str+1 >= endp || !str[1] )
++                break;
++            p[len] = ((ch & 0x1F) << 6) | (str[1] & 0x3F);
++            str += 2;
++        } else if ( (ch & 0xF0) == 0xE0 ) {
++            if ( str+1 >= endp || !str[1] || str+2 >= endp || !str[2] )
++                break;
++            p[len] = ((ch & 0x0F) << 12) | ((lChar32)(str[1] & 0x3F) << 6) | (str[2] & 0x3F);
++            str += 3;
++        } else if ( (ch & 0xF8) == 0xF0 ) {
++            if ( str+1 >= endp || !str[1] || str+2 >= endp || !str[2] || str+3 >= endp || !str[3] )
++                break;
++            p[len] = ((lChar32)(ch & 0x07) << 18) | ((lChar32)(str[1] & 0x3F) << 12)
++                        | ((lChar32)(str[2] & 0x3F) << 6) | (str[3] & 0x3F);
++            str += 4;
++        } else {
++            // invalid first byte in UTF-8 sequence: passed with mask 0x7F, as DecodeUtf8() does
++            p[len] = ch & 0x7F;
++            str += 1;
++        }
++        len++;
++    }
++    if (!len)
++      return lString32::empty_str;
++    dst.pchunk->len = len;
++    p[len] = 0;
++    return dst;
++}
+ 
+ lString8 UnicodeToUtf8(const lChar32 * s, int count)
+ {
+--- a/crengine/src/lvtextfm.cpp
++++ b/crengine/src/lvtextfm.cpp
+@@ -67,8 +67,22 @@
+ #define FRM_ALLOC_SIZE 16
+ #define FLT_ALLOC_SIZE 4
+ 
++// Formatted lines, and their words buffers, are allocated and freed for each final block
++// laid out: some of the freed ones are kept to be reused. (Only words buffers of
++// FRM_ALLOC_SIZE words, the size they get for their first word, are kept.)
++#define FRM_POOL_SIZE 256
++static formatted_line_t * frm_lines_pool[FRM_POOL_SIZE];
++static int frm_lines_pool_count = 0;
++static formatted_word_t * frm_words_pool[FRM_POOL_SIZE];
++static int frm_words_pool_count = 0;
++
+ formatted_line_t * lvtextAllocFormattedLine( )
+ {
++    if ( frm_lines_pool_count > 0 ) {
++        formatted_line_t * pline = frm_lines_pool[--frm_lines_pool_count];
++        memset( pline, 0, sizeof(*pline) );
++        return pline;
++    }
+     formatted_line_t * pline = (formatted_line_t *)calloc(1, sizeof(*pline));
+     return pline;
+ }
+@@ -84,13 +98,27 @@
+ 
+ void lvtextFreeFormattedLine( formatted_line_t * pline )
+ {
+-    if (pline->words)
+-        free( pline->words );
+-    free(pline);
++    if (pline->words) {
++        // (A words buffer is allocated for FRM_ALLOC_SIZE words at a time, so it has
++        // room for at least FRM_ALLOC_SIZE words if it has some.)
++        if ( pline->word_count > 0 && pline->word_count <= FRM_ALLOC_SIZE && frm_words_pool_count < FRM_POOL_SIZE )
++            frm_words_pool[frm_words_pool_count++] = pline->words;
++        else
++            free( pline->words );
++    }
++    if ( frm_lines_pool_count < FRM_POOL_SIZE )
++        frm_lines_pool[frm_lines_pool_count++] = pline;
++    else
++        free(pline);
+ }
+ 
+ formatted_word_t * lvtextAddFormattedWord( formatted_line_t * pline )
+ {
++    if ( pline->word_count == 0 && !pline->words && frm_words_pool_count > 0 ) {
++        // A kept buffer, with room for FRM_ALLOC_SIZE words, as allocated below
++        pline->words = frm_words_pool[--frm_words_pool_count];
++        return &pline->words[ pline->word_count++ ];
++    }
+     int size = (pline->word_count + FRM_ALLOC_SIZE-1) / FRM_ALLOC_SIZE * FRM_ALLOC_SIZE;
+     if ( pline->word_count >= size)
+     {
+@@ -336,6 +364,36 @@
+     pline->lang_cfg = lang_cfg;
+ }
+ 
++
++#if USE_HARFBUZZ==1
++// hb_unicode_script() with the default Unicode functions (hb_unicode_funcs_get_default(),
++// that must be what is passed here), as used below for each char when measuring with
++// Harfbuzz. Its results for the chars below 0x250 (Basic Latin to Latin Extended-B),
++// which make up most of many texts, are kept in a table.
++#define HB_SCRIPT_TABLE_SIZE 0x250
++static hb_script_t hb_script_table[HB_SCRIPT_TABLE_SIZE];
++static bool hb_script_table_ready = false;
++// Set if all these chars are of the Latin script, or of no specific script (common, inherited
++// or unknown)
++static bool hb_script_table_latin_only = false;
++static void initHBScriptTable( hb_unicode_funcs_t * default_hb_unicode_funcs ) {
++    hb_script_table_latin_only = true;
++    for ( lChar32 ch=0; ch < HB_SCRIPT_TABLE_SIZE; ch++ ) {
++        hb_script_t script = hb_unicode_script(default_hb_unicode_funcs, ch);
++        hb_script_table[ch] = script;
++        if ( script != HB_SCRIPT_LATIN && script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED && script != HB_SCRIPT_UNKNOWN )
++            hb_script_table_latin_only = false;
++    }
++    hb_script_table_ready = true;
++}
++static inline hb_script_t getCharHBScript( hb_unicode_funcs_t * default_hb_unicode_funcs, lChar32 c ) {
++    if ( c >= HB_SCRIPT_TABLE_SIZE )
++        return hb_unicode_script(default_hb_unicode_funcs, c);
++    if ( !hb_script_table_ready )
++        initHBScriptTable(default_hb_unicode_funcs);
++    return hb_script_table[c];
++}
++#endif
+ 
+ #define DEPRECATED_LINE_BREAK_WORD_COUNT    3
+ #define DEPRECATED_LINE_BREAK_SPACE_LIMIT   64
+@@ -453,6 +511,7 @@
+     bool m_has_bidi; // true when Bidi (or pure RTL) detected
+     bool m_para_dir_is_rtl; // boolean shortcut of m_para_bidi_type
+     bool m_has_cjk; // true when some CJK met
++    bool m_has_ctrl_or_ignorable; // true when some control char (tab, \n...) or LCHAR_IS_TO_IGNORE met in this paragraph
+     int  m_cjk_prev_line_added_space_div; // Used with CJK justified lines, to
+     int  m_cjk_prev_line_added_space_mod; // apply same spacing on last line.
+     struct {
+@@ -508,6 +567,7 @@
+         m_initial_letter_exclusion.start_y = 0;
+         m_initial_letter_exclusion.end_y = 0;
+         m_has_cjk = false;
++        m_has_ctrl_or_ignorable = false;
+         m_cjk_prev_line_added_space_div = 0;
+         m_cjk_prev_line_added_space_mod = 0;
+         m_specified_para_dir = REND_DIRECTION_UNSET;
+@@ -1195,6 +1255,7 @@
+         #endif
+ 
+         m_has_bidi = false; // will be set if fribidi detects it is bidirectional text
++        m_has_ctrl_or_ignorable = false;
+         m_para_dir_is_rtl = false;
+         #if (USE_FRIBIDI==1)
+         bool has_rtl = false; // if no RTL char, no need for expensive bidi processing
+@@ -1492,6 +1553,14 @@
+                 // in word->flags if needed later for drawing).
+ 
+                 bool preformatted = (src->flags & LTEXT_FLAG_PREFORMATTED);
++                bool src_has_locked_spacing = (src->flags & LTEXT_LOCKED_SPACING);
++                #if (USE_LIBUNIBREAK==1)
++                // Lang specific function that may substitute some chars (fetched once
++                // for this text node, as the calls in the loop below make the compiler
++                // fetch it again for each char), and the lowest char it may substitute
++                lb_char_sub_func_t lb_char_sub_func = src->lang_cfg->getLBCharSubFunc();
++                lChar32 lb_char_sub_min_char = src->lang_cfg->getLBCharSubFuncMinChar();
++                #endif
+                 for ( int k=0; k<len; k++ ) {
+                     lChar32 c = m_text[pos];
+ 
+@@ -1521,6 +1590,8 @@
+                             // expanded to spaces, converted or skipped)
+                             if ( c != 0x000A && c!= 0x000D && c!= 0x0009 )
+                                 is_to_ignore = true; // 0000>001F except those above
++                            // (Tabs and \n need some care in measureText() and processParagraph())
++                            m_has_ctrl_or_ignorable = true;
+                         }
+                         else if ( c >= 0x007F ) {
+                             is_to_ignore = true;     // 007F>009F
+@@ -1534,8 +1605,19 @@
+                     // spaces and collapse consecutive spaces (other spaces
+                     // like UNICODE_NO_BREAK_SPACE should not collapse).
+                     bool is_space = (c == ' ');
+-                    if ( is_to_ignore ) {
++                    if ( !is_to_ignore && !preformatted && !is_locked_spacing && !src_has_locked_spacing ) {
++                        // What the 2 branches below do in this most common case, without
++                        // branching on is_space (which would be mispredicted around most spaces)
++                        if ( is_space & prev_was_space ) // (rare)
++                            m_flags[pos] = LCHAR_IS_COLLAPSED_SPACE | LCHAR_ALLOW_WRAP_AFTER;
++                        last_non_collapsed_space_pos = is_space ? (prev_was_space ? last_non_collapsed_space_pos : pos) : -1;
++                        last_non_space_pos = is_space ? last_non_space_pos : pos;
++                        has_non_space = has_non_space | (!is_space & (c != UNICODE_NO_BREAK_SPACE));
++                        prev_was_space = is_space | (c == '\n');
++                    }
++                    else if ( is_to_ignore ) {
+                         m_flags[pos] = LCHAR_IS_TO_IGNORE;
++                        m_has_ctrl_or_ignorable = true;
+                         // Don't update any space related state when meeting an ignorable
+                     }
+                     else if ( is_space && !preformatted ) {
+@@ -1602,7 +1684,9 @@
+                             // a space following a \n be allowed to collapse.
+                     }
+ 
+-                    if ( lStr_isCJK(c) ) {
++                    // (No CJK nor RTL char below U+0590: no need to check most chars)
++                    bool may_be_cjk_or_rtl = c >= 0x0590;
++                    if ( may_be_cjk_or_rtl && lStr_isCJK(c) ) {
+                         // We have some specific code for handling CJK typography, that we don't
+                         // need to trigger if we didn't meet any CJK char.
+                         if ( !m_has_cjk ) {
+@@ -1640,7 +1724,32 @@
+                         printf("control char %x\n", c);
+                     */
+ 
+-                    #if (USE_LIBUNIBREAK==1)
++                    #if (USE_FRIBIDI==1)
++                        // Also try to detect if we have RTL chars, so that if we don't have any,
++                        // we don't need to invoke expensive fribidi processing below (which
++                        // may add a 50% duration increase to the text rendering phase).
++                        if ( !has_rtl && may_be_cjk_or_rtl ) {
++                            has_rtl = lStr_isRTL(c);
++                        }
++                    #endif
++
++                    m_charindex[pos] = k;
++                    m_srcs[pos] = src;
++                    pos++;
++                }
++                #if (USE_LIBUNIBREAK==1)
++                // Line breaking opportunities between the chars of this text node. This is
++                // done after the loop above (and not in it), so that the calls made here don't
++                // slow down that loop: nothing in it depends on what is done here, which only
++                // adds or removes LCHAR_ALLOW_WRAP_AFTER and LCHAR_DEPRECATED_WRAP_AFTER flags
++                // on the chars that loop has set.
++                pos -= len;
++                TextLangCfg * lb_lang_cfg = src->lang_cfg;
++                int lb_state = -1; // see TextLangCfg::lbProcessNextChar()
++                // The 2 chars before pos (as m_text[pos-1] and m_text[pos-2], or 0)
++                lChar32 prev_c1 = pos >= 1 ? m_text[pos-1] : 0;
++                lChar32 prev_c2 = pos >= 2 ? m_text[pos-2] : 0;
++                for ( int k=0; k<len; k++ ) {
+                     if ( nowrap ) {
+                         // If "white-space: nowrap", we flag everything but the last char
+                         // (So, for a 1 char long text node, no flag.)
+@@ -1649,27 +1758,34 @@
+                         }
+                     }
+                     lChar32 ch = m_text[pos];
+-                    if ( src->lang_cfg->hasLBCharSubFunc() ) {
++                    if ( lb_char_sub_func && ch >= lb_char_sub_min_char ) {
+                         // Lang specific function may want to substitute char (for
+                         // libunibreak only) to tweak line breaking around it
+-                        ch = src->lang_cfg->getLBCharSubFunc()(&lbCtx, m_text, pos, len-1 - k);
++                        lb_lang_cfg->lbSyncContext(&lbCtx, lb_state);
++                        ch = lb_char_sub_func(&lbCtx, m_text, pos, len-1 - k);
+                         // We do this before the following, to allow this lang specific function
+                         // to possibly tweak the more generic getCssLbCharSub()
+                     }
+                     if ( has_css_line_breaking_tweaks ) {
+                         // CSS line breaking tweaks by char substitution (we need to provide our 'ch'
+                         // as it may have been tweaked and differ from m_text[pos]...)
++                        lb_lang_cfg->lbSyncContext(&lbCtx, lb_state);
+                         ch = src->lang_cfg->getCssLbCharSub(css_linebreak, css_wordbreak, &lbCtx, m_text, pos, len-1 - k, ch);
+                     }
+-                    int brk = lb_process_next_char(&lbCtx, (utf32_t)ch);
++                    // (lbCtx.lbpLang has been set to this text node's lang_cfg's props: we can use
++                    // its faster equivalent of lb_process_next_char(), which keeps the context
++                    // state in lb_state until synced)
++                    int brk = lb_lang_cfg->lbProcessNextChar(&lbCtx, lb_state, ch);
+                     if ( pos > 0 ) {
+                         // printf("between <%c%c>: brk %d\n", m_text[pos-1], m_text[pos], brk);
+                         // printf("between <%x.%x>: brk %d\n", m_text[pos-1], m_text[pos], brk);
+-                        if (brk != LINEBREAK_ALLOWBREAK) {
+-                            m_flags[pos-1] &= ~LCHAR_ALLOW_WRAP_AFTER;
+-                        }
+-                        else {
+-                            m_flags[pos-1] |= LCHAR_ALLOW_WRAP_AFTER;
++                        // (Done without branching on brk, which would be mispredicted around most spaces.)
++                        bool allow_break = brk == LINEBREAK_ALLOWBREAK;
++                        lUInt16 prev_flags = m_flags[pos-1];
++                        m_flags[pos-1] = allow_break ? (prev_flags | LCHAR_ALLOW_WRAP_AFTER) : (prev_flags & ~LCHAR_ALLOW_WRAP_AFTER);
++                        // If allowed, the break after previous spaces is also allowed (see below): there
++                        // is something to do only if there are 2 spaces before this char (which is rare).
++                        if ( allow_break & (prev_c1 == ' ') & (prev_c2 == ' ') & (pos >= 2) ) {
+                             // brk is set on the last space in a sequence of multiple spaces.
+                             //   between <ne>: brk 2
+                             //   between <ed>: brk 2
+@@ -1716,21 +1832,12 @@
+                             }
+                         }
+                     }
+-                    #endif
+-
+-                    #if (USE_FRIBIDI==1)
+-                        // Also try to detect if we have RTL chars, so that if we don't have any,
+-                        // we don't need to invoke expensive fribidi processing below (which
+-                        // may add a 50% duration increase to the text rendering phase).
+-                        if ( !has_rtl ) {
+-                            has_rtl = lStr_isRTL(c);
+-                        }
+-                    #endif
+-
+-                    m_charindex[pos] = k;
+-                    m_srcs[pos] = src;
++                    prev_c2 = prev_c1;
++                    prev_c1 = m_text[pos];
+                     pos++;
+                 }
++                lb_lang_cfg->lbSyncContext(&lbCtx, lb_state);
++                #endif
+             }
+             prev_src = src;
+         }
+@@ -2028,7 +2135,72 @@
+         #endif
+         int first_word_len = 0; // set to -1 when done with it (only used to check
+                                 // for single char first word, see below)
++        // Most chars are in the same text node as the previous one, and don't end the
++        // current segment: for them, the loop below only re-sets the same font, letter
++        // spacing and source (and, with Harfbuzz, finds the same script or one that
++        // doesn't count). We can skip over them, unless bidi levels need to be checked.
++        bool can_skip_same_src_chars = !m_has_bidi;
+         for ( i=0; i<=m_length; i++ ) {
++            if ( can_skip_same_src_chars && i > 0 && i < m_length && m_srcs[i] == lastSrc
++                    && !(m_flags[i-1] & LCHAR_IS_OBJECT)
++                    && !(lastSrc->flags & LTEXT_SRC_IS_OBJECT)
++                    && (LVFont *)lastSrc->t.font == lastFont
++                    && lastSrc->letter_spacing == lastLetterSpacing ) {
++                // A char that starts a new segment (object, ignorable, newline, or the
++                // first one past MAX_TEXT_CHUNK_SIZE), the first tab (tabIndex), or a
++                // char from another script than the current one (even if the current
++                // one is still HB_SCRIPT_COMMON) is left to the full processing below.
++                int skip_end = start + MAX_TEXT_CHUNK_SIZE;
++                if ( skip_end > m_length )
++                    skip_end = m_length;
++                bool skip_whole_src = !m_has_ctrl_or_ignorable;
++                #if (USE_HARFBUZZ==1)
++                    if ( usingHarfbuzz )
++                        skip_whole_src = false;
++                #endif
++                if ( skip_whole_src ) {
++                    // No tab nor ignorable in this paragraph, and only its first char can have
++                    // LCHAR_MANDATORY_NEWLINE: the next chars of this text node (that are at
++                    // successive positions, m_charindex[i] being i's index in the text node)
++                    // can all be skipped.
++                    int src_end = i - m_charindex[i] + (lastSrc->t.len - lastSrc->t.offset);
++                    i = src_end < skip_end ? src_end : skip_end;
++                }
++                #if (USE_HARFBUZZ==1)
++                else if ( usingHarfbuzz && !m_has_ctrl_or_ignorable && prevScript == HB_SCRIPT_LATIN
++                                && !prevSpecificScriptIsCursive ) {
++                    // The same with Harfbuzz, for the next chars of this text node that are below
++                    // HB_SCRIPT_TABLE_SIZE, if these are all Latin or of no specific script: the
++                    // current script being Latin, they don't change it (or flag anything).
++                    if ( !hb_script_table_ready )
++                        initHBScriptTable(_hb_unicode_funcs);
++                    if ( hb_script_table_latin_only ) {
++                        int src_end = i - m_charindex[i] + (lastSrc->t.len - lastSrc->t.offset);
++                        if ( src_end > skip_end )
++                            src_end = skip_end;
++                        while ( i < src_end && m_text[i] < HB_SCRIPT_TABLE_SIZE )
++                            i++;
++                    }
++                }
++                #endif
++                while ( i < skip_end && m_srcs[i] == lastSrc
++                            && !(m_flags[i] & (LCHAR_IS_OBJECT|LCHAR_IS_TO_IGNORE|LCHAR_MANDATORY_NEWLINE))
++                            && (tabIndex >= 0 || m_text[i] != '\t') ) {
++                    #if (USE_HARFBUZZ==1)
++                    if ( usingHarfbuzz ) {
++                        // As done below
++                        hb_script_t script = getCharHBScript(_hb_unicode_funcs, m_text[i]);
++                        if ( script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED && script != HB_SCRIPT_UNKNOWN ) {
++                            if ( script != prevScript )
++                                break;
++                            if ( prevSpecificScriptIsCursive )
++                                m_flags[i] |= LCHAR_LOCKED_SPACING;
++                        }
++                    }
++                    #endif
++                    i++;
++                }
++            }
+             LVFont * newFont = NULL;
+             lInt16 newLetterSpacing = 0;
+             src_text_fragment_t * newSrc = NULL;
+@@ -2085,7 +2257,7 @@
+                 if ( usingHarfbuzz && !isObject ) {
+                     // While we have the hb_script here, we'll update m_flags[i]
+                     // with LCHAR_LOCKED_SPACING if the script is cursive
+-                    hb_script_t script = hb_unicode_script(_hb_unicode_funcs, m_text[i]);
++                    hb_script_t script = getCharHBScript(_hb_unicode_funcs, m_text[i]);
+                     if ( script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED && script != HB_SCRIPT_UNKNOWN ) {
+                         if ( script != prevScript ) {
+                             if ( prevScript != HB_SCRIPT_COMMON ) {
+@@ -2187,7 +2359,13 @@
+                     int cumulative_width_removed = 0;
+                     int prev_orig_measured_width = 0;
+                     int char_width = 0; // current single char width
+-                    for ( int k=0; k<len; k++ ) {
++                    int k = 0;
++                    for ( ; k<len; k++ ) {
++                        if ( first_word_len < 0 && !scale_space_width && !m_has_cjk ) {
++                            // Done with the first word: what remains to do for the
++                            // other chars is done by the simpler loop below.
++                            break;
++                        }
+                         // printf("%c %x f=%d w=%d\n", m_text[start+k], m_text[start+k], flags[k], widths[k]);
+                         char_width = widths[k] - prev_orig_measured_width;
+                         prev_orig_measured_width = widths[k];
+@@ -2287,6 +2465,40 @@
+                         #endif
+                         m_flags[start + k] |= flags[k];
+                         // printf("  => w=%d\n", m_widths[start + k]);
++                    }
++                    // The same as the loop above does when there is no first word to check,
++                    // no space width scaling and no CJK: spaces and other chars then get the
++                    // same processing, and only (rare) collapsed spaces need some care.
++                    // (flags[] is not used after this loop, so it is not updated.)
++                    #if (USE_LIBUNIBREAK==1)
++                    const lUInt8 flags_mask = (lUInt8)~(LCHAR_ALLOW_WRAP_AFTER|LCHAR_DEPRECATED_WRAP_AFTER);
++                    #else
++                    const lUInt8 flags_mask = 0xFF;
++                    #endif
++                    lUInt16 * seg_flags = m_flags + start;
++                    int * seg_widths = m_widths + start;
++                    while ( k<len ) {
++                        // Chars up to the next collapsed space, without any branching
++                        int run_end = k;
++                        while ( run_end<len && !(seg_flags[run_end] & LCHAR_IS_COLLAPSED_SPACE) )
++                            run_end++;
++                        if ( run_end > k ) {
++                            prev_orig_measured_width = widths[run_end-1];
++                            for ( int kk=k; kk<run_end; kk++ ) {
++                                widths[kk] -= cumulative_width_removed;
++                                seg_widths[kk] = lastWidth + widths[kk];
++                                seg_flags[kk] |= flags[kk] & flags_mask;
++                            }
++                            k = run_end;
++                        }
++                        if ( k<len ) { // collapsed space
++                            char_width = widths[k] - prev_orig_measured_width;
++                            prev_orig_measured_width = widths[k];
++                            cumulative_width_removed += char_width;
++                            widths[k] = k>0 ? widths[k-1] : 0;
++                            seg_widths[k] = lastWidth + widths[k];
++                            k++;
++                        }
+                     }
+ 
+                     /* If the following was ever needed, it was wrong to do it at this step
+@@ -3744,7 +3956,47 @@
+         // Used when LTEXT_FIT_GLYPHS and preceeding or following word is an image or inline box
+         int prev_word_overflow = 0;
+         bool prev_word_is_object = false;
++        // Without bidi reordering and script changes on this line, the chars inside
++        // a word only update lastIsSpace and lastIsRTL in the loop below: we can
++        // skip over them, with the same checks as the loop does for a new word.
++        bool can_skip_word_chars = !lineIsBidi && !m_has_multiple_scripts;
++        // With light formatting, the words made are only used for the line height (which
++        // they all change the same way when from the same text node) and to find in-page
++        // footnote links (only flagged on a text node's first word): the words in a same
++        // text node can be made as a single one. (Without CJK and bidi, so that each word
++        // made that way is always made from successive words in the logical order.)
++        bool single_word_per_src = can_skip_word_chars && light_formatting && !m_has_cjk && !m_has_bidi;
+         for ( int i=start; i<=end; i++ ) { // loop thru each char
++            if ( single_word_per_src && i > wstart && i < end ) {
++                int i0 = i;
++                while ( i < end && m_srcs[i] == lastSrc ) {
++                    i++;
++                }
++                if ( i > i0 ) {
++                    // As set when looping on the previous char
++                    lastIsSpace = (m_flags[i-1] & LCHAR_IS_SPACE)!=0;
++                    lastIsRTL = m_flags[i-1] & LCHAR_IS_RTL;
++                }
++            }
++            else if ( can_skip_word_chars && i > wstart && i < end && !(m_flags[wstart] & LCHAR_IS_CJK) ) {
++                int i0 = i;
++                while ( i < end && m_srcs[i] == lastSrc ) {
++                    lUInt16 flags = m_flags[i];
++                    lUInt16 prev_flags = m_flags[i-1];
++                    if ( flags & (LCHAR_IS_TO_IGNORE|LCHAR_IS_CJK) )
++                        break;
++                    if ( (flags ^ prev_flags) & LCHAR_IS_RTL )
++                        break;
++                    if ( (prev_flags & LCHAR_IS_SPACE) && !(flags & LCHAR_IS_SPACE) && i<=lastnonspace )
++                        break;
++                    i++;
++                }
++                if ( i > i0 ) {
++                    // As set when looping on the previous char
++                    lastIsSpace = (m_flags[i-1] & LCHAR_IS_SPACE)!=0;
++                    lastIsRTL = m_flags[i-1] & LCHAR_IS_RTL;
++                }
++            }
+             src_text_fragment_t * newSrc = i<end ? m_srcs[i] : NULL;
+             if ( i<end ) {
+                 isSpace = (m_flags[i] & LCHAR_IS_SPACE)!=0; // current char is a space
+@@ -3760,7 +4012,7 @@
+                     // To be done only when we met multiple scripts in a same paragraph
+                     // while measuring (which we checked only when using Harfbuzz kerning)
+                     if ( m_has_multiple_scripts && !(m_flags[i] & LCHAR_IS_OBJECT) ) {
+-                        hb_script_t script = hb_unicode_script(_hb_unicode_funcs, m_text[i]);
++                        hb_script_t script = getCharHBScript(_hb_unicode_funcs, m_text[i]);
+                         if ( script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED && script != HB_SCRIPT_UNKNOWN ) {
+                             if ( prevScript != HB_SCRIPT_COMMON && script != prevScript ) {
+                                 scriptChanged = true;
+@@ -4231,31 +4483,40 @@
+                     // not used, as we won't have that information anymore in alignLine().
+                     word->added_letter_spacing = 0;
+                     word->distinct_glyphs = word->t.len; // start with all chars are distinct glyphs
+-                    bool seen_non_space = false;
+-                    int tailing_spaces = 0;
+-                    for ( int j=i-1; j >= wstart; j-- ) {
++                    // A single char flagged with LCHAR_LOCKED_SPACING makes the whole word non tweakable.
++                    // We'd rather not include the spaces that end most words - but some words can be
++                    // made of a single space, that we'd rather not ignore when adjusting spacing.
++                    // Chars that are part of a cluster, collapsed spaces and ignorables don't count.
++                    // (The trailing spaces are walked first, then the other chars, without any
++                    // per-char branching, as these loops run for every word.)
++                    // Not needed with light formatting, which won't be used by alignLine().
++                    int j = light_formatting ? wstart-1 : i-1;
++                    bool locked_spacing = false;
++                    int tailing_spaces = 0;
++                    for ( ; j >= wstart; j-- ) {
+                         if ( m_flags[j] & LCHAR_LOCKED_SPACING ) {
+-                            // A single char flagged with this makes the whole word non tweakable
+-                            word->distinct_glyphs = 0;
+-                            tailing_spaces = 0; // prevent tailing spaces correction
++                            locked_spacing = true;
+                             break;
+                         }
+-                        if ( !seen_non_space && (m_flags[j] & LCHAR_IS_SPACE) ) {
+-                            // We'd rather not include the space that ends most words.
+-                            word->distinct_glyphs--;
+-                            // But some words can be made of a single space, that we'd rather
+-                            // not ignore when adjusting spacing.
+-                            tailing_spaces++;
+-                            continue;
++                        if ( !(m_flags[j] & LCHAR_IS_SPACE) )
++                            break;
++                        tailing_spaces++;
++                    }
++                    if ( !locked_spacing && j >= wstart ) { // (if only spaces, they all count)
++                        int not_distinct = 0;
++                        lUInt16 all_flags = 0;
++                        for ( ; j >= wstart; j-- ) {
++                            lUInt16 flags = m_flags[j];
++                            all_flags |= flags;
++                            not_distinct += (flags & (LCHAR_IS_CLUSTER_TAIL|LCHAR_IS_COLLAPSED_SPACE|LCHAR_IS_TO_IGNORE)) != 0;
+                         }
+-                        seen_non_space = true;
+-                        if ( m_flags[j] & (LCHAR_IS_CLUSTER_TAIL|LCHAR_IS_COLLAPSED_SPACE|LCHAR_IS_TO_IGNORE) ) {
+-                            word->distinct_glyphs--;
+-                        }
++                        if ( all_flags & LCHAR_LOCKED_SPACING )
++                            locked_spacing = true;
++                        else
++                            word->distinct_glyphs -= tailing_spaces + not_distinct;
+                     }
+-                    if ( !seen_non_space && tailing_spaces ) {
+-                        word->distinct_glyphs += tailing_spaces;
+-                    }
++                    if ( locked_spacing )
++                        word->distinct_glyphs = 0;
+ 
+                     if ( i - wstart == 1 && (m_flags[wstart] & LCHAR_IS_CJK) ) {
+                         word->flags |= LTEXT_WORD_IS_CJK;
+@@ -4275,8 +4536,9 @@
+                         }
+                     }
+ 
+-                    if ( firstWord && (align == LTEXT_ALIGN_LEFT || align == LTEXT_ALIGN_WIDTH) ) {
+-                        // Adjust line start x if needed
++                    if ( firstWord && (align == LTEXT_ALIGN_LEFT || align == LTEXT_ALIGN_WIDTH) && !light_formatting ) {
++                        // Adjust line start x if needed (not needed with light formatting, where
++                        // lines are not positioned for drawing)
+                         // No need to do it when line is centered or right aligned (doing so
+                         // might increase the line width and change space widths for no reason).
+                         // We currently have no chance to get an added hyphen for hyphenation
+@@ -4356,7 +4618,7 @@
+                     word->width = m_widths[i>0 ? i-1 : 0] - (wstart>0 ? m_widths[wstart-1] : 0);
+                     word->min_width = word->width;
+                     TR("addLine - word(%d, %d) x=%d (%d..%d)[%d] |%s|", wstart, i, frmline->width, wstart>0 ? m_widths[wstart-1] : 0, m_widths[i-1], word->width, LCSTR(lString32(m_text+wstart, i-wstart)));
+-                    if ( m_flags[wstart] & LCHAR_IS_CLUSTER_TAIL ) {
++                    if ( (m_flags[wstart] & LCHAR_IS_CLUSTER_TAIL) && !light_formatting ) { // (width not needed if light)
+                         // The start of this word is part of a ligature that started
+                         // in a previous word: some hyphenation wrap happened on
+                         // this ligature, which will not be rendered as such.
+@@ -4370,7 +4632,7 @@
+                         }
+                     }
+                     if ( m_flags[i-1] & LCHAR_ALLOW_HYPH_WRAP_AFTER ) {
+-                        if ( m_flags[i] & LCHAR_IS_CLUSTER_TAIL ) {
++                        if ( (m_flags[i] & LCHAR_IS_CLUSTER_TAIL) && !light_formatting ) {
+                             // The end of this word is part of a ligature that, because
+                             // of hyphenation, has been splitted onto next word.
+                             // We are the first part of the hyphenated word, and
+@@ -4400,7 +4662,8 @@
+                         // would be too late, as reordering has been done).
+                         if ( !(m_flags[i-1] & LCHAR_LOCKED_SPACING) ) {
+                             word->flags |= LTEXT_WORD_CAN_ADD_SPACE_AFTER;
+-                            int dw = getMaxCondensedSpaceTruncation(i-1);
++                            // (min_width is only used by alignLine(), not used with light formatting)
++                            int dw = light_formatting ? 0 : getMaxCondensedSpaceTruncation(i-1);
+                             if (dw>0) {
+                                 word->min_width = word->width - dw;
+                             }
+@@ -4521,8 +4784,9 @@
+                         }
+                     }
+ 
+-                    if ( lastWord && (align == LTEXT_ALIGN_RIGHT || align == LTEXT_ALIGN_WIDTH) ) {
+-                        // Adjust line end if needed.
++                    if ( lastWord && (align == LTEXT_ALIGN_RIGHT || align == LTEXT_ALIGN_WIDTH) && !light_formatting ) {
++                        // Adjust line end if needed (not needed with light formatting, where
++                        // lines are not positioned for drawing).
+                         // If we need to adjust last word's last char, we need to put the delta
+                         // in this word->width, which will make it into frmline->width.
+                         // By reducing the last word width and so frmline->width, we'll have
+@@ -5054,8 +5318,48 @@
+             bool seen_non_collapsed_space = false;
+             bool seen_first_rendered_char = false;
+             bool first_line_sequance_end_reached = false; // ::first-line cloned text end reached
++            #if (USE_LIBUNIBREAK==1)
++            // Once past the start of the line, and without ::first-line or CJK, most chars
++            // need only the checks done by the loop at the start of the for body below:
++            // they are not \n, not objects, and fit in the line. The loop stops at any
++            // other char, for the full processing.
++            bool can_take_plain_chars = !is_css_first_line && !m_has_cjk;
++            bool can_condense_spaces = m_pbuffer->min_space_condensing_percent != 100;
++            bool may_have_newlines = m_has_ctrl_or_ignorable; // ('\n' is a control char)
++            #endif
+             int i;
+             for ( i=pos; i<m_length; i++ ) {
++                #if (USE_LIBUNIBREAK==1)
++                if ( can_take_plain_chars && seen_first_rendered_char ) {
++                    // (seen_first_rendered_char is set after seen_non_collapsed_space)
++                    const lUInt16 * flags_buf = m_flags;
++                    const int * widths_buf = m_widths;
++                    while ( i < m_length ) {
++                        lUInt16 flags = flags_buf[i];
++                        if ( (flags & LCHAR_IS_OBJECT) || (may_have_newlines && m_text[i]=='\n') )
++                            break;
++                        if ( x + widths_buf[i]-w0 > maxWidth + spaceReduceWidth )
++                            break;
++                        // As below, for a char that fits (without branching on the
++                        // flags, which would be mispredicted around most spaces)
++                        int wrap_flags = flags & (LCHAR_ALLOW_WRAP_AFTER|LCHAR_DEPRECATED_WRAP_AFTER);
++                        lastNormalWrap = wrap_flags == LCHAR_ALLOW_WRAP_AFTER ? i : lastNormalWrap;
++                        lastDeprecatedWrap = wrap_flags == (LCHAR_ALLOW_WRAP_AFTER|LCHAR_DEPRECATED_WRAP_AFTER) ? i : lastDeprecatedWrap;
++                        if ( i==m_length-1 ) // Last char always provides a normal wrap
++                            lastNormalWrap = i;
++                        if ( can_condense_spaces && i < m_length-1 &&
++                                (flags & (LCHAR_IS_SPACE|LCHAR_LOCKED_SPACING)) == LCHAR_IS_SPACE &&
++                                !(flags_buf[i+1] & LCHAR_IS_SPACE) ) {
++                            int dw = getMaxCondensedSpaceTruncation(i);
++                            if ( dw>0 )
++                                spaceReduceWidth += dw;
++                        }
++                        i++;
++                    }
++                    if ( i >= m_length )
++                        break;
++                }
++                #endif
+                 if ( m_text[i]=='\n' ) { // might happen in <pre>formatted only (?)
+                     lastMandatoryWrap = i;
+                     break;
+--- a/crengine/src/lvtinydom.cpp
++++ b/crengine/src/lvtinydom.cpp
+@@ -3662,6 +3662,12 @@
+ {
+     ldomTextStorageChunk * chunk = getChunk(address);
+     return chunk->getTextBytes(address&0xFFFF, text, length);
++}
++
++lString32 ldomDataStorageManager::getText32( lUInt32 address )
++{
++    ldomTextStorageChunk * chunk = getChunk(address);
++    return chunk->getText32(address&0xFFFF);
+ }
+ 
+ /// get pointer to element data
+@@ -4070,6 +4076,18 @@
+     }
+     CRLog::error("Offset %d is out of bounds (%d) for storage chunk %c%d, chunkCount=%d", offset, this->_bufpos, this->_type, this->_index, _manager->_chunks.length() );
+     return NULL;
++}
++
++/// get text item from buffer by offset, as unicode
++lString32 ldomTextStorageChunk::getText32( int offset )
++{
++    offset <<= 4;
++    if ( _buf && offset>=0 && offset<(int)_bufpos ) {
++        TextDataStorageItem * item = (TextDataStorageItem *)(_buf+offset);
++        // Utf8ToUnicode( item->getText8() ), without its intermediate copy
++        return Utf8ToUnicodeUpToZero( item->text, item->length );
++    }
++    return lString32::empty_str;
+ }
+ #endif
+ 
+@@ -20627,7 +20645,7 @@
+         break;
+ #if BUILD_LITE!=1
+     case NT_PTEXT:
+-        return Utf8ToUnicode(getDocument()->_textStorage.getText( _data._ptext_addr ));
++        return getDocument()->_textStorage.getText32( _data._ptext_addr );
+ #endif
+     case NT_TEXT:
+         return _data._text_ptr->getText32();
+--- a/crengine/src/textlang.cpp
++++ b/crengine/src/textlang.cpp
+@@ -570,7 +570,196 @@
+     }
+     return text[pos];
+ }
++
++// lb_process_next_char() updates a line breaking context with the next char, and returns
++// the break opportunity before that char. It is called for every char laid out, and was a
++// large part of the layout time, while most texts only meet a few dozen different context
++// states, and a few thousand combinations of state and char. Its results only depend on
++// the context fields and the char (and on libunibreak's and our _lb_props tables, which
++// don't change), so they can be kept and reused: TextLangCfg::lbProcessNextChar() does
++// this, as a state machine whose states are the context states met, numbered as met:
++// - the context fields that change from char to char are packed into a 32 bits state,
++//   and we check that the others are as initialized by lb_init_break_context() without
++//   a language name (as crengine does, which also means no LB25 fixups); otherwise the
++//   context is left to lb_process_next_char() alone.
++// - for each state number and ASCII char, the next state number and the break are kept
++//   in a table directly indexed by both, for the most common chars to need only one memory
++//   read (on a slow device, the time taken by the chain of these reads, each needing the
++//   previous one, is what matters most), and by a hash of both for the other chars.
++// This needs to know all the LineBreakContext fields: if libunibreak changes them, the
++// following static_assert should fail, and the code below must be updated.
++struct LineBreakContextFields {
++    const char *lang;
++    const struct LineBreakProperties *lbpLang;
++    enum LineBreakClass lbcCur;
++    enum LineBreakClass lbcNew;
++    enum LineBreakClass lbcLast;
++    size_t posLast;
++#if UB_LANG_FLAGS
++    bool fLangCjk;
++    bool fLangStrict;
++#endif
++    bool fLb8aZwj;
++    bool fLb21aHebrew;
++    int cLb30aRI;
++    enum Lb25State eLb25;
++    size_t posLb25Fixup;
++    bool fLb25Mark;
++};
++static_assert( sizeof(struct LineBreakContext) == sizeof(struct LineBreakContextFields),
++        "LineBreakContext has changed: TextLangCfg::lbProcessNextChar() must be updated" );
+ 
++#define LB_MAX_STATES 64 // (at most 255)
++#define LB_OTHER_RESULTS_BITS 10
++#define LB_OTHER_RESULTS_SIZE (1 << LB_OTHER_RESULTS_BITS)
++#define LB_MAX_OTHER_CHAR 0xFFFFFF // (so it fits in a key with the state number)
++struct TextLangCfg::LBNextCharResults {
++    lUInt32 states[LB_MAX_STATES]; // packed context state of each state number
++    int states_count;
++    // For each state number and ASCII char: 0 if not known yet, or the next state number + 1
++    // in the low byte and the break + 1 in the high byte.
++    lUInt16 ascii[LB_MAX_STATES << LB_ASCII_BITS];
++    // For other chars, by hash: the char and state number (key, 0 if unused), and the result
++    // as above.
++    struct { lUInt32 key; lUInt16 next; } others[LB_OTHER_RESULTS_SIZE];
++};
++
++// The fields not packed in the state, as set by lb_init_break_context( ctx, ch, NULL ) (whatever ch)
++static struct LineBreakContext lb_init_ctx;
++static bool lb_init_ctx_set = false;
++
++// Packs the state of ctx, returns false if it can't be (other fields are not as expected)
++static bool getLBContextState( const struct LineBreakContext * ctx, lUInt32 & state ) {
++    if ( ctx->lang != lb_init_ctx.lang || ctx->posLast != lb_init_ctx.posLast
++            || ctx->posLb25Fixup != lb_init_ctx.posLb25Fixup || ctx->fLb25Mark != lb_init_ctx.fLb25Mark
++#if UB_LANG_FLAGS
++            || ctx->fLangCjk != lb_init_ctx.fLangCjk || ctx->fLangStrict != lb_init_ctx.fLangStrict
++#endif
++       )
++        return false;
++    lUInt32 lbc = (lUInt32)ctx->lbcCur | (lUInt32)ctx->lbcNew | (lUInt32)ctx->lbcLast;
++    if ( lbc > 63 || (lUInt32)ctx->cLb30aRI > 3 || (lUInt32)ctx->eLb25 > 7 )
++        return false;
++    state = (lUInt32)ctx->lbcCur | ((lUInt32)ctx->lbcNew << 6) | ((lUInt32)ctx->lbcLast << 12)
++              | ((lUInt32)ctx->fLb8aZwj << 18) | ((lUInt32)ctx->fLb21aHebrew << 19)
++              | ((lUInt32)ctx->cLb30aRI << 20) | ((lUInt32)ctx->eLb25 << 22);
++    return true;
++}
++
++// Unpacks state into ctx (whose other fields are as when state was packed)
++static void setLBContextState( struct LineBreakContext * ctx, lUInt32 state ) {
++    ctx->lbcCur = (enum LineBreakClass)(state & 63);
++    ctx->lbcNew = (enum LineBreakClass)((state >> 6) & 63);
++    ctx->lbcLast = (enum LineBreakClass)((state >> 12) & 63);
++    ctx->fLb8aZwj = (state >> 18) & 1;
++    ctx->fLb21aHebrew = (state >> 19) & 1;
++    ctx->cLb30aRI = (state >> 20) & 3;
++    ctx->eLb25 = (enum Lb25State)((state >> 22) & 7);
++}
++
++void TextLangCfg::lbSyncContext( struct LineBreakContext * lbpCtx, int & state_id ) {
++    if ( state_id >= 0 ) {
++        setLBContextState(lbpCtx, _lb_results->states[state_id]);
++        state_id = -1;
++    }
++}
++
++// When lbProcessNextChar() doesn't know the result for state_id and ch: get it from
++// lb_process_next_char(), and keep it
++int TextLangCfg::lbProcessNextCharAndKeep( struct LineBreakContext * lbpCtx, int & state_id, lChar32 ch ) {
++    if ( !_lb_results ) {
++        if ( !lb_init_ctx_set ) {
++            lb_init_break_context(&lb_init_ctx, 0x200D, NULL);
++            lb_init_ctx_set = true;
++        }
++        _lb_results = (LBNextCharResults *)calloc(1, sizeof(LBNextCharResults));
++        if ( !_lb_results )
++            return lb_process_next_char(lbpCtx, (utf32_t)ch);
++        _lb_ascii_results = _lb_results->ascii;
++    }
++    LBNextCharResults * results = _lb_results;
++    lUInt32 key = 0;
++    lUInt32 other_index = 0;
++    if ( state_id >= 0 ) {
++        if ( ch >= LB_ASCII_SIZE && ch <= LB_MAX_OTHER_CHAR ) {
++            key = ((lUInt32)ch << 8) | (lUInt32)(state_id + 1);
++            other_index = ( key * 0x9E3779B1u ) >> (32 - LB_OTHER_RESULTS_BITS);
++            if ( results->others[other_index].key == key ) {
++                lUInt16 next = results->others[other_index].next;
++                state_id = (next & 0xFF) - 1;
++                return (next >> 8) - 1;
++            }
++        }
++        // lbpCtx has not been updated since state_id was set
++        setLBContextState(lbpCtx, results->states[state_id]);
++    }
++    else if ( lbpCtx->lbpLang != _lb_props ) {
++        return lb_process_next_char(lbpCtx, (utf32_t)ch); // (state_id stays -1: lbpCtx holds it)
++    }
++    else {
++        // Get the state number of lbpCtx, if it can have one
++        lUInt32 state;
++        if ( !getLBContextState(lbpCtx, state) )
++            return lb_process_next_char(lbpCtx, (utf32_t)ch);
++        for ( int i=0; i < results->states_count; i++ ) {
++            if ( results->states[i] == state ) {
++                state_id = i;
++                break;
++            }
++        }
++        if ( state_id < 0 ) {
++            if ( results->states_count >= LB_MAX_STATES )
++                return lb_process_next_char(lbpCtx, (utf32_t)ch);
++            state_id = results->states_count++;
++            results->states[state_id] = state;
++        }
++        if ( ch < LB_ASCII_SIZE ) {
++            // We may know it now
++            lUInt16 next = results->ascii[ (state_id << LB_ASCII_BITS) + ch ];
++            if ( next ) {
++                state_id = (next & 0xFF) - 1;
++                return (next >> 8) - 1;
++            }
++        }
++        else if ( ch <= LB_MAX_OTHER_CHAR ) {
++            key = ((lUInt32)ch << 8) | (lUInt32)(state_id + 1);
++            other_index = ( key * 0x9E3779B1u ) >> (32 - LB_OTHER_RESULTS_BITS);
++            if ( results->others[other_index].key == key ) {
++                lUInt16 next = results->others[other_index].next;
++                state_id = (next & 0xFF) - 1;
++                return (next >> 8) - 1;
++            }
++        }
++    }
++    // Here, lbpCtx holds the state numbered state_id
++    int brk = lb_process_next_char(lbpCtx, (utf32_t)ch);
++    lUInt32 new_state;
++    int new_state_id = -1;
++    if ( getLBContextState(lbpCtx, new_state) ) {
++        for ( int i=0; i < results->states_count; i++ ) {
++            if ( results->states[i] == new_state ) {
++                new_state_id = i;
++                break;
++            }
++        }
++        if ( new_state_id < 0 && results->states_count < LB_MAX_STATES ) {
++            new_state_id = results->states_count++;
++            results->states[new_state_id] = new_state;
++        }
++    }
++    if ( new_state_id >= 0 && brk >= -1 && brk < 254 && ch <= LB_MAX_OTHER_CHAR ) {
++        lUInt16 next = (lUInt16)( (new_state_id + 1) | ((brk + 1) << 8) );
++        if ( ch < LB_ASCII_SIZE )
++            results->ascii[ (state_id << LB_ASCII_BITS) + ch ] = next;
++        else {
++            results->others[other_index].key = key;
++            results->others[other_index].next = next;
++        }
++    }
++    state_id = new_state_id; // (-1 if none: lbpCtx then holds the state)
++    return brk;
++}
++
+ lChar32 lb_char_sub_func_polish(struct LineBreakContext *lbpCtx, const lChar32 * text, int pos, int next_usable) {
+     // https://github.com/koreader/koreader/issues/5645#issuecomment-559193057
+     // Letters aiouwzAIOUWS are prepositions that should not be left at the
+@@ -1194,22 +1383,32 @@
+     // Done with libunibreak per-language LineBreakProperties extensions
+ 
+     // Other line breaking and text layout tweaks
++    _lb_results = NULL;
++    _lb_ascii_results = NULL;
++
++    // (Each function comes with the lowest char it may substitute, which
++    // must be updated if the function is.)
+     _lb_char_sub_func = NULL;
++    _lb_char_sub_func_min_char = 0;
+     if ( langStartsWith(lang_tag, "en") ) { // English
+         _lb_char_sub_func = &lb_char_sub_func_english;
++        _lb_char_sub_func_min_char = 0x2014; // em dash
+     }
+     else if ( langStartsWith(lang_tag, "pl") ) { // Polish
+         _lb_char_sub_func = &lb_char_sub_func_polish;
++        _lb_char_sub_func_min_char = 'A';
+         _duplicate_real_hyphen_on_next_line = true;
+     }
+     else if ( langStartsWith(lang_tag, "cs", "sk") ) { // Czech, Slovak
+         _lb_char_sub_func = &lb_char_sub_func_czech_slovak;
++        _lb_char_sub_func_min_char = 'A';
+     }
+     else if ( langStartsWith(lang_tag, "pt", "sr") ) { // Portuguese, Serbian
+         _duplicate_real_hyphen_on_next_line = true;
+     }
+     else if ( langStartsWith(lang_tag, "ru") ) { // Russian
+         _lb_char_sub_func = &lb_char_sub_func_russian;
++        _lb_char_sub_func_min_char = 0x0410; // "А"
+     }
+ #endif
+ 
+@@ -1237,6 +1436,10 @@
+ }
+ 
+ TextLangCfg::~TextLangCfg() {
++    #if USE_LIBUNIBREAK==1
++    if ( _lb_results )
++        free( _lb_results );
++    #endif
+     // NOTE: _hyph_method may be dangling now, not *quite* sure what it points to,
+     //       and how it relates to HyphMan::uninit & TextLangMan::uninit
+ }

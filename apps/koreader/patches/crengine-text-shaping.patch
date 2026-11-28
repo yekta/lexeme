@@ -1,0 +1,1996 @@
+--- a/crengine/src/lvfntman.cpp
++++ b/crengine/src/lvfntman.cpp
+@@ -72,6 +72,7 @@
+ #include <hb.h>
+ #include <hb-ft.h>
+ #include <hb-ot.h>
++#include <hb-aat.h>
+ #include "lvhashtable.h"
+ #endif
+ 
+@@ -568,7 +569,1391 @@
+             script == HB_SCRIPT_SYLOTI_NAGRI ||
+             script == HB_SCRIPT_TIRHUTA ||
+             script == HB_SCRIPT_OGHAM;
++}
++
++// Word shaping cache, for KERNING_MODE_HARFBUZZ.
++//
++// Full HarfBuzz shaping is the main cost of laying out text with KERNING_MODE_HARFBUZZ:
++// each paragraph is shaped as a whole when measured, and each word again when drawn.
++// As text is mostly made of the same few thousand words, we shape it by pieces ending
++// after a space ("word "), and cache the result for each piece, as browsers do: what
++// measureText() gets from its glyphs (small), or its glyphs, for drawing.
++//
++// Shaping the pieces separately and concatenating their glyphs gives exactly what
++// shaping the whole text gives when nothing HarfBuzz does can see across such a space:
++// - no GSUB/GPOS rule that can apply to the text can see the space glyph (be applied
++//   at it, match it, or skip over it), and the font has no table or feature HarfBuzz
++//   would apply otherwise ('kern', 'kerx', 'morx', 'mort', 'trak', 'rand'). This is
++//   checked once per font face (see analyseShapingFace()): if some rules could see the
++//   space glyph, only text made of chars that can never lead to the glyphs these rules
++//   need is shaped by pieces (with Bookerly, Greek capitals and combining marks are
++//   kept out this way);
++// - all chars are in the font (so HarfBuzz gets them as they are, with or without a
++//   fallback font);
++// - HarfBuzz uses its default shaper (Latin, Greek, Cyrillic or no script found),
++//   left-to-right, and all our features are global;
++// - the char after the space does not join the space's cluster or normalization
++//   (marks, joiners, variation selectors, emoji modifiers...) and is not a default
++//   ignorable or control char (see isShapingSafeAfterSpace());
++// - each piece is shaped with the script, direction and language HarfBuzz would have
++//   guessed or been given for the whole text, with the BOT flag only on the first piece
++//   and the EOT flag only on the last one.
++// When any of this does not hold, the text is shaped as a whole, as before.
++//
++// The cache is shared by all fonts, keyed by an id given to each font and language, that
++// changes whenever anything affecting the font's shaping changes. It is made of two
++// generations of fixed size (an arena and a hash table each): lookups check the current one,
++// then the old one (moving entries found there to the current one); when the current one is
++// full, the old one is dropped and the current one becomes the old one. Memory is so bounded
++// by 2 * (SHAPING_CACHE_ARENA_SIZE + 4 * SHAPING_CACHE_SLOTS) bytes (4 MB).
++
++#define SHAPING_CACHE_ARENA_SIZE  (1536*1024)
++#define SHAPING_CACHE_SLOTS       131072 // power of 2, more than twice the entries an arena holds
++#define SHAPING_CACHE_MAX_PIECE   255   // longer pieces are shaped but not cached
++
++// A cached piece of text, laid out in an arena (4-byte aligned) as this header, then the
++// text (as lUInt8 (see shapingTextByte()), lUInt16 or lUInt32), and then, for a glyphs entry
++// (padded to 2 bytes):
++//   glyph ids (lUInt16), x advances (lInt16), x and y offsets (lInt16, if
++//   SHAPING_ENTRY_HAS_OFFSETS: else all 0), clusters (lUInt8, if SHAPING_ENTRY_HAS_CLUSTERS:
++//   else one glyph per char),
++// or, for a measures entry (as lUInt8, or lInt16 if SHAPING_ENTRY_MEASURES_16BIT), for each char
++//   what measureText() gets going along the glyphs: 2 * the advance in pixels it adds, + 1 if it
++//   continues a cluster.
++struct LVShapingCacheEntry {
++    lUInt32 hash;
++    lUInt32 owner;  // id of the font and language it was shaped with
++    lUInt8  text_len;
++    lUInt8  glyph_count;
++    lUInt8  props;  // script index, HB_BUFFER_FLAG_BOT/EOT it was shaped with, entry kind
++    lUInt8  layout;
++};
++#define SHAPING_ENTRY_TEXT_8BIT      0x01
++#define SHAPING_ENTRY_TEXT_16BIT     0x02
++#define SHAPING_ENTRY_HAS_OFFSETS    0x04
++#define SHAPING_ENTRY_HAS_CLUSTERS   0x08
++#define SHAPING_ENTRY_MEASURES_16BIT 0x10
++
++// Entry kinds (in props)
++#define SHAPING_GLYPHS   0x00
++#define SHAPING_MEASURES 0x10
++
++struct LVShapingCacheKey {
++    lUInt32 hash;
++    lUInt32 owner;
++    lUInt8  props; // script index | buffer flags << 2 | entry kind
++    const lChar32 * text;
++    int text_len;
++};
++
++// Text stored as lUInt8: chars below 0x80, Latin-1 letters and signs (0xA0..0xFF), and
++// U+2010..U+202F (dashes, quotes, bullet, ellipsis...) as 0x80..0x9F (C1 controls, never
++// stored as such). Returns 0x100 for other chars.
++static inline unsigned int shapingTextByte( lChar32 c ) {
++    if ( c < 0x80 || (c >= 0xA0 && c <= 0xFF) )
++        return c;
++    if ( c >= 0x2010 && c <= 0x202F )
++        return c - 0x2010 + 0x80;
++    return 0x100;
++}
++
++class LVShapingCacheGeneration {
++public:
++    lUInt8 *  arena;
++    lUInt32   used;
++    lUInt32 * slots; // offset+1 of each entry in arena, 0 if free
++    lUInt32   count;
++    LVShapingCacheGeneration() : arena(NULL), used(0), slots(NULL), count(0) {}
++    ~LVShapingCacheGeneration() { release(); }
++    void release() {
++        if ( arena ) free(arena);
++        if ( slots ) free(slots);
++        arena = NULL;
++        slots = NULL;
++        used = 0;
++        count = 0;
++    }
++    void reset() {
++        used = 0;
++        count = 0;
++        if ( slots )
++            memset(slots, 0, SHAPING_CACHE_SLOTS * sizeof(lUInt32));
++    }
++    bool allocate() {
++        if ( arena )
++            return true;
++        arena = (lUInt8 *)malloc(SHAPING_CACHE_ARENA_SIZE);
++        slots = (lUInt32 *)calloc(SHAPING_CACHE_SLOTS, sizeof(lUInt32));
++        if ( !arena || !slots ) {
++            release();
++            return false;
++        }
++        return true;
++    }
++    bool isFull() const {
++        return used > SHAPING_CACHE_ARENA_SIZE - SHAPING_CACHE_ARENA_SIZE/8
++            || count > SHAPING_CACHE_SLOTS/2 - SHAPING_CACHE_SLOTS/16;
++    }
++    static bool matches(const LVShapingCacheEntry * e, const LVShapingCacheKey & key) {
++        if ( e->hash != key.hash || e->owner != key.owner || e->props != key.props
++                || e->text_len != key.text_len )
++            return false;
++        const lUInt8 * p = (const lUInt8 *)(e + 1);
++        int n = key.text_len;
++        if ( e->layout & SHAPING_ENTRY_TEXT_8BIT ) {
++            for ( int i=0; i < n; i++ ) {
++                if ( p[i] != shapingTextByte(key.text[i]) )
++                    return false;
++            }
++            return true;
++        }
++        if ( e->layout & SHAPING_ENTRY_TEXT_16BIT ) {
++            const lUInt16 * t = (const lUInt16 *)p;
++            for ( int i=0; i < n; i++ ) {
++                if ( t[i] != key.text[i] )
++                    return false;
++            }
++            return true;
++        }
++        return memcmp(p, key.text, n * sizeof(lUInt32)) == 0;
++    }
++    LVShapingCacheEntry * find(const LVShapingCacheKey & key) const {
++        if ( !count )
++            return NULL;
++        lUInt32 i = key.hash & (SHAPING_CACHE_SLOTS-1);
++        while ( slots[i] ) {
++            LVShapingCacheEntry * e = (LVShapingCacheEntry *)(arena + slots[i] - 1);
++            if ( matches(e, key) )
++                return e;
++            i = (i + 1) & (SHAPING_CACHE_SLOTS-1);
++        }
++        return NULL;
++    }
++    // Returns where to write an entry of this size, or NULL if no room
++    LVShapingCacheEntry * reserve(lUInt32 size) {
++        if ( !allocate() )
++            return NULL;
++        if ( used + size > SHAPING_CACHE_ARENA_SIZE || count >= SHAPING_CACHE_SLOTS/2 )
++            return NULL;
++        return (LVShapingCacheEntry *)(arena + used);
++    }
++    // Indexes the entry just written where reserve() said
++    void commit(LVShapingCacheEntry * e, lUInt32 size) {
++        lUInt32 i = e->hash & (SHAPING_CACHE_SLOTS-1);
++        while ( slots[i] )
++            i = (i + 1) & (SHAPING_CACHE_SLOTS-1);
++        slots[i] = used + 1;
++        used += size;
++        count++;
++    }
++};
++
++class LVShapingCache {
++    LVShapingCacheGeneration _gens[2];
++    int _cur;
++    lUInt32 _next_owner;
++public:
++    LVShapingCache() : _cur(0), _next_owner(1) {}
++    // A new id for entries of a font and language, or 0 when all have been given (never
++    // expected: fonts still using ids would then share them with new ones, so caching stops)
++    lUInt32 newOwner() {
++        if ( _next_owner == 0xFFFFFFFF )
++            return 0;
++        return _next_owner++;
++    }
++    // To be called before a batch of lookups and additions: entries found
++    // stay valid until the next call
++    void prepare() {
++        if ( _gens[_cur].isFull() ) {
++            _cur = 1 - _cur;
++            _gens[_cur].reset();
++        }
++    }
++    const LVShapingCacheEntry * find(const LVShapingCacheKey & key) {
++        const LVShapingCacheEntry * e = _gens[_cur].find(key);
++        if ( e )
++            return e;
++        e = _gens[1-_cur].find(key);
++        if ( e ) { // move it to the current generation, if room
++            lUInt32 size = entrySize(e);
++            LVShapingCacheEntry * ne = _gens[_cur].reserve(size);
++            if ( ne ) {
++                memcpy(ne, e, size);
++                _gens[_cur].commit(ne, size);
++                return ne;
++            }
++        }
++        return e;
++    }
++    static int textSize(int text_len, int layout) {
++        if ( layout & SHAPING_ENTRY_TEXT_8BIT )
++            return text_len;
++        return text_len * ((layout & SHAPING_ENTRY_TEXT_16BIT) ? 2 : 4);
++    }
++    static lUInt32 entrySize(const LVShapingCacheEntry * e) {
++        return entrySize(e->text_len, e->glyph_count, e->props & SHAPING_MEASURES, e->layout);
++    }
++    static lUInt32 entrySize(int text_len, int glyph_count, int kind, int layout) {
++        lUInt32 size = sizeof(LVShapingCacheEntry) + textSize(text_len, layout);
++        if ( kind == SHAPING_MEASURES ) {
++            if ( layout & SHAPING_ENTRY_MEASURES_16BIT )
++                size = ((size + 1) & ~1) + text_len * 2;
++            else
++                size += text_len;
++        }
++        else {
++            size = (size + 1) & ~1;
++            size += glyph_count * 4;
++            if ( layout & SHAPING_ENTRY_HAS_OFFSETS )
++                size += glyph_count * 4;
++            if ( layout & SHAPING_ENTRY_HAS_CLUSTERS )
++                size += glyph_count;
++        }
++        return (size + 3) & ~3;
++    }
++    // Starts an entry for this key, writing its header and text. Returns where the
++    // data that follows goes, or NULL if no room or values not fitting.
++    lUInt8 * startEntry(const LVShapingCacheKey & key, int glyph_count, int layout, lUInt32 & size) {
++        if ( key.text_len > SHAPING_CACHE_MAX_PIECE || glyph_count > 0xFF )
++            return NULL;
++        bool bytes = true;
++        lChar32 max_char = 0;
++        for ( int i=0; i < key.text_len; i++ ) {
++            if ( key.text[i] > max_char )
++                max_char = key.text[i];
++            if ( shapingTextByte(key.text[i]) > 0xFF )
++                bytes = false;
++        }
++        layout |= bytes ? SHAPING_ENTRY_TEXT_8BIT : max_char <= 0xFFFF ? SHAPING_ENTRY_TEXT_16BIT : 0;
++        size = entrySize(key.text_len, glyph_count, key.props & SHAPING_MEASURES, layout);
++        LVShapingCacheEntry * e = _gens[_cur].reserve(size);
++        if ( !e )
++            return NULL;
++        e->hash = key.hash;
++        e->owner = key.owner;
++        e->text_len = (lUInt8)key.text_len;
++        e->glyph_count = (lUInt8)glyph_count;
++        e->props = key.props;
++        e->layout = (lUInt8)layout;
++        lUInt8 * p = (lUInt8 *)(e + 1);
++        if ( layout & SHAPING_ENTRY_TEXT_8BIT ) {
++            for ( int i=0; i < key.text_len; i++ )
++                p[i] = (lUInt8)shapingTextByte(key.text[i]);
++        }
++        else if ( layout & SHAPING_ENTRY_TEXT_16BIT ) {
++            lUInt16 * t = (lUInt16 *)p;
++            for ( int i=0; i < key.text_len; i++ )
++                t[i] = (lUInt16)key.text[i];
++        }
++        else {
++            memcpy(p, key.text, key.text_len * sizeof(lUInt32));
++        }
++        return p + textSize(key.text_len, layout);
++    }
++    // Adds the glyphs of a piece of text (their clusters relative to cluster_base).
++    // Returns the entry, or NULL if they can't be cached (no room, or values not fitting).
++    const LVShapingCacheEntry * addGlyphs(const LVShapingCacheKey & key, const hb_glyph_info_t * info,
++                    const hb_glyph_position_t * pos, int glyph_count, lUInt32 cluster_base) {
++        if ( glyph_count <= 0 )
++            return NULL;
++        int layout = glyph_count != key.text_len ? SHAPING_ENTRY_HAS_CLUSTERS : 0;
++        for ( int i=0; i < glyph_count; i++ ) {
++            if ( info[i].cluster != cluster_base + i )
++                layout |= SHAPING_ENTRY_HAS_CLUSTERS;
++            if ( info[i].codepoint > 0xFFFF || info[i].cluster < cluster_base
++                    || info[i].cluster - cluster_base >= (lUInt32)key.text_len
++                    || pos[i].y_advance != 0
++                    || pos[i].x_advance < -32768 || pos[i].x_advance > 32767 )
++                return NULL;
++            if ( pos[i].x_offset || pos[i].y_offset ) {
++                if ( pos[i].x_offset < -32768 || pos[i].x_offset > 32767
++                        || pos[i].y_offset < -32768 || pos[i].y_offset > 32767 )
++                    return NULL;
++                layout |= SHAPING_ENTRY_HAS_OFFSETS;
++            }
++        }
++        lUInt32 size;
++        lUInt8 * p = startEntry(key, glyph_count, layout, size);
++        if ( !p )
++            return NULL;
++        LVShapingCacheEntry * e = (LVShapingCacheEntry *)(_gens[_cur].arena + _gens[_cur].used);
++        p = (lUInt8 *)e + ((p - (lUInt8 *)e + 1) & ~1);
++        lUInt16 * gids = (lUInt16 *)p;
++        lInt16 * advs = (lInt16 *)(gids + glyph_count);
++        lInt16 * offs = advs + glyph_count;
++        for ( int i=0; i < glyph_count; i++ ) {
++            gids[i] = (lUInt16)info[i].codepoint;
++            advs[i] = (lInt16)pos[i].x_advance;
++        }
++        if ( e->layout & SHAPING_ENTRY_HAS_OFFSETS ) {
++            for ( int i=0; i < glyph_count; i++ ) {
++                offs[i] = (lInt16)pos[i].x_offset;
++                offs[glyph_count + i] = (lInt16)pos[i].y_offset;
++            }
++            offs += 2*glyph_count;
++        }
++        if ( e->layout & SHAPING_ENTRY_HAS_CLUSTERS ) {
++            lUInt8 * clusters = (lUInt8 *)offs;
++            for ( int i=0; i < glyph_count; i++ )
++                clusters[i] = (lUInt8)(info[i].cluster - cluster_base);
++        }
++        _gens[_cur].commit(e, size);
++        return e;
++    }
++    // Adds the measures of a piece of text (see computeMeasures()).
++    // Returns the entry, or NULL if they can't be cached (no room).
++    const LVShapingCacheEntry * addMeasures(const LVShapingCacheKey & key, const lInt16 * measures) {
++        int layout = 0;
++        for ( int i=0; i < key.text_len; i++ ) {
++            if ( measures[i] < 0 || measures[i] > 0xFF )
++                layout = SHAPING_ENTRY_MEASURES_16BIT;
++        }
++        lUInt32 size;
++        lUInt8 * p = startEntry(key, 0, layout, size);
++        if ( !p )
++            return NULL;
++        LVShapingCacheEntry * e = (LVShapingCacheEntry *)(_gens[_cur].arena + _gens[_cur].used);
++        if ( layout & SHAPING_ENTRY_MEASURES_16BIT ) {
++            p = (lUInt8 *)e + ((p - (lUInt8 *)e + 1) & ~1);
++            memcpy(p, measures, key.text_len * sizeof(lInt16));
++        }
++        else {
++            for ( int i=0; i < key.text_len; i++ )
++                p[i] = (lUInt8)measures[i];
++        }
++        _gens[_cur].commit(e, size);
++        return e;
++    }
++    // Computes what measureText() gets, for each char of a piece of text, going along its glyphs
++    // (as it does for the whole text: clusters are only shifted): 2 * the advance in pixels it
++    // adds (with this synthetic weight), + 1 if it continues a cluster. Returns false when a glyph
++    // is not found (measureText() deals with it otherwise), when the first glyph is not the first
++    // char's (measureText() would then differ at the start of the text), or values not fitting.
++    static bool computeMeasures(const hb_glyph_info_t * info, const hb_glyph_position_t * pos,
++                    int glyph_count, lUInt32 cluster_base, int text_len, int synth_weight_strength,
++                    lInt16 * measures) {
++        if ( glyph_count <= 0 || info[0].cluster != cluster_base )
++            return false;
++        int hg = 0;
++        int cur_cluster = -1;
++        for ( int t=0; t < text_len; t++ ) {
++            int advance = 0;
++            while ( hg < glyph_count && (int)(info[hg].cluster - cluster_base) <= t ) {
++                if ( info[hg].codepoint == 0 )
++                    return false;
++                if ( pos[hg].x_advance )
++                    advance += FONT_METRIC_TO_PX(pos[hg].x_advance + synth_weight_strength);
++                cur_cluster = info[hg].cluster - cluster_base;
++                hg++;
++            }
++            if ( advance < -16384 || advance > 16383 )
++                return false;
++            measures[t] = (lInt16)(advance * 2 + (cur_cluster < t ? 1 : 0));
++        }
++        return hg == glyph_count;
++    }
++    // The measures of a measures entry: either lUInt8 (measures8 set) or lInt16 (measures16 set)
++    static inline void getMeasures(const LVShapingCacheEntry * e, const lUInt8 * & measures8, const lInt16 * & measures16) {
++        lUInt32 offset = sizeof(LVShapingCacheEntry) + textSize(e->text_len, e->layout);
++        if ( e->layout & SHAPING_ENTRY_MEASURES_16BIT ) {
++            measures8 = NULL;
++            measures16 = (const lInt16 *)((const lUInt8 *)e + ((offset + 1) & ~1));
++        }
++        else {
++            measures8 = (const lUInt8 *)e + offset;
++            measures16 = NULL;
++        }
++    }
++    // Writes the glyphs of a glyphs entry, their clusters offset by cluster_base
++    static void getGlyphs(const LVShapingCacheEntry * e, hb_glyph_info_t * info,
++                                hb_glyph_position_t * pos, lUInt32 cluster_base) {
++        int n = e->glyph_count;
++        lUInt32 offset = (sizeof(LVShapingCacheEntry) + textSize(e->text_len, e->layout) + 1) & ~1;
++        const lUInt16 * gids = (const lUInt16 *)((const lUInt8 *)e + offset);
++        const lInt16 * advs = (const lInt16 *)(gids + n);
++        const lInt16 * offs = advs + n;
++        bool has_offsets = e->layout & SHAPING_ENTRY_HAS_OFFSETS;
++        const lUInt8 * clusters = (const lUInt8 *)(has_offsets ? offs + 2*n : offs);
++        bool has_clusters = e->layout & SHAPING_ENTRY_HAS_CLUSTERS;
++        for ( int i=0; i < n; i++ ) {
++            info[i].codepoint = gids[i];
++            info[i].mask = 0;
++            info[i].cluster = cluster_base + (has_clusters ? clusters[i] : i);
++            info[i].var1.u32 = 0;
++            info[i].var2.u32 = 0;
++            pos[i].x_advance = advs[i];
++            pos[i].y_advance = 0;
++            pos[i].x_offset = has_offsets ? offs[i] : 0;
++            pos[i].y_offset = has_offsets ? offs[n + i] : 0;
++            pos[i].var.u32 = 0;
++        }
++    }
++    // Drops the old generation (used when fonts are dropped)
++    void shrink() {
++        _gens[1-_cur].release();
++    }
++    void clear() {
++        _gens[0].release();
++        _gens[1].release();
++    }
++};
++
++static LVShapingCache * _shapingCache = NULL;
++static hb_buffer_t * _shapingBatchBuffer = NULL; // shapes the pieces not found in the cache
++
++// A piece of the text being shaped
++struct LVShapingPiece {
++    int start;
++    int end;
++    lUInt32 hash;
++    lUInt8 buffer_flags;
++    const LVShapingCacheEntry * entry; // NULL if not found in the cache
++    int batch_start; // its glyphs in _shapingBatchBuffer, if not found
++    int batch_end;
++};
++static LVArray<LVShapingPiece> _shapingPieces;
++static LVArray<lInt16> _shapingMeasures; // measures of pieces measured but not cached
++static int _shapingNbPieces = 0;
++static int _shapingNbGlyphs = 0;
++
++// Ends a hash made of (hash ^ char) * 16777619u steps: mixes high bits into the low
++// ones, which index the hash table
++static inline lUInt32 shapingHashFinish( lUInt32 h ) {
++    h ^= h >> 16;
++    h *= 0x85ebca6bu;
++    h ^= h >> 13;
++    h *= 0xc2b2ae35u;
++    h ^= h >> 16;
++    return h;
++}
++
++static LVShapingCache * getShapingCache() {
++    if ( !_shapingCache )
++        _shapingCache = new LVShapingCache();
++    return _shapingCache;
++}
++
++// Whether a char following a space can start a piece shaped separately (see above)
++static inline bool isShapingSafeAfterSpace( lChar32 c ) {
++    if ( c >= 0x21 && c <= 0x7E )  // ASCII, no space
++        return true;
++    if ( c >= 0xA1 && c <= 0x2FF ) // Latin-1, Latin Extended, IPA, spacing modifiers: no marks
++        return c != 0xAD;          // but soft hyphen (format char, default ignorable)
++    if ( c == 0x115F || c == 0x1160 || c == 0x3164 || c == 0xFFA0 ) // default ignorable letters
++        return false;
++    if ( c >= 0x1F1E6 && c <= 0x1F1FF ) // regional indicators
++        return false;
++    if ( c >= 0x1F3FB && c <= 0x1F3FF ) // emoji modifiers (continuations)
++        return false;
++    if ( c == 0xFF9E || c == 0xFF9F )   // halfwidth katakana sound marks (continuations)
++        return false;
++    switch ( hb_unicode_general_category(hb_unicode_funcs_get_default(), c) ) {
++        case HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK:
++        case HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK:
++        case HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK:
++        case HB_UNICODE_GENERAL_CATEGORY_CONTROL:
++        case HB_UNICODE_GENERAL_CATEGORY_FORMAT: // ZWJ, ZWNJ, bidi controls, tags...
++        case HB_UNICODE_GENERAL_CATEGORY_SURROGATE:
++        case HB_UNICODE_GENERAL_CATEGORY_PRIVATE_USE:
++        case HB_UNICODE_GENERAL_CATEGORY_UNASSIGNED:
++            return false;
++        default:
++            return true;
++    }
++}
++
++// Whether a glyph set (NULL meaning all glyphs) has a glyph in first..last
++static inline bool glyphsHaveIn( const hb_set_t * glyphs, unsigned int first, unsigned int last ) {
++    if ( !glyphs )
++        return true;
++    hb_codepoint_t g = first ? first - 1 : HB_SET_VALUE_INVALID;
++    return hb_set_next(glyphs, &g) && g <= last;
++}
++
++// Bounds-checked reading of big-endian values in an OpenType table
++class LVOTTableReader {
++    const lUInt8 * _data;
++    unsigned int _len;
++    unsigned long _reads_left; // (offsets can make loops go over the same data again and again)
++public:
++    bool ok; // set to false on any read out of the table, or past a budget of reads
++    LVOTTableReader(const char * data, unsigned int len)
++        : _data((const lUInt8 *)data), _len(len), _reads_left(64UL * len + 65536), ok(true) {}
++    unsigned int u16(unsigned int offset) {
++        if ( offset > _len || _len - offset < 2 || !_reads_left ) {
++            ok = false;
++            return 0;
++        }
++        _reads_left--;
++        return (_data[offset] << 8) | _data[offset+1];
++    }
++    unsigned int u32(unsigned int offset) {
++        return (u16(offset) << 16) | u16(offset + 2);
++    }
++    // Checks a Coverage or ClassDef array (count items of item_size at offset) is all in
++    // the table (HarfBuzz would otherwise use it sanitized, with no glyph or all in class 0)
++    bool arrayFits(unsigned int offset, unsigned int count, unsigned int item_size) {
++        if ( offset > _len || (unsigned long)count * item_size > _len - offset )
++            ok = false;
++        return ok;
++    }
++    // Checks glyph ids (format 1 Coverage) or ranges (format 2 Coverage and ClassDef) are
++    // strictly increasing and don't overlap: HarfBuzz looks them up by binary search, which
++    // would not find what a scan finds otherwise
++    bool glyphsSorted(unsigned int offset, unsigned int count) {
++        unsigned int prev = 0;
++        for ( unsigned int i=0; i < count && ok; i++ ) {
++            unsigned int g = u16(offset + 2*i);
++            if ( i > 0 && g <= prev )
++                ok = false;
++            prev = g;
++        }
++        return ok;
++    }
++    bool rangesSorted(unsigned int offset, unsigned int count) {
++        unsigned int prev_last = 0;
++        for ( unsigned int i=0; i < count && ok; i++ ) {
++            unsigned int first = u16(offset + 6*i);
++            unsigned int last = u16(offset + 6*i + 2);
++            if ( first > last || (i > 0 && first <= prev_last) )
++                ok = false;
++            prev_last = last;
++        }
++        return ok;
++    }
++    // Whether glyph is in the Coverage table at offset
++    bool coverageHas(unsigned int offset, unsigned int glyph) {
++        unsigned int format = u16(offset);
++        unsigned int count = u16(offset + 2);
++        if ( !arrayFits(offset + 4, count, format == 1 ? 2 : 6) )
++            return false;
++        if ( !(format == 1 ? glyphsSorted(offset + 4, count) : rangesSorted(offset + 4, count)) )
++            return false;
++        if ( format == 1 ) {
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                if ( u16(offset + 4 + 2*i) == glyph )
++                    return true;
++            }
++            return false;
++        }
++        if ( format == 2 ) {
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                unsigned int r = offset + 4 + 6*i;
++                if ( glyph >= u16(r) && glyph <= u16(r + 2) )
++                    return true;
++            }
++            return false;
++        }
++        ok = false;
++        return false;
++    }
++    // Whether the Coverage table at offset has a glyph in glyphs (NULL meaning all glyphs)
++    bool coverageIntersects(unsigned int offset, const hb_set_t * glyphs) {
++        unsigned int format = u16(offset);
++        unsigned int count = u16(offset + 2);
++        if ( !arrayFits(offset + 4, count, format == 1 ? 2 : 6) )
++            return false;
++        if ( !(format == 1 ? glyphsSorted(offset + 4, count) : rangesSorted(offset + 4, count)) )
++            return false;
++        if ( format == 1 ) {
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                unsigned int g = u16(offset + 4 + 2*i);
++                if ( glyphsHaveIn(glyphs, g, g) )
++                    return true;
++            }
++            return false;
++        }
++        if ( format == 2 ) {
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                unsigned int r = offset + 4 + 6*i;
++                if ( glyphsHaveIn(glyphs, u16(r), u16(r + 2)) )
++                    return true;
++            }
++            return false;
++        }
++        ok = false;
++        return false;
++    }
++    // Whether a rule value (a glyph with format 1 rules, a class of the ClassDef at
++    // classdef with format 2 ones) may match a glyph in glyphs (NULL meaning all glyphs)
++    bool valueIntersects(unsigned int format, unsigned int classdef, unsigned int value, const hb_set_t * glyphs) {
++        if ( format == 1 )
++            return glyphsHaveIn(glyphs, value, value);
++        if ( value == 0 || !classdef ) // class 0: any glyph not in another class
++            return true;
++        unsigned int def_format = u16(classdef);
++        if ( def_format == 1 ) {
++            unsigned int start = u16(classdef + 2);
++            unsigned int count = u16(classdef + 4);
++            if ( !arrayFits(classdef + 6, count, 2) )
++                return false;
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                if ( u16(classdef + 6 + 2*i) == value && glyphsHaveIn(glyphs, start + i, start + i) )
++                    return true;
++            }
++            return false;
++        }
++        if ( def_format == 2 ) {
++            unsigned int count = u16(classdef + 2);
++            if ( !arrayFits(classdef + 4, count, 6) || !rangesSorted(classdef + 4, count) )
++                return false;
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                unsigned int r = classdef + 4 + 6*i;
++                if ( u16(r + 4) == value && glyphsHaveIn(glyphs, u16(r), u16(r + 2)) )
++                    return true;
++            }
++            return false;
++        }
++        ok = false;
++        return false;
++    }
++    // Class of glyph in the ClassDef table at offset (0 if offset is 0: no ClassDef)
++    unsigned int glyphClass(unsigned int offset, unsigned int glyph) {
++        if ( !offset )
++            return 0;
++        unsigned int format = u16(offset);
++        if ( format == 1 ) {
++            unsigned int start = u16(offset + 2);
++            unsigned int count = u16(offset + 4);
++            if ( !arrayFits(offset + 6, count, 2) )
++                return 0;
++            if ( glyph >= start && glyph < start + count )
++                return u16(offset + 6 + 2*(glyph - start));
++            return 0;
++        }
++        if ( format == 2 ) {
++            unsigned int count = u16(offset + 2);
++            if ( !arrayFits(offset + 4, count, 6) || !rangesSorted(offset + 4, count) )
++                return 0;
++            for ( unsigned int i=0; i < count && ok; i++ ) {
++                unsigned int r = offset + 4 + 6*i;
++                if ( glyph >= u16(r) && glyph <= u16(r + 2) )
++                    return u16(r + 4);
++            }
++            return 0;
++        }
++        ok = false;
++        return 0;
++    }
++};
++
++// Whether a GSUB or GPOS lookup subtable could make shaping see across the space glyph, with
++// text that can only lead to these glyphs (NULL meaning any glyph): the lookup applied at it,
++// or a glyph sequence matched including it (input glyphs after the first, backtrack, lookahead,
++// ligature components; by glyph, coverage or class, including class 0, "any other glyph"), or
++// a mark attached to it, or (if skips_space) any glyph sequence matched. A rule is ignored when
++// some glyph it needs can't be met. (A pair positioned with the space as its second glyph is
++// fine: nothing after it is seen.)
++// Also returns true if the subtable can't be analysed.
++static bool otSubtableSeesSpace( LVOTTableReader & t, bool is_gsub, unsigned int type, unsigned int sub,
++                                 unsigned int space, bool skips_space, const hb_set_t * glyphs ) {
++    unsigned int format = t.u16(sub);
++    bool is_context = type == (is_gsub ? 5u : 7u);
++    bool is_chain_context = type == (is_gsub ? 6u : 8u);
++    bool reverse = is_gsub && type == 8;
++    if ( is_context || is_chain_context || reverse ) {
++        if ( format == 3 || reverse ) { // coverage based, a single rule
++            if ( reverse && format != 1 )
++                return true;
++            bool sees = skips_space;
++            bool possible = true;
++            unsigned int p = sub + 2;
++            unsigned int nb_input;
++            unsigned int inputs;
++            if ( reverse ) {
++                nb_input = 1;
++                inputs = sub + 2;
++                p = sub + 4;
++            }
++            else {
++                if ( is_chain_context ) {
++                    unsigned int nb_backtrack = t.u16(p);
++                    for ( unsigned int i=0; i < nb_backtrack && t.ok; i++ ) {
++                        unsigned int cov = sub + t.u16(p + 2 + 2*i);
++                        sees = sees || t.coverageHas(cov, space);
++                        possible = possible && t.coverageIntersects(cov, glyphs);
++                    }
++                    p += 2 + 2*nb_backtrack;
++                }
++                nb_input = t.u16(p);
++                inputs = is_context ? p + 4 : p + 2; // (context: after seqLookupCount)
++                p = inputs + 2*nb_input;
++            }
++            if ( nb_input == 0 )
++                return true;
++            for ( unsigned int i=0; i < nb_input && t.ok; i++ ) {
++                unsigned int cov = sub + t.u16(inputs + 2*i);
++                // (the space glyph as the first input: the lookup is applied at it)
++                sees = sees || t.coverageHas(cov, space);
++                possible = possible && t.coverageIntersects(cov, glyphs);
++            }
++            if ( is_chain_context || reverse ) {
++                if ( reverse ) { // backtrack before lookahead
++                    unsigned int nb_backtrack = t.u16(p);
++                    for ( unsigned int i=0; i < nb_backtrack && t.ok; i++ ) {
++                        unsigned int cov = sub + t.u16(p + 2 + 2*i);
++                        sees = sees || t.coverageHas(cov, space);
++                        possible = possible && t.coverageIntersects(cov, glyphs);
++                    }
++                    p += 2 + 2*nb_backtrack;
++                }
++                unsigned int nb_lookahead = t.u16(p);
++                for ( unsigned int i=0; i < nb_lookahead && t.ok; i++ ) {
++                    unsigned int cov = sub + t.u16(p + 2 + 2*i);
++                    sees = sees || t.coverageHas(cov, space);
++                    possible = possible && t.coverageIntersects(cov, glyphs);
++                }
++            }
++            return !t.ok || (sees && possible);
++        }
++        if ( format != 1 && format != 2 )
++            return true;
++        unsigned int coverage = sub + t.u16(sub + 2);
++        if ( t.coverageHas(coverage, space) )
++            return true;
++        if ( !t.coverageIntersects(coverage, glyphs) )
++            return !t.ok;
++        // With format 1, rules have glyph ids; with format 2, classes (any glyph not
++        // in a class being in class 0)
++        unsigned int backtrack_def = 0;
++        unsigned int input_def = 0;
++        unsigned int lookahead_def = 0;
++        unsigned int nb_rulesets;
++        unsigned int rulesets;
++        if ( format == 2 ) {
++            unsigned int off;
++            if ( is_context ) {
++                off = t.u16(sub + 4);
++                input_def = off ? sub + off : 0;
++                nb_rulesets = t.u16(sub + 6);
++                rulesets = sub + 8;
++            }
++            else {
++                off = t.u16(sub + 4);
++                backtrack_def = off ? sub + off : 0;
++                off = t.u16(sub + 6);
++                input_def = off ? sub + off : 0;
++                off = t.u16(sub + 8);
++                lookahead_def = off ? sub + off : 0;
++                nb_rulesets = t.u16(sub + 10);
++                rulesets = sub + 12;
++            }
++        }
++        else {
++            nb_rulesets = t.u16(sub + 4);
++            rulesets = sub + 6;
++        }
++        unsigned int backtrack_space = format == 2 ? t.glyphClass(backtrack_def, space) : space;
++        unsigned int input_space = format == 2 ? t.glyphClass(input_def, space) : space;
++        unsigned int lookahead_space = format == 2 ? t.glyphClass(lookahead_def, space) : space;
++        for ( unsigned int k=0; k < nb_rulesets && t.ok; k++ ) {
++            unsigned int off = t.u16(rulesets + 2*k);
++            if ( !off )
++                continue;
++            unsigned int ruleset = sub + off;
++            unsigned int nb_rules = t.u16(ruleset);
++            for ( unsigned int r=0; r < nb_rules && t.ok; r++ ) {
++                unsigned int p = ruleset + t.u16(ruleset + 2 + 2*r);
++                bool sees = skips_space;
++                bool possible = true;
++                unsigned int nb_backtrack = 0;
++                unsigned int backtrack = 0;
++                if ( is_chain_context ) {
++                    nb_backtrack = t.u16(p);
++                    backtrack = p + 2;
++                    p += 2 + 2*nb_backtrack;
++                }
++                unsigned int nb_input = t.u16(p);
++                unsigned int input = is_context ? p + 4 : p + 2;
++                unsigned int nb_lookahead = 0;
++                unsigned int lookahead = 0;
++                if ( is_chain_context ) {
++                    p += 2 + 2*(nb_input > 0 ? nb_input - 1 : 0);
++                    nb_lookahead = t.u16(p);
++                    lookahead = p + 2;
++                }
++                for ( unsigned int i=0; i < nb_backtrack && t.ok; i++ ) {
++                    unsigned int v = t.u16(backtrack + 2*i);
++                    sees = sees || v == backtrack_space;
++                    possible = possible && t.valueIntersects(format, backtrack_def, v, glyphs);
++                }
++                for ( unsigned int i=0; i+1 < nb_input && t.ok; i++ ) {
++                    unsigned int v = t.u16(input + 2*i);
++                    sees = sees || v == input_space;
++                    possible = possible && t.valueIntersects(format, input_def, v, glyphs);
++                }
++                for ( unsigned int i=0; i < nb_lookahead && t.ok; i++ ) {
++                    unsigned int v = t.u16(lookahead + 2*i);
++                    sees = sees || v == lookahead_space;
++                    possible = possible && t.valueIntersects(format, lookahead_def, v, glyphs);
++                }
++                if ( sees && possible )
++                    return true;
++            }
++        }
++        return !t.ok;
++    }
++    unsigned int coverage = sub + t.u16(sub + 2);
++    if ( is_gsub ) {
++        switch ( type ) {
++            case 1: // Single
++            case 2: // Multiple
++            case 3: // Alternate
++                if ( format != 1 && !(type == 1 && format == 2) )
++                    return true;
++                return !t.ok || t.coverageHas(coverage, space)
++                        || (skips_space && t.coverageIntersects(coverage, glyphs));
++            case 4: { // Ligature
++                if ( format != 1 )
++                    return true;
++                if ( t.coverageHas(coverage, space) )
++                    return true;
++                if ( !t.coverageIntersects(coverage, glyphs) )
++                    return !t.ok;
++                unsigned int nb_sets = t.u16(sub + 4);
++                for ( unsigned int k=0; k < nb_sets && t.ok; k++ ) {
++                    unsigned int set = sub + t.u16(sub + 6 + 2*k);
++                    unsigned int nb_ligs = t.u16(set);
++                    for ( unsigned int l=0; l < nb_ligs && t.ok; l++ ) {
++                        unsigned int lig = set + t.u16(set + 2 + 2*l);
++                        unsigned int nb_comps = t.u16(lig + 2);
++                        bool sees = skips_space;
++                        bool possible = true;
++                        for ( unsigned int i=0; i+1 < nb_comps && t.ok; i++ ) {
++                            unsigned int g = t.u16(lig + 4 + 2*i);
++                            sees = sees || g == space;
++                            possible = possible && glyphsHaveIn(glyphs, g, g);
++                        }
++                        if ( sees && possible )
++                            return true;
++                    }
++                }
++                return !t.ok;
++            }
++            default:
++                return true;
++        }
++    }
++    switch ( type ) {
++        case 1: // Single
++        case 2: // Pair (the space as the first glyph)
++        case 3: // Cursive
++            if ( format != 1 && !(type != 3 && format == 2) )
++                return true;
++            return !t.ok || t.coverageHas(coverage, space)
++                    || (skips_space && t.coverageIntersects(coverage, glyphs));
++        case 4: // Mark to base
++        case 5: // Mark to ligature
++        case 6: { // Mark to mark
++            if ( format != 1 )
++                return true;
++            unsigned int coverage2 = sub + t.u16(sub + 4);
++            if ( t.coverageHas(coverage, space) )
++                return true;
++            bool sees = skips_space || t.coverageHas(coverage2, space);
++            return !t.ok || (sees && t.coverageIntersects(coverage, glyphs) && t.coverageIntersects(coverage2, glyphs));
++        }
++        default:
++            return true;
++    }
++}
++
++// Whether shaping could see across the space glyph because of a GSUB or GPOS table, with
++// text that can only lead to these glyphs (NULL meaning any glyph): some lookup skipping it
++// (per its lookup flags and the space glyph props) or seeing it (see above). Also true when
++// the table can't be analysed, or has the 'rand' feature (random alternates are picked with
++// a state running along the buffer).
++static bool otLayoutTableSeesSpace( hb_face_t * face, hb_tag_t table_tag, unsigned int space,
++                                    unsigned int space_props, const hb_set_t * glyphs ) {
++    hb_blob_t * blob = hb_face_reference_table(face, table_tag);
++    unsigned int len = 0;
++    const char * data = hb_blob_get_data(blob, &len);
++    bool is_gsub = table_tag == HB_OT_TAG_GSUB;
++    bool sees = false;
++    if ( len > 0 ) {
++        LVOTTableReader t(data, len);
++        if ( t.u16(0) != 1 ) // (version 2 tables have 24-bit offsets)
++            t.ok = false;
++        unsigned int feature_list = t.u16(6);
++        unsigned int lookup_list = t.u16(8);
++        if ( feature_list ) {
++            unsigned int nb_features = t.u16(feature_list);
++            for ( unsigned int i=0; i < nb_features && t.ok && !sees; i++ ) {
++                if ( t.u32(feature_list + 2 + 6*i) == HB_TAG('r','a','n','d') )
++                    sees = true;
++            }
++        }
++        unsigned int nb_lookups = lookup_list ? t.u16(lookup_list) : 0;
++        for ( unsigned int i=0; i < nb_lookups && t.ok && !sees; i++ ) {
++            unsigned int lookup = lookup_list + t.u16(lookup_list + 2 + 2*i);
++            unsigned int lookup_type = t.u16(lookup);
++            unsigned int lookup_flags = t.u16(lookup + 2);
++            unsigned int nb_subtables = t.u16(lookup + 4);
++            // IgnoreBaseGlyphs 0x02, IgnoreLigatures 0x04, IgnoreMarks 0x08 are tested
++            // by HarfBuzz against these same bits of glyph props
++            bool skips_space = lookup_flags & space_props & 0x0E;
++            for ( unsigned int j=0; j < nb_subtables && t.ok && !sees; j++ ) {
++                unsigned int sub = lookup + t.u16(lookup + 6 + 2*j);
++                unsigned int type = lookup_type;
++                if ( type == (is_gsub ? 7u : 9u) ) { // Extension
++                    if ( t.u16(sub) != 1 ) {
++                        sees = true;
++                        break;
++                    }
++                    type = t.u16(sub + 2);
++                    sub = sub + t.u32(sub + 4);
++                }
++                sees = otSubtableSeesSpace(t, is_gsub, type, sub, space, skips_space, glyphs);
++            }
++        }
++        if ( !t.ok ) // malformed: don't trust it
++            sees = true;
++    }
++    hb_blob_destroy(blob);
++    return sees;
++}
++
++// Chars allowed in text shaped by pieces with a font whose layout tables have rules that could
++// see across the space glyph: added by groups, each if no text made of the chars allowed can
++// ever lead to the glyphs such a rule needs.
++#define SHAPING_CHARS_LIMIT 0x3000 // (chars above are never allowed)
++static const lChar32 _shapingCharGroups[][4] = {
++    { 0x20, 0x7E, 0xA0, 0xFF },       // ASCII, Latin-1
++    { 0x100, 0x2FF },                 // Latin Extended-A and B, IPA, spacing modifier letters
++    { 0x2000, 0x20CF },               // General punctuation, super and subscripts, currency
++    { 0x1E00, 0x1EFF },               // Latin Extended Additional
++    { 0x400, 0x482, 0x48A, 0x52F },   // Cyrillic (but combining marks)
++    { 0x370, 0x3FF, 0x1F00, 0x1FFF }, // Greek
++    { 0x2100, 0x27BF },               // Letterlike symbols, number forms, arrows, math, technical, shapes, dingbats...
++};
++
++// Whether a char is in the font, both for FreeType (as checked by filterChar()) and HarfBuzz
++static inline bool shapingFontHasChar( hb_font_t * hb_font, FT_Face ft_face, lChar32 c ) {
++    hb_codepoint_t glyph;
++    return c != '\t' && hb_font_get_nominal_glyph(hb_font, c, &glyph) && glyph != 0
++                      && FT_Get_Char_Index(ft_face, c) == glyph;
++}
++
++// Adds the chars in ranges (first, last pairs, ending with 0 or at count) that are in the font to chars
++static void addShapingChars( hb_font_t * hb_font, FT_Face ft_face, const lChar32 * ranges, int count, lUInt32 * chars ) {
++    for ( int i=0; i+1 < count && ranges[i]; i += 2 ) {
++        for ( lChar32 c = ranges[i]; c <= ranges[i+1] && c < SHAPING_CHARS_LIMIT; c++ ) {
++            if ( shapingFontHasChar(hb_font, ft_face, c) )
++                chars[c >> 5] |= 1U << (c & 31);
++        }
++    }
++}
++
++// Features HarfBuzz may apply with its default shaper (hb-ot-shape.cc), whatever the script,
++// language and direction (with our own ones, they make all the GSUB lookups it may apply,
++// with the lookups these call, and the ones of LangSys required features)
++static const hb_tag_t _shapingHBFeatures[] = {
++    HB_TAG('r','v','r','n'), HB_TAG('l','t','r','a'), HB_TAG('l','t','r','m'), HB_TAG('r','t','l','a'),
++    HB_TAG('r','t','l','m'), HB_TAG('f','r','a','c'), HB_TAG('n','u','m','r'), HB_TAG('d','n','o','m'),
++    HB_TAG('r','a','n','d'), HB_TAG('H','a','r','f'), HB_TAG('H','A','R','F'), HB_TAG('B','u','z','z'),
++    HB_TAG('B','U','Z','Z'), HB_TAG('a','b','v','m'), HB_TAG('b','l','w','m'), HB_TAG('c','c','m','p'),
++    HB_TAG('l','o','c','l'), HB_TAG('m','a','r','k'), HB_TAG('m','k','m','k'), HB_TAG('r','l','i','g'),
++    HB_TAG('c','a','l','t'), HB_TAG('c','l','i','g'), HB_TAG('c','u','r','s'), HB_TAG('d','i','s','t'),
++    HB_TAG('k','e','r','n'), HB_TAG('l','i','g','a'), HB_TAG('r','c','l','t'), HB_TAG('v','e','r','t'),
++};
++
++// Whether a GSUB closure can be trusted to be complete with this table, and so the restricted
++// mode used: HarfBuzz stops a closure round, silently, past HB_MAX_LOOKUP_VISIT_COUNT (35000)
++// lookup visits. Each round visits each lookup once, and the lookup called by each contextual
++// rule record once, as long as none of these called lookups is itself contextual (it would then
++// be visited again for each set of glyphs reaching it, multiplying visits along the nesting).
++// So: no contextual lookup called from a rule, and at most 10000 lookups and records.
++static bool shapingGSUBClosureIsBounded( hb_face_t * face ) {
++    hb_blob_t * blob = hb_face_reference_table(face, HB_OT_TAG_GSUB);
++    unsigned int len = 0;
++    const char * data = hb_blob_get_data(blob, &len);
++    bool bounded = true;
++    if ( len > 0 ) {
++        LVOTTableReader t(data, len);
++        if ( t.u16(0) != 1 ) // (version 2 tables have 24-bit offsets)
++            t.ok = false;
++        unsigned int lookup_list = t.u16(8);
++        unsigned int nb_lookups = lookup_list ? t.u16(lookup_list) : 0;
++        // Contextual lookups (types 5 and 6, or Extensions of them)
++        lUInt32 * contextual = (lUInt32 *)calloc(65536/32, sizeof(lUInt32));
++        if ( !contextual )
++            t.ok = false;
++        for ( int pass=0; pass < 2 && t.ok && bounded; pass++ ) {
++            unsigned int visits = nb_lookups;
++            for ( unsigned int i=0; i < nb_lookups && t.ok && bounded; i++ ) {
++                unsigned int lookup = lookup_list + t.u16(lookup_list + 2 + 2*i);
++                unsigned int lookup_type = t.u16(lookup);
++                unsigned int nb_subtables = t.u16(lookup + 4);
++                for ( unsigned int j=0; j < nb_subtables && t.ok && bounded; j++ ) {
++                    unsigned int sub = lookup + t.u16(lookup + 6 + 2*j);
++                    unsigned int type = lookup_type;
++                    if ( type == 7 ) { // Extension
++                        type = t.u16(sub + 2);
++                        sub = sub + t.u32(sub + 4);
++                    }
++                    if ( type != 5 && type != 6 )
++                        continue;
++                    if ( pass == 0 ) {
++                        contextual[i >> 5] |= 1U << (i & 31);
++                        continue;
++                    }
++                    // Where the rule records (lookupListIndex at +2 of each 4 bytes) are
++                    unsigned int format = t.u16(sub);
++                    LVArray<unsigned int> records; // (offset of the record count of each rule)
++                    if ( format == 3 ) {
++                        unsigned int p = sub + 2;
++                        if ( type == 6 ) {
++                            p += 2 + 2*t.u16(p); // backtrack
++                            p += 2 + 2*t.u16(p); // input
++                            p += 2 + 2*t.u16(p); // lookahead
++                            records.add(p);
++                        }
++                        else { // glyphCount, seqLookupCount, coverages, records
++                            records.add(p);
++                        }
++                    }
++                    else if ( format == 1 || format == 2 ) {
++                        unsigned int nb_rulesets = t.u16(sub + (format == 1 ? 4 : (type == 5 ? 6 : 10)));
++                        unsigned int rulesets = sub + (format == 1 ? 6 : (type == 5 ? 8 : 12));
++                        for ( unsigned int k=0; k < nb_rulesets && t.ok && bounded; k++ ) {
++                            unsigned int off = t.u16(rulesets + 2*k);
++                            if ( !off )
++                                continue;
++                            unsigned int ruleset = sub + off;
++                            unsigned int nb_rules = t.u16(ruleset);
++                            for ( unsigned int r=0; r < nb_rules && t.ok && bounded; r++ ) {
++                                unsigned int p = ruleset + t.u16(ruleset + 2 + 2*r);
++                                if ( type == 6 ) {
++                                    p += 2 + 2*t.u16(p); // backtrack
++                                    unsigned int nb_input = t.u16(p);
++                                    p += 2 + 2*(nb_input > 0 ? nb_input - 1 : 0);
++                                    p += 2 + 2*t.u16(p); // lookahead
++                                    records.add(p);
++                                }
++                                else { // glyphCount, seqLookupCount, input classes or glyphs, records
++                                    records.add(p);
++                                }
++                                if ( records.length() > 10000 )
++                                    bounded = false;
++                            }
++                        }
++                    }
++                    else {
++                        t.ok = false;
++                    }
++                    for ( int k=0; k < records.length() && t.ok && bounded; k++ ) {
++                        unsigned int p = records[k];
++                        unsigned int nb_records;
++                        unsigned int first; // first record
++                        if ( format == 3 && type == 5 ) { // p: glyphCount
++                            nb_records = t.u16(p + 2);
++                            first = p + 4 + 2*t.u16(p);
++                        }
++                        else if ( format != 3 && type == 5 ) { // p: glyphCount of the rule
++                            unsigned int nb_input = t.u16(p);
++                            nb_records = t.u16(p + 2);
++                            first = p + 4 + 2*(nb_input > 0 ? nb_input - 1 : 0);
++                        }
++                        else { // p: seqLookupCount
++                            nb_records = t.u16(p);
++                            first = p + 2;
++                        }
++                        visits += nb_records;
++                        if ( visits > 10000 ) {
++                            bounded = false;
++                            break;
++                        }
++                        for ( unsigned int r=0; r < nb_records && t.ok; r++ ) {
++                            unsigned int target = t.u16(first + 4*r + 2);
++                            if ( target < 65536 && (contextual[target >> 5] & (1U << (target & 31))) )
++                                bounded = false;
++                        }
++                    }
++                }
++            }
++            if ( visits > 10000 )
++                bounded = false;
++        }
++        if ( contextual )
++            free(contextual);
++        if ( !t.ok )
++            bounded = false;
++    }
++    hb_blob_destroy(blob);
++    return bounded;
++}
++
++// Returns the GSUB lookups of these features and of required features, or NULL for all
++// lookups (if the table can't be analysed, or has FeatureVariations)
++static hb_set_t * shapingGSUBLookups( hb_face_t * face, const LVArray<hb_feature_t> & features ) {
++    hb_blob_t * blob = hb_face_reference_table(face, HB_OT_TAG_GSUB);
++    unsigned int len = 0;
++    const char * data = hb_blob_get_data(blob, &len);
++    hb_set_t * lookups = hb_set_create();
++    bool all = false;
++    // (required features, by index: a bitmap of all possible u16 values)
++    lUInt32 * required = (lUInt32 *)calloc(65536/32, sizeof(lUInt32));
++    if ( !required )
++        all = true;
++    if ( len > 0 && !all ) {
++        LVOTTableReader t(data, len);
++        if ( t.u16(0) != 1 ) // (version 2 tables have 24-bit offsets)
++            t.ok = false;
++        if ( t.u16(2) >= 1 && t.u32(10) != 0 ) // FeatureVariations
++            all = true;
++        unsigned int script_list = t.u16(4);
++        unsigned int feature_list = t.u16(6);
++        unsigned int nb_features = feature_list ? t.u16(feature_list) : 0;
++        unsigned int nb_scripts = script_list ? t.u16(script_list) : 0;
++        for ( unsigned int i=0; i < nb_scripts && t.ok && !all; i++ ) {
++            unsigned int script = script_list + t.u16(script_list + 2 + 6*i + 4);
++            unsigned int off = t.u16(script);
++            if ( off ) {
++                unsigned int index = t.u16(script + off + 2);
++                required[index >> 5] |= 1U << (index & 31);
++            }
++            unsigned int nb_langsys = t.u16(script + 2);
++            for ( unsigned int k=0; k < nb_langsys && t.ok; k++ ) {
++                unsigned int index = t.u16(script + t.u16(script + 4 + 6*k + 4) + 2);
++                required[index >> 5] |= 1U << (index & 31);
++            }
++        }
++        for ( unsigned int i=0; i < nb_features && t.ok && !all; i++ ) {
++            hb_tag_t tag = t.u32(feature_list + 2 + 6*i);
++            bool used = required[i >> 5] & (1U << (i & 31));
++            for ( unsigned int k=0; k < sizeof(_shapingHBFeatures)/sizeof(hb_tag_t) && !used; k++ )
++                used = tag == _shapingHBFeatures[k];
++            for ( int k=0; k < features.length() && !used; k++ )
++                used = tag == features[k].tag;
++            if ( !used )
++                continue;
++            unsigned int feature = feature_list + t.u16(feature_list + 2 + 6*i + 4);
++            unsigned int nb_lookups = t.u16(feature + 2);
++            for ( unsigned int k=0; k < nb_lookups && t.ok; k++ )
++                hb_set_add(lookups, t.u16(feature + 4 + 2*k));
++        }
++        if ( !t.ok )
++            all = true;
++    }
++    if ( required )
++        free(required);
++    hb_blob_destroy(blob);
++    if ( all || !hb_set_allocation_successful(lookups) ) {
++        hb_set_destroy(lookups);
++        return NULL;
++    }
++    return lookups;
+ }
++
++// Whether no rule could make shaping see across the space glyph, with text made of these
++// chars, considering all the glyphs these GSUB lookups could make from them
++static bool shapingCharsAllowed( hb_font_t * hb_font, const lUInt32 * chars, hb_codepoint_t space,
++                                 unsigned int space_props, const hb_set_t * lookups ) {
++    hb_face_t * face = hb_font_get_face(hb_font);
++    hb_set_t * glyphs = hb_set_create();
++    hb_set_add(glyphs, 0); // .notdef
++    hb_set_add(glyphs, space); // (also used for some missing spaces)
++    for ( lChar32 c = 0; c < SHAPING_CHARS_LIMIT; c++ ) {
++        hb_codepoint_t glyph;
++        if ( (chars[c >> 5] & (1U << (c & 31))) && hb_font_get_nominal_glyph(hb_font, c, &glyph) )
++            hb_set_add(glyphs, glyph);
++    }
++    // All the glyphs GSUB could make from these (HarfBuzz stops a closure after some
++    // rounds: go on until nothing is added)
++    bool complete = false;
++    for ( int i=0; i < 8 && !complete; i++ ) {
++        unsigned int population = hb_set_get_population(glyphs);
++        hb_ot_layout_lookups_substitute_closure(face, lookups, glyphs);
++        complete = hb_set_get_population(glyphs) == population;
++    }
++    bool allowed = complete && hb_set_allocation_successful(glyphs)
++                && !otLayoutTableSeesSpace(face, HB_OT_TAG_GSUB, space, space_props, glyphs)
++                && !otLayoutTableSeesSpace(face, HB_OT_TAG_GPOS, space, space_props, glyphs);
++    hb_set_destroy(glyphs);
++    return allowed;
++}
++
++// How text can be shaped by pieces with a font face
++struct LVShapingFaceInfo {
++    lString8 key;      // font file, face index and features
++    int by_pieces;     // whether text can be shaped by pieces...
++    lUInt32 chars[SHAPING_CHARS_LIMIT/32]; // ...if all its chars are in this bitmap
++    lUInt16 * cmap;    // cache of nominal glyphs (see shapingGetNominalGlyphs())
++    LVShapingFaceInfo() : by_pieces(0), cmap(NULL) {}
++    ~LVShapingFaceInfo() { if ( cmap ) free(cmap); }
++};
++static LVArray<LVShapingFaceInfo *> _shapingFaceInfos;
++
++// Finds whether and when text can be shaped by pieces with a font face (see above)
++static void analyseShapingFace( hb_font_t * hb_font, FT_Face ft_face, const LVArray<hb_feature_t> & features,
++                                LVShapingFaceInfo * info ) {
++    info->by_pieces = 0;
++    memset(info->chars, 0, sizeof(info->chars));
++    if ( !hb_font || !ft_face )
++        return;
++    hb_face_t * face = hb_font_get_face(hb_font);
++    hb_codepoint_t space = 0;
++    if ( !hb_font_get_nominal_glyph(hb_font, 0x20, &space) || space == 0 || space > 0xFFFF )
++        return;
++    // Tables HarfBuzz may use instead of, or in addition to, GSUB and GPOS
++    // (FreeType kerning, from a 'kern' table or AFM data, is only used by HarfBuzz's fallback
++    // kerning, which KOReader's HarfBuzz leaves out (HB_DISABLE_DEPRECATED): checked anyway)
++    if ( FT_HAS_KERNING(ft_face) )
++        return;
++    if ( hb_aat_layout_has_substitution(face) || hb_aat_layout_has_positioning(face)
++            || hb_aat_layout_has_tracking(face) )
++        return;
++    hb_blob_t * kern = hb_face_reference_table(face, HB_TAG('k','e','r','n'));
++    bool has_kern = hb_blob_get_length(kern) > 0;
++    hb_blob_destroy(kern);
++    if ( has_kern )
++        return;
++    // The space glyph props, as HarfBuzz sets them from GDEF (or from Unicode, without GDEF classes)
++    unsigned int space_props = 0x02; // HB_OT_LAYOUT_GLYPH_PROPS_BASE_GLYPH
++    if ( hb_ot_layout_has_glyph_classes(face) ) {
++        switch ( hb_ot_layout_get_glyph_class(face, space) ) {
++            case HB_OT_LAYOUT_GLYPH_CLASS_BASE_GLYPH: space_props = 0x02; break;
++            case HB_OT_LAYOUT_GLYPH_CLASS_LIGATURE:   space_props = 0x04; break;
++            case HB_OT_LAYOUT_GLYPH_CLASS_MARK:       return;
++            default:                                  space_props = 0; break;
++        }
++    }
++    if ( !otLayoutTableSeesSpace(face, HB_OT_TAG_GSUB, space, space_props, NULL)
++            && !otLayoutTableSeesSpace(face, HB_OT_TAG_GPOS, space, space_props, NULL) ) {
++        // Any text, if all its chars are in the font
++        for ( lChar32 c = 0; c < SHAPING_CHARS_LIMIT; c++ ) {
++            if ( shapingFontHasChar(hb_font, ft_face, c) )
++                info->chars[c >> 5] |= 1U << (c & 31);
++        }
++        info->by_pieces = 1;
++        return;
++    }
++    // Some rules could see across the space: find the chars that can never lead to them
++    // (with GSUB closures, if they can't be cut short)
++    if ( !shapingGSUBClosureIsBounded(face) )
++        return;
++    hb_set_t * lookups = shapingGSUBLookups(face, features);
++    lUInt32 * chars = info->chars;
++    lUInt32 tried[SHAPING_CHARS_LIMIT/32];
++    int nb_groups = sizeof(_shapingCharGroups) / sizeof(_shapingCharGroups[0]);
++    for ( int g=0; g < nb_groups; g++ ) {
++        memcpy(tried, chars, sizeof(tried));
++        addShapingChars(hb_font, ft_face, _shapingCharGroups[g], 4, tried);
++        if ( shapingCharsAllowed(hb_font, tried, space, space_props, lookups) )
++            memcpy(chars, tried, sizeof(tried));
++    }
++    if ( lookups )
++        hb_set_destroy(lookups);
++    for ( int i=0; i < SHAPING_CHARS_LIMIT/32; i++ ) {
++        if ( chars[i] ) {
++            info->by_pieces = 1;
++            break;
++        }
++    }
++}
++
++// The HarfBuzz font functions of the fonts shaping the pieces not found in the cache:
++// sub fonts of the fonts' own HarfBuzz font (so, with all the same values and functions),
++// but that get nominal glyphs (as HarfBuzz does for each char when normalizing) from a
++// cache of their face, rather than from FreeType's binary searches in the cmap.
++static hb_font_funcs_t * _shapingFontFuncs = NULL;
++
++// Index of a char in this cache, which has chars 0..0x7FF and 0x2000..0x20FF (-1 if not there)
++#define SHAPING_CMAP_SIZE 0x900
++static inline int shapingCmapIndex( hb_codepoint_t u ) {
++    if ( u < 0x800 )
++        return u;
++    if ( u >= 0x2000 && u < 0x2100 )
++        return u - 0x2000 + 0x800;
++    return -1;
++}
++
++// Gets glyphs as the parent font does (stopping at the first char not found), but for the
++// cached ones. (A miss asks the parent's single char function, which, unlike hb-ft's function
++// for many chars, also finds the chars of symbol fonts moved to U+F0xx: for these, HarfBuzz
++// would ask it next anyway.)
++static unsigned int shapingGetNominalGlyphs( hb_font_t * font, void * font_data, unsigned int count,
++                        const hb_codepoint_t * first_unicode, unsigned int unicode_stride,
++                        hb_codepoint_t * first_glyph, unsigned int glyph_stride, void * user_data ) {
++    lUInt16 * cmap = (lUInt16 *)font_data; // glyph+1, 0 if not known yet
++    hb_font_t * parent = hb_font_get_parent(font);
++    unsigned int done;
++    for ( done = 0; done < count; done++ ) {
++        hb_codepoint_t u = *first_unicode;
++        hb_codepoint_t glyph;
++        int index = shapingCmapIndex(u);
++        if ( index >= 0 && cmap[index] ) {
++            glyph = cmap[index] - 1;
++        }
++        else {
++            if ( !hb_font_get_nominal_glyph(parent, u, &glyph) )
++                glyph = 0;
++            if ( index >= 0 && glyph < 0xFFFF )
++                cmap[index] = (lUInt16)(glyph + 1);
++        }
++        if ( !glyph ) // not found
++            break;
++        *first_glyph = glyph;
++        first_unicode = (const hb_codepoint_t *)((const char *)first_unicode + unicode_stride);
++        first_glyph = (hb_codepoint_t *)((char *)first_glyph + glyph_stride);
++    }
++    return done;
++}
++
++// Returns how text can be shaped by pieces with the face of a font (analysed once per face)
++static LVShapingFaceInfo * getShapingFaceInfo( hb_font_t * hb_font, FT_Face ft_face, const lString8 & file_name,
++                                                     const LVArray<hb_feature_t> & features ) {
++    lString8 key;
++    if ( !file_name.empty() && ft_face ) {
++        // (with some of its sizes, in case the file at this path is replaced)
++        key = file_name;
++        key << ":" << lString8::itoa((int)ft_face->face_index) << ":" << lString8::itoa((int)ft_face->num_glyphs);
++        hb_face_t * face = hb_font_get_face(hb_font);
++        hb_tag_t tables[4] = { HB_OT_TAG_GSUB, HB_OT_TAG_GPOS, HB_OT_TAG_GDEF, HB_TAG('c','m','a','p') };
++        for ( int i=0; i < 4; i++ ) {
++            hb_blob_t * blob = hb_face_reference_table(face, tables[i]);
++            key << ":" << lString8::itoa((int)hb_blob_get_length(blob));
++            hb_blob_destroy(blob);
++        }
++        for ( int i=0; i < features.length(); i++ ) {
++            char tag[6] = { ' ', (char)(features[i].tag >> 24), (char)(features[i].tag >> 16),
++                            (char)(features[i].tag >> 8), (char)features[i].tag, 0 };
++            key << tag;
++        }
++        for ( int i=0; i < _shapingFaceInfos.length(); i++ ) {
++            if ( _shapingFaceInfos[i]->key == key )
++                return _shapingFaceInfos[i];
++        }
++    }
++    // (Fonts from memory, without a file name, are analysed for each instance)
++    static LVShapingFaceInfo unshared;
++    LVShapingFaceInfo * info = key.empty() ? &unshared : new LVShapingFaceInfo();
++    info->key = key;
++    analyseShapingFace(hb_font, ft_face, features, info);
++    if ( !key.empty() )
++        _shapingFaceInfos.add(info);
++    return info;
++}
++
++static void freeShapingCache() {
++    if ( _shapingCache ) {
++        delete _shapingCache;
++        _shapingCache = NULL;
++    }
++    if ( _shapingBatchBuffer ) {
++        hb_buffer_destroy(_shapingBatchBuffer);
++        _shapingBatchBuffer = NULL;
++    }
++    _shapingPieces.clear();
++    _shapingMeasures.clear();
++    for ( int i=0; i < _shapingFaceInfos.length(); i++ )
++        delete _shapingFaceInfos[i];
++    _shapingFaceInfos.clear();
++    if ( _shapingFontFuncs ) {
++        hb_font_funcs_destroy(_shapingFontFuncs);
++        _shapingFontFuncs = NULL;
++    }
++}
+ #endif
+ 
+ #if 0 // removed during font manager refactor
+@@ -1566,6 +2951,18 @@
+     LVFontLocalGlyphCache _glyph_cache2;
+     // For use with KERNING_MODE_HARFBUZZ_LIGHT:
+     LVHashTable<struct LVCharTriplet, struct LVCharPosInfo> _width_cache2;
++    // For use with KERNING_MODE_HARFBUZZ, the word shaping cache:
++    // ids of this font's entries for some languages (forgotten when its shaping may change)
++    #define SHAPING_FONT_LANGS 8
++    hb_language_t _shaping_langs[SHAPING_FONT_LANGS];
++    lUInt32   _shaping_owners[SHAPING_FONT_LANGS];
++    int       _shaping_nb_langs;
++    int       _shaping_by_pieces; // whether text can be shaped by pieces (-1: not yet checked)...
++    lUInt32 * _shaping_chars;     // ...if all its chars are in this bitmap (of chars < SHAPING_CHARS_LIMIT)
++    hb_font_t * _shaping_hb_font; // to shape pieces, with a cache of nominal glyphs (NULL until needed)
++    lUInt16 *   _shaping_cmap;    // this cache, in the face info (NULL if not shared)
++    LVArray<hb_glyph_info_t> _shaped_infos;         // glyphs shaped by pieces, for drawing
++    LVArray<hb_glyph_position_t> _shaped_positions;
+ #endif
+ public:
+ 
+@@ -1777,6 +3174,11 @@
+         #if USE_HARFBUZZ==1
+         , _glyph_cache2(globalCache)
+         , _width_cache2(1024)
++        , _shaping_nb_langs(0)
++        , _shaping_by_pieces(-1)
++        , _shaping_chars(NULL)
++        , _shaping_hb_font(NULL)
++        , _shaping_cmap(NULL)
+         #endif
+     {
+         _hintingMode = fontMan->GetHintingMode();
+@@ -1793,6 +3195,8 @@
+         #if USE_HARFBUZZ==1
+         if (_hb_buffer)
+             hb_buffer_destroy(_hb_buffer);
++        if (_shaping_chars)
++            free(_shaping_chars);
+         #endif
+         Clear();
+     }
+@@ -1805,6 +3209,11 @@
+         #if USE_HARFBUZZ==1
+         _glyph_cache2.clear();
+         _width_cache2.clear();
++        _shaping_nb_langs = 0; // forget its cached shaping
++        if ( _shaping_hb_font ) { // made from _hb_font, which may be about to change
++            hb_font_destroy(_shaping_hb_font);
++            _shaping_hb_font = NULL;
++        }
+         #endif
+     }
+ 
+@@ -1888,6 +3297,8 @@
+     }
+     void setupHBFeatures() {
+         _hb_features.clear();
++        _shaping_nb_langs = 0;
++        _shaping_by_pieces = -1;
+         if ( _kerningMode == KERNING_MODE_HARFBUZZ ) {
+             // We reserve 2 for those we're adding now, +2 for possibly added CSS font features
+             // (otherwise, LVArray would expand from 2 to 11 on the next addition - it will
+@@ -1992,6 +3403,9 @@
+     void setVariations( const LVFontVariations& variations ) {
+         _variations = variations;
+         _hash = 0; // force calcHash(font_ref_t) to recompute
++        #if USE_HARFBUZZ==1
++        _shaping_nb_langs = 0;
++        #endif
+     }
+     virtual lUInt32 getVariationHash() const {
+         return _variations.hash();
+@@ -2216,6 +3630,12 @@
+         }
+ 
+         #if USE_HARFBUZZ==1
++        _shaping_nb_langs = 0;
++        _shaping_by_pieces = -1;
++        if ( _shaping_hb_font ) {
++            hb_font_destroy(_shaping_hb_font);
++            _shaping_hb_font = NULL;
++        }
+         if (FT_Err_Ok == error) {
+             if (_hb_font)
+                 hb_font_destroy(_hb_font);
+@@ -2408,7 +3828,407 @@
+             return true;
+         }
+         return false;
++    }
++
++    // Used by Harfbuzz full: whether some glyph is .notdef
++    static bool hasNotFoundGlyph( const hb_glyph_info_t * info, int count ) {
++        for ( int i=0; i < count; i++ ) {
++            if ( info[i].codepoint == 0 )
++                return true;
++        }
++        return false;
++    }
++
++    // Used by Harfbuzz full: the HarfBuzz font shaping pieces: _hb_font, or a sub font of it
++    // using the cache of nominal glyphs of its face (see shapingGetNominalGlyphs())
++    hb_font_t * getShapingHBFont() {
++        if ( _shaping_hb_font || !_shaping_cmap || !_hb_font )
++            return _shaping_hb_font ? _shaping_hb_font : _hb_font;
++        if ( !_shapingFontFuncs ) {
++            hb_font_funcs_t * funcs = hb_font_funcs_create();
++            if ( hb_font_funcs_is_immutable(funcs) ) { // the empty funcs: allocation failed
++                hb_font_funcs_destroy(funcs);
++                return _hb_font;
++            }
++            hb_font_funcs_set_nominal_glyphs_func(funcs, shapingGetNominalGlyphs, NULL, NULL);
++            hb_font_funcs_make_immutable(funcs);
++            _shapingFontFuncs = funcs;
++        }
++        hb_font_t * font = hb_font_create_sub_font(_hb_font);
++        if ( font == hb_font_get_empty() ) // (allocation failed)
++            return _hb_font;
++        hb_font_set_funcs(font, _shapingFontFuncs, _shaping_cmap, NULL);
++        _shaping_hb_font = font;
++        return _shaping_hb_font;
+     }
++
++    // Used by Harfbuzz full: shapes text by pieces with the word shaping cache (see the
++    // comments with LVShapingCache), getting the glyphs measureText() and DrawTextString()
++    // get from HarfBuzz shaping the text as a whole, with the same hints and buffer flags
++    // (and the Latin script if none found, when latin_if_no_script). On success, script
++    // is set to the script they were shaped with, and, until the next shaping by pieces,
++    // the glyphs (with no glyph flags) can be had with getShapedGlyphs() if kind is
++    // SHAPING_GLYPHS, or what measureText() gets from them with measureShapedPieces() if
++    // kind is SHAPING_MEASURES (the cache keeping only that for measuring, which is much
++    // smaller).
++    // Text is only shaped by pieces if all its chars are in this font (and none is a tab),
++    // so that HarfBuzz gets them as they are, with or without a fallback font (filterChar()
++    // would keep them all).
++    // Returns false, having changed nothing but _hb_buffer contents, when the text can't
++    // be shaped by pieces (or, with SHAPING_MEASURES, when some glyph is not found): it
++    // must then be shaped as a whole.
++    bool shapeByPieces( const lChar32 * text, int len, lUInt32 hints, TextLangCfg * lang_cfg,
++                        bool latin_if_no_script, hb_script_t & script, int kind )
++    {
++        if ( _shaping_by_pieces < 0 ) {
++            _shaping_by_pieces = 0;
++            bool features_global = true;
++            for ( int i=0; i < _hb_features.length(); i++ ) {
++                if ( _hb_features[i].start != HB_FEATURE_GLOBAL_START || _hb_features[i].end != HB_FEATURE_GLOBAL_END )
++                    features_global = false;
++            }
++            if ( features_global ) {
++                LVShapingFaceInfo * info = getShapingFaceInfo(_hb_font, _face, _fileName, _hb_features);
++                _shaping_cmap = NULL;
++                if ( info->by_pieces && !info->key.empty() ) {
++                    if ( !info->cmap )
++                        info->cmap = (lUInt16 *)calloc(SHAPING_CMAP_SIZE, sizeof(lUInt16));
++                    _shaping_cmap = info->cmap;
++                }
++                if ( info->by_pieces ) {
++                    if ( !_shaping_chars )
++                        _shaping_chars = (lUInt32 *)malloc(sizeof(info->chars));
++                    if ( _shaping_chars ) {
++                        memcpy(_shaping_chars, info->chars, sizeof(info->chars));
++                        _shaping_by_pieces = 1;
++                    }
++                }
++            }
++        }
++        if ( !_shaping_by_pieces || len <= 0 ) {
++            return false;
++        }
++        // Only left-to-right (with the scripts allowed below, a direction
++        // not given would be guessed left-to-right)
++        if ( (hints & LFNT_HINT_DIRECTION_KNOWN) && (hints & LFNT_HINT_DIRECTION_IS_RTL) ) {
++            return false;
++        }
++        // Only chars in this font (and allowed with it): checked below while cutting the text
++        const lUInt32 * chars = _shaping_chars;
++        // The script hb_buffer_guess_segment_properties() would set: the first one
++        // not Common, Inherited or Unknown (in ASCII, Latin for letters, else Common)
++        script = HB_SCRIPT_INVALID;
++        for ( int i=0; i < len; i++ ) {
++            lChar32 c = text[i];
++            if ( c < 0x80 ) {
++                if ( (lChar32)((c | 0x20) - 'a') < 26 ) {
++                    script = HB_SCRIPT_LATIN;
++                    break;
++                }
++                continue;
++            }
++            hb_script_t s = hb_unicode_script(hb_unicode_funcs_get_default(), c);
++            if ( s != HB_SCRIPT_COMMON && s != HB_SCRIPT_INHERITED && s != HB_SCRIPT_UNKNOWN ) {
++                script = s;
++                break;
++            }
++        }
++        if ( script == HB_SCRIPT_INVALID && latin_if_no_script )
++            script = HB_SCRIPT_LATIN;
++        // Only scripts using HarfBuzz' default shaper, with no cross-cluster processing
++        if ( script != HB_SCRIPT_LATIN && script != HB_SCRIPT_GREEK
++                && script != HB_SCRIPT_CYRILLIC && script != HB_SCRIPT_INVALID ) {
++            return false;
++        }
++        hb_language_t lang = lang_cfg ? lang_cfg->getHBLanguage() : HB_LANGUAGE_INVALID;
++        if ( lang == HB_LANGUAGE_INVALID )
++            lang = hb_language_get_default();
++        LVShapingCache * cache = getShapingCache();
++        lUInt32 owner = 0;
++        for ( int i=0; i < _shaping_nb_langs; i++ ) {
++            if ( _shaping_langs[i] == lang ) {
++                owner = _shaping_owners[i];
++                break;
++            }
++        }
++        if ( !owner ) { // (past SHAPING_FONT_LANGS languages, text is shaped as a whole)
++            if ( _shaping_nb_langs >= SHAPING_FONT_LANGS )
++                return false;
++            owner = cache->newOwner();
++            if ( !owner )
++                return false;
++            _shaping_langs[_shaping_nb_langs] = lang;
++            _shaping_owners[_shaping_nb_langs] = owner;
++            _shaping_nb_langs++;
++        }
++        // Buffer flags: the ones set for shaping as a whole, or the ones left from the
++        // previous shaping (hb_buffer_clear_contents() does not reset them)
++        unsigned int run_flags;
++        if ( hints ) {
++            run_flags = HB_BUFFER_FLAG_DEFAULT;
++            if ( hints & LFNT_HINT_BEGINS_PARAGRAPH )
++                run_flags |= HB_BUFFER_FLAG_BOT;
++            if ( hints & LFNT_HINT_ENDS_PARAGRAPH )
++                run_flags |= HB_BUFFER_FLAG_EOT;
++        }
++        else {
++            run_flags = hb_buffer_get_flags(_hb_buffer);
++        }
++        if ( run_flags & ~(unsigned int)(HB_BUFFER_FLAG_BOT|HB_BUFFER_FLAG_EOT) )
++            return false;
++
++        // Cut the text into pieces, each ending after a space (but the last one),
++        // and look them up in the cache (there is nothing to undo if we give up because
++        // of a char not allowed: entries found may just have been moved to the current
++        // generation)
++        cache->prepare(); // entries found stay valid until we're done
++        _shapingPieces.reserve(len);
++        LVShapingPiece * pieces = _shapingPieces.get();
++        int nb_pieces = 0;
++        int nb_missing = 0;
++        int nb_glyphs = 0;
++        int script_index = script == HB_SCRIPT_LATIN ? 1 : script == HB_SCRIPT_GREEK ? 2 : script == HB_SCRIPT_CYRILLIC ? 3 : 0;
++        LVShapingCacheKey key;
++        key.owner = owner;
++        lUInt32 seed = 2166136261u ^ (owner * 0x9E3779B1u) ^ (script_index * 0x85EBCA77u);
++        lUInt32 hash = seed;
++        int start = 0;
++        for ( int i=0; i < len; i++ ) {
++            lChar32 c = text[i];
++            if ( c >= SHAPING_CHARS_LIMIT || !(chars[c >> 5] & (1U << (c & 31))) )
++                return false;
++            hash = (hash ^ (lUInt32)c) * 16777619u;
++            if ( i+1 < len && !( c == ' ' && text[i+1] != ' ' && isShapingSafeAfterSpace(text[i+1]) ) )
++                continue;
++            LVShapingPiece * piece = pieces + nb_pieces++;
++            piece->start = start;
++            piece->end = i+1;
++            piece->buffer_flags = (start == 0 ? run_flags & HB_BUFFER_FLAG_BOT : 0)
++                                | (i+1 == len ? run_flags & HB_BUFFER_FLAG_EOT : 0);
++            piece->hash = shapingHashFinish(hash ^ piece->buffer_flags);
++            piece->entry = NULL;
++            if ( i+1 - start <= SHAPING_CACHE_MAX_PIECE ) {
++                key.hash = piece->hash;
++                key.props = script_index | (piece->buffer_flags << 2) | kind;
++                key.text = text + start;
++                key.text_len = i+1 - start;
++                piece->entry = cache->find(key);
++            }
++            if ( piece->entry ) {
++                nb_glyphs += piece->entry->glyph_count;
++            }
++            else {
++                nb_missing++;
++            }
++            hash = seed;
++            start = i+1;
++        }
++
++        // Shape all the pieces not found at once: as nothing is seen across the spaces
++        // they end with, each gets the glyphs it would get if shaped alone, or as part
++        // of the whole text.
++        hb_glyph_info_t * batch_info = NULL;
++        hb_glyph_position_t * batch_pos = NULL;
++        if ( nb_missing ) {
++            if ( !_shapingBatchBuffer ) {
++                hb_buffer_t * buffer = hb_buffer_create();
++                if ( !hb_buffer_allocation_successful(buffer) ) { // (the empty buffer)
++                    hb_buffer_destroy(buffer);
++                    return false;
++                }
++                _shapingBatchBuffer = buffer;
++            }
++            hb_buffer_t * batch = _shapingBatchBuffer;
++            hb_buffer_clear_contents(batch);
++            int first = -1;
++            int last = -1;
++            for ( int p=0; p < nb_pieces; p++ ) {
++                if ( pieces[p].entry )
++                    continue;
++                if ( first < 0 )
++                    first = p;
++                last = p;
++                for ( int i=pieces[p].start; i < pieces[p].end; i++ )
++                    hb_buffer_add(batch, (hb_codepoint_t)text[i], i);
++            }
++            hb_buffer_set_content_type(batch, HB_BUFFER_CONTENT_TYPE_UNICODE);
++            int batch_flags = HB_BUFFER_FLAG_DEFAULT;
++            if ( pieces[first].start == 0 )
++                batch_flags |= run_flags & HB_BUFFER_FLAG_BOT;
++            if ( pieces[last].end == len )
++                batch_flags |= run_flags & HB_BUFFER_FLAG_EOT;
++            hb_buffer_set_flags(batch, (hb_buffer_flags_t)batch_flags); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
++            hb_buffer_set_direction(batch, HB_DIRECTION_LTR);
++            hb_buffer_set_script(batch, script);
++            hb_buffer_set_language(batch, lang);
++            hb_buffer_guess_segment_properties(batch); // (nothing left to guess)
++            hb_shape(getShapingHBFont(), batch, _hb_features.ptr(), (unsigned int)_hb_features.length());
++            unsigned int batch_count = hb_buffer_get_length(batch);
++            // Nothing to keep if an allocation failed, or HarfBuzz' budget of operations for
++            // this buffer was exceeded (the whole text may or may not exceed its own)
++            if ( !hb_buffer_allocation_successful(batch) || batch_count == 0 )
++                return false;
++            batch_info = hb_buffer_get_glyph_infos(batch, NULL);
++            batch_pos = hb_buffer_get_glyph_positions(batch, NULL);
++            // Glyphs come in text order: give each piece its own
++            unsigned int g = 0;
++            for ( int p=0; p < nb_pieces; p++ ) {
++                if ( pieces[p].entry )
++                    continue;
++                pieces[p].batch_start = g;
++                while ( g < batch_count && batch_info[g].cluster >= (unsigned int)pieces[p].start
++                                        && batch_info[g].cluster < (unsigned int)pieces[p].end )
++                    g++;
++                pieces[p].batch_end = g;
++                if ( g == (unsigned int)pieces[p].batch_start ) // no glyph: not expected
++                    return false;
++            }
++            if ( g != batch_count ) // not expected
++                return false;
++            nb_glyphs += batch_count;
++            lInt16 * measures = NULL;
++            if ( kind == SHAPING_MEASURES ) {
++                // (measures of all the pieces not found, at their text index)
++                _shapingMeasures.reserve(len);
++                measures = _shapingMeasures.get();
++                for ( int p=0; p < nb_pieces; p++ ) {
++                    if ( pieces[p].entry )
++                        continue;
++                    if ( !LVShapingCache::computeMeasures(batch_info + pieces[p].batch_start, batch_pos + pieces[p].batch_start,
++                                pieces[p].batch_end - pieces[p].batch_start, pieces[p].start,
++                                pieces[p].end - pieces[p].start, _synth_weight_strength, measures + pieces[p].start) )
++                        return false;
++                }
++            }
++            for ( int p=0; p < nb_pieces; p++ ) {
++                if ( pieces[p].entry || pieces[p].end - pieces[p].start > SHAPING_CACHE_MAX_PIECE )
++                    continue;
++                key.hash = pieces[p].hash;
++                key.props = script_index | (pieces[p].buffer_flags << 2) | kind;
++                key.text = text + pieces[p].start;
++                key.text_len = pieces[p].end - pieces[p].start;
++                if ( kind == SHAPING_MEASURES )
++                    pieces[p].entry = cache->addMeasures(key, measures + pieces[p].start);
++                else
++                    pieces[p].entry = cache->addGlyphs(key, batch_info + pieces[p].batch_start, batch_pos + pieces[p].batch_start,
++                                pieces[p].batch_end - pieces[p].batch_start, pieces[p].start);
++            }
++        }
++        _shapingNbPieces = nb_pieces;
++        _shapingNbGlyphs = nb_glyphs;
++        // Leave the buffer flags as shaping as a whole would
++        hb_buffer_set_flags(_hb_buffer, (hb_buffer_flags_t)run_flags); // NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange)
++        return true;
++    }
++
++    // Used by Harfbuzz full: gets the glyphs of the text just shaped by pieces (in arrays of this font)
++    void getShapedGlyphs( int & glyph_count, hb_glyph_info_t * & glyph_info, hb_glyph_position_t * & glyph_pos )
++    {
++        const LVShapingPiece * pieces = _shapingPieces.get();
++        int nb_glyphs = _shapingNbGlyphs;
++        const hb_glyph_info_t * batch_info = NULL;
++        const hb_glyph_position_t * batch_pos = NULL;
++        if ( _shapingBatchBuffer ) {
++            batch_info = hb_buffer_get_glyph_infos(_shapingBatchBuffer, NULL);
++            batch_pos = hb_buffer_get_glyph_positions(_shapingBatchBuffer, NULL);
++        }
++        _shaped_infos.reserve(nb_glyphs);
++        _shaped_positions.reserve(nb_glyphs);
++        hb_glyph_info_t * info = _shaped_infos.get();
++        hb_glyph_position_t * pos = _shaped_positions.get();
++        int g = 0;
++        for ( int p=0; p < _shapingNbPieces; p++ ) {
++            if ( pieces[p].entry ) {
++                LVShapingCache::getGlyphs(pieces[p].entry, info + g, pos + g, pieces[p].start);
++                g += pieces[p].entry->glyph_count;
++                continue;
++            }
++            for ( int bg = pieces[p].batch_start; bg < pieces[p].batch_end; bg++, g++ ) {
++                info[g].codepoint = batch_info[bg].codepoint;
++                info[g].mask = 0;
++                info[g].cluster = batch_info[bg].cluster;
++                info[g].var1.u32 = 0;
++                info[g].var2.u32 = 0;
++                pos[g].x_advance = batch_pos[bg].x_advance;
++                pos[g].y_advance = batch_pos[bg].y_advance;
++                pos[g].x_offset = batch_pos[bg].x_offset;
++                pos[g].y_offset = batch_pos[bg].y_offset;
++                pos[g].var.u32 = 0;
++            }
++        }
++        glyph_count = nb_glyphs;
++        glyph_info = info;
++        glyph_pos = pos;
++    }
++
++    // Used by Harfbuzz full: sets the widths and flags measureText() gets going along the
++    // glyphs of the text just shaped by pieces with SHAPING_MEASURES, from their per char
++    // measures. Returns false if widths don't stay within 0..max_width (where measureText()
++    // would stop): measureText() must then shape the text as a whole.
++    bool measureShapedPieces( const lChar32 * text, lUInt16 * widths, lUInt8 * flags,
++                              int max_width, int letter_spacing )
++    {
++        const LVShapingPiece * pieces = _shapingPieces.get();
++        int nb_pieces = _shapingNbPieces;
++        const lInt16 * new_measures = _shapingMeasures.get(); // (of the pieces not cached)
++        int max = max_width < 0xFFFF ? max_width : 0xFFFF;
++        int width = 0;
++        for ( int p=0; p < nb_pieces; p++ ) {
++            const lUInt8 * measures8 = NULL;
++            const lInt16 * measures16 = NULL;
++            if ( pieces[p].entry )
++                LVShapingCache::getMeasures(pieces[p].entry, measures8, measures16);
++            else
++                measures16 = new_measures + pieces[p].start;
++            int start = pieces[p].start;
++            int end = pieces[p].end;
++            if ( measures8 ) {
++                // (no negative advance here: no check needed for width < 0)
++                for ( int t = start; t < end; t++ ) {
++                    int m = measures8[t - start];
++                    int advance = m >> 1;
++                    width += advance;
++                    lUInt8 f;
++                    if ( m & 1 ) { // continues a cluster
++                        f = LCHAR_IS_CLUSTER_TAIL;
++                    }
++                    else {
++                        f = GET_CHAR_FLAGS(text[t]);
++                        if ( advance == 0 ) // (e.g. soft hyphen): no letter spacing
++                            f |= LCHAR_IS_CLUSTER_TAIL;
++                        else
++                            width += letter_spacing;
++                    }
++                    if ( width > max )
++                        return false;
++                    flags[t] = f;
++                    widths[t] = (lUInt16)width;
++                }
++                continue;
++            }
++            for ( int t = start; t < end; t++ ) {
++                int m = measures16[t - start];
++                int advance = (m - (m & 1)) / 2;
++                width += advance;
++                lUInt8 f;
++                if ( m & 1 ) { // continues a cluster
++                    f = LCHAR_IS_CLUSTER_TAIL;
++                }
++                else {
++                    f = GET_CHAR_FLAGS(text[t]);
++                    if ( advance == 0 ) // (e.g. soft hyphen): no letter spacing
++                        f |= LCHAR_IS_CLUSTER_TAIL;
++                    else
++                        width += letter_spacing;
++                }
++                if ( width < 0 || width > max )
++                    return false;
++                flags[t] = f;
++                widths[t] = (lUInt16)width;
++            }
++        }
++        return true;
++    }
+ #endif // USE_HARFBUZZ==1
+ 
+     FT_UInt getCharIndex( lChar32 code, lChar32 def_char ) {
+@@ -2890,7 +4710,24 @@
+         // measure character widths
+ 
+     #if USE_HARFBUZZ==1
+-        if (_kerningMode == KERNING_MODE_HARFBUZZ) {
++        // With KERNING_MODE_HARFBUZZ, the widths and flags may be had from the word shaping
++        // cache (see shapeByPieces() and measureShapedPieces())
++        bool measured_by_pieces = false;
++        if ( _kerningMode == KERNING_MODE_HARFBUZZ ) {
++            hb_script_t script;
++            int spacing = letter_spacing;
++            if ( shapeByPieces(text, len, hints, lang_cfg, false, script, SHAPING_MEASURES) ) {
++                if ( spacing > 0 && isHBScriptCursive(script) ) // (as below)
++                    spacing = 0;
++                measured_by_pieces = measureShapedPieces(text, widths, flags, max_width, spacing);
++            }
++        }
++        if ( measured_by_pieces ) {
++            // Got the widths and flags the code below gets
++            lastFitChar = len;
++            i = len;
++        }
++        else if (_kerningMode == KERNING_MODE_HARFBUZZ) {
+ 
+             /** from harfbuzz/src/hb-buffer.h
+              * hb_glyph_info_t:
+@@ -4170,11 +6007,27 @@
+             int glyph_count;
+             hb_glyph_info_t *glyph_info = 0;
+             hb_glyph_position_t *glyph_pos = 0;
+-            hb_buffer_clear_contents(_hb_buffer);
+             // Fill HarfBuzz buffer
+             bool is_fallback_font = flags & LFNT_HINT_IS_FALLBACK_FONT;
+-            LVFontRef fallback = is_fallback_font ? getNextFallbackFont() : getFallbackFont();
+-            bool has_fallback_font = !fallback.isNull();
++            LVFontRef fallback;
++            bool has_fallback_font = false;
++            hb_script_t script;
++            bool is_rtl = false;
++            if ( shapeByPieces(text, len, flags, lang_cfg, true, script, SHAPING_GLYPHS) ) {
++                // Got the glyphs shaping as a whole (below) gives, from the word shaping cache
++                // (see measureText() about the fallback font)
++                getShapedGlyphs(glyph_count, glyph_info, glyph_pos);
++                if ( hasNotFoundGlyph(glyph_info, glyph_count) ) {
++                    fallback = is_fallback_font ? getNextFallbackFont() : getFallbackFont();
++                    has_fallback_font = !fallback.isNull();
++                }
++                if ( letter_spacing > 0 && isHBScriptCursive(script) )
++                    letter_spacing = 0;
++            }
++            else {
++            fallback = is_fallback_font ? getNextFallbackFont() : getFallbackFont();
++            has_fallback_font = !fallback.isNull();
++            hb_buffer_clear_contents(_hb_buffer);
+             if ( has_fallback_font ) { // It has a fallback font, add chars as-is
+                 for (i = 0; i < len; i++) {
+                     hb_buffer_add(_hb_buffer, (hb_codepoint_t)(text[i]), i);
+@@ -4235,11 +6088,13 @@
+             // If direction is RTL, hb_shape() has reversed the order of the glyphs, so
+             // they are in visual order and ready to be iterated and drawn. So,
+             // we do not revert them, unlike in measureText().
+-            bool is_rtl = hb_buffer_get_direction(_hb_buffer) == HB_DIRECTION_RTL;
++            is_rtl = hb_buffer_get_direction(_hb_buffer) == HB_DIRECTION_RTL;
++            script = hb_buffer_get_script(_hb_buffer);
+ 
+             glyph_count = hb_buffer_get_length(_hb_buffer);
+             glyph_info = hb_buffer_get_glyph_infos(_hb_buffer, 0);
+             glyph_pos = hb_buffer_get_glyph_positions(_hb_buffer, 0);
++            } // shaped as a whole
+ 
+             #ifdef DEBUG_DRAW_TEXT
+                 printf("DTHB >>> drawTextString %x len %d is_rtl=%d [%s]\n", text, len, is_rtl, _faceName.c_str());
+@@ -4401,7 +6256,7 @@
+                     int prev_x = x;
+                     for (i = hg; i < hg2; i++) {
+                         if ( svg_collector ) {
+-                            bool can_adjust_from_previous = (i == hg) && !isHBScriptCursive(hb_buffer_get_script(_hb_buffer));
++                            bool can_adjust_from_previous = (i == hg) && !isHBScriptCursive(script);
+                             svg_collector->collectGlyph(this, glyph_info[i].codepoint, true, text[glyph_info[i].cluster],
+                                                         glyph_pos[i].x_offset,  -glyph_pos[i].y_offset,
+                                                         glyph_pos[i].x_advance, -glyph_pos[i].y_advance,
+@@ -6722,6 +8577,7 @@
+             FT_Done_FreeType( _library );
+         #if USE_HARFBUZZ==1
+         destroy_SVGGlyphsCollector_svg_funcs();
++        freeShapingCache();
+         #endif
+         #if (DEBUG_FONT_MAN==1)
+             if ( _log ) {
+@@ -6756,6 +8612,12 @@
+     {
+         FONT_MAN_GUARD
+         _instance_cache.gc();
++        #if USE_HARFBUZZ==1
++        // Font instances may have been dropped: drop the older half of the word
++        // shaping cache (their entries there won't be used anymore)
++        if ( _shapingCache )
++            _shapingCache->shrink();
++        #endif
+     }
+ 
+     /// returns available typefaces (global fonts only - excludes document-embedded fonts)

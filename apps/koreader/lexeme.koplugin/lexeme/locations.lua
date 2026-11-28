@@ -1,7 +1,10 @@
 --[[
-The Kindle's "Loc" numbers. A book converted from Amazon's own copy (its KFX in
-Downloads/Items01, named like the book plus an id) takes them from that copy's
-location map, so they are the Kindle's exactly. Any other book gets the rule
+The Kindle's "Loc" numbers. A book whose conversion marked each of the Kindle's
+locations in its text (<span id="lexeme_loc_N"/>, listed by spine item in
+META-INF/lexeme-locations.txt) takes them from those marks. A book converted
+from Amazon's own copy (its KFX in Downloads/Items01, named like the book plus an
+id) takes them from that copy's location map. Both are the Kindle's exactly.
+Any other book gets the rule
 Amazon's map follows: a location every 150 bytes of its HTML, which is the text
 and about 20 bytes for each paragraph. A MOBI file says how long its HTML is, so
 its count is exact and the estimate only spreads it over the text.
@@ -19,6 +22,7 @@ local Locations = {}
 
 local BYTES_PER_LOCATION = 150
 local BYTES_PER_PARAGRAPH = 20
+local INDEX_FILE = "META-INF/lexeme-locations.txt"
 
 local books = setmetatable({}, { __mode = "k" })
 
@@ -77,12 +81,89 @@ local function mobiTextLength(file)
     return ok and length or nil
 end
 
+-- The book's location marks: its spine items that have some, ascending, the locations marked in
+-- each as ranges ("1-40,42"), and the locations whose mark isn't their own lexeme_loc_N element
+-- ("^" for where the spine item starts, "#<id>" for an element with that id).
+local function readIndex(document)
+    if not document.getDocumentFileContent then return nil end
+    local ok, text = pcall(document.getDocumentFileContent, document, INDEX_FILE)
+    if not ok or type(text) ~= "string" or not text:match("^lexeme%-locations 1\n") then return nil end
+    local index = { spines = {}, ranges = {}, last = {}, labels = {}, targets = {} }
+    for spine, ranges, rest in text:gmatch("\n(%d+) ([%d,%-]+)([^\n]*)") do
+        spine = tonumber(spine)
+        table.insert(index.spines, spine)
+        index.ranges[spine] = ranges
+        index.last[spine] = tonumber(ranges:match("(%d+)$"))
+        for label, target in rest:gmatch("(%d+):(%S+)") do index.targets[tonumber(label)] = target end
+    end
+    if #index.spines == 0 then return nil end
+    index.total = index.last[index.spines[#index.spines]]
+    return index
+end
+
+-- The locations marked in a spine item, ascending.
+local function labelsIn(index, spine)
+    if index.labels[spine] then return index.labels[spine] end
+    local labels = {}
+    for range in index.ranges[spine]:gmatch("[^,]+") do
+        local from, to = range:match("^(%d+)%-(%d+)$")
+        for n = tonumber(from or range), tonumber(to or range) do labels[#labels + 1] = n end
+    end
+    index.labels[spine] = labels
+    return labels
+end
+
+-- The last of `count` items for which `fits(i)` holds, they being all true and then all false; 0 if none.
+local function lastFitting(count, fits)
+    local low, high = 1, count
+    while low <= high do
+        local mid = math.floor((low + high) / 2)
+        if fits(mid) then low = mid + 1 else high = mid - 1 end
+    end
+    return high
+end
+
+-- Where a location is marked. crengine makes spine item i /body/DocFragment[i + 1], and gives an
+-- element of it with id X the id "_doc_fragment_<i>_ X".
+local function mark(document, index, spine, label)
+    local target = index.targets[label]
+    if target == "^" then
+        return document:getNormalizedXPointer(string.format("/body/DocFragment[%d].0", spine + 1)) or nil
+    end
+    local id = target and target:sub(2) or "lexeme_loc_" .. label
+    return document:getNormalizedXPointer(string.format("#_doc_fragment_%d_ %s", spine, id)) or nil
+end
+
+-- The location xpointer is in: the last one marked at or before it in the text.
+local function markedLocationAt(document, index, xpointer)
+    local fragment = tonumber(xpointer:match("^/body/DocFragment%[(%d+)%]"))
+    if not fragment then return 1 end
+    local spine = fragment - 1
+    local row = lastFitting(#index.spines, function(i) return index.spines[i] <= spine end)
+    if row == 0 then return 1 end
+    if index.spines[row] < spine then return index.last[index.spines[row]] end
+    local labels = labelsIn(index, spine)
+    local found = lastFitting(#labels, function(i)
+        local at = mark(document, index, spine, labels[i])
+        local order = at and document:compareXPointers(at, xpointer)
+        return order == 1 or order == 0
+    end)
+    if found > 0 then return labels[found] end
+    local before = index.spines[row - 1]
+    return before and index.last[before] or 1
+end
+
 local function book(ui)
     local document = ui.document
     if books[document] then return books[document] end
+    local index = readIndex(document)
+    if index then
+        books[document] = { index = index, total = index.total, known = {} }
+        return books[document]
+    end
     local copy = amazonCopy(document.file)
     local starts = copy and Kfx.locationStarts(copy)
-    local entry = { starts = starts, measure = starts and Kfx.length or htmlBytes }
+    local entry = { starts = starts, measure = starts and Kfx.length or htmlBytes, known = {} }
     if starts then
         entry.total = #starts
     else
@@ -117,18 +198,19 @@ local function measureBefore(entry, document, xpointer)
     return entry.measured
 end
 
-local function locationAt(starts, chars)
-    local low, high = 1, #starts
-    while low <= high do
-        local mid = math.floor((low + high) / 2)
-        if starts[mid] <= chars then low = mid + 1 else high = mid - 1 end
-    end
-    return math.max(1, high)
+local function measuredLocationAt(entry, document, xpointer)
+    local measured = measureBefore(entry, document, xpointer)
+    if not entry.starts then return math.floor(measured / BYTES_PER_LOCATION) + 1 end
+    return math.max(1, lastFitting(#entry.starts, function(i) return entry.starts[i] <= measured end))
 end
 
+-- Kept per place: the toolbar asks for the page's and for "Back to"'s at each paint.
 local function locationOf(entry, document, xpointer)
-    local measured = measureBefore(entry, document, xpointer)
-    return entry.starts and locationAt(entry.starts, measured) or math.floor(measured / BYTES_PER_LOCATION) + 1
+    if entry.known[xpointer] then return entry.known[xpointer] end
+    local location = entry.index and markedLocationAt(document, entry.index, xpointer)
+        or measuredLocationAt(entry, document, xpointer)
+    entry.known[xpointer] = location
+    return location
 end
 
 -- The location the page starts in, and how many the book has; nil for books laid out in fixed pages.
@@ -148,12 +230,16 @@ local function annotationXPointer(item)
     return type(xpointer) == "string" and xpointer or nil
 end
 
+-- The location at a place in the book (an xpointer); nil for books laid out in fixed pages.
+function Locations.at(ui, xpointer)
+    if not ui.rolling or type(xpointer) ~= "string" then return end
+    return locationOf(book(ui), ui.document, xpointer)
+end
+
 -- A highlight's or bookmark's location, as recorded or worked out now.
 function Locations.ofAnnotation(ui, item)
-    if not ui.rolling then return end
     if item.lexeme_location then return item.lexeme_location end
-    local xpointer = annotationXPointer(item)
-    return xpointer and locationOf(book(ui), ui.document, xpointer)
+    return Locations.at(ui, annotationXPointer(item))
 end
 
 -- Turns to the page `location` is on.
@@ -169,12 +255,12 @@ function Locations.goTo(ui, location)
 end
 
 -- Where Amazon's reader left a MOBI book: a byte offset into its HTML, the first number of "lpr" in
--- the book's .sdr/*.mbs (a KRDS file: typed values, a field named after 0xFE).
+-- the book's .sdr/*.mbs, or *.azw3f for an AZW3 (KRDS files: typed values, a field named after 0xFE).
 local function amazonOffset(file)
     local sdr = file:gsub("%.[^.]+$", "") .. ".sdr"
     if lfs.attributes(sdr, "mode") ~= "directory" then return nil end
     for name in lfs.dir(sdr) do
-        local f = name:match("%.mbs$") and io.open(sdr .. "/" .. name, "rb")
+        local f = (name:match("%.mbs$") or name:match("%.azw3f$")) and io.open(sdr .. "/" .. name, "rb")
         local data = f and f:read("*a")
         if f then f:close() end
         local at = data and data:find("\254\0\0\3lpr", 1, true)

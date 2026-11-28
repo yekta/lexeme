@@ -21,13 +21,23 @@ function Loading:render(bb)
     D.icon(bb, "spinner", x, y, size, size)
 end
 
+-- Draws the spinner's frames ahead of the first time it turns.
+function Loading.prepare()
+    local _, _, size = Loading.spinnerBox()
+    Spinner.prepare(size)
+end
+
 -- Shows it now, before whatever blocks next; closes itself if nothing does within `timeout` seconds.
-function Loading.show(timeout)
+-- `still` leaves the spinner unturned, for a book big enough that the memory the turning takes
+-- is better left to laying it out.
+function Loading.show(timeout, still)
     Loading.close()
     current = Loading:new{}
     UIManager:show(current, "flashui")
-    UIManager:forceRePaint()
-    Spinner.start(current:spinnerBox())
+    -- Drawn now, without waiting for the flash to finish, which would keep the book from
+    -- starting to load.
+    require("lexeme/flash").withoutWaiting(UIManager.forceRePaint, UIManager)
+    if not still then Spinner.start(current:spinnerBox()) end
     local shown = current
     UIManager:scheduleIn(timeout or 20, function()
         if current == shown then Loading.close() end

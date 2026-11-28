@@ -141,6 +141,18 @@ function Settings:readingPage()
                     end,
                 },
                 {
+                    title = "Precise text shaping",
+                    subtitle = "Kerning and ligatures from the font, as KOReader's Best kerning. "
+                        .. "Off, books lay out faster, but Bookerly isn't kerned at all.",
+                    toggle = require("lexeme/layout").kerning() == require("lexeme/layout").KERNING_BEST,
+                    tap = function()
+                        local Layout = require("lexeme/layout")
+                        local best = Layout.kerning() == Layout.KERNING_BEST
+                        Layout.setKerning(ui, best and Layout.KERNING_FAST or Layout.KERNING_BEST)
+                        self:refresh()
+                    end,
+                },
+                {
                     title = "Publisher font",
                     subtitle = "Use the fonts that come with a book.",
                     toggle = (G_reader_settings:readSetting("copt_embedded_fonts") or 1) == 1,
@@ -159,15 +171,6 @@ function Settings:readingPage()
                         local on = (G_reader_settings:readSetting("copt_embedded_css") or 1) ~= 1
                         G_reader_settings:saveSetting("copt_embedded_css", on and 1 or 0)
                         if ui and ui.typeset then ui.typeset:onToggleEmbeddedStyleSheet(on) end
-                        self:refresh()
-                    end,
-                },
-                {
-                    title = "Footnotes in a pop-up",
-                    subtitle = "Show a footnote over the page instead of jumping to it.",
-                    toggle = G_reader_settings:isTrue("footnote_link_in_popup"),
-                    tap = function()
-                        G_reader_settings:flipNilOrFalse("footnote_link_in_popup")
                         self:refresh()
                     end,
                 },

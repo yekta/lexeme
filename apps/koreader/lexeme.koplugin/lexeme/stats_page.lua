@@ -16,7 +16,8 @@ local StatsPage = View:extend{}
 
 StatsPage.LEXEME_NOTE = "Counted in Lexeme, across all your readers."
 StatsPage.LOCAL_NOTE = "Counted on this Kindle, with your Amazon history if it's imported."
-StatsPage.LOCAL_DAYS_NOTE = StatsPage.LOCAL_NOTE .. " A day counts once you've read 5 minutes in it."
+StatsPage.LOCAL_DAYS_NOTE = string.format("%s A day counts once you've read %d minutes in it.", StatsPage.LOCAL_NOTE,
+    math.floor(Streak.MIN_DAY_SECONDS / 60))
 
 local CHIPS = { top = 252, h = 78, pad = 33, gap = 15, baseline = 50 }
 
@@ -62,7 +63,8 @@ function StatsPage:paintChips(bb, x, y, labels, selected, on_select)
         else
             D.border(bb, chip_x, top, chip_w, chip_h, D.s(2), D.BLACK, math.floor(chip_h / 2))
         end
-        D.text(bb, chip_x + D.s(CHIPS.pad), top + D.s(CHIPS.baseline), face, label, i == selected and D.WHITE or D.BLACK)
+        local color = i == selected and D.WHITE or D.BLACK
+        D.text(bb, chip_x + D.s(CHIPS.pad), top + D.s(CHIPS.baseline), face, label, color)
         self:hit(chip_x, top, chip_w, chip_h, function()
             on_select(i)
             self:refresh("ui")

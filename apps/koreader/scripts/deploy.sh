@@ -11,13 +11,20 @@ tar -cf - lexeme.koplugin | ssh "$HOST" "rm -rf $PLUGINS/lexeme.koplugin && tar 
 # Amazon's reader draws text with the Kindle's own FreeType, which renders through Monotype's
 # iType; KOReader uses it too. crengine and MuPDF need patches/ (scripts/build-engine.sh) to work
 # with iType, and HarfBuzz to load with a FreeType older than 2.11, so they are installed only when
-# that build exists for this KOReader. HarfBuzz goes only to Kindles whose FreeType needs it.
+# that build exists for this KOReader and was built from patches/ as they are now; an older build
+# is left out, and the Kindle keeps the engine it has. HarfBuzz goes only to Kindles whose FreeType
+# needs it.
 VERSION=$(ssh "$HOST" cat /mnt/us/koreader/git-rev)
 ENGINE="libkoreader-cre.so libwrap-mupdf.so"
 ssh "$HOST" 'grep -q FT_Get_Transform /usr/lib/libfreetype.so.6' || ENGINE="$ENGINE libharfbuzz.so.0"
 BUILT=yes
 for lib in $ENGINE; do [ -f "build/$VERSION/libs/$lib" ] || BUILT=; done
-if [ -n "$BUILT" ]; then
+CURRENT=yes
+[ "$(cat "build/$VERSION/patches.sum" 2>/dev/null)" = "$(cat patches/*.patch | cksum)" ] || CURRENT=
+if [ -n "$BUILT" ] && [ -z "$CURRENT" ]; then
+  echo "The engine build for KOReader $VERSION is older than patches/; the Kindle keeps its engine." \
+    "Run scripts/build-engine.sh." >&2
+elif [ -n "$BUILT" ]; then
   for lib in $ENGINE; do
     ssh "$HOST" "cat > /mnt/us/koreader/libs/$lib.new && mv /mnt/us/koreader/libs/$lib.new /mnt/us/koreader/libs/$lib" < "build/$VERSION/libs/$lib"
   done

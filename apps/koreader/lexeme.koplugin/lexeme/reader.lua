@@ -1,11 +1,13 @@
 -- Puts the Kindle reading chrome on KOReader's reader.
 local UIManager = require("ui/uimanager")
 local util = require("util")
+local lfs = require("libs/libkoreader-lfs")
 
 local Footer = require("lexeme/footer")
 local HighlightPositions = require("lexeme/highlight_positions")
 local Layout = require("lexeme/layout")
 local Marks = require("lexeme/marks")
+local Notes = require("lexeme/notes")
 local Quick = require("lexeme/quick")
 local Reading = require("lexeme/reading")
 local Selection = require("lexeme/selection")
@@ -171,6 +173,22 @@ function Reader.install(ui)
         Selection.show(ui, { boxes = boxes, highlight_index = index })
         return true
     end
+    -- Footnotes in a sheet, links with a bar to go back, note numbers that can't be selected.
+    Notes.install(ui)
+end
+
+-- The reading settings go in before the book loads too, after KOReader's own: crengine styles the
+-- book as it loads it, and anything that differs by the time it's laid out (the stylesheet, a
+-- margin a pixel off from KOReader's rounding) has it style the whole book again.
+function Reader.beforeLoad(ui)
+    -- crengine reads its cache once the read started as the cover was tapped is done.
+    require("lexeme/engine").awaitReadAhead()
+    if not ui.rolling then return end
+    -- A book laid out before loads its styles with it from crengine's cache: nothing to gain, and
+    -- reading the stylesheets out of the EPUB would only slow its opening down.
+    local cache = ui.doc_settings:readSetting("cache_file_path")
+    if cache and lfs.attributes(cache, "mode") == "file" then return end
+    Layout.applyBeforeRender(ui)
 end
 
 function Reader.beforeRender(ui)
@@ -209,6 +227,11 @@ function Reader.onReaderReady(ui)
         if ui.document then ui.document:enablePartialRerendering(false) end
     end)
     require("lexeme/locations").openWhereAmazonLeftOff(ui)
+    -- Where the book opened is its reading spot, for "Back to loc …" (lexeme/backstack.lua); after
+    -- the tick on which it may move to where Amazon's reader left the book.
+    UIManager:nextTick(function()
+        UIManager:nextTick(function() require("lexeme/backstack").start(ui) end)
+    end)
 end
 
 return Reader

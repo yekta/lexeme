@@ -11,7 +11,7 @@ export function SessionRow({ session, bookTitle }: { session: TReadingSession; b
   const { unit } = usePositionUnit();
   const amount =
     unit === "location" && session.locations != null
-      ? `${formatLocation(session.locations)} ${session.locations === 1 ? "location" : "locations"}`
+      ? `${formatLocation(session.locations)} loc`
       : `${session.pages} ${session.pages === 1 ? "page" : "pages"}`;
   return (
     <div className="flex items-center gap-3 px-4 py-3">

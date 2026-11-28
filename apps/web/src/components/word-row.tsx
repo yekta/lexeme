@@ -1,4 +1,3 @@
-import { formatDistanceToNowStrict } from "date-fns";
 import { useState } from "react";
 
 import { Plus } from "lucide-react";
@@ -7,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { WordCardForm } from "@/components/word-card-form";
 import type { TLookup } from "@/hooks/data/use-reading";
+import { formatAgo } from "@/lib/relative-day";
 
 /** The word in bold inside the sentence it was read in. */
 function WordInContext({ word, context }: { word: string; context?: string | null }) {
@@ -34,7 +34,7 @@ export function WordRow({ lookup, bookTitle, isCard }: { lookup: TLookup; bookTi
             <span className="text-[11px] rounded-full border px-1.5 py-px text-muted-foreground">Card</span>
           )}
           <span className="ml-auto text-xs text-muted-foreground shrink-0">
-            {formatDistanceToNowStrict(lookup.looked_up_at, { addSuffix: true })}
+            {formatAgo(lookup.looked_up_at)}
           </span>
           {isCard ? (
             <span className="size-9 -my-2 -mr-2.5 shrink-0" />

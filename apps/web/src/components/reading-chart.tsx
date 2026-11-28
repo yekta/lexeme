@@ -21,7 +21,7 @@ export function ReadingChart({ days, isPlaceholder }: { days: TReadingDay[]; isP
     <div className="rounded-xl border bg-card px-4 py-3.5 flex flex-col gap-2">
       <div className="h-4 mb-2 flex items-start text-xs text-muted-foreground">
         <span className="group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-          {isPlaceholder ? "Most: 0 min" : peak && peak.seconds > 0 ? `Most: ${formatReadingTime(peak.seconds)}` : "No reading yet"}
+          {isPlaceholder ? "Most: 0m" : peak && peak.seconds > 0 ? `Most: ${formatReadingTime(peak.seconds)}` : "No reading yet"}
         </span>
       </div>
       {isPlaceholder ? (

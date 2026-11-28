@@ -1,15 +1,15 @@
 --[[
-When you read, by hour of the day, counted on this Kindle: KOReader's reading plus the
-Amazon reader's history when it's imported. Home's stats open it.
+When you read, by hour of the day: Lexeme's count across every reader while an account is
+connected, otherwise this Kindle's (KOReader's reading plus the Amazon reader's history
+when it's imported). Home's Today opens it.
 ]]
 local UIManager = require("ui/uimanager")
 
 local D = require("lexeme/draw")
-local Status = require("lexeme/status")
+local StatsPage = require("lexeme/stats_page")
 local Streak = require("lexeme/streak")
-local View = require("lexeme/view")
 
-local StatsScreen = View:extend{}
+local StatsScreen = StatsPage:extend{}
 
 local RANGES = {
     { label = "7 days", days = 7 },
@@ -17,10 +17,7 @@ local RANGES = {
     { label = "Year", days = 365 },
     { label = "All time" },
 }
-local CHIPS = { top = 252, h = 78, pad = 33, gap = 15, baseline = 50 }
 local CHART = { top = 700, bottom = 1420, gap = 10 }
-local NOTE = "Counted on this Kindle, with your Amazon history if it's imported. A day counts once you've read "
-    .. "5 minutes in it."
 
 local selected = 2
 
@@ -39,55 +36,20 @@ local function tickLabel(hour)
     return hourLabel(hour)
 end
 
-function StatsScreen:init()
-    View.init(self)
-    self.results = {}
-end
-
-function StatsScreen:result()
-    if not self.results[selected] then self.results[selected] = Streak.hours(RANGES[selected].days) end
-    return self.results[selected]
-end
-
-function StatsScreen:onSwipe(direction)
-    if direction == "east" then self:close("flashui") end
-end
-
 function StatsScreen:render(bb, x, y, w, h)
-    Status.paint(self, bb, x, y, w)
-    D.icon(bb, "arrow-left", x + D.s(30), y + D.s(131), D.s(53), D.s(53))
-    self:pressable(x, y + D.s(100), D.s(120), D.s(112), function() self:close("flashui") end,
-        { x = x + D.s(7), y = y + D.s(108), w = D.s(101), h = D.s(101) })
-    D.text(bb, x + D.s(139), y + D.s(168), D.face("bold", 34), "Reading by Hour")
-    D.rect(bb, x, y + D.s(212), w, D.s(4), D.gray(170))
-    self:paintChips(bb, x, y)
-    local result = self:result()
+    self:paintHeader(bb, x, y, w, "Reading by Hour")
+    local labels = {}
+    for i, range in ipairs(RANGES) do labels[i] = range.label end
+    self:paintChips(bb, x, y, labels, selected, function(i) selected = i end)
+    local days = RANGES[selected].days
+    local result, is_lexeme = self:load("hours_" .. selected,
+        function() return Streak.fetchHours(days) end,
+        function() return Streak.keptHours(days) end,
+        function() return Streak.hours(days) end)
+    if not result then return self:paintLoading(bb, x, y, w) end
     self:paintSummary(bb, x, y, w, result)
     self:paintChart(bb, x, y, w, result)
-    local face = D.face("regular", 26)
-    for i, line in ipairs(D.wrap(face, NOTE, w - D.s(72), 2)) do
-        D.text(bb, x + D.s(36), y + h - D.s(110) + (i - 1) * D.s(38), face, line, D.gray(102))
-    end
-end
-
-function StatsScreen:paintChips(bb, x, y)
-    local face = D.face("regular", 32)
-    local chip_x, top, chip_h = x + D.s(36), y + D.s(CHIPS.top), D.s(CHIPS.h)
-    for i, range in ipairs(RANGES) do
-        local chip_w = D.width(face, range.label) + 2 * D.s(CHIPS.pad)
-        if i == selected then
-            D.roundRect(bb, chip_x, top, chip_w, chip_h, D.BLACK, math.floor(chip_h / 2))
-        else
-            D.border(bb, chip_x, top, chip_w, chip_h, D.s(2), D.BLACK, math.floor(chip_h / 2))
-        end
-        D.text(bb, chip_x + D.s(CHIPS.pad), top + D.s(CHIPS.baseline), face, range.label,
-            i == selected and D.WHITE or D.BLACK)
-        self:hit(chip_x, top, chip_w, chip_h, function()
-            selected = i
-            self:refresh("ui")
-        end)
-        chip_x = chip_x + chip_w + D.s(CHIPS.gap)
-    end
+    self:paintNote(bb, x, y, w, h, is_lexeme and StatsPage.LEXEME_NOTE or StatsPage.LOCAL_DAYS_NOTE)
 end
 
 function StatsScreen:paintSummary(bb, x, y, w, result)

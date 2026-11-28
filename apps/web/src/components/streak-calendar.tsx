@@ -62,7 +62,7 @@ export function StreakCalendar({
     <div className="rounded-xl border bg-card px-4 pt-3.5 flex flex-col gap-2 overflow-hidden">
       <div className="h-4 mb-1 flex items-start text-xs text-muted-foreground">
         <span className="group-data-placeholder:text-transparent group-data-placeholder:bg-muted-foreground/20 group-data-placeholder:animate-pulse group-data-placeholder:rounded group-data-placeholder:select-none">
-          {reached} {reached === 1 ? "day" : "days"} with {goalMinutes}+ min of reading
+          {reached} {reached === 1 ? "day" : "days"} with {goalMinutes}m+ of reading
         </span>
       </div>
       <div ref={scroller} className="overflow-x-auto -mx-4 pr-4 pb-3.5">

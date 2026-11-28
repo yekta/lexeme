@@ -1,6 +1,6 @@
 import type { TConnectedApp } from "@lexeme/contracts";
 import { createFileRoute } from "@tanstack/react-router";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { format } from "date-fns";
 import { BlocksIcon } from "lucide-react";
 
 import { CopyField } from "@/components/access/copy-field";
@@ -25,6 +25,7 @@ import { LoadError } from "@/components/load-error";
 import { useConnectedApps, useRevokeConnectedApp } from "@/hooks/data/use-connected-apps";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { publicApiOrigin } from "@/lib/api";
+import { formatAgo } from "@/lib/relative-day";
 
 export const Route = createFileRoute("/settings/connected-apps/")({
   component: ConnectedAppsPage,
@@ -111,7 +112,7 @@ function ConnectedAppList({
           meta={
             <>
               {app.last_used_at
-                ? `Last used ${formatDistanceToNowStrict(new Date(app.last_used_at), { addSuffix: true })}`
+                ? `Last used ${formatAgo(app.last_used_at)}`
                 : "Never used"}{" "}
               <Dot />{" "}
               Connected {format(new Date(app.created_at), "MMM d, yyyy")}

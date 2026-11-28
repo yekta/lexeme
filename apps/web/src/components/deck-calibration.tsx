@@ -1,4 +1,3 @@
-import { formatDistanceToNowStrict } from "date-fns";
 import { useForm } from "@tanstack/react-form";
 import { LoaderIcon, RotateCcwIcon } from "lucide-react";
 import { z } from "zod";
@@ -33,6 +32,7 @@ import {
   memoryStatesFor,
   MIN_REVIEWS_TO_CALIBRATE,
 } from "@/lib/fsrs/fsrs-calibration";
+import { formatAgo } from "@/lib/relative-day";
 import { cn } from "@/lib/utils";
 
 export const RESET_CALIBRATION_CONFIRMATION = "I want to reset calibration";
@@ -121,11 +121,7 @@ function calibrationLabel(
   longTermReviews: number,
 ): string {
   if (profile.last_calibrated_at) {
-    const ago = formatDistanceToNowStrict(
-      new Date(profile.last_calibrated_at),
-      { addSuffix: true },
-    );
-    return `Calibrated ${ago}`;
+    return `Calibrated ${formatAgo(profile.last_calibrated_at)}`;
   }
   return longTermReviews < MIN_REVIEWS_TO_CALIBRATE
     ? "Not enough data for calibration"

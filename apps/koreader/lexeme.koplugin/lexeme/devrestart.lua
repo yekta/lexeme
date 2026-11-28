@@ -9,7 +9,9 @@ fail to read the frontlight or battery, or take the Kindle down with it.
 
 While stay-awake exists there, the Kindle doesn't sleep, so it stays on SSH: powerd's screensaver
 timer is held off, and so is KOReader's own auto-suspend, which on a Kindle presses the power
-button and so ignores powerd's hold. Deleting the file lets both run again.
+button and so ignores powerd's hold. Deleting the file lets both run again. As with KOReader's Keep
+alive, PluginShare.keepalive is set too: auto-suspend then stops resetting powerd's screensaver
+timer, which with the screensaver held off blocked KOReader for good in powerd's reply.
 ]]
 local PluginShare = require("pluginshare")
 local UIManager = require("ui/uimanager")
@@ -29,6 +31,7 @@ local function stayAwake(on)
     if on == awake then return end
     awake = on
     PluginShare.pause_auto_suspend = on
+    PluginShare.keepalive = on
     os.execute("lipc-set-prop com.lab126.powerd preventScreenSaver " .. (on and 1 or 0))
 end
 

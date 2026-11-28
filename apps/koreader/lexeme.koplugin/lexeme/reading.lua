@@ -343,6 +343,21 @@ function Reading.snapshot(since)
         keys[book.key] = located[book.key] or true
         key_by_title[book.title] = book.key
     end
+    -- Books read only in Amazon's reader or apps, from the imported history.
+    for _, book in ipairs(require("lexeme/amazon_history").books()) do
+        if not keys[book.key] then
+            keys[book.key] = true
+            table.insert(books, {
+                id = Reading.stableId("book:" .. book.key),
+                key = book.key,
+                title = book.title,
+                authors = book.authors,
+                status = book.finished_at and "finished" or "reading",
+                last_read_at = book.last_read_at * 1000,
+                finished_at = book.finished_at and book.finished_at * 1000 or nil,
+            })
+        end
+    end
     local recent = math.max(0, since - 6 * 3600)
     local removed = Reading.removedBooks(keys)
     local removed_keys = {}

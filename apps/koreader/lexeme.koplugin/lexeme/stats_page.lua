@@ -15,7 +15,7 @@ local View = require("lexeme/view")
 local StatsPage = View:extend{}
 
 StatsPage.LEXEME_NOTE = "Counted in Lexeme, across all your readers."
-StatsPage.LOCAL_NOTE = "Counted on this Kindle, with your Amazon history if it's imported."
+StatsPage.LOCAL_NOTE = "Counted on this Kindle, with any Amazon history you imported."
 StatsPage.LOCAL_DAYS_NOTE = string.format("%s A day counts once you've read %d minutes in it.", StatsPage.LOCAL_NOTE,
     math.floor(Streak.MIN_DAY_SECONDS / 60))
 

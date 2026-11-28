@@ -2,7 +2,7 @@
 What this device had when it last synced: each book's highlight ids, every looked-up
 word's id and how many page visits each book had. Compared with what it has now, it
 tells Lexeme what was deleted here since. Only what KOReader recorded is compared, so
-what came from Amazon's reader is never taken for deleted.
+highlights and words from Amazon's reader are never taken for deleted.
 ]]
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
@@ -55,9 +55,9 @@ function Sent.addDeleted(snapshot, outgoing)
     -- A book whose earlier page visits number fewer than they did lost some: send all it has left.
     -- An empty list is left out, which Lexeme reads as none.
     outgoing.book_page_reads = {}
-    for key in pairs(now.highlights) do
-        local had = (before.page_reads or {})[key]
-        if had and Reading.pageReadsUpTo(key, had.last) < had.count then
+    -- Any book that had page visits, so one whose imported visits moved to another book is told too.
+    for key, had in pairs(before.page_reads or {}) do
+        if Reading.pageReadsUpTo(key, had.last) < had.count then
             local ids = pageReadIds(key)
             table.insert(outgoing.book_page_reads, { book_key = key, page_read_ids = #ids > 0 and ids or nil })
         end

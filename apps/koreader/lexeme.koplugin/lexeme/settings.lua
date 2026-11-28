@@ -210,9 +210,33 @@ function Settings:readingPage()
                         self:refresh()
                     end,
                 },
+                {
+                    title = "Import Amazon reading history",
+                    subtitle = "Count your reading in Amazon's reader and apps. Copy Kindle.zip from Amazon's "
+                        .. "\"Request your data\" to this Kindle first.",
+                    tap = function() self:importAmazonHistory() end,
+                },
             }
         end,
     }
+end
+
+function Settings:importAmazonHistory()
+    local AmazonHistory = require("lexeme/amazon_history")
+    local Books = require("lexeme/books")
+    local Toast = require("lexeme/toast")
+    local path = AmazonHistory.findExport(Books.homeDir())
+    if not path then return Toast.show("Copy Kindle.zip to this Kindle first.") end
+    local done = Toast.busy("Importing your Amazon history…")
+    UIManager:nextTick(function()
+        local result, failure = AmazonHistory.import(path, Books.homeDir())
+        done()
+        if not result then return Toast.show(failure) end
+        local Sync = require("lexeme/sync")
+        Toast.show(string.format("Imported %s of reading in %d books.",
+            require("lexeme/streak").readingTime(result.seconds), result.books))
+        if Sync.isConnected() then Sync.soon() end
+    end)
 end
 
 function Settings:integrationsPage()
@@ -325,7 +349,7 @@ function Settings:lexemePage()
                 },
                 self:highlightsRow(),
                 {
-                    title = "Import Kindle history",
+                    title = "Send from Amazon's reader",
                     subtitle = Sync.sendsHighlights()
                         and "Send the words you looked up, your highlights and the books you read in Amazon's reader."
                         or "Send the words you looked up and the books you read in Amazon's reader.",
@@ -382,7 +406,7 @@ end
 
 function Settings:importHistory()
     local Toast = require("lexeme/toast")
-    Toast.show("Reading your Kindle history…")
+    Toast.show("Reading what Amazon's reader kept…")
     UIManager:nextTick(function()
         local ok, result = pcall(require("lexeme/kindle_import").queue)
         if not ok then

@@ -212,11 +212,18 @@ KOReader's lookup history, as before.
 
 ### Amazon reading history
 
-`scripts/amazon_history.py` reads the Kindle part of Amazon's "Request your
-data" export. Written as `.json`, it's for Lexeme's `import-reading`, so the
-sessions count in Lexeme's stats everywhere; written as `.sqlite3`
-(`lexeme_history.sqlite3` in `koreader/settings/`), it feeds the stats Home
-counts on a Kindle without a Lexeme account.
+Settings > Reading options > Import Amazon reading history reads `Kindle.zip`
+from Amazon's "Request your data" export, copied to the Kindle's top folder
+(`lexeme/amazon_history.lua`). Its sessions, from every device on the account,
+go into KOReader's `statistics.sqlite3` as page visits: Amazon keeps no pages,
+so each book's sessions are spread over its pages in order. A book with a
+converted copy goes on the copy; any other is kept under `kindle:` and its
+Amazon id, as the Kindle import keys it. The stats count it like any reading,
+and the next sync sends everything again, so it reaches Lexeme too. Importing
+again replaces the last import (`lexeme_amazon_book` and `lexeme_amazon_page`
+record what it wrote). `scripts/import-amazon-history.sh Kindle.zip` does the
+same over SSH, with KOReader stopped. Dev mode's `off` undoes an import made
+while it's on.
 
 ### Rules that keep the Kindle alive
 

@@ -153,6 +153,17 @@ function Settings:readingPage()
                     end,
                 },
                 {
+                    title = "Progress by location",
+                    subtitle = "How far you are in a book, as Amazon's reader counts it: by location, "
+                        .. "not by pages. The same however a book is laid out.",
+                    toggle = G_reader_settings:isTrue("lexeme_progress_by_location"),
+                    tap = function()
+                        local on = not G_reader_settings:isTrue("lexeme_progress_by_location")
+                        G_reader_settings:saveSetting("lexeme_progress_by_location", on)
+                        self:refresh()
+                    end,
+                },
+                {
                     title = "Publisher font",
                     subtitle = "Use the fonts that come with a book.",
                     toggle = (G_reader_settings:readSetting("copt_embedded_fonts") or 1) == 1,

@@ -125,6 +125,7 @@ function Reading.books()
                 located[key] = {
                     total = tonumber(settings:readSetting("lexeme_locations")),
                     pages = settings:readSetting("lexeme_page_locations"),
+                    file = file,
                 }
             end
         end
@@ -191,7 +192,7 @@ function Reading.pageReads(since, known_keys)
             local total_pages = tonumber(row[5]) or 0
             local location, end_location
             if type(book) == "table" then
-                location, end_location = Locations.ofPageRead(book.pages, book.total, page, total_pages)
+                location, end_location = Locations.ofPageRead(book, page, total_pages)
             end
             table.insert(reads, {
                 id = Reading.stableId("page:" .. key .. ":" .. page .. ":" .. start),

@@ -239,7 +239,8 @@ end
 local function readMarksFile(file)
     local text = readFile(besideSettings(file, MARKS_FILE))
     if not text or not text:match("^lexeme%-kindle%-locations 1\n") then return nil end
-    return { count = tonumber(text:match("\ncount (%d+)")), moved = " " .. (text:match("\nmoved ([^\n]*)") or "") .. " ",
+    return { count = tonumber(text:match("\ncount (%d+)")),
+        moved = " " .. (text:match("\nmoved ([^\n]*)") or "") .. " ",
         text = text }
 end
 
@@ -333,7 +334,8 @@ local function amazonStarts(file, copy)
             steps[i] = start - previous
             previous = start
         end
-        writeFile(path, "lexeme-amazon-location-map 1\ncopy " .. stamp .. "\nstarts " .. table.concat(steps, " ") .. "\n")
+        writeFile(path,
+            "lexeme-amazon-location-map 1\ncopy " .. stamp .. "\nstarts " .. table.concat(steps, " ") .. "\n")
     end
     return starts
 end
@@ -466,7 +468,7 @@ function Locations.goTo(ui, location)
     local entry, document = book(ui), ui.document
     local pages = document:getPageCount()
     location = math.max(1, math.min(location, entry.total or location))
-    local page = 1
+    local page
     if entry.index then
         -- The page of its mark, or in a long book that marks every few locations, one a little after.
         local at = markOfLocation(entry, document, location)
@@ -523,8 +525,37 @@ function Locations.openWhereAmazonLeftOff(ui)
     end)
 end
 
--- Where each page read starts and where the next one does, keyed by the page count of the layout it was read in.
+--[[
+Where each page read starts and where the next one does, in locations, by the page count of the
+layout it was read in. A page turned to is noted in the book's settings as two xpointers until the
+book's locations are next worked out; then its locations are added to a file beside the settings, a
+line each: the layout, the page, the two locations, tab-separated. Kept in the settings, they grew
+with every page read, and KOReader rewrites the settings whole at every close, sleep and periodic save.
+]]
 local PAGE_XPOINTERS, PAGE_LOCATIONS = "lexeme_page_xpointers", "lexeme_page_locations"
+local PAGES_FILE = "lexeme_page_locations.tsv"
+-- An open book's pages located, by document, once its file has been read.
+local pages_located = setmetatable({}, { __mode = "k" })
+
+local function readPagesFile(file, into)
+    into = into or {}
+    local f = io.open(besideSettings(file, PAGES_FILE), "rb")
+    if not f then return into end
+    for line in f:lines() do
+        local layout, page, start, stop = line:match("^(%d+)\t(%d+)\t(%d+)\t(%d+)")
+        if layout then
+            into[layout] = into[layout] or {}
+            into[layout][tonumber(page)] = { tonumber(start), tonumber(stop) }
+        end
+    end
+    f:close()
+    return into
+end
+
+local function appendFile(path, data)
+    local f = io.open(path, "ab")
+    return f and f:write(data) and f:close() or false
+end
 
 -- Notes where a page turned to starts; it becomes locations when the book's locations are next worked out.
 function Locations.notePage(ui, page)
@@ -532,7 +563,7 @@ function Locations.notePage(ui, page)
     local document, settings = ui.document, ui.doc_settings
     local count = document:getPageCount()
     local layout = tostring(count)
-    local located = settings:readSetting(PAGE_LOCATIONS)
+    local located = pages_located[document]
     if located and located[layout] and located[layout][page] then return end
     local noted = settings:readSetting(PAGE_XPOINTERS) or {}
     noted[layout] = noted[layout] or {}
@@ -542,8 +573,9 @@ function Locations.notePage(ui, page)
     settings:saveSetting(PAGE_XPOINTERS, noted)
 end
 
--- The places a book's settings still need located: its highlights and bookmarks, and the pages noted.
-local function unlocated(settings, annotations)
+-- The places a book's settings still need located: its highlights and bookmarks, and the pages
+-- noted that `located` (pages located, by layout) doesn't have.
+local function unlocated(settings, annotations, located)
     local xpointers, seen = {}, {}
     local function add(xpointer)
         if xpointer and not seen[xpointer] then
@@ -554,10 +586,12 @@ local function unlocated(settings, annotations)
     for _, item in ipairs(annotations) do
         if not item.lexeme_location then add(annotationXPointer(item)) end
     end
-    for _, pages in pairs(settings:readSetting(PAGE_XPOINTERS) or {}) do
-        for _, page in pairs(pages) do
-            add(page[1])
-            add(page[2] or nil)
+    for layout, pages in pairs(settings:readSetting(PAGE_XPOINTERS) or {}) do
+        for page, xpointers_of in pairs(pages) do
+            if not (located and located[layout] and located[layout][page]) then
+                add(xpointers_of[1])
+                add(xpointers_of[2] or nil)
+            end
         end
     end
     return xpointers
@@ -571,23 +605,44 @@ local function locate(entry, document, xpointers)
     return found
 end
 
--- Saves what `found` says about the book's places, with its location count (false when it couldn't be measured).
-local function saveLocated(settings, annotations, found, total)
+-- Saves what `found` says about the places of the book at `file`, with its location count (false
+-- when it couldn't be measured). `located` is what its pages file has, read here when not given.
+local function saveLocated(file, settings, annotations, found, total, located)
     for _, item in ipairs(annotations) do
         local location = found[annotationXPointer(item) or ""]
         if not item.lexeme_location and location then item.lexeme_location = location end
     end
-    local located = settings:readSetting(PAGE_LOCATIONS) or {}
-    for layout, pages in pairs(settings:readSetting(PAGE_XPOINTERS) or {}) do
+    located = located or readPagesFile(file)
+    local lines = {}
+    local function add(layout, page, start, stop)
+        local known = located[layout] and located[layout][page]
+        if known and known[1] == start and known[2] == stop then return end
         located[layout] = located[layout] or {}
+        located[layout][page] = { start, stop }
+        lines[#lines + 1] = string.format("%s\t%d\t%d\t%d\n", layout, page, start, stop)
+    end
+    -- Pages located before the file existed, kept in the settings, move out to it.
+    for layout, pages in pairs(settings:readSetting(PAGE_LOCATIONS) or {}) do
+        for page, range in pairs(type(pages) == "table" and pages or {}) do
+            local start = type(range) == "table" and tonumber(range[1])
+            local stop = type(range) == "table" and tonumber(range[2])
+            if tonumber(layout) and tonumber(page) and start and stop then
+                add(tostring(layout), tonumber(page), start, stop)
+            end
+        end
+    end
+    for layout, pages in pairs(settings:readSetting(PAGE_XPOINTERS) or {}) do
         for page, xpointers in pairs(pages) do
             local start = found[xpointers[1]]
             local stop = xpointers[2] and found[xpointers[2]] or (total and total + 1)
-            if start and stop then located[layout][page] = { start, math.max(stop, start + 1) } end
+            if start and stop then add(layout, page, start, math.max(stop, start + 1)) end
         end
     end
-    settings:saveSetting(PAGE_LOCATIONS, located)
-    settings:delSetting(PAGE_XPOINTERS)
+    -- Without the file (the book's settings folder isn't made yet), the pages wait in the settings.
+    if #lines == 0 or appendFile(besideSettings(file, PAGES_FILE), table.concat(lines)) then
+        settings:delSetting(PAGE_LOCATIONS)
+        settings:delSetting(PAGE_XPOINTERS)
+    end
     settings:saveSetting("lexeme_locations", total or false)
 end
 
@@ -598,12 +653,18 @@ missing is worked out, so this costs little once done.
 ]]
 function Locations.record(ui)
     if not ui.rolling or not ui.annotation or not ui.document then return end
-    local settings = ui.doc_settings
+    local settings, document = ui.doc_settings, ui.document
     local annotations = ui.annotation.annotations or {}
-    local xpointers = unlocated(settings, annotations)
+    local located = pages_located[document]
+    if not located then
+        located = readPagesFile(document.file)
+        pages_located[document] = located
+    end
+    local xpointers = unlocated(settings, annotations, located)
     local entry = book(ui)
-    if #xpointers > 0 or settings:readSetting("lexeme_locations") ~= entry.total then
-        saveLocated(settings, annotations, locate(entry, ui.document, xpointers), entry.total)
+    if #xpointers > 0 or settings:readSetting("lexeme_locations") ~= entry.total
+            or settings:readSetting(PAGE_XPOINTERS) or settings:readSetting(PAGE_LOCATIONS) then
+        saveLocated(document.file, settings, annotations, locate(entry, document, xpointers), entry.total, located)
     end
     if entry.places_changed then
         entry.places_changed = nil
@@ -645,7 +706,8 @@ function Locations.recordClosedBooks(open_file)
     local DocumentRegistry = require("document/documentregistry")
     for _, history in ipairs(require("readhistory").hist) do
         local file = history.file
-        local size = file and file ~= open_file and lfs.attributes(file, "mode") == "file" and lfs.attributes(file, "size")
+        local size = file and file ~= open_file and lfs.attributes(file, "mode") == "file"
+            and lfs.attributes(file, "size")
         local provider = size and DocSettings:hasSidecarFile(file) and DocumentRegistry:getProvider(file)
         if provider and provider.provider == "crengine" then
             local settings = DocSettings:open(file)
@@ -667,7 +729,7 @@ function Locations.recordClosedBooks(open_file)
                     -- Read again: the book may have been opened and changed meanwhile.
                     settings = DocSettings:open(file)
                     local annotations = settings:readSetting("annotations") or {}
-                    saveLocated(settings, annotations, ok and found or {}, ok and total or nil)
+                    saveLocated(file, settings, annotations, ok and found or {}, ok and total or nil)
                     settings:saveSetting("annotations", annotations)
                     settings:flush()
                 end
@@ -676,10 +738,18 @@ function Locations.recordClosedBooks(open_file)
     end
 end
 
--- Where a page read lies in locations: as noted while reading, or else in proportion to the page's place in the book.
-function Locations.ofPageRead(located, total, page, total_pages)
-    local exact = located and located[tostring(total_pages)] and located[tostring(total_pages)][page]
+-- Where a page read lies in locations: as located while reading, or else in proportion to the
+-- page's place in the book. `known` is { file =, total = location count, pages = pages located by an
+-- earlier version, from its settings }; its pages file is read the first time it's needed.
+function Locations.ofPageRead(known, page, total_pages)
+    if known.file and not known.pages_read then
+        known.pages_read = true
+        known.pages = readPagesFile(known.file, type(known.pages) == "table" and known.pages or nil)
+    end
+    local layout = known.pages and known.pages[tostring(total_pages)]
+    local exact = layout and layout[page]
     if exact then return exact[1], exact[2] end
+    local total = known.total
     if not total or total_pages <= 0 or page < 1 then return end
     local start = math.floor((page - 1) / total_pages * total) + 1
     return start, math.max(start + 1, math.floor(page / total_pages * total) + 1)

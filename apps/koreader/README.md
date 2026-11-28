@@ -111,6 +111,12 @@ Amazon's map gives a paragraph's position past a block set inside it (a boxed
 line in a diary, say) as one position, though the block's text is read where it
 stands: `kfx.lua` counts that text, which Woolf's diaries have 121 of.
 
+The locations of the pages read are kept beside a book's settings, in
+`lexeme_page_locations.tsv` (a line per page: the layout's page count, the
+page, its first location and the next page's), added to as pages are located
+and read when syncing sends them. In the settings they grew with every page
+read, and KOReader rewrites those whole at every save.
+
 Syncing gives the books not open their location counts and highlights' and
 pages' locations, each book measured in a child process, never on the
 screen's thread. A converted book's count comes from its marks file without

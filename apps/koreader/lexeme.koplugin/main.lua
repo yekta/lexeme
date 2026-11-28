@@ -129,6 +129,12 @@ function Lexeme:onReaderReady()
     self.forgetOpening()
     Reader.onReaderReady(self.ui)
     require("lexeme/loading").close()
+    require("lexeme/cachesave").start(self.ui)
+end
+
+-- A book laid out again (a font change) has its cache written again while it's read.
+function Lexeme:onDocumentRerendered()
+    if self.ui.document then require("lexeme/cachesave").start(self.ui) end
 end
 
 -- Lexeme gets what's new whenever the Kindle comes online, a book is put down,
@@ -145,6 +151,7 @@ function Lexeme:onAnnotationsModified()
 end
 
 function Lexeme:onCloseDocument()
+    require("lexeme/cachesave").stop()
     require("lexeme/highlight_positions").save(self.ui)
     require("lexeme/sync").soon()
 end

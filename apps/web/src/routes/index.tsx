@@ -43,7 +43,6 @@ import { dataStateOf, mergeStates } from "@/lib/query-state";
 import { usePlaceholderPhase } from "@/lib/settle";
 import { cn } from "@/lib/utils";
 import { createFileRoute } from "@tanstack/react-router";
-import { formatDuration, intervalToDuration } from "date-fns";
 import { CloudOffIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -421,13 +420,19 @@ function TodayStatsFooter({
   );
 }
 
+/** "1h 5m 3s", "<1s". */
 function formatHumanDuration(totalMs: number): string {
-  const duration = intervalToDuration({ start: 0, end: Math.round(totalMs) });
-  const formatted = formatDuration(duration, {
-    format: ["hours", "minutes", "seconds"],
-    delimiter: ", ",
-  });
-  return formatted || "less than a second";
+  const totalSeconds = Math.floor(totalMs / 1000);
+  if (totalSeconds === 0) return "<1s";
+  const parts = [
+    [Math.floor(totalSeconds / 3600), "h"],
+    [Math.floor(totalSeconds / 60) % 60, "m"],
+    [totalSeconds % 60, "s"],
+  ] as const;
+  return parts
+    .filter(([value]) => value > 0)
+    .map(([value, unit]) => `${value}${unit}`)
+    .join(" ");
 }
 
 function formatSecondsPerCard(msPerCard: number): string {

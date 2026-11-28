@@ -1,7 +1,7 @@
 import { DEFAULT_ACCESS_ROLE, type TAccessRole } from "@lexeme/shared";
 import type { TApiKey } from "@lexeme/contracts";
 import { createFileRoute } from "@tanstack/react-router";
-import { addDays, format, formatDistanceToNowStrict } from "date-fns";
+import { addDays, format } from "date-fns";
 import { KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -40,6 +40,7 @@ import { Label } from "@/components/ui/label";
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from "@/hooks/data/use-api-keys";
 import useRedirectToSignInIfNecessary from "@/hooks/use-redirect-to-sign-in-if-necessary";
 import { publicApiOrigin } from "@/lib/api";
+import { formatAgo, formatSpan } from "@/lib/relative-day";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings/api-keys/")({
@@ -160,9 +161,9 @@ function ApiKeyMeta({ apiKey }: { apiKey: TApiKey }) {
     ? "Never expires"
     : isExpired
       ? "Expired"
-      : `Expires in ${formatDistanceToNowStrict(expiresAt)}`;
+      : `Expires in ${formatSpan(expiresAt.getTime() - Date.now())}`;
   const lastUsed = apiKey.last_used_at
-    ? `Last used ${formatDistanceToNowStrict(new Date(apiKey.last_used_at), { addSuffix: true })}`
+    ? `Last used ${formatAgo(apiKey.last_used_at)}`
     : "Never used";
 
   return (

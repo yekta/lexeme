@@ -10,6 +10,7 @@ import {
   streakEndingOn,
   formatReadingTime,
   lastDays,
+  readingByHour,
   readingDate,
   estimatedPageLocations,
   readingSessions,
@@ -89,10 +90,10 @@ test("the last days run oldest first and end today, with gaps as zero", () => {
 });
 
 test("reading time reads as hours and minutes", () => {
-  assert.equal(formatReadingTime(0), "0 min");
-  assert.equal(formatReadingTime(45 * 60), "45 min");
-  assert.equal(formatReadingTime(60 * 60), "1 h");
-  assert.equal(formatReadingTime(80 * 60 + 20), "1 h 20 min");
+  assert.equal(formatReadingTime(0), "0m");
+  assert.equal(formatReadingTime(45 * 60), "45m");
+  assert.equal(formatReadingTime(60 * 60), "1h");
+  assert.equal(formatReadingTime(80 * 60 + 20), "1h 20m");
 });
 
 const at = (hour: number, minute: number) => new Date(2026, 10, 23, hour, minute).getTime();
@@ -208,4 +209,35 @@ test("a page's estimated locations split the book's locations evenly across its 
   assert.deepEqual(estimatedPageLocations(200, 200, 2000), { location: 1991, end_location: 2001 });
   assert.deepEqual(estimatedPageLocations(3, 1000, 100), { location: 1, end_location: 2 });
   assert.equal(estimatedPageLocations(1, 0, 2000), null);
+});
+
+test("reading by hour splits a read across the hours it spans, on the device's clock", () => {
+  const at = (iso: string) => Date.parse(iso);
+  const result = readingByHour(
+    [
+      { started_at: at("2026-11-23T21:50:00Z"), seconds: 20 * 60 },
+      { started_at: at("2026-11-24T06:00:00Z"), seconds: 300 },
+    ],
+    180,
+  );
+  assert.equal(result.hours[0], 10 * 60);
+  assert.equal(result.hours[1], 10 * 60);
+  assert.equal(result.hours[9], 300);
+  assert.equal(result.total_seconds, 25 * 60);
+  assert.equal(result.reading_days, 1);
+});
+
+test("reading by hour leaves out the days before the range", () => {
+  const result = readingByHour(
+    [
+      { started_at: Date.parse("2026-11-20T10:00:00Z"), seconds: 600 },
+      { started_at: Date.parse("2026-11-23T10:00:00Z"), seconds: 120 },
+    ],
+    0,
+    0,
+    "2026-11-22",
+  );
+  assert.equal(result.total_seconds, 120);
+  assert.equal(result.reading_days, 1);
+  assert.equal(result.hours[10], 120);
 });

@@ -673,7 +673,7 @@ local function calendarLabel(days, goal_minutes)
         if day.seconds >= least then read = read + 1 end
     end
     if heatmap then return count(read, "reading day", "reading days") .. " in the last year" end
-    return string.format("%s with %d+ min of reading", count(read, "day", "days"), goal_minutes)
+    return string.format("%s with %dm+ of reading", count(read, "day", "days"), goal_minutes)
 end
 
 -- How tall the calendar is, from the top of its label's ink to the bottom of its days.

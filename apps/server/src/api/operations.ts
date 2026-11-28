@@ -27,6 +27,7 @@ import {
   dbRowToFSRSCard,
   formatInterval,
   fsrsCardToDbRow,
+  readingByHour,
   readingSessions,
   reviewLogToDbRow,
   secondsByDayAtOffset,
@@ -701,6 +702,36 @@ export const operations: TOperation[] = [
         finished_this_year: finishedThisYear,
         days: daysEndingOn(totals, today, input.days),
       };
+    },
+  }),
+
+  defineOperation({
+    name: "get-reading-hours",
+    title: "Get reading by hour",
+    description:
+      "When in the day the user reads: seconds read in each hour (hours[0] is midnight to 1 AM) over the last days, or all time without days, with the time read and the reading days in that range. Hours and days are on the clock utc_offset_minutes ahead of UTC.",
+    role: "viewer",
+    method: "GET",
+    path: "/reading/hours",
+    input: z.object({
+      utc_offset_minutes: z.coerce.number().int().min(-720).max(840).default(0),
+      days: z.coerce.number().int().min(1).max(3660).optional(),
+    }),
+    run: async (caller, input) => {
+      const [goal] = await db.select().from(readingGoals).where(eq(readingGoals.user_id, caller.userId));
+      const dayStartsAt = goal?.day_starts_at ?? DEFAULT_DAY_STARTS_AT;
+      const reads = await db
+        .select({ started_at: pageReads.started_at, seconds: pageReads.seconds })
+        .from(pageReads)
+        .where(eq(pageReads.user_id, caller.userId));
+      const today = dayKeyAtOffset(Date.now(), input.utc_offset_minutes, dayStartsAt);
+      const sinceDay = input.days ? daysEndingOn(new Map(), today, input.days)[0]?.day : undefined;
+      return readingByHour(
+        reads.map((read) => ({ started_at: read.started_at.getTime(), seconds: read.seconds })),
+        input.utc_offset_minutes,
+        dayStartsAt,
+        sinceDay,
+      );
     },
   }),
 

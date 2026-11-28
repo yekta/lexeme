@@ -1,7 +1,8 @@
 --[[
 The reading Home shows: the last year of days, the streak, all the time read and the
-books finished. `summary` is Lexeme's count across every reader, fetched at each sync;
-`localSummary` and `hours` count this Kindle alone and need no account.
+books finished. `summary` is Lexeme's count across every reader, fetched at each sync,
+and `fetchHours` its reading by hour; `localSummary` and `hours` count this Kindle alone
+and need no account.
 ]]
 local DataStorage = require("datastorage")
 local LuaSettings = require("luasettings")
@@ -47,6 +48,32 @@ function Streak.refresh()
     })
     settings:flush()
     return true
+end
+
+local function hoursKey(days)
+    return tostring(days or "all")
+end
+
+-- Lexeme's reading by hour over the last `days` days, or all time when nil, in `Streak.hours`'
+-- shape, kept for when it can't be fetched. Nil when Lexeme didn't answer.
+function Streak.fetchHours(days)
+    local ok, body = Api.get("/api/v1/reading/hours?utc_offset_minutes=" .. utcOffsetMinutes()
+        .. (days and ("&days=" .. days) or ""))
+    if not ok or type(body) ~= "table" or type(body.hours) ~= "table" or #body.hours ~= 24 then return nil end
+    local result = { hours = {}, total = tonumber(body.total_seconds) or 0, days = tonumber(body.reading_days) or 0 }
+    for h = 1, 24 do result.hours[h] = tonumber(body.hours[h]) or 0 end
+    local settings = store()
+    local kept = settings:readSetting("hours") or {}
+    kept[hoursKey(days)] = result
+    settings:saveSetting("hours", kept)
+    settings:flush()
+    return result
+end
+
+-- What `fetchHours` last got for `days`, or nil.
+function Streak.keptHours(days)
+    local kept = store():readSetting("hours")
+    return kept and kept[hoursKey(days)]
 end
 
 local function dayKey(time, day_starts_at)
@@ -133,13 +160,13 @@ function Streak.summary()
     }
 end
 
--- "1 h 20 min", "2 h", "45 min", as Lexeme writes reading time.
+-- "1h 20m", "2h", "45m", as Lexeme writes reading time.
 function Streak.readingTime(seconds)
     local minutes = math.floor(seconds / 60 + 0.5)
     local hours, rest = math.floor(minutes / 60), minutes % 60
-    if hours == 0 then return string.format("%d min", minutes) end
-    if rest == 0 then return string.format("%d h", hours) end
-    return string.format("%d h %d min", hours, rest)
+    if hours == 0 then return string.format("%dm", minutes) end
+    if rest == 0 then return string.format("%dh", hours) end
+    return string.format("%dh %dm", hours, rest)
 end
 
 -- Local stats ------------------------------------------------------------------

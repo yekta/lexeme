@@ -205,6 +205,42 @@ export function daysEndingOn(totals: Map<string, number>, lastDay: string, count
   });
 }
 
+const HOUR_MS = 3_600_000;
+
+export type TReadingByHour = { hours: number[]; total_seconds: number; reading_days: number };
+
+/**
+ * Seconds read in each hour of the day (`hours[0]` is midnight to 1 AM) on clocks
+ * `utcOffsetMinutes` ahead of UTC, from the reading day `sinceDay` on, or all time.
+ * A read running past the hour is split between the hours.
+ */
+export function readingByHour(
+  reads: readonly { started_at: number; seconds: number }[],
+  utcOffsetMinutes: number,
+  dayStartsAt = DEFAULT_DAY_STARTS_AT,
+  sinceDay?: string,
+): TReadingByHour {
+  const hours = Array.from({ length: 24 }, () => 0);
+  const days = new Set<string>();
+  let total = 0;
+  for (const read of reads) {
+    const day = dayKeyAtOffset(read.started_at, utcOffsetMinutes, dayStartsAt);
+    if (sinceDay && day < sinceDay) continue;
+    if (read.seconds <= 0) continue;
+    days.add(day);
+    total += read.seconds;
+    let at = read.started_at + utcOffsetMinutes * 60_000;
+    let left = read.seconds * 1000;
+    while (left > 0) {
+      const part = Math.min(left, HOUR_MS - (((at % HOUR_MS) + HOUR_MS) % HOUR_MS));
+      hours[new Date(at).getUTCHours()] += part / 1000;
+      at += part;
+      left -= part;
+    }
+  }
+  return { hours, total_seconds: total, reading_days: days.size };
+}
+
 /** `readingStreak` for days keyed by `dayKeyAtOffset`, ending on `today`. */
 export function streakEndingOn(totals: Map<string, number>, today: string, goalSeconds = 1): number {
   const reached = (day: string) => (totals.get(day) ?? 0) >= goalSeconds;
@@ -217,11 +253,11 @@ export function streakEndingOn(totals: Map<string, number>, today: string, goalS
   return streak;
 }
 
-/** "1 h 20 min", "45 min", "0 min". */
+/** "1h 20m", "45m", "0m". */
 export function formatReadingTime(seconds: number): string {
   const minutes = Math.round(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  if (hours === 0) return `${minutes} min`;
+  if (hours === 0) return `${minutes}m`;
   const rest = minutes % 60;
-  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }

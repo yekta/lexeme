@@ -1,6 +1,5 @@
 import { MAX_SENT_BOOK_BYTES, SENDABLE_BOOK_EXTENSIONS } from "@lexeme/contracts";
 import { createFileRoute } from "@tanstack/react-router";
-import { formatDistanceToNowStrict } from "date-fns";
 import { BookUpIcon, CheckIcon, LoaderCircleIcon } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
@@ -14,6 +13,7 @@ import { RequireIdentity } from "@/components/require-identity";
 import { SectionTitle } from "@/components/section-title";
 import { SettlingSkeleton } from "@/components/settling-skeleton";
 import { useSendBook, useSentBooks, useUnsendBook, type TSentBook } from "@/hooks/data/use-sent-books";
+import { formatAgo } from "@/lib/relative-day";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/send/")({
@@ -152,7 +152,7 @@ function SentBookRow({ book, onRemove }: { book: TSentBook; onRemove: () => Prom
       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
         <span className="font-medium truncate">{book.title}</span>
         <span className="text-xs text-muted-foreground">
-          {formatSize(book.size_bytes)} <Dot /> sent {formatDistanceToNowStrict(book.created_at, { addSuffix: true })}
+          {formatSize(book.size_bytes)} <Dot /> sent {formatAgo(book.created_at)}
         </span>
       </div>
       <span

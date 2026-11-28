@@ -1,4 +1,5 @@
--- Highlight positions and the pages of annotations, kept per layout and saved when a book closes.
+-- Highlight positions, the pages of annotations and the Kindle locations of pages, kept per layout
+-- and saved when a book closes.
 -- KOReader otherwise looks up every highlight before the page on each paint (half a second with a
 -- few hundred highlights), and the pages of a dozen or more annotations, to find the page's
 -- bookmark, each time the page changes: 80 ms each time the book opens.
@@ -38,7 +39,11 @@ local function load(key)
     for xp, page in pairs(type(saved.pages) == "table" and saved.pages or {}) do
         if type(xp) == "string" and type(page) == "number" then pages[xp] = page end
     end
-    return { key = key, pos = pos, pages = pages }
+    local locations = {}
+    for xp, label in pairs(type(saved.locations) == "table" and saved.locations or {}) do
+        if type(xp) == "string" and (type(label) == "number" or label == false) then locations[xp] = label end
+    end
+    return { key = key, pos = pos, pages = pages, locations = locations }
 end
 
 function Positions.install(ui)
@@ -53,11 +58,12 @@ function Positions.install(ui)
         if not key then return nil end
         local memo = view.lexeme_positions
         if memo and memo.key == key then return memo end
-        memo = may_load and load(key) or { key = key, pos = {}, pages = {} }
+        memo = may_load and load(key) or { key = key, pos = {}, pages = {}, locations = {} }
         may_load = false
         view.lexeme_positions = memo
         return memo
     end
+    view.lexeme_positions_current = current
 
     -- The page an xpointer is on is the layout's too.
     local get_page = document.getPageFromXPointer
@@ -112,12 +118,19 @@ function Positions.install(ui)
     end
 end
 
+-- The memo for the book's layout now, which other modules can keep what depends on the layout
+-- in (Lexeme's locations: memo.locations); nil until the book is laid out.
+function Positions.memo(ui)
+    local current = ui.view and ui.view.lexeme_positions_current
+    return current and current() or nil
+end
+
 local function write(memo)
     if lfs.attributes(DIR, "mode") ~= "directory" and not lfs.mkdir(DIR) then return end
     local path = savedPath(memo.key)
     local file = io.open(path .. ".part", "w")
     if not file then return end
-    file:write("return ", dump({ key = memo.key, pos = memo.pos, pages = memo.pages }), "\n")
+    file:write("return ", dump({ key = memo.key, pos = memo.pos, pages = memo.pages, locations = memo.locations }), "\n")
     file:close()
     if not os.rename(path .. ".part", path) then
         logger.warn("Lexeme: can't save highlight positions to", path)
@@ -132,7 +145,8 @@ function Positions.save(ui)
     local xp = ui.rolling and ui.rolling.xpointer
     if type(xp) == "string" and ui.document then pcall(ui.document.getPageFromXPointer, ui.document, xp) end
     local memo = ui.view and ui.view.lexeme_positions
-    if not (memo and memo.changed and memo.key and (next(memo.pos) or next(memo.pages))) then return end
+    if not (memo and memo.changed and memo.key
+        and (next(memo.pos) or next(memo.pages) or next(memo.locations or {}))) then return end
     memo.changed = nil
     UIManager:scheduleIn(1, function() write(memo) end)
 end

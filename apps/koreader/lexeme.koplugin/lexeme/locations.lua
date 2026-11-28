@@ -397,17 +397,24 @@ function Locations.at(ui, xp)
     local book = ui.document and books[ui.document]
     if not book or type(xp) ~= "string" then return nil end
     if book.how == "anchors" then
-        -- Which anchors share a line with xp depends on the layout.
-        local layout = ui.document:getPageCount()
-        if book.memo_layout ~= layout then
-            book.memo, book.memo_layout = {}, layout
+        -- Which anchors share a line with xp depends on the layout: the labels found are kept
+        -- with the layout's highlight positions, from one opening to the next.
+        local layout_memo = require("lexeme/highlight_positions").memo(ui)
+        local memo = layout_memo and layout_memo.locations
+        if not memo then
+            local layout = ui.document:getPageCount()
+            if book.memo_layout ~= layout then
+                book.memo, book.memo_layout = {}, layout
+            end
+            memo = book.memo
         end
-        local label = book.memo[xp]
+        local label = memo[xp]
         if label == nil then
             local ok, found = pcall(anchorLabelAt, ui.document, book.index, xp)
             label = ok and found or false
             if not ok then logger.warn("Lexeme: location lookup", found) end
-            book.memo[xp] = label
+            memo[xp] = label
+            if layout_memo and ok then layout_memo.changed = true end
         end
         return label and labelToLocation(book.count, book.labels, label) or nil
     elseif book.how == "height" then

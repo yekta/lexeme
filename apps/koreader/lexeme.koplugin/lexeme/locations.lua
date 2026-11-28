@@ -810,8 +810,17 @@ end
 
 -- Whether the book has location marks: a converted book, whose print pages (if it has any) stand
 -- for its pages, rather than KOReader's.
+-- Asked at every paint of the page number: a book without marks isn't measured for it.
+local unmarked = setmetatable({}, { __mode = "k" })
+
 function Locations.replacesPages(ui)
-    return ui.rolling ~= nil and ui.document ~= nil and book(ui).index ~= nil
+    local document = ui.document
+    if not (ui.rolling and document) or unmarked[document] then return false end
+    if not books[document] and not readIndex(document) then
+        unmarked[document] = true
+        return false
+    end
+    return book(ui).index ~= nil
 end
 
 -- The print edition's page at the current page, from a converted book's print pages, and the last
